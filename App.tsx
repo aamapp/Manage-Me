@@ -1,19 +1,29 @@
 
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Layout } from './components/Layout';
-import { Dashboard } from './pages/Dashboard';
-import { Projects } from './pages/Projects';
-import { Clients } from './pages/Clients';
-import { Income } from './pages/Income';
-import { Expenses } from './pages/Expenses';
-import { Reports } from './pages/Reports';
-import { Settings } from './pages/Settings';
-import { Login } from './pages/Login';
-import { Signup } from './pages/Signup';
 import { Toast } from './components/Toast';
 import { AppProvider, useAppContext } from './context/AppContext';
 import { supabase, isConfigured } from './lib/supabase';
+
+// Lazy loading components to reduce initial bundle size
+const Dashboard = lazy(() => import('./pages/Dashboard').then(module => ({ default: module.Dashboard })));
+const Projects = lazy(() => import('./pages/Projects').then(module => ({ default: module.Projects })));
+const Clients = lazy(() => import('./pages/Clients').then(module => ({ default: module.Clients })));
+const Income = lazy(() => import('./pages/Income').then(module => ({ default: module.Income })));
+const Expenses = lazy(() => import('./pages/Expenses').then(module => ({ default: module.Expenses })));
+const Reports = lazy(() => import('./pages/Reports').then(module => ({ default: module.Reports })));
+const Settings = lazy(() => import('./pages/Settings').then(module => ({ default: module.Settings })));
+const Login = lazy(() => import('./pages/Login').then(module => ({ default: module.Login })));
+const Signup = lazy(() => import('./pages/Signup').then(module => ({ default: module.Signup })));
+
+// A simple loading fallback for lazy loaded components
+const PageLoader = () => (
+  <div className="h-full w-full flex flex-col items-center justify-center py-20">
+    <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+    <p className="text-slate-400 text-sm font-medium animate-pulse">পেজ লোড হচ্ছে...</p>
+  </div>
+);
 
 const AppContent: React.FC = () => {
   const { user, loading, toast, showToast, hideToast } = useAppContext();
@@ -94,38 +104,46 @@ const AppContent: React.FC = () => {
         </div>
       )}
       
-      <Routes>
-        <Route 
-          path="/login" 
-          element={!user ? <Login onLogin={handleLogin} onGoToSignup={() => window.location.hash = '/signup'} /> : <Navigate to="/dashboard" />} 
-        />
-        <Route 
-          path="/signup" 
-          element={!user ? <Signup onSignup={handleSignup} onGoToLogin={() => window.location.hash = '/login'} /> : <Navigate to="/dashboard" />} 
-        />
-        
-        <Route 
-          path="/*" 
-          element={
-            user ? (
-              <Layout user={user} onLogout={handleLogout}>
-                <Routes>
-                  <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/projects" element={<Projects />} />
-                  <Route path="/clients" element={<Clients />} />
-                  <Route path="/income" element={<Income />} />
-                  <Route path="/expenses" element={<Expenses />} />
-                  <Route path="/reports" element={<Reports />} />
-                  <Route path="/settings" element={<Settings />} />
-                  <Route path="*" element={<Navigate to="/dashboard" />} />
-                </Routes>
-              </Layout>
-            ) : (
-              <Navigate to="/login" />
-            )
-          } 
-        />
-      </Routes>
+      <Suspense fallback={
+        <div className="min-h-screen flex items-center justify-center bg-slate-50">
+          <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      }>
+        <Routes>
+          <Route 
+            path="/login" 
+            element={!user ? <Login onLogin={handleLogin} onGoToSignup={() => window.location.hash = '/signup'} /> : <Navigate to="/dashboard" />} 
+          />
+          <Route 
+            path="/signup" 
+            element={!user ? <Signup onSignup={handleSignup} onGoToLogin={() => window.location.hash = '/login'} /> : <Navigate to="/dashboard" />} 
+          />
+          
+          <Route 
+            path="/*" 
+            element={
+              user ? (
+                <Layout user={user} onLogout={handleLogout}>
+                  <Suspense fallback={<PageLoader />}>
+                    <Routes>
+                      <Route path="/dashboard" element={<Dashboard />} />
+                      <Route path="/projects" element={<Projects />} />
+                      <Route path="/clients" element={<Clients />} />
+                      <Route path="/income" element={<Income />} />
+                      <Route path="/expenses" element={<Expenses />} />
+                      <Route path="/reports" element={<Reports />} />
+                      <Route path="/settings" element={<Settings />} />
+                      <Route path="*" element={<Navigate to="/dashboard" />} />
+                    </Routes>
+                  </Suspense>
+                </Layout>
+              ) : (
+                <Navigate to="/login" />
+              )
+            } 
+          />
+        </Routes>
+      </Suspense>
     </HashRouter>
   );
 };
