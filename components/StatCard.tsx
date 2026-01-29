@@ -11,14 +11,18 @@ interface StatCardProps {
 
 export const StatCard: React.FC<StatCardProps> = ({ title, value, icon, isCurrency }) => {
   const { user } = useAppContext();
-  const currency = user.currency || '৳';
+  const currency = user?.currency || '৳';
   
+  // Ensure value is a number before calling toLocaleString
+  const numValue = typeof value === 'string' ? parseFloat(value) : value;
+  const safeValue = isNaN(numValue as number) ? 0 : numValue;
+
   return (
     <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
       <div>
         <p className="text-slate-500 text-sm font-medium mb-1">{title}</p>
         <h3 className="text-2xl font-bold text-slate-800">
-          {isCurrency ? `${currency} ${Number(value).toLocaleString('bn-BD')}` : value}
+          {isCurrency ? `${currency} ${Number(safeValue).toLocaleString('bn-BD')}` : safeValue}
         </h3>
       </div>
       <div className="bg-indigo-50 p-3 rounded-xl text-indigo-600">

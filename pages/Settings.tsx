@@ -1,18 +1,19 @@
 
 import React, { useState } from 'react';
-import { User as UserIcon, Bell, Shield, Palette, Globe, Save, CheckCircle2 } from 'lucide-react';
+import { User as UserIcon, Bell, Shield, Palette, Globe, Save, CheckCircle2, Loader2 } from 'lucide-react';
 import { APP_NAME } from '../constants';
 import { useAppContext } from '../context/AppContext';
+import { supabase } from '../lib/supabase';
 
 export const Settings: React.FC = () => {
-  const { user, setUser } = useAppContext();
+  const { user, setUser, showToast } = useAppContext();
   const [formData, setFormData] = useState({
-    name: user.name,
-    email: user.email,
-    phone: user.phone || '',
-    occupation: user.occupation || '',
-    language: user.language || 'bn',
-    currency: user.currency || '৳'
+    name: user?.name || '',
+    email: user?.email || '',
+    phone: user?.phone || '',
+    occupation: user?.occupation || '',
+    language: user?.language || 'bn',
+    currency: user?.currency || '৳'
   });
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -22,24 +23,45 @@ export const Settings: React.FC = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (!user) return;
     setIsSaving(true);
-    // Simulate API call
-    setTimeout(() => {
-      setUser(prev => ({
+    
+    try {
+      // সুপাবেজ অথ মেটাডাটা আপডেট করা হচ্ছে
+      const { data, error } = await supabase.auth.updateUser({
+        data: {
+          name: formData.name,
+          phone: formData.phone,
+          occupation: formData.occupation,
+          language: formData.language,
+          currency: formData.currency
+        }
+      });
+
+      if (error) throw error;
+
+      // লোকাল অ্যাপ স্টেট আপডেট করা হচ্ছে
+      setUser(prev => prev ? ({
         ...prev,
         name: formData.name,
-        email: formData.email,
         phone: formData.phone,
         occupation: formData.occupation,
         language: formData.language as 'bn' | 'en',
         currency: formData.currency as '৳' | '$'
-      }));
-      setIsSaving(false);
+      }) : null);
+
       setShowSuccess(true);
+      showToast('সেটিংস সফলভাবে সেভ হয়েছে', 'success');
       setTimeout(() => setShowSuccess(false), 3000);
-    }, 800);
+    } catch (err: any) {
+      showToast(`সেভ করতে সমস্যা হয়েছে: ${err.message}`, 'error');
+    } finally {
+      setIsSaving(false);
+    }
   };
+
+  if (!user) return null;
 
   return (
     <div className="max-w-4xl space-y-8">
@@ -51,10 +73,10 @@ export const Settings: React.FC = () => {
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
         <div className="p-6 border-b flex items-center gap-4 bg-slate-50/50">
           <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold">
-            {formData.name.charAt(0)}
+            {formData.name ? formData.name.charAt(0) : 'U'}
           </div>
           <div>
-            <h3 className="text-lg font-bold text-slate-800">{formData.name}</h3>
+            <h3 className="text-lg font-bold text-slate-800">{formData.name || 'ইউজার'}</h3>
             <p className="text-slate-500 text-sm">প্রোফাইল তথ্য আপডেট করুন</p>
           </div>
         </div>
@@ -72,13 +94,13 @@ export const Settings: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">ইমেইল এড্রেস</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">ইমেইল এড্রেস (পরিবর্তনযোগ্য নয়)</label>
               <input 
                 type="email" 
                 name="email"
                 value={formData.email} 
-                onChange={handleChange}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 transition-all font-medium" 
+                disabled
+                className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl outline-none text-slate-500 font-medium cursor-not-allowed" 
               />
             </div>
             <div>
@@ -89,6 +111,7 @@ export const Settings: React.FC = () => {
                 value={formData.phone} 
                 onChange={handleChange}
                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 transition-all font-medium" 
+                placeholder="আপনার ফোন নম্বর"
               />
             </div>
             <div>
@@ -99,6 +122,7 @@ export const Settings: React.FC = () => {
                 value={formData.occupation} 
                 onChange={handleChange}
                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 transition-all font-medium" 
+                placeholder="যেমন: সাউন্ড ইঞ্জিনিয়ার"
               />
             </div>
           </div>
@@ -145,7 +169,7 @@ export const Settings: React.FC = () => {
               `}
             >
               {isSaving ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <Loader2 size={20} className="animate-spin" />
               ) : (
                 <Save size={20} />
               )}

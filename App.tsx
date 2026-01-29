@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Layout } from './components/Layout';
 import { Dashboard } from './pages/Dashboard';
@@ -13,42 +13,70 @@ import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
 import { Toast } from './components/Toast';
 import { AppProvider, useAppContext } from './context/AppContext';
+import { supabase, isConfigured } from './lib/supabase';
 
 const AppContent: React.FC = () => {
-  const { user, setUser } = useAppContext();
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return localStorage.getItem('mm_is_logged_in') === 'true';
-  });
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const { user, loading, toast, showToast, hideToast } = useAppContext();
 
-  const showToast = (message: string, type: 'success' | 'error' = 'error') => {
-    setToast({ message, type });
-  };
-
-  const handleLogin = (email: string, password?: string) => {
-    // লোকাল সিমুলেটেড লগইন
-    if (email === 'demo@manage-me.com' && password === 'password123') {
-      setIsAuthenticated(true);
-      localStorage.setItem('mm_is_logged_in', 'true');
-      showToast('লগইন সফল হয়েছে!', 'success');
-    } else {
-      showToast('ভুল ইমেইল বা পাসওয়ার্ড। ডেমো ট্রাই করুন।');
+  const handleLogin = async (email: string, password?: string) => {
+    if (!isConfigured) {
+      showToast('সুপাবেজ কনফিগার করা হয়নি। lib/supabase.ts চেক করুন।');
+      return;
+    }
+    if (!password) return;
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        showToast(error.message);
+      } else {
+        showToast('লগইন সফল হয়েছে!', 'success');
+      }
+    } catch (err: any) {
+      showToast(err.message || 'একটি অজানা সমস্যা হয়েছে।');
     }
   };
 
-  const handleSignup = (name: string, email: string, password?: string) => {
-    // লোকাল সিমুলেটেড সাইনআপ
-    setUser({ ...user, name, email, id: 'user_' + Date.now() });
-    setIsAuthenticated(true);
-    localStorage.setItem('mm_is_logged_in', 'true');
-    showToast('অ্যাকাউন্ট তৈরি সফল হয়েছে!', 'success');
+  const handleSignup = async (name: string, email: string, password?: string) => {
+    if (!isConfigured) {
+      showToast('সুপাবেজ কনফিগার করা হয়নি।');
+      return;
+    }
+    if (!password) return;
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { name } }
+      });
+      if (error) {
+        showToast(error.message);
+      } else {
+        showToast('অ্যাকাউন্ট তৈরি সফল! ইমেইল ভেরিফাই করুন।', 'success');
+      }
+    } catch (err: any) {
+      showToast(err.message || 'একটি সমস্যা হয়েছে।');
+    }
   };
 
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    localStorage.removeItem('mm_is_logged_in');
-    showToast('আপনি সফলভাবে লগআউট করেছেন।', 'success');
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      showToast('লগআউট সফল হয়েছে।', 'success');
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-slate-500 font-medium animate-pulse">লোড হচ্ছে...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <HashRouter>
@@ -56,24 +84,30 @@ const AppContent: React.FC = () => {
         <Toast 
           message={toast.message} 
           type={toast.type} 
-          onClose={() => setToast(null)} 
+          onClose={hideToast} 
         />
+      )}
+      
+      {!isConfigured && (
+        <div className="fixed bottom-0 left-0 right-0 bg-amber-500 text-white p-2 text-center text-xs font-bold z-[300]">
+          সতর্কতা: সুপাবেজ কনফিগারেশন চেক করুন।
+        </div>
       )}
       
       <Routes>
         <Route 
           path="/login" 
-          element={!isAuthenticated ? <Login onLogin={handleLogin} onGoToSignup={() => window.location.hash = '/signup'} /> : <Navigate to="/dashboard" />} 
+          element={!user ? <Login onLogin={handleLogin} onGoToSignup={() => window.location.hash = '/signup'} /> : <Navigate to="/dashboard" />} 
         />
         <Route 
           path="/signup" 
-          element={!isAuthenticated ? <Signup onSignup={handleSignup} onGoToLogin={() => window.location.hash = '/login'} /> : <Navigate to="/dashboard" />} 
+          element={!user ? <Signup onSignup={handleSignup} onGoToLogin={() => window.location.hash = '/login'} /> : <Navigate to="/dashboard" />} 
         />
         
         <Route 
           path="/*" 
           element={
-            isAuthenticated ? (
+            user ? (
               <Layout user={user} onLogout={handleLogout}>
                 <Routes>
                   <Route path="/dashboard" element={<Dashboard />} />

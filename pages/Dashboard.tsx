@@ -19,43 +19,37 @@ import { useAppContext } from '../context/AppContext';
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { projects, user } = useAppContext();
-  const currency = user.currency || '৳';
+  const { projects, incomeRecords, user } = useAppContext();
+  const currency = user?.currency || '৳';
 
-  const totalIncome = projects.reduce((acc, curr) => acc + curr.paidAmount, 0);
+  const totalIncome = incomeRecords.reduce((acc, curr) => acc + (curr.amount || 0), 0);
   const totalProjects = projects.length;
   const completedProjects = projects.filter(p => p.status === 'Completed').length;
   const ongoingProjects = projects.filter(p => p.status === 'In Progress').length;
 
-  // গত ৬ মাসের আয়ের ডাটা ক্যালকুলেশন
   const chartData = useMemo(() => {
-    const incomeRecordsRaw = localStorage.getItem(`mm_income_records_${user.id}`);
-    const incomeRecords = incomeRecordsRaw ? JSON.parse(incomeRecordsRaw) : [];
-
     const monthNames = ['জানু', 'ফেব্রু', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্টে', 'অক্টো', 'নভে', 'ডিসে'];
     const result = [];
     const now = new Date();
     
-    // গত ৬ মাস লুপ করে ডাটা বের করা
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const mIdx = d.getMonth();
       const year = d.getFullYear();
       
-      const mIncome = incomeRecords
-        .filter((r: any) => {
-          const rd = new Date(r.date);
-          return rd.getMonth() === mIdx && rd.getFullYear() === year;
-        })
-        .reduce((acc: number, curr: any) => acc + curr.amount, 0);
+      // Filter income records for this specific month/year
+      const monthlySum = incomeRecords.filter(record => {
+        const recordDate = new Date(record.date);
+        return recordDate.getMonth() === mIdx && recordDate.getFullYear() === year;
+      }).reduce((sum, rec) => sum + (rec.amount || 0), 0);
 
       result.push({
         name: monthNames[mIdx],
-        income: mIncome
+        income: monthlySum 
       });
     }
     return result;
-  }, [user.id, projects]); // projects dependencies adding to refresh when projects update
+  }, [incomeRecords]);
 
   const hasChartData = chartData.some(d => d.income > 0);
 
@@ -65,7 +59,7 @@ export const Dashboard: React.FC = () => {
     { label: 'সম্পন্ন', count: projects.filter(p => p.status === 'Completed').length, color: 'bg-emerald-500' },
   ];
 
-  const recentProjects = [...projects].sort((a, b) => b.id.localeCompare(a.id)).slice(0, 5);
+  const recentProjects = [...projects].sort((a, b) => b.createdat.localeCompare(a.createdat)).slice(0, 5);
 
   return (
     <div className="space-y-8">
@@ -138,7 +132,7 @@ export const Dashboard: React.FC = () => {
                     radius={[6, 6, 0, 0]} 
                     barSize={32}
                   >
-                    {chartData.map((entry, index) => (
+                    {chartData.map((_entry, index) => (
                       <Cell key={`cell-${index}`} fill={index === 5 ? '#6366f1' : '#c7d2fe'} />
                     ))}
                   </Bar>
@@ -207,14 +201,14 @@ export const Dashboard: React.FC = () => {
                   <th className="px-6 py-4 font-medium">ক্লায়েন্ট</th>
                   <th className="px-6 py-4 font-medium">টাইপ</th>
                   <th className="px-6 py-4 font-medium">স্ট্যাটাস</th>
-                  <th className="px-6 py-4 font-medium text-right">বাজেট</th>
+                  <th className="px-6 py-4 text-right">বাজেট</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {recentProjects.map(p => (
                   <tr key={p.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-6 py-4 font-bold text-slate-800">{p.name}</td>
-                    <td className="px-6 py-4 text-slate-600">{p.clientName}</td>
+                    <td className="px-6 py-4 text-slate-600">{p.clientname}</td>
                     <td className="px-6 py-4">
                       <span className="text-[10px] font-bold uppercase text-indigo-600 bg-indigo-50 px-2 py-1 rounded">
                         {PROJECT_TYPE_LABELS[p.type]}
@@ -229,7 +223,9 @@ export const Dashboard: React.FC = () => {
                         {PROJECT_STATUS_LABELS[p.status]}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-right font-bold text-slate-800">{currency} {p.totalAmount.toLocaleString('bn-BD')}</td>
+                    <td className="px-6 py-4 text-right font-bold text-slate-800">
+                      {currency} {(p.totalamount || 0).toLocaleString('bn-BD')}
+                    </td>
                   </tr>
                 ))}
               </tbody>

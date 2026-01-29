@@ -5,25 +5,25 @@ export type ProjectType = 'NasheedSong' | 'Ads' | 'Waz';
 export interface Project {
   id: string;
   name: string;
-  clientName: string;
+  clientname: string;
   type: ProjectType;
-  totalAmount: number;
-  paidAmount: number;
-  dueAmount: number;
+  totalamount: number;
+  paidamount: number;
+  dueamount: number;
   status: ProjectStatus;
   deadline: string;
-  createdAt: string;
+  createdat: string;
   notes?: string;
-  userId: string;
+  userid: string;
 }
 
 export interface Client {
   id: string;
   name: string;
   contact: string;
-  totalProjects: number;
-  totalEarnings: number;
-  userId: string;
+  totalprojects: number;
+  totalearnings: number;
+  userid: string;
 }
 
 export interface Expense {
@@ -32,22 +32,23 @@ export interface Expense {
   amount: number;
   date: string;
   notes: string;
-  userId: string;
+  userid: string;
 }
 
 export interface IncomeRecord {
   id: string;
-  projectId: string;
-  projectName: string;
+  projectid: string;
+  projectname: string;
+  clientname: string;
   amount: number;
   date: string;
-  userId: string;
+  method: string;
+  userid: string;
 }
 
 export interface User {
   id: string;
   email: string;
-  password?: string; // লগইন ভেরিফিকেশনের জন্য
   name: string;
   phone?: string;
   occupation?: string;
