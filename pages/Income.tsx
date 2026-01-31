@@ -55,6 +55,17 @@ export const Income: React.FC = () => {
     fetchIncome();
   }, [user]);
 
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (activeMenuId && !(event.target as Element).closest('.action-menu-container')) {
+        setActiveMenuId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [activeMenuId]);
+
   const handleDeletePayment = async (id: string, payment: any) => {
     if (!user) return;
     if (window.confirm('আপনি কি নিশ্চিত? এটি ডিলিট করলে প্রজেক্টের বকেয়া আবার বেড়ে যাবে।')) {
@@ -216,7 +227,7 @@ export const Income: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-slate-800">আয় (পেমেন্ট)</h1>
-          <p className="text-xs text-slate-500">মোট আয়: <span className="text-emerald-600 font-bold">{currency} {totalIncome.toLocaleString('bn-BD')}</span></p>
+          <p className="text-xs text-slate-500 font-medium">মোট আয়: <span className="text-emerald-600 font-bold">{currency} {totalIncome.toLocaleString('bn-BD')}</span></p>
         </div>
         <button 
           onClick={handleOpenAddModal}
@@ -239,15 +250,15 @@ export const Income: React.FC = () => {
 
       <div className="space-y-3 pb-20">
         {loading ? (
-          <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-emerald-600" /></div>
+          <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-emerald-600" size={24} /></div>
         ) : filteredPayments.length === 0 ? (
           <div className="py-20 text-center text-slate-400">
             <ReceiptText size={48} className="mx-auto mb-4 opacity-20" />
-            <p>কোনো পেমেন্ট নেই</p>
+            <p className="text-sm font-medium">কোনো পেমেন্ট নেই</p>
           </div>
         ) : (
           filteredPayments.map((payment) => (
-            <div key={payment.id} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+            <div key={payment.id} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm relative animate-in slide-in-from-bottom-2 duration-300">
               <div className="flex justify-between items-start mb-2">
                 <div className="flex items-center gap-3">
                    <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
@@ -255,15 +266,40 @@ export const Income: React.FC = () => {
                    </div>
                    <div>
                      <h3 className="font-bold text-slate-800 text-sm">{payment.projectname}</h3>
-                     <p className="text-xs text-slate-500">{payment.clientname}</p>
+                     <p className="text-xs text-slate-500 font-medium">{payment.clientname}</p>
                    </div>
                 </div>
-                <button 
-                  onClick={() => setActiveMenuId(activeMenuId === payment.id ? null : payment.id)}
-                  className="p-2 -mr-2 text-slate-300 hover:text-emerald-600"
-                >
-                  <MoreVertical size={20} />
-                </button>
+                
+                {/* Floating Action Menu */}
+                <div className="relative action-menu-container">
+                    <button 
+                      onClick={(e) => {
+                         e.stopPropagation();
+                         setActiveMenuId(activeMenuId === payment.id ? null : payment.id);
+                      }}
+                      className={`p-2 -mr-2 rounded-full transition-colors ${activeMenuId === payment.id ? 'bg-emerald-50 text-emerald-600' : 'text-slate-300 hover:text-emerald-600 active:bg-slate-50'}`}
+                    >
+                      <MoreVertical size={20} />
+                    </button>
+                    
+                    {activeMenuId === payment.id && (
+                       <div className="absolute right-0 top-full mt-1 w-36 bg-white rounded-xl shadow-xl border border-slate-100 z-20 flex flex-col py-1.5 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); handleOpenEditModal(payment); }}
+                                className="w-full px-4 py-2.5 text-left text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-emerald-600 flex items-center gap-2 transition-colors"
+                            >
+                                <Pencil size={14} /> এডিট
+                            </button>
+                            <div className="h-px bg-slate-50 w-full my-0.5"></div>
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); handleDeletePayment(payment.id, payment); }}
+                                className="w-full px-4 py-2.5 text-left text-xs font-bold text-rose-500 hover:bg-rose-50 flex items-center gap-2 transition-colors"
+                            >
+                                 <Trash2 size={14} /> ডিলিট
+                            </button>
+                        </div>
+                    )}
+                </div>
               </div>
               
               <div className="flex justify-between items-end border-t border-slate-50 pt-3 mt-1">
@@ -280,17 +316,6 @@ export const Income: React.FC = () => {
                    <p className="text-lg font-black text-emerald-600">{currency} {payment.amount.toLocaleString('bn-BD')}</p>
                 </div>
               </div>
-
-              {activeMenuId === payment.id && (
-                <div className="mt-3 pt-3 border-t border-slate-100 flex gap-3 animate-in fade-in">
-                  <button onClick={() => handleOpenEditModal(payment)} className="flex-1 py-2 bg-slate-50 rounded-xl text-xs font-bold text-slate-600 flex items-center justify-center gap-2">
-                    <Pencil size={14} /> এডিট
-                  </button>
-                  <button onClick={() => handleDeletePayment(payment.id, payment)} className="flex-1 py-2 bg-rose-50 rounded-xl text-xs font-bold text-rose-600 flex items-center justify-center gap-2">
-                    <Trash2 size={14} /> ডিলিট
-                  </button>
-                </div>
-              )}
             </div>
           ))
         )}
@@ -317,7 +342,7 @@ export const Income: React.FC = () => {
                     value={projectSearch} 
                     onFocus={() => setShowSuggestions(true)} 
                     onChange={e => {setProjectSearch(e.target.value); setShowSuggestions(true);}} 
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none" 
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none text-sm" 
                     placeholder="প্রজেক্ট খুঁজুন..." 
                 />
                 {showSuggestions && projectSuggestions.length > 0 && (
@@ -360,7 +385,7 @@ export const Income: React.FC = () => {
                 </div>
               </div>
 
-              <button type="submit" disabled={isSubmitting} className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg shadow-emerald-200 active:scale-95 transition-transform flex items-center justify-center gap-2 mt-4 mb-4">
+              <button type="submit" disabled={isSubmitting} className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold text-base shadow-lg shadow-emerald-200 active:scale-95 transition-transform flex items-center justify-center gap-2 mt-4 mb-4">
                 {isSubmitting ? <Loader2 className="animate-spin" /> : <Wallet />}
                 সেভ করুন
               </button>

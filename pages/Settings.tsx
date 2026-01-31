@@ -28,7 +28,6 @@ export const Settings: React.FC = () => {
     setIsSaving(true);
     
     try {
-      // সুপাবেজ অথ মেটাডাটা আপডেট করা হচ্ছে
       const { data, error } = await supabase.auth.updateUser({
         data: {
           name: formData.name,
@@ -41,7 +40,6 @@ export const Settings: React.FC = () => {
 
       if (error) throw error;
 
-      // লোকাল অ্যাপ স্টেট আপডেট করা হচ্ছে
       setUser(prev => prev ? ({
         ...prev,
         name: formData.name,
@@ -64,25 +62,25 @@ export const Settings: React.FC = () => {
   if (!user) return null;
 
   return (
-    <div className="max-w-4xl space-y-8">
+    <div className="space-y-6 pb-20">
       <div>
         <h1 className="text-2xl font-bold text-slate-800">সেটিংস</h1>
-        <p className="text-slate-500">আপনার একাউন্ট এবং অ্যাপলিকেশন সেটিংস এখান থেকে পরিবর্তন করুন।</p>
+        <p className="text-slate-500">প্রোফাইল কনফিগারেশন</p>
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
         <div className="p-6 border-b flex items-center gap-4 bg-slate-50/50">
-          <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold">
+          <div className="w-14 h-14 bg-indigo-600 rounded-full flex items-center justify-center text-white text-xl font-bold">
             {formData.name ? formData.name.charAt(0) : 'U'}
           </div>
           <div>
             <h3 className="text-lg font-bold text-slate-800">{formData.name || 'ইউজার'}</h3>
-            <p className="text-slate-500 text-sm">প্রোফাইল তথ্য আপডেট করুন</p>
+            <p className="text-slate-500 text-xs">এডিট প্রোফাইল</p>
           </div>
         </div>
         
-        <div className="p-6 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="p-6 space-y-5">
+          <div className="grid grid-cols-1 gap-5">
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">পূর্ণ নাম</label>
               <input 
@@ -90,17 +88,17 @@ export const Settings: React.FC = () => {
                 name="name"
                 value={formData.name} 
                 onChange={handleChange}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 transition-all font-medium" 
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 transition-all font-medium" 
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">ইমেইল এড্রেস (পরিবর্তনযোগ্য নয়)</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">ইমেইল</label>
               <input 
                 type="email" 
                 name="email"
                 value={formData.email} 
                 disabled
-                className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl outline-none text-slate-500 font-medium cursor-not-allowed" 
+                className="w-full px-4 py-3 bg-slate-100 border border-slate-200 rounded-xl outline-none text-slate-500 font-medium cursor-not-allowed" 
               />
             </div>
             <div>
@@ -110,7 +108,7 @@ export const Settings: React.FC = () => {
                 name="phone"
                 value={formData.phone} 
                 onChange={handleChange}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 transition-all font-medium" 
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 transition-all font-medium" 
                 placeholder="আপনার ফোন নম্বর"
               />
             </div>
@@ -121,25 +119,25 @@ export const Settings: React.FC = () => {
                 name="occupation"
                 value={formData.occupation} 
                 onChange={handleChange}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 transition-all font-medium" 
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 transition-all font-medium" 
                 placeholder="যেমন: সাউন্ড ইঞ্জিনিয়ার"
               />
             </div>
           </div>
           
           <div className="pt-4 border-t border-slate-100">
-            <h4 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-              <Globe size={18} className="text-indigo-600" />
+            <h4 className="font-bold text-slate-800 mb-4 flex items-center gap-2 text-sm">
+              <Globe size={16} className="text-indigo-600" />
               অ্যাপলিকেশন সেটিংস
             </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-5">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">ভাষা</label>
                 <select 
                   name="language"
                   value={formData.language}
                   onChange={handleChange}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 font-medium cursor-pointer"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 font-medium cursor-pointer"
                 >
                   <option value="bn">বাংলা</option>
                   <option value="en">English</option>
@@ -151,7 +149,7 @@ export const Settings: React.FC = () => {
                   name="currency"
                   value={formData.currency}
                   onChange={handleChange}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 font-medium cursor-pointer"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 font-medium cursor-pointer"
                 >
                   <option value="৳">টাকা (৳)</option>
                   <option value="$">ইউএস ডলার ($)</option>
@@ -160,11 +158,11 @@ export const Settings: React.FC = () => {
             </div>
           </div>
 
-          <div className="pt-6 flex flex-col sm:flex-row items-center gap-4">
+          <div className="pt-6">
             <button 
               onClick={handleSave}
               disabled={isSaving}
-              className={`flex items-center gap-2 px-8 py-3 rounded-xl font-bold transition-all shadow-lg 
+              className={`w-full flex justify-center items-center gap-2 px-8 py-4 rounded-xl font-bold transition-all shadow-lg 
                 ${isSaving ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-100 active:scale-95'}
               `}
             >
@@ -173,15 +171,8 @@ export const Settings: React.FC = () => {
               ) : (
                 <Save size={20} />
               )}
-              {isSaving ? 'সেভ হচ্ছে...' : 'পরিবর্তনগুলো সেভ করুন'}
+              {isSaving ? 'সেভ হচ্ছে...' : 'পরিবর্তন সেভ করুন'}
             </button>
-
-            {showSuccess && (
-              <div className="flex items-center gap-2 text-emerald-600 font-bold animate-in fade-in slide-in-from-left-2 duration-300">
-                <CheckCircle2 size={20} />
-                <span>সফলভাবে সেভ হয়েছে!</span>
-              </div>
-            )}
           </div>
         </div>
       </div>

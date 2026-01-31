@@ -17,8 +17,8 @@ export const Projects: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   
-  // For mobile dropdown menu on cards
-  const [actionMenuOpenId, setActionMenuOpenId] = useState<string | null>(null);
+  // New: State to control which card has its menu open
+  const [activeCardMenuId, setActiveCardMenuId] = useState<string | null>(null);
   
   const [showClientSuggestions, setShowClientSuggestions] = useState(false);
   const [clientSearch, setClientSearch] = useState('');
@@ -35,12 +35,23 @@ export const Projects: React.FC = () => {
     notes: ''
   });
 
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (activeCardMenuId && !(event.target as Element).closest('.action-menu-container')) {
+        setActiveCardMenuId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [activeCardMenuId]);
+
   const handleDeleteProject = async (id: string) => {
     if (!user) return;
     
     if (window.confirm('আপনি কি নিশ্চিত যে এই প্রজেক্টটি ডিলিট করতে চান?')) {
       setIsDeleting(id);
-      setActionMenuOpenId(null);
+      setActiveCardMenuId(null);
       
       try {
         const { error } = await supabase
@@ -94,7 +105,7 @@ export const Projects: React.FC = () => {
       deadline: project.deadline ? project.deadline.split('T')[0] : ''
     });
     setModalOpen(true);
-    setActionMenuOpenId(null);
+    setActiveCardMenuId(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -189,7 +200,7 @@ export const Projects: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-slate-800">প্রজেক্ট তালিকা</h1>
-          <p className="text-xs text-slate-500">{filteredProjects.length} টি প্রজেক্ট পাওয়া গেছে</p>
+          <p className="text-xs text-slate-500 font-medium">{filteredProjects.length} টি প্রজেক্ট পাওয়া গেছে</p>
         </div>
         <button 
           onClick={handleOpenAddModal}
@@ -215,19 +226,19 @@ export const Projects: React.FC = () => {
           <select 
             value={filter}
             onChange={(e) => setFilter(e.target.value as any)}
-            className="appearance-none bg-white border border-slate-200 text-slate-700 py-2.5 pl-4 pr-10 rounded-2xl text-sm font-bold shadow-sm outline-none focus:border-indigo-500"
+            className="appearance-none bg-white border border-slate-200 text-slate-700 py-2.5 pl-4 pr-10 rounded-2xl text-xs font-bold shadow-sm outline-none focus:border-indigo-500 h-full"
           >
             <option value="All">সবগুলো</option>
             {Object.entries(PROJECT_STATUS_LABELS).map(([key, label]) => (
               <option key={key} value={key}>{label}</option>
             ))}
           </select>
-          <Filter size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          <Filter size={14} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
         </div>
       </div>
 
-      {/* Projects List (Cards) */}
-      <div className="space-y-4 pb-20">
+      {/* Projects List (Cards instead of Table) */}
+      <div className="space-y-4 pb-12">
         {filteredProjects.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-slate-400">
             <FolderOpen size={48} className="mb-4 opacity-20" />
@@ -235,7 +246,7 @@ export const Projects: React.FC = () => {
           </div>
         ) : (
           filteredProjects.map((p) => (
-            <div key={p.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <div key={p.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm relative animate-in slide-in-from-bottom-2 duration-300">
               {/* Card Header */}
               <div className="p-4 border-b border-slate-50 flex justify-between items-start">
                 <div className="flex-1 min-w-0 mr-3">
@@ -243,29 +254,44 @@ export const Projects: React.FC = () => {
                     {PROJECT_TYPE_LABELS[p.type]}
                   </span>
                   <h3 className="font-bold text-slate-800 text-base mt-1.5 truncate">{p.name}</h3>
-                  <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+                  <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5 font-medium">
                     <Users size={12} /> {p.clientname}
                   </p>
                 </div>
-                <button 
-                  onClick={() => setActionMenuOpenId(actionMenuOpenId === p.id ? null : p.id)}
-                  className="p-2 -mr-2 text-slate-300 hover:text-indigo-600 active:bg-slate-50 rounded-full"
-                >
-                  <MoreVertical size={20} />
-                </button>
-              </div>
+                
+                {/* Floating Action Menu Button */}
+                <div className="relative action-menu-container">
+                    <button 
+                      onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveCardMenuId(activeCardMenuId === p.id ? null : p.id);
+                      }}
+                      className={`p-2 -mr-2 rounded-full transition-colors ${activeCardMenuId === p.id ? 'bg-indigo-50 text-indigo-600' : 'text-slate-300 hover:text-indigo-600 active:bg-slate-50'}`}
+                    >
+                      <MoreVertical size={20} />
+                    </button>
 
-              {/* Action Menu (Dropdown inside card) */}
-              {actionMenuOpenId === p.id && (
-                <div className="bg-slate-50 px-4 py-2 flex gap-3 animate-in slide-in-from-top-2 duration-200">
-                  <button onClick={() => handleOpenEditModal(p)} className="flex-1 flex items-center justify-center gap-2 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-indigo-600 shadow-sm active:scale-95">
-                    <Pencil size={14} /> এডিট
-                  </button>
-                  <button onClick={() => handleDeleteProject(p.id)} className="flex-1 flex items-center justify-center gap-2 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-rose-600 shadow-sm active:scale-95">
-                    {isDeleting === p.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} ডিলিট
-                  </button>
+                    {/* Dropdown Menu */}
+                    {activeCardMenuId === p.id && (
+                        <div className="absolute right-0 top-full mt-1 w-36 bg-white rounded-xl shadow-xl border border-slate-100 z-20 flex flex-col py-1.5 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); handleOpenEditModal(p); }}
+                                className="w-full px-4 py-2.5 text-left text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-indigo-600 flex items-center gap-2 transition-colors"
+                            >
+                                <Pencil size={14} /> এডিট
+                            </button>
+                            <div className="h-px bg-slate-50 w-full my-0.5"></div>
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); handleDeleteProject(p.id); }}
+                                className="w-full px-4 py-2.5 text-left text-xs font-bold text-rose-500 hover:bg-rose-50 flex items-center gap-2 transition-colors"
+                            >
+                                {isDeleting === p.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} 
+                                ডিলিট
+                            </button>
+                        </div>
+                    )}
                 </div>
-              )}
+              </div>
 
               {/* Card Body */}
               <div className="p-4 pt-3">
@@ -292,8 +318,8 @@ export const Projects: React.FC = () => {
                 </div>
                 
                 <div className="flex justify-between items-center">
-                  <span className="text-[10px] font-bold text-slate-400">
-                    পরিশোধ: {Math.round(p.totalamount > 0 ? (p.paidamount / p.totalamount) * 100 : 0)}%
+                  <span className="text-[10px] font-bold text-slate-500">
+                    পরিশোধ: <span className="text-slate-800">{Math.round(p.totalamount > 0 ? (p.paidamount / p.totalamount) * 100 : 0)}%</span>
                   </span>
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border
                     ${p.status === 'Completed' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
@@ -327,7 +353,7 @@ export const Projects: React.FC = () => {
               <h2 className="text-lg font-bold text-slate-800">
                 {isEditing ? 'প্রজেক্ট এডিট' : 'নতুন প্রজেক্ট'}
               </h2>
-              <button disabled={isSubmitting} onClick={() => setModalOpen(false)} className="p-2 bg-slate-100 rounded-full text-slate-500">
+              <button disabled={isSubmitting} onClick={() => setModalOpen(false)} className="p-2 bg-slate-100 rounded-full text-slate-500 hover:bg-slate-200 transition-colors">
                 <X size={20} />
               </button>
             </div>
@@ -337,22 +363,22 @@ export const Projects: React.FC = () => {
               
               <div>
                 <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">প্রজেক্ট নাম</label>
-                <input required type="text" value={newProject.name} onChange={e => setNewProject({...newProject, name: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="নাম লিখুন..." />
+                <input required type="text" value={newProject.name} onChange={e => setNewProject({...newProject, name: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none text-sm" placeholder="নাম লিখুন..." />
               </div>
 
               <div className="relative">
                 <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">ক্লায়েন্ট</label>
-                <input required type="text" value={clientSearch} onFocus={() => setShowClientSuggestions(true)} onChange={e => {setClientSearch(e.target.value); setShowClientSuggestions(true);}} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="ক্লায়েন্ট খুঁজুন..." />
+                <input required type="text" value={clientSearch} onFocus={() => setShowClientSuggestions(true)} onChange={e => {setClientSearch(e.target.value); setShowClientSuggestions(true);}} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none text-sm" placeholder="ক্লায়েন্ট খুঁজুন..." />
                 
                 {showClientSuggestions && (clientSearch || clientSuggestions.length > 0) && (
                   <div className="absolute bottom-full mb-2 w-full bg-white border border-slate-200 rounded-xl shadow-xl max-h-40 overflow-y-auto z-50">
                     {clientSuggestions.map(c => (
-                      <div key={c.id} onClick={() => handleSelectClient(c)} className="px-4 py-3 border-b border-slate-50 hover:bg-indigo-50 font-medium text-sm">
+                      <div key={c.id} onClick={() => handleSelectClient(c)} className="px-4 py-3 border-b border-slate-50 hover:bg-indigo-50 font-medium text-xs cursor-pointer">
                         {c.name}
                       </div>
                     ))}
                     {isNewClient && (
-                      <div className="px-4 py-3 bg-emerald-50 text-emerald-700 text-xs font-bold border-t">
+                      <div className="px-4 py-3 bg-emerald-50 text-emerald-700 text-[10px] font-bold border-t">
                         + নতুন ক্লায়েন্ট হিসেবে যোগ হবে
                       </div>
                     )}
@@ -363,7 +389,7 @@ export const Projects: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">টাইপ</label>
-                   <select value={newProject.type} onChange={e => setNewProject({...newProject, type: e.target.value})} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none">
+                   <select value={newProject.type} onChange={e => setNewProject({...newProject, type: e.target.value})} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xs text-slate-800 outline-none">
                      {Object.entries(PROJECT_TYPE_LABELS).map(([key, label]) => (
                        <option key={key} value={key}>{label}</option>
                      ))}
@@ -371,7 +397,7 @@ export const Projects: React.FC = () => {
                 </div>
                 <div>
                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">স্ট্যাটাস</label>
-                   <select value={newProject.status} onChange={e => setNewProject({...newProject, status: e.target.value})} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none">
+                   <select value={newProject.status} onChange={e => setNewProject({...newProject, status: e.target.value})} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xs text-slate-800 outline-none">
                      {Object.entries(PROJECT_STATUS_LABELS).map(([key, label]) => (
                        <option key={key} value={key}>{label}</option>
                      ))}
@@ -382,26 +408,26 @@ export const Projects: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">বাজেট ({currency})</label>
-                  <input required type="number" value={newProject.totalamount || ''} onChange={e => setNewProject({...newProject, totalamount: Number(e.target.value)})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 outline-none" placeholder="0" />
+                  <input required type="number" value={newProject.totalamount || ''} onChange={e => setNewProject({...newProject, totalamount: Number(e.target.value)})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 outline-none text-sm" placeholder="0" />
                 </div>
                 <div>
                   <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">পরিশোধ ({currency})</label>
-                  <input type="number" value={newProject.paidamount || ''} onChange={e => setNewProject({...newProject, paidamount: Number(e.target.value)})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-emerald-600 outline-none" placeholder="0" />
+                  <input type="number" value={newProject.paidamount || ''} onChange={e => setNewProject({...newProject, paidamount: Number(e.target.value)})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-emerald-600 outline-none text-sm" placeholder="0" />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                  <div>
                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">শুরু</label>
-                   <input required type="date" value={newProject.createdat} onChange={e => setNewProject({...newProject, createdat: e.target.value})} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none" />
+                   <input required type="date" value={newProject.createdat} onChange={e => setNewProject({...newProject, createdat: e.target.value})} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xs text-slate-800 outline-none" />
                  </div>
                  <div>
                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">ডেডলাইন</label>
-                   <input required type="date" value={newProject.deadline} onChange={e => setNewProject({...newProject, deadline: e.target.value})} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none" />
+                   <input required type="date" value={newProject.deadline} onChange={e => setNewProject({...newProject, deadline: e.target.value})} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xs text-slate-800 outline-none" />
                  </div>
               </div>
 
-              <button type="submit" disabled={isSubmitting} className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg shadow-indigo-200 active:scale-95 transition-transform flex items-center justify-center gap-2 mt-4 mb-4">
+              <button type="submit" disabled={isSubmitting} className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold text-base shadow-lg shadow-indigo-200 active:scale-95 transition-transform flex items-center justify-center gap-2 mt-2 mb-4">
                 {isSubmitting ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}
                 সেভ করুন
               </button>

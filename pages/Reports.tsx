@@ -127,35 +127,35 @@ export const Reports: React.FC = () => {
   const hasData = filteredProjects.length > 0;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-6 pb-20">
+      <div className="flex flex-col gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">রিপোর্ট ও এনালাইটিক্স</h1>
-          <p className="text-slate-500">আপনার সৃজনশীল ব্যবসার আর্থিক প্রবৃদ্ধি পর্যবেক্ষণ করুন।</p>
+          <h1 className="text-2xl font-bold text-slate-800">রিপোর্ট</h1>
+          <p className="text-slate-500">আর্থিক প্রবৃদ্ধি পর্যবেক্ষণ করুন।</p>
         </div>
         <div className="flex items-center gap-3">
           <button 
             onClick={handleDownloadJSON}
             disabled={!hasData}
-            className="bg-white text-slate-700 border px-4 py-2.5 rounded-xl font-semibold flex items-center gap-2 text-sm disabled:opacity-50"
+            className="flex-1 bg-white text-slate-700 border px-4 py-2.5 rounded-xl font-semibold flex justify-center items-center gap-2 text-sm disabled:opacity-50"
           >
             <FileJson size={18} />
-            <span className="hidden sm:inline">JSON ডাউনলোড</span>
+            <span className="">JSON</span>
           </button>
           
           <button 
             onClick={handleDownloadImage}
             disabled={!hasData || isCapturing}
-            className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-semibold flex items-center gap-2 text-sm disabled:opacity-50"
+            className="flex-1 bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-semibold flex justify-center items-center gap-2 text-sm disabled:opacity-50"
           >
             {isCapturing ? <RefreshCcw size={18} className="animate-spin" /> : <ImageIcon size={18} />}
-            <span>{isCapturing ? 'ছবি তৈরি হচ্ছে...' : 'ছবি হিসেবে সেভ'}</span>
+            <span>{isCapturing ? 'তৈরি হচ্ছে...' : 'ইমেজ'}</span>
           </button>
         </div>
       </div>
 
-      <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col md:flex-row items-end gap-4">
-        <div className="flex-1 w-full grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col gap-4">
+        <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-bold text-slate-400 uppercase mb-2">শুরু তারিখ</label>
             <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 border rounded-xl outline-none text-sm" />
@@ -165,25 +165,20 @@ export const Reports: React.FC = () => {
             <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 border rounded-xl outline-none text-sm" />
           </div>
         </div>
-        <button onClick={resetFilter} className="p-2.5 text-slate-400 hover:text-indigo-600 rounded-xl"><RefreshCcw size={20} /></button>
+        <button onClick={resetFilter} className="w-full py-2 bg-slate-100 text-slate-600 rounded-xl font-bold text-sm">ফিল্টার রিসেট করুন</button>
       </div>
 
       <div ref={reportRef} className="space-y-6 p-4 rounded-3xl bg-slate-50">
-        <div className="bg-white p-6 rounded-2xl border flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-black text-xl">M</div>
-            <div>
-              <h2 className="text-xl font-black text-slate-800 tracking-tight">সাউন্ড ডিজাইন রিপোর্ট</h2>
-              <p className="text-slate-500 text-xs font-bold uppercase">{APP_NAME}</p>
-            </div>
-          </div>
-          <div className="text-right">
-            <div className="flex items-center justify-end gap-2 text-indigo-600 font-bold text-sm"><UserIcon size={14} /> {user?.name}</div>
-            <div className="text-[10px] text-slate-400">{new Date().toLocaleString('bn-BD')}</div>
-          </div>
+        <div className="bg-white p-6 rounded-2xl border flex flex-col gap-2">
+           <div className="flex items-center justify-between">
+              <h2 className="text-xl font-black text-slate-800 tracking-tight">রিপোর্ট</h2>
+              <div className="text-[10px] text-slate-400">{new Date().toLocaleDateString('bn-BD')}</div>
+           </div>
+           <p className="text-slate-500 text-xs font-bold uppercase">{APP_NAME}</p>
+           <p className="text-xs text-slate-400">User: {user?.name}</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 gap-4">
           <div className="bg-white p-6 rounded-2xl border shadow-sm">
             <p className="text-xs font-bold text-slate-400 uppercase mb-2">মোট আয়</p>
             <h3 className="text-2xl font-black text-slate-800">{currency} {stats.totalIncome.toLocaleString('bn-BD')}</h3>
@@ -192,13 +187,15 @@ export const Reports: React.FC = () => {
             <p className="text-xs font-bold text-slate-400 uppercase mb-2">নিট লাভ</p>
             <h3 className="text-2xl font-black text-indigo-600">{currency} {stats.profit.toLocaleString('bn-BD')}</h3>
           </div>
-          <div className="bg-white p-6 rounded-2xl border shadow-sm">
-            <p className="text-xs font-bold text-slate-400 uppercase mb-2">বকেয়া</p>
-            <h3 className="text-2xl font-black text-amber-600">{currency} {stats.totalDue.toLocaleString('bn-BD')}</h3>
-          </div>
-          <div className="bg-white p-6 rounded-2xl border shadow-sm">
-            <p className="text-xs font-bold text-slate-400 uppercase mb-2">রেকর্ড সংখ্যা</p>
-            <h3 className="text-2xl font-black text-slate-800">{filteredProjects.length} টি</h3>
+          <div className="bg-white p-6 rounded-2xl border shadow-sm grid grid-cols-2 gap-4">
+             <div>
+                <p className="text-xs font-bold text-slate-400 uppercase mb-2">বকেয়া</p>
+                <h3 className="text-xl font-black text-amber-600">{currency} {stats.totalDue.toLocaleString('bn-BD')}</h3>
+             </div>
+             <div>
+                <p className="text-xs font-bold text-slate-400 uppercase mb-2">রেকর্ড</p>
+                <h3 className="text-xl font-black text-slate-800">{filteredProjects.length} টি</h3>
+             </div>
           </div>
         </div>
 
@@ -207,26 +204,23 @@ export const Reports: React.FC = () => {
             <p className="text-slate-500">এই সময়ের মধ্যে কোনো ডাটা পাওয়া যায়নি।</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="bg-white p-6 rounded-2xl border h-80">
-              <h3 className="text-lg font-bold text-slate-800 mb-6">আয় বনাম খরচ</h3>
+          <div className="flex flex-col gap-6">
+            <div className="bg-white p-6 rounded-2xl border h-64">
+              <h3 className="text-sm font-bold text-slate-800 mb-6">আয় বনাম খরচ</h3>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="name" />
-                  <YAxis />
+                  <XAxis dataKey="name" tick={{fontSize: 10}} />
                   <Tooltip />
-                  <Legend />
                   <Bar dataKey="income" name="আয়" fill="#6366f1" />
-                  <Bar dataKey="expense" name="খরচ" fill="#ef4444" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
-            <div className="bg-white p-6 rounded-2xl border h-80">
-              <h3 className="text-lg font-bold text-slate-800 mb-6">প্রজেক্টের ধরন</h3>
+            <div className="bg-white p-6 rounded-2xl border h-64">
+              <h3 className="text-sm font-bold text-slate-800 mb-6">প্রজেক্টের ধরন</h3>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={typeData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="value">
+                  <Pie data={typeData} cx="50%" cy="50%" innerRadius={40} outerRadius={80} paddingAngle={5} dataKey="value">
                     {typeData.map((_entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}

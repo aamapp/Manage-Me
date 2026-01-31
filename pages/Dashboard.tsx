@@ -11,8 +11,7 @@ import {
   Clock, 
   Wallet,
   ArrowUpRight,
-  Inbox,
-  ChevronRight
+  Inbox
 } from 'lucide-react';
 import { StatCard } from '../components/StatCard';
 import { PROJECT_STATUS_LABELS, PROJECT_TYPE_LABELS } from '../constants';
@@ -62,72 +61,95 @@ export const Dashboard: React.FC = () => {
   const recentProjects = [...projects].sort((a, b) => b.createdat.localeCompare(a.createdat)).slice(0, 5);
 
   return (
-    <div className="space-y-6">
-      {/* Welcome Section */}
-      <div>
-        <h1 className="text-2xl font-bold text-slate-800">স্বাগতম, {user?.name.split(' ')[0]} 👋</h1>
-        <p className="text-slate-500 text-sm">আপনার সাউন্ড ডিজাইন প্রজেক্টের ওভারভিউ</p>
-      </div>
-
-      {/* Stats Grid - optimized for mobile 2x2 */}
+    <div className="space-y-5 w-full max-w-full overflow-hidden pt-2">
+      {/* Stats Grid - Compact 2x2 Layout */}
       <div className="grid grid-cols-2 gap-3">
-        <StatCard title="মোট আয়" value={totalIncome} isCurrency={true} icon={<Wallet size={20} />} />
-        <StatCard title="মোট প্রজেক্ট" value={totalProjects} icon={<Briefcase size={20} />} />
-        <StatCard title="সম্পন্ন" value={completedProjects} icon={<CheckCircle2 size={20} />} />
-        <StatCard title="চলমান" value={ongoingProjects} icon={<Clock size={20} />} />
+        {/* Primary Income Card */}
+        <StatCard 
+          title="মোট আয়" 
+          value={totalIncome} 
+          isCurrency={true} 
+          icon={<Wallet />} 
+          variant="primary"
+        />
+        
+        {/* Secondary Cards */}
+        <StatCard 
+          title="মোট প্রজেক্ট" 
+          value={totalProjects} 
+          icon={<Briefcase />} 
+          variant="default"
+        />
+        <StatCard 
+          title="সম্পন্ন" 
+          value={completedProjects} 
+          icon={<CheckCircle2 />} 
+          variant="success"
+        />
+        <StatCard 
+          title="চলমান" 
+          value={ongoingProjects} 
+          icon={<Clock />} 
+          variant="info"
+        />
       </div>
 
       {/* Chart Section */}
-      <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-bold text-slate-800">মাসিক আয়</h3>
+      <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm w-full overflow-hidden">
+        <div className="flex items-center justify-between mb-5">
+          <div>
+             <h3 className="font-bold text-slate-800 text-sm">মাসিক আয়</h3>
+             <p className="text-[10px] text-slate-400 font-medium mt-0.5">গত ৬ মাসের আয়ের হিসাব</p>
+          </div>
           <button 
             onClick={() => navigate('/reports')}
-            className="text-indigo-600 bg-indigo-50 p-2 rounded-full active:scale-90 transition-transform"
+            className="text-indigo-600 bg-indigo-50 p-2 rounded-xl active:scale-90 transition-transform"
           >
             <ArrowUpRight size={18} />
           </button>
         </div>
         
-        <div className="h-64 w-full">
+        <div className="h-48 w-full -ml-2">
           {!hasChartData ? (
-            <div className="h-full w-full flex flex-col items-center justify-center text-slate-300 gap-3 border-2 border-dashed border-slate-100 rounded-2xl">
-              <Wallet size={32} className="opacity-50" />
-              <p className="text-xs text-center px-4">পেমেন্ট রেকর্ড থাকলে চার্ট দেখা যাবে</p>
+            <div className="h-full w-full flex flex-col items-center justify-center text-slate-300 gap-2 border-2 border-dashed border-slate-100 rounded-2xl ml-2">
+              <Wallet size={28} className="opacity-50" />
+              <p className="text-[10px] text-center px-4 font-medium">পেমেন্ট রেকর্ড থাকলে চার্ট দেখা যাবে</p>
             </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+              <BarChart data={chartData} margin={{ top: 10, right: 0, left: -15, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis 
                   dataKey="name" 
                   axisLine={false} 
                   tickLine={false} 
-                  tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 500}} 
+                  tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 600}} 
+                  dy={10}
                 />
                 <YAxis 
                   axisLine={false} 
                   tickLine={false} 
-                  tick={{fill: '#94a3b8', fontSize: 10}}
+                  tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 500}}
                 />
                 <Tooltip 
-                  cursor={{fill: '#f8fafc'}}
+                  cursor={{fill: '#f8fafc', radius: 8}}
                   contentStyle={{ 
                     borderRadius: '12px', 
                     border: 'none', 
-                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                    fontSize: '12px',
-                    fontWeight: 'bold'
+                    boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    padding: '8px 12px'
                   }}
                   formatter={(value: number) => [`${currency} ${value.toLocaleString('bn-BD')}`, '']}
                 />
                 <Bar 
                   dataKey="income" 
                   radius={[4, 4, 4, 4]} 
-                  barSize={24}
+                  barSize={20}
                 >
                   {chartData.map((_entry, index) => (
-                    <Cell key={`cell-${index}`} fill={index === 5 ? '#6366f1' : '#e0e7ff'} />
+                    <Cell key={`cell-${index}`} fill={index === 5 ? '#6366f1' : '#cbd5e1'} />
                   ))}
                 </Bar>
               </BarChart>
@@ -138,17 +160,17 @@ export const Dashboard: React.FC = () => {
 
       {/* Project Status Summary */}
       <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-        <h3 className="font-bold text-slate-800 mb-4">প্রজেক্ট স্ট্যাটাস</h3>
-        <div className="space-y-4">
+        <h3 className="font-bold text-slate-800 mb-4 text-sm">প্রজেক্ট স্ট্যাটাস</h3>
+        <div className="space-y-3">
           {statusSummary.map((status) => (
             <div key={status.label}>
               <div className="flex justify-between items-center mb-1.5 text-xs">
-                <span className="text-slate-600 font-medium">{status.label}</span>
-                <span className="font-bold text-slate-800">{status.count} টি</span>
+                <span className="text-slate-600 font-bold">{status.label}</span>
+                <span className="font-bold text-slate-800 bg-slate-50 px-2 py-0.5 rounded text-[10px]">{status.count}</span>
               </div>
-              <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+              <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                 <div 
-                  className={`${status.color} h-full transition-all duration-1000 rounded-full`} 
+                  className={`${status.color} h-full transition-all duration-1000 rounded-full shadow-sm`} 
                   style={{ width: `${totalProjects > 0 ? (status.count / totalProjects) * 100 : 0}%` }} 
                 />
               </div>
@@ -158,21 +180,21 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* Recent Projects List (Cards) */}
-      <div>
+      <div className="pb-6">
         <div className="flex items-center justify-between mb-3 px-1">
-          <h3 className="font-bold text-slate-800 text-lg">সাম্প্রতিক প্রজেক্ট</h3>
+          <h3 className="font-bold text-slate-800 text-sm">সাম্প্রতিক প্রজেক্ট</h3>
           <button 
             onClick={() => navigate('/projects')}
-            className="text-indigo-600 text-sm font-semibold hover:underline"
+            className="text-indigo-600 text-[10px] font-bold bg-indigo-50 px-2.5 py-1 rounded-full hover:bg-indigo-100 transition-colors"
           >
             সব দেখুন
           </button>
         </div>
         
         {recentProjects.length === 0 ? (
-          <div className="bg-white p-10 rounded-3xl border border-slate-100 text-center text-slate-400">
-              <Inbox size={40} className="mx-auto mb-3 opacity-30" />
-              <p className="text-sm">কোনো প্রজেক্ট নেই</p>
+          <div className="bg-white p-8 rounded-3xl border border-slate-100 text-center text-slate-400">
+              <Inbox size={32} className="mx-auto mb-2 opacity-20" />
+              <p className="text-xs font-medium">কোনো প্রজেক্ট নেই</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -180,21 +202,21 @@ export const Dashboard: React.FC = () => {
               <div 
                 key={p.id} 
                 onClick={() => navigate('/projects')}
-                className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm active:scale-[0.99] transition-transform flex items-center justify-between"
+                className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm active:scale-[0.98] transition-all flex items-center justify-between group"
               >
                 <div className="flex-1 min-w-0 mr-3">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[10px] font-bold uppercase text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md truncate max-w-[80px]">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded truncate max-w-[80px]">
                       {PROJECT_TYPE_LABELS[p.type]}
                     </span>
-                    <span className={`w-2 h-2 rounded-full ${p.status === 'Completed' ? 'bg-emerald-500' : p.status === 'In Progress' ? 'bg-blue-500' : 'bg-amber-500'}`}></span>
+                    <span className={`w-2 h-2 rounded-full ring-1 ring-white ${p.status === 'Completed' ? 'bg-emerald-500' : p.status === 'In Progress' ? 'bg-blue-500' : 'bg-amber-500'}`}></span>
                   </div>
-                  <h4 className="font-bold text-slate-800 text-sm truncate">{p.name}</h4>
-                  <p className="text-xs text-slate-500 truncate">{p.clientname}</p>
+                  <h4 className="font-bold text-slate-800 text-sm truncate mb-0.5">{p.name}</h4>
+                  <p className="text-[11px] text-slate-500 truncate font-medium">{p.clientname}</p>
                 </div>
                 <div className="text-right whitespace-nowrap">
                   <p className="font-bold text-slate-800 text-sm">{currency} {p.totalamount.toLocaleString('bn-BD')}</p>
-                  <p className="text-[10px] text-slate-400 mt-1">{p.deadline}</p>
+                  <p className="text-[9px] text-slate-400 mt-0.5 font-bold bg-slate-50 px-1.5 py-0.5 rounded inline-block">{p.deadline}</p>
                 </div>
               </div>
             ))}

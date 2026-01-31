@@ -24,58 +24,31 @@ export const Signup: React.FC<SignupProps> = ({ onSignup, onGoToLogin }) => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row">
-      {/* Left Section - Brand */}
-      <div className="w-full md:w-1/2 bg-indigo-700 p-8 md:p-16 flex flex-col justify-between text-white relative overflow-hidden">
-        <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-12">
-            <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-indigo-700 font-black text-2xl">
-              M
-            </div>
-            <span className="text-2xl font-bold tracking-tight">{APP_NAME}</span>
-          </div>
-          
-          <div className="max-w-md">
-            <h1 className="text-4xl md:text-5xl font-black mb-6 leading-tight">আপনার সৃজনশীল যাত্রার নতুন শুরু।</h1>
-            <p className="text-indigo-100 text-lg">আমাদের কমিউনিটিতে যোগ দিন এবং আপনার প্রজেক্ট ম্যানেজমেন্টকে নিয়ে যান এক নতুন উচ্চতায়।</p>
-          </div>
+    <div className="min-h-screen flex flex-col bg-slate-50">
+      {/* Brand Header */}
+      <div className="bg-indigo-700 p-8 pt-10 pb-16 rounded-b-[3rem] shadow-xl text-center relative overflow-hidden">
+        <div className="relative z-10 flex flex-col items-center">
+             <h1 className="text-2xl font-black text-white tracking-tight mb-2">নতুন একাউন্ট</h1>
+            <p className="text-indigo-200 text-sm font-medium">আমাদের কমিউনিটিতে যোগ দিন</p>
         </div>
-
-        <div className="relative z-10 pt-12 md:pt-0">
-          <div className="flex items-center gap-4">
-            <div className="flex -space-x-3">
-              {[5, 6, 7, 8].map((i) => (
-                <img key={i} className="w-10 h-10 rounded-full border-2 border-indigo-700 bg-indigo-100" src={`https://picsum.photos/seed/${i + 10}/100/100`} alt="user" />
-              ))}
-            </div>
-            <p className="text-sm text-indigo-100"><span className="font-bold text-white">১০০০+</span> প্রজেক্ট সফলভাবে সম্পন্ন হয়েছে আমাদের প্ল্যাটফর্মে।</p>
-          </div>
-        </div>
-
-        {/* Decorative Elements */}
-        <div className="absolute top-1/2 -right-20 transform -translate-y-1/2 opacity-10">
-          <Music size={400} />
+         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-10 pointer-events-none">
+          <Music size={200} />
         </div>
       </div>
 
-      {/* Right Section - Form */}
-      <div className="w-full md:w-1/2 bg-white flex items-center justify-center p-8 md:p-16">
-        <div className="w-full max-w-md">
-          <div className="mb-10 text-center md:text-left">
-            <button 
+      <div className="flex-1 px-6 -mt-10 relative z-20 pb-10">
+        <div className="bg-white rounded-3xl shadow-xl p-6 border border-slate-100">
+          <button 
               onClick={onGoToLogin}
-              className="flex items-center gap-2 text-indigo-600 font-semibold mb-4 hover:gap-3 transition-all"
+              className="flex items-center gap-2 text-slate-400 font-bold text-xs mb-6 hover:text-indigo-600 transition-colors"
             >
-              <ArrowLeft size={18} />
+              <ArrowLeft size={14} />
               <span>লগইন-এ ফিরে যান</span>
             </button>
-            <h2 className="text-3xl font-bold text-slate-800 mb-2">একাউন্ট তৈরি করুন</h2>
-            <p className="text-slate-500">শুরু করতে নিচের তথ্যগুলো প্রদান করুন</p>
-          </div>
 
-          <form className="space-y-5" onSubmit={handleSubmit}>
+          <form className="space-y-4" onSubmit={handleSubmit}>
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">পূর্ণ নাম</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">পূর্ণ নাম</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
                   <User size={18} />
@@ -84,15 +57,15 @@ export const Signup: React.FC<SignupProps> = ({ onSignup, onGoToLogin }) => {
                   type="text" 
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="আপনার নাম লিখুন" 
-                  className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all outline-none text-slate-900 placeholder:text-slate-400"
+                  placeholder="আপনার নাম" 
+                  className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 font-medium"
                   required
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">ইমেইল এড্রেস</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">ইমেইল</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
                   <Mail size={18} />
@@ -102,14 +75,14 @@ export const Signup: React.FC<SignupProps> = ({ onSignup, onGoToLogin }) => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@example.com" 
-                  className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all outline-none text-slate-900 placeholder:text-slate-400"
+                  className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 font-medium"
                   required
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">পাসওয়ার্ড</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">পাসওয়ার্ড</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
                   <Lock size={18} />
@@ -119,35 +92,26 @@ export const Signup: React.FC<SignupProps> = ({ onSignup, onGoToLogin }) => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••" 
-                  className="w-full pl-11 pr-12 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all outline-none text-slate-900 placeholder:text-slate-400"
+                  className="w-full pl-11 pr-12 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 font-medium"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 p-2"
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
             </div>
 
-            <div className="pt-2">
-              <button 
-                type="submit"
-                className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold text-lg hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200"
-              >
-                নিবন্ধন করুন
-              </button>
-            </div>
+            <button 
+              type="submit"
+              className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-indigo-700 active:scale-95 transition-all shadow-lg shadow-indigo-200 mt-4"
+            >
+              নিবন্ধন করুন
+            </button>
           </form>
-
-          <div className="mt-8 text-center">
-            <p className="text-slate-500">
-              ইতিমধ্যে একাউন্ট আছে? {' '}
-              <button onClick={onGoToLogin} className="text-indigo-600 font-bold hover:underline">লগইন করুন</button>
-            </p>
-          </div>
         </div>
       </div>
     </div>

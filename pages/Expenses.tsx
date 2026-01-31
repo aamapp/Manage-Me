@@ -84,7 +84,7 @@ export const Expenses: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-slate-800">খরচসমূহ</h1>
-          <p className="text-xs text-slate-500">মোট খরচ: <span className="text-rose-600 font-bold">{user?.currency || '৳'} {totalExpenseAll.toLocaleString('bn-BD')}</span></p>
+          <p className="text-xs text-slate-500 font-medium">মোট খরচ: <span className="text-rose-600 font-bold">{user?.currency || '৳'} {totalExpenseAll.toLocaleString('bn-BD')}</span></p>
         </div>
         <button 
           onClick={() => setModalOpen(true)}
@@ -107,11 +107,11 @@ export const Expenses: React.FC = () => {
 
       <div className="space-y-3 pb-20">
         {loading ? (
-          <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-rose-600" /></div>
+          <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-rose-600" size={24} /></div>
         ) : filteredExpenses.length === 0 ? (
           <div className="py-20 text-center text-slate-400">
             <ShoppingCart size={48} className="mx-auto mb-4 opacity-20" />
-            <p>কোনো খরচ নেই</p>
+            <p className="text-sm font-medium">কোনো খরচ নেই</p>
           </div>
         ) : (
           filteredExpenses.map((expense) => (
@@ -122,14 +122,14 @@ export const Expenses: React.FC = () => {
                 </div>
                 <div className="min-w-0">
                   <h3 className="font-bold text-slate-800 text-sm truncate">{expense.notes}</h3>
-                  <p className="text-xs text-slate-500">{EXPENSE_CATEGORY_LABELS[expense.category] || expense.category} • {expense.date}</p>
+                  <p className="text-xs text-slate-500 font-medium">{EXPENSE_CATEGORY_LABELS[expense.category] || expense.category} • {expense.date}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-3 pl-2">
-                <span className="font-bold text-rose-600 text-base">{user?.currency || '৳'} {expense.amount.toLocaleString('bn-BD')}</span>
+              <div className="flex items-center gap-2 pl-2">
+                <span className="font-black text-rose-600 text-base">{user?.currency || '৳'} {expense.amount.toLocaleString('bn-BD')}</span>
                 <button 
                   onClick={() => handleDelete(expense.id)}
-                  className="p-2 bg-slate-50 text-slate-300 hover:text-rose-600 rounded-full"
+                  className="p-2 bg-slate-50 text-slate-300 hover:text-rose-600 rounded-full transition-colors"
                 >
                   <Trash2 size={16} />
                 </button>
@@ -145,7 +145,7 @@ export const Expenses: React.FC = () => {
           <div className="relative bg-white w-full rounded-t-3xl shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[90vh] flex flex-col">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
               <h2 className="text-lg font-bold text-slate-800">নতুন খরচ</h2>
-              <button disabled={isSubmitting} onClick={() => setModalOpen(false)} className="p-2 bg-slate-100 rounded-full text-slate-500">
+              <button disabled={isSubmitting} onClick={() => setModalOpen(false)} className="p-2 bg-slate-100 rounded-full text-slate-500 hover:bg-slate-200">
                 <X size={20} />
               </button>
             </div>
@@ -153,7 +153,7 @@ export const Expenses: React.FC = () => {
               
               <div>
                 <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">বিবরণ</label>
-                <input required type="text" value={newExpense.notes} onChange={e => setNewExpense({...newExpense, notes: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-rose-500 outline-none" placeholder="কিসের জন্য খরচ?" />
+                <input required type="text" value={newExpense.notes} onChange={e => setNewExpense({...newExpense, notes: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-rose-500 outline-none text-sm" placeholder="কিসের জন্য খরচ?" />
               </div>
 
               <div>
@@ -176,7 +176,7 @@ export const Expenses: React.FC = () => {
                 </div>
               </div>
 
-              <button type="submit" disabled={isSubmitting} className="w-full bg-rose-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg shadow-rose-200 active:scale-95 transition-transform flex items-center justify-center gap-2 mt-4 mb-4">
+              <button type="submit" disabled={isSubmitting} className="w-full bg-rose-600 text-white py-4 rounded-2xl font-bold text-base shadow-lg shadow-rose-200 active:scale-95 transition-transform flex items-center justify-center gap-2 mt-4 mb-4">
                 {isSubmitting ? <Loader2 className="animate-spin" /> : <Receipt />}
                 খরচ সেভ করুন
               </button>
