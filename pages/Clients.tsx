@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Users, Plus, Search, Mail, Phone, MoreHorizontal, X, UserCheck, Pencil, Trash2, Loader2 } from 'lucide-react';
+import { Users, Plus, Search, Phone, MoreHorizontal, X, Pencil, Trash2, Loader2, ChevronRight } from 'lucide-react';
 import { CURRENCY } from '../constants';
 import { Client } from '../types';
 import { useAppContext } from '../context/AppContext';
@@ -11,10 +11,10 @@ export const Clients: React.FC = () => {
   const [isModalOpen, setModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [activeClientId, setActiveClientId] = useState<string | null>(null);
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   
   const [newClient, setNewClient] = useState<Partial<Client>>({
     name: '',
@@ -23,27 +23,11 @@ export const Clients: React.FC = () => {
     totalearnings: 0
   });
 
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setOpenMenuId(null);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const handleDeleteClient = async (e: React.MouseEvent, id: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
+  const handleDeleteClient = async (id: string) => {
     if (!user) return;
-    
-    if (window.confirm('আপনি কি নিশ্চিত যে এই ক্লায়েন্টটি ডিলিট করতে চান? ডাটাবেস থেকে এটি চিরতরে মুছে যাবে।')) {
+    if (window.confirm('আপনি কি নিশ্চিত? ক্লায়েন্ট ডিলিট করলে ডাটাবেস থেকে মুছে যাবে।')) {
       setIsDeleting(id);
-      setOpenMenuId(null);
+      setActiveMenuId(null);
       try {
         const { error } = await supabase
           .from('clients')
@@ -56,7 +40,7 @@ export const Clients: React.FC = () => {
         showToast('ক্লায়েন্ট ডিলিট করা হয়েছে', 'success');
         await refreshData();
       } catch (err: any) {
-        showToast(`ডিলিট করতে সমস্যা: ${err.message}`);
+        showToast(`সমস্যা: ${err.message}`);
       } finally {
         setIsDeleting(null);
       }
@@ -74,7 +58,7 @@ export const Clients: React.FC = () => {
     setActiveClientId(client.id);
     setNewClient({ ...client });
     setModalOpen(true);
-    setOpenMenuId(null);
+    setActiveMenuId(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -130,152 +114,111 @@ export const Clients: React.FC = () => {
     (c.contact || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const totalEarningsAll = clients.reduce((acc, curr) => acc + curr.totalearnings, 0);
-
   return (
-    <div className="space-y-6 pb-32">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">ক্লায়েন্ট ও স্টুডিও</h1>
-          <p className="text-slate-500">আপনার সমস্ত ক্লায়েন্টদের তথ্য এখানে ম্যানেজ করুন।</p>
+          <h1 className="text-xl font-bold text-slate-800">ক্লায়েন্ট তালিকা</h1>
+          <p className="text-xs text-slate-500">{clients.length} জন ক্লায়েন্ট</p>
         </div>
         <button 
           onClick={handleOpenAddModal}
-          className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors shadow-sm"
+          className="bg-indigo-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-indigo-200 active:scale-90 transition-transform"
         >
-          <Plus size={20} />
-          <span>নতুন ক্লায়েন্ট</span>
+          <Plus size={24} />
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center">
-             <Users size={24} />
-          </div>
-          <div>
-            <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">মোট ক্লায়েন্ট</p>
-            <h3 className="text-xl font-bold text-slate-800">{clients.length} জন</h3>
-          </div>
-        </div>
+      <div className="bg-white px-4 py-2.5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-2">
+        <Search size={18} className="text-slate-400" />
+        <input 
+          type="text" 
+          placeholder="ক্লায়েন্ট খুঁজুন..." 
+          className="w-full bg-transparent outline-none text-sm font-medium" 
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-visible">
-        <div className="p-4 border-b bg-slate-50/30">
-          <div className="relative w-full max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-            <input 
-              type="text" 
-              placeholder="ক্লায়েন্ট সার্চ করুন..." 
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm text-slate-900 shadow-sm" 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+      <div className="space-y-3 pb-20">
+        {filteredClients.length === 0 ? (
+          <div className="py-20 text-center text-slate-400">
+            <Users size={48} className="mx-auto mb-4 opacity-20" />
+            <p>কোনো ক্লায়েন্ট নেই</p>
           </div>
-        </div>
-        <div className="overflow-x-auto no-scrollbar">
-          {filteredClients.length === 0 ? (
-            <div className="p-20 text-center text-slate-400">
-              <Users size={48} className="mx-auto mb-4 opacity-20" />
-              <p className="font-medium">কোনো ক্লায়েন্ট পাওয়া যায়নি</p>
+        ) : (
+          filteredClients.map(client => (
+            <div key={client.id} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+              <div className="flex justify-between items-start">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-lg">
+                    {client.name ? client.name[0] : 'C'}
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-800">{client.name}</h3>
+                    <p className="text-xs text-slate-500 flex items-center gap-1">
+                      <Phone size={10} /> {client.contact || 'N/A'}
+                    </p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setActiveMenuId(activeMenuId === client.id ? null : client.id)}
+                  className="p-2 -mr-2 text-slate-300 hover:text-indigo-600"
+                >
+                  <MoreHorizontal size={20} />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 mt-4 bg-slate-50 p-3 rounded-xl">
+                 <div className="text-center border-r border-slate-200">
+                   <p className="text-[10px] text-slate-400 font-bold uppercase">প্রজেক্ট</p>
+                   <p className="font-bold text-slate-800">{client.totalprojects} টি</p>
+                 </div>
+                 <div className="text-center">
+                   <p className="text-[10px] text-slate-400 font-bold uppercase">মোট আয়</p>
+                   <p className="font-bold text-indigo-600">{CURRENCY} {client.totalearnings.toLocaleString('bn-BD')}</p>
+                 </div>
+              </div>
+
+              {activeMenuId === client.id && (
+                <div className="mt-3 pt-3 border-t border-slate-100 flex gap-3 animate-in fade-in">
+                  <button onClick={() => handleOpenEditModal(client)} className="flex-1 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 flex items-center justify-center gap-2">
+                    <Pencil size={14} /> এডিট
+                  </button>
+                  <button onClick={() => handleDeleteClient(client.id)} className="flex-1 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-rose-600 flex items-center justify-center gap-2">
+                    <Trash2 size={14} /> ডিলিট
+                  </button>
+                </div>
+              )}
             </div>
-          ) : (
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="bg-slate-50 text-slate-400 font-bold uppercase tracking-wider text-[11px]">
-                  <th className="px-6 py-5 border-b border-slate-100">নাম</th>
-                  <th className="px-6 py-5 border-b border-slate-100">যোগাযোগ</th>
-                  <th className="px-6 py-5 border-b border-slate-100">মোট প্রজেক্ট</th>
-                  <th className="px-6 py-5 border-b border-slate-100">মোট আয়</th>
-                  <th className="px-6 py-5 border-b border-slate-100 text-center">একশন</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {filteredClients.map(client => (
-                  <tr key={client.id} className="hover:bg-slate-50/80 transition-colors group">
-                    <td className="px-6 py-5 whitespace-nowrap">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-sm">
-                          {client.name ? client.name[0] : 'C'}
-                        </div>
-                        <span className="font-bold text-slate-800">{client.name}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-5 whitespace-nowrap">
-                      <div className="flex items-center gap-1.5 text-slate-500">
-                        <Phone size={14} className="text-slate-400" />
-                        <span>{client.contact}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-5 text-slate-600 whitespace-nowrap">
-                      <span className="px-2 py-1 bg-slate-100 rounded text-xs font-bold">{client.totalprojects} টি</span>
-                    </td>
-                    <td className="px-6 py-5 font-bold text-slate-800 whitespace-nowrap">{CURRENCY} {client.totalearnings.toLocaleString('bn-BD')}</td>
-                    <td className="px-6 py-5 text-center relative overflow-visible">
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setOpenMenuId(openMenuId === client.id ? null : client.id);
-                        }}
-                        className="p-2 text-slate-400 hover:text-indigo-600 transition-colors inline-flex items-center justify-center"
-                      >
-                        {isDeleting === client.id ? <Loader2 size={18} className="animate-spin text-rose-500" /> : <MoreHorizontal size={20} />}
-                      </button>
-                      
-                      {openMenuId === client.id && (
-                        <div 
-                          ref={menuRef}
-                          className="absolute right-0 top-full mt-1 w-44 bg-white rounded-xl shadow-2xl border border-slate-100 py-2 animate-in fade-in zoom-in duration-150 z-[100]"
-                        >
-                          <button 
-                            onClick={() => handleOpenEditModal(client)}
-                            className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3 transition-colors"
-                          >
-                            <Pencil size={16} className="text-indigo-500" />
-                            <span className="font-semibold">এডিট করুন</span>
-                          </button>
-                          <button 
-                            onClick={(e) => handleDeleteClient(e, client.id)}
-                            className="w-full text-left px-4 py-2.5 text-sm text-rose-600 hover:bg-rose-50 flex items-center gap-3 transition-colors border-t border-slate-50"
-                          >
-                            <Trash2 size={16} />
-                            <span className="font-semibold">ডিলিট করুন</span>
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+          ))
+        )}
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => !isSubmitting && setModalOpen(false)} />
-          <div className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
-            <div className="px-6 py-4 border-b flex items-center justify-between bg-slate-50">
-              <h2 className="text-xl font-bold text-slate-800">
-                {isEditing ? 'ক্লায়েন্ট এডিট করুন' : 'নতুন ক্লায়েন্ট যোগ করুন'}
+        <div className="fixed inset-0 z-[100] flex items-end justify-center">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => !isSubmitting && setModalOpen(false)} />
+          <div className="relative bg-white w-full rounded-t-3xl shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[90vh] flex flex-col">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-slate-800">
+                {isEditing ? 'ক্লায়েন্ট এডিট' : 'নতুন ক্লায়েন্ট'}
               </h2>
-              <button disabled={isSubmitting} onClick={() => setModalOpen(false)} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
+              <button disabled={isSubmitting} onClick={() => setModalOpen(false)} className="p-2 bg-slate-100 rounded-full text-slate-500">
                 <X size={20} />
               </button>
             </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">ক্লায়েন্ট বা স্টুডিওর নাম</label>
-                <input required type="text" value={newClient.name} onChange={e => setNewClient({...newClient, name: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-slate-900 font-bold" placeholder="যেমন: ডিজিটাল স্টুডিও" />
+                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">নাম</label>
+                <input required type="text" value={newClient.name} onChange={e => setNewClient({...newClient, name: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="ক্লায়েন্ট নাম..." />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">যোগাযোগ (ফোন/ইমেইল)</label>
-                <input required type="text" value={newClient.contact} onChange={e => setNewClient({...newClient, contact: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-slate-900 font-bold" placeholder="০১৭xxxxxxxx" />
+                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">যোগাযোগ</label>
+                <input required type="text" value={newClient.contact} onChange={e => setNewClient({...newClient, contact: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="মোবাইল নম্বর..." />
               </div>
-              <button disabled={isSubmitting} type="submit" className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-100 mt-4 active:scale-95 flex items-center justify-center gap-2">
+              <button disabled={isSubmitting} type="submit" className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg shadow-indigo-200 active:scale-95 transition-transform flex items-center justify-center gap-2 mt-4 mb-4">
                 {isSubmitting && <Loader2 size={20} className="animate-spin" />}
-                {isEditing ? 'আপডেট করুন' : 'সেভ করুন'}
+                সেভ করুন
               </button>
             </form>
           </div>

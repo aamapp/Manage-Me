@@ -14,7 +14,6 @@ export const Income: React.FC = () => {
   const [isModalOpen, setModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [activePaymentId, setActivePaymentId] = useState<string | null>(null);
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [projectSearch, setProjectSearch] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -23,6 +22,9 @@ export const Income: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  
+  // Mobile action menu state
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
 
   const [newPayment, setNewPayment] = useState<any>({
     projectName: '',
@@ -31,9 +33,6 @@ export const Income: React.FC = () => {
     amount: 0,
     method: 'বিকাশ'
   });
-
-  const menuRef = useRef<HTMLDivElement>(null);
-  const suggestionRef = useRef<HTMLDivElement>(null);
 
   const fetchIncome = async () => {
     if (!user) return;
@@ -56,34 +55,17 @@ export const Income: React.FC = () => {
     fetchIncome();
   }, [user]);
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setOpenMenuId(null);
-      }
-      if (suggestionRef.current && !suggestionRef.current.contains(event.target as Node)) {
-        setShowSuggestions(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const handleDeletePayment = async (e: React.MouseEvent, payment: any) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
+  const handleDeletePayment = async (id: string, payment: any) => {
     if (!user) return;
-    
     if (window.confirm('আপনি কি নিশ্চিত? এটি ডিলিট করলে প্রজেক্টের বকেয়া আবার বেড়ে যাবে।')) {
-      setIsDeleting(payment.id);
-      setOpenMenuId(null);
+      setIsDeleting(id);
+      setActiveMenuId(null);
       
       try {
         const { error: delError } = await supabase
           .from('income_records')
           .delete()
-          .eq('id', payment.id)
+          .eq('id', id)
           .eq('userid', user.id);
         
         if (delError) throw delError;
@@ -131,7 +113,7 @@ export const Income: React.FC = () => {
     if (proj) setSelectedProjectDue(proj.dueamount);
     
     setModalOpen(true);
-    setOpenMenuId(null);
+    setActiveMenuId(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -228,227 +210,159 @@ export const Income: React.FC = () => {
   };
 
   const totalIncome = payments.reduce((acc, curr) => acc + curr.amount, 0);
-  const totalDue = projects.reduce((acc, curr) => acc + (curr.dueamount || 0), 0);
 
   return (
-    <div className="space-y-6 pb-24">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">আয় (পেমেন্ট রেকর্ড)</h1>
-          <p className="text-slate-500">সমস্ত পেমেন্ট ডাটাবেসে সেভ হচ্ছে।</p>
+          <h1 className="text-xl font-bold text-slate-800">আয় (পেমেন্ট)</h1>
+          <p className="text-xs text-slate-500">মোট আয়: <span className="text-emerald-600 font-bold">{currency} {totalIncome.toLocaleString('bn-BD')}</span></p>
         </div>
         <button 
           onClick={handleOpenAddModal}
-          className="bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-emerald-700 transition-colors shadow-sm whitespace-nowrap"
+          className="bg-emerald-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-emerald-200 active:scale-90 transition-transform"
         >
-          <Plus size={20} />
-          <span>পেমেন্ট রেকর্ড করুন</span>
+          <Plus size={24} />
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center">
-            <TrendingUp size={24} />
-          </div>
-          <div>
-            <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">মোট আয়</p>
-            <h3 className="text-xl font-bold text-slate-800">{currency} {totalIncome.toLocaleString('bn-BD')}</h3>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center">
-            <Clock size={24} />
-          </div>
-          <div>
-            <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">মোট বকেয়া</p>
-            <h3 className="text-xl font-bold text-rose-600">{currency} {totalDue.toLocaleString('bn-BD')}</h3>
-          </div>
-        </div>
+      <div className="bg-white px-4 py-2.5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-2">
+        <Search size={18} className="text-slate-400" />
+        <input 
+          type="text" 
+          placeholder="পেমেন্ট খুঁজুন..." 
+          className="w-full bg-transparent outline-none text-sm font-medium" 
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-visible">
-        <div className="p-4 border-b bg-slate-50/30">
-          <div className="relative w-full max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-            <input 
-              type="text" 
-              placeholder="সার্চ করুন..." 
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm text-slate-900 shadow-sm" 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-        </div>
-        
+      <div className="space-y-3 pb-20">
         {loading ? (
-          <div className="p-20 flex flex-col items-center justify-center">
-            <Loader2 className="animate-spin text-indigo-600 mb-4" size={32} />
-            <p className="text-slate-500">ডাটা লোড হচ্ছে...</p>
+          <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-emerald-600" /></div>
+        ) : filteredPayments.length === 0 ? (
+          <div className="py-20 text-center text-slate-400">
+            <ReceiptText size={48} className="mx-auto mb-4 opacity-20" />
+            <p>কোনো পেমেন্ট নেই</p>
           </div>
         ) : (
-          <div className="overflow-x-auto min-h-[400px] no-scrollbar">
-            {filteredPayments.length === 0 ? (
-              <div className="p-20 text-center text-slate-400">
-                <ReceiptText size={48} className="mx-auto mb-4 opacity-20" />
-                <p className="font-medium">কোনো পেমেন্ট রেকর্ড পাওয়া যায়নি</p>
+          filteredPayments.map((payment) => (
+            <div key={payment.id} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+              <div className="flex justify-between items-start mb-2">
+                <div className="flex items-center gap-3">
+                   <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                     <DollarSign size={20} />
+                   </div>
+                   <div>
+                     <h3 className="font-bold text-slate-800 text-sm">{payment.projectname}</h3>
+                     <p className="text-xs text-slate-500">{payment.clientname}</p>
+                   </div>
+                </div>
+                <button 
+                  onClick={() => setActiveMenuId(activeMenuId === payment.id ? null : payment.id)}
+                  className="p-2 -mr-2 text-slate-300 hover:text-emerald-600"
+                >
+                  <MoreVertical size={20} />
+                </button>
               </div>
-            ) : (
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="bg-slate-50 text-slate-400 font-bold uppercase tracking-wider text-[11px]">
-                    <th className="px-6 py-5 border-b border-slate-100">তারিখ</th>
-                    <th className="px-6 py-5 border-b border-slate-100">প্রজেক্ট</th>
-                    <th className="px-6 py-5 border-b border-slate-100">ক্লায়েন্ট</th>
-                    <th className="px-6 py-5 border-b border-slate-100">পদ্ধতি</th>
-                    <th className="px-6 py-5 border-b border-slate-100 text-right">পরিমাণ</th>
-                    <th className="px-6 py-5 border-b border-slate-100 text-center">একশন</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {filteredPayments.map((payment) => (
-                    <tr key={payment.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="px-6 py-5 text-slate-500">{payment.date}</td>
-                      <td className="px-6 py-5 font-bold text-slate-800">{payment.projectname}</td>
-                      <td className="px-6 py-5 text-slate-600">{payment.clientname}</td>
-                      <td className="px-6 py-5">
-                        <span className="px-2.5 py-1 bg-slate-100 rounded text-xs font-bold text-slate-500">{payment.method}</span>
-                      </td>
-                      <td className="px-6 py-5 text-right font-bold text-emerald-600">{currency} {payment.amount.toLocaleString('bn-BD')}</td>
-                      <td className="px-6 py-5 text-center relative">
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === payment.id ? null : payment.id); }}
-                          className="p-2 text-slate-400 hover:text-indigo-600"
-                        >
-                          {isDeleting === payment.id ? <Loader2 size={18} className="animate-spin text-rose-500" /> : <MoreVertical size={18} />}
-                        </button>
-                        {openMenuId === payment.id && (
-                          <div ref={menuRef} className="absolute right-0 mt-2 w-40 bg-white rounded-xl shadow-xl border z-50 py-2 animate-in fade-in zoom-in duration-100">
-                            <button onClick={() => handleOpenEditModal(payment)} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
-                              <Pencil size={14} className="text-indigo-500" /> এডিট
-                            </button>
-                            <button onClick={(e) => handleDeletePayment(e, payment)} className="w-full text-left px-4 py-2 text-sm text-rose-600 hover:bg-rose-50 flex items-center gap-2">
-                              <Trash2 size={14} /> ডিলিট
-                            </button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+              
+              <div className="flex justify-between items-end border-t border-slate-50 pt-3 mt-1">
+                <div>
+                   <p className="text-[10px] text-slate-400 font-bold uppercase mb-0.5">তারিখ</p>
+                   <p className="text-xs font-bold text-slate-600 flex items-center gap-1">
+                     <Calendar size={12} /> {payment.date}
+                   </p>
+                </div>
+                <div className="text-right">
+                   <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-500 font-bold mb-1 inline-block">
+                     {payment.method}
+                   </span>
+                   <p className="text-lg font-black text-emerald-600">{currency} {payment.amount.toLocaleString('bn-BD')}</p>
+                </div>
+              </div>
+
+              {activeMenuId === payment.id && (
+                <div className="mt-3 pt-3 border-t border-slate-100 flex gap-3 animate-in fade-in">
+                  <button onClick={() => handleOpenEditModal(payment)} className="flex-1 py-2 bg-slate-50 rounded-xl text-xs font-bold text-slate-600 flex items-center justify-center gap-2">
+                    <Pencil size={14} /> এডিট
+                  </button>
+                  <button onClick={() => handleDeletePayment(payment.id, payment)} className="flex-1 py-2 bg-rose-50 rounded-xl text-xs font-bold text-rose-600 flex items-center justify-center gap-2">
+                    <Trash2 size={14} /> ডিলিট
+                  </button>
+                </div>
+              )}
+            </div>
+          ))
         )}
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[100] flex items-end justify-center">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => !isSubmitting && setModalOpen(false)} />
-          <div className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
-            <div className="px-6 py-4 border-b flex items-center justify-between bg-slate-50">
-              <h2 className="text-xl font-bold text-slate-800">{isEditing ? 'এডিট করুন' : 'পেমেন্ট রেকর্ড'}</h2>
-              <button disabled={isSubmitting} onClick={() => setModalOpen(false)} className="p-2 hover:bg-slate-200 rounded-full text-slate-400">
+          <div className="relative bg-white w-full rounded-t-3xl shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[90vh] flex flex-col">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-slate-800">{isEditing ? 'এডিট পেমেন্ট' : 'নতুন পেমেন্ট'}</h2>
+              <button disabled={isSubmitting} onClick={() => setModalOpen(false)} className="p-2 bg-slate-100 rounded-full text-slate-500">
                 <X size={20} />
               </button>
             </div>
             
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
               {error && <div className="p-3 bg-rose-50 text-rose-600 text-xs rounded-xl font-bold flex items-center gap-2"><AlertCircle size={14} /> {error}</div>}
               
-              <div className="relative" ref={suggestionRef}>
-                <label className="block text-sm font-bold text-slate-700 mb-1">প্রজেক্ট</label>
-                <div className="relative">
-                  <Briefcase size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input 
+              <div className="relative">
+                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">প্রজেক্ট</label>
+                <input 
                     type="text" 
                     value={projectSearch} 
                     onFocus={() => setShowSuggestions(true)} 
                     onChange={e => {setProjectSearch(e.target.value); setShowSuggestions(true);}} 
-                    className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 transition-all text-slate-900 font-bold" 
-                    placeholder="প্রজেক্ট সার্চ করুন..." 
-                  />
-                  {showSuggestions && projectSuggestions.length > 0 && (
-                    <div className="absolute w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl z-[200] max-h-48 overflow-y-auto no-scrollbar py-2">
-                      {projectSuggestions.map(p => (
-                        <button key={p.id} type="button" onClick={() => handleSelectProject(p)} className="w-full text-left px-4 py-2.5 hover:bg-emerald-50 flex flex-col transition-colors group">
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm font-bold text-slate-700 group-hover:text-emerald-700">{p.name}</span>
-                            <span className="text-[10px] font-bold text-rose-500">বকেয়া: {currency}{p.dueamount.toLocaleString('bn-BD')}</span>
-                          </div>
-                          <span className="text-[10px] text-slate-400">{p.clientname}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                {selectedProjectId && (
-                  <div className="mt-2 flex items-center justify-between px-1">
-                    <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1"><Users size={12}/> {newPayment.clientName}</span>
-                    <span className="text-[11px] font-bold text-rose-500 bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-100">
-                      বকেয়া: {currency} {selectedProjectDue.toLocaleString('bn-BD')}
-                    </span>
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none" 
+                    placeholder="প্রজেক্ট খুঁজুন..." 
+                />
+                {showSuggestions && projectSuggestions.length > 0 && (
+                  <div className="absolute bottom-full mb-2 w-full bg-white border border-slate-200 rounded-xl shadow-xl max-h-40 overflow-y-auto z-50">
+                    {projectSuggestions.map(p => (
+                      <div key={p.id} onClick={() => handleSelectProject(p)} className="px-4 py-3 border-b border-slate-50 hover:bg-emerald-50 cursor-pointer">
+                        <div className="font-bold text-sm text-slate-800">{p.name}</div>
+                        <div className="text-xs text-rose-500">বকেয়া: {currency}{p.dueamount}</div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">পরিমাণ ({currency})</label>
-                <div className="relative">
-                  <DollarSign size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input 
-                    required 
-                    type="number" 
-                    value={newPayment.amount || ''} 
-                    onChange={e => setNewPayment({...newPayment, amount: Number(e.target.value)})} 
-                    className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-lg text-emerald-600" 
-                    placeholder="0.00"
-                  />
-                </div>
+                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">পরিমাণ ({currency})</label>
+                <input 
+                  required type="number" 
+                  value={newPayment.amount || ''} 
+                  onChange={e => setNewPayment({...newPayment, amount: Number(e.target.value)})} 
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-black text-xl text-emerald-600 focus:ring-2 focus:ring-emerald-500 outline-none" 
+                  placeholder="0.00"
+                />
               </div>
 
-              <div className="grid grid-cols-1 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">পেমেন্ট তারিখ</label>
-                  <div className="relative">
-                    <CalendarDays size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                    <input 
-                      required 
-                      type="date" 
-                      value={newPayment.date} 
-                      onChange={e => setNewPayment({...newPayment, date: e.target.value})} 
-                      className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 font-semibold text-slate-900" 
-                    />
-                  </div>
+                  <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">তারিখ</label>
+                  <input required type="date" value={newPayment.date} onChange={e => setNewPayment({...newPayment, date: e.target.value})} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none" />
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">পেমেন্ট পদ্ধতি</label>
-                <div className="relative">
-                  <CreditCard size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                  <select 
-                    value={newPayment.method} 
-                    onChange={e => setNewPayment({...newPayment, method: e.target.value})} 
-                    className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-slate-900"
-                  >
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">পদ্ধতি</label>
+                  <select value={newPayment.method} onChange={e => setNewPayment({...newPayment, method: e.target.value})} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none">
                     <option value="বিকাশ">বিকাশ</option>
                     <option value="নগদ">নগদ</option>
                     <option value="রকেট">রকেট</option>
                     <option value="ব্যাংক">ব্যাংক</option>
-                    <option value="নগদ (ক্যাশ)">নগদ (ক্যাশ)</option>
+                    <option value="নগদ (ক্যাশ)">ক্যাশ</option>
                   </select>
                 </div>
               </div>
 
-              <button 
-                disabled={isSubmitting} 
-                type="submit" 
-                className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-100 hover:bg-emerald-700 active:scale-95 transition-all mt-4"
-              >
-                {isSubmitting ? <Loader2 className="animate-spin" size={24} /> : <Wallet size={20} />}
-                {isEditing ? 'আপডেট করুন' : 'সেভ করুন'}
+              <button type="submit" disabled={isSubmitting} className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg shadow-emerald-200 active:scale-95 transition-transform flex items-center justify-center gap-2 mt-4 mb-4">
+                {isSubmitting ? <Loader2 className="animate-spin" /> : <Wallet />}
+                সেভ করুন
               </button>
             </form>
           </div>

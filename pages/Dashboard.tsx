@@ -11,7 +11,8 @@ import {
   Clock, 
   Wallet,
   ArrowUpRight,
-  Inbox
+  Inbox,
+  ChevronRight
 } from 'lucide-react';
 import { StatCard } from '../components/StatCard';
 import { PROJECT_STATUS_LABELS, PROJECT_TYPE_LABELS } from '../constants';
@@ -37,7 +38,6 @@ export const Dashboard: React.FC = () => {
       const mIdx = d.getMonth();
       const year = d.getFullYear();
       
-      // Filter income records for this specific month/year
       const monthlySum = incomeRecords.filter(record => {
         const recordDate = new Date(record.date);
         return recordDate.getMonth() === mIdx && recordDate.getFullYear() === year;
@@ -62,174 +62,142 @@ export const Dashboard: React.FC = () => {
   const recentProjects = [...projects].sort((a, b) => b.createdat.localeCompare(a.createdat)).slice(0, 5);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
+      {/* Welcome Section */}
       <div>
-        <h1 className="text-2xl font-bold text-slate-800">স্বাগতম, আপনার ড্যাশবোর্ড</h1>
-        <p className="text-slate-500">আপনার সাউন্ড ডিজাইন প্রজেক্টগুলোর সংক্ষিপ্ত চিত্র এখানে দেখুন।</p>
+        <h1 className="text-2xl font-bold text-slate-800">স্বাগতম, {user?.name.split(' ')[0]} 👋</h1>
+        <p className="text-slate-500 text-sm">আপনার সাউন্ড ডিজাইন প্রজেক্টের ওভারভিউ</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title="মোট আয়" value={totalIncome} isCurrency={true} icon={<Wallet size={24} />} />
-        <StatCard title="মোট প্রজেক্ট" value={totalProjects} icon={<Briefcase size={24} />} />
-        <StatCard title="সম্পন্ন প্রজেক্ট" value={completedProjects} icon={<CheckCircle2 size={24} />} />
-        <StatCard title="চলমান প্রজেক্ট" value={ongoingProjects} icon={<Clock size={24} />} />
+      {/* Stats Grid - optimized for mobile 2x2 */}
+      <div className="grid grid-cols-2 gap-3">
+        <StatCard title="মোট আয়" value={totalIncome} isCurrency={true} icon={<Wallet size={20} />} />
+        <StatCard title="মোট প্রজেক্ট" value={totalProjects} icon={<Briefcase size={20} />} />
+        <StatCard title="সম্পন্ন" value={completedProjects} icon={<CheckCircle2 size={20} />} />
+        <StatCard title="চলমান" value={ongoingProjects} icon={<Clock size={20} />} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-bold text-slate-800">মাসিক আয় (ছয় মাস)</h3>
-            <button 
-              onClick={() => navigate('/reports')}
-              className="text-indigo-600 text-sm font-medium flex items-center gap-1 hover:underline"
-            >
-              বিস্তারিত রিপোর্ট <ArrowUpRight size={16} />
-            </button>
-          </div>
-          
-          <div className="h-80 w-full flex-1">
-            {!hasChartData ? (
-              <div className="h-full w-full flex flex-col items-center justify-center text-slate-300 gap-4">
-                <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center">
-                   <Wallet size={32} />
-                </div>
-                <p className="text-sm">পর্যাপ্ত আর্থিক তথ্য (পেমেন্ট রেকর্ড) পাওয়া গেলে এখানে চার্ট প্রদর্শিত হবে।</p>
-                <button 
-                  onClick={() => navigate('/income')}
-                  className="text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-100 transition-colors"
-                >
-                  প্রথম আয় রেকর্ড করুন
-                </button>
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis 
-                    dataKey="name" 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{fill: '#64748b', fontSize: 12, fontWeight: 500}} 
-                  />
-                  <YAxis 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{fill: '#64748b', fontSize: 11}}
-                  />
-                  <Tooltip 
-                    cursor={{fill: '#f8fafc'}}
-                    contentStyle={{ 
-                      borderRadius: '12px', 
-                      border: 'none', 
-                      boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-                      fontSize: '12px',
-                      fontWeight: 'bold'
-                    }}
-                    formatter={(value: number) => [`${currency} ${value.toLocaleString('bn-BD')}`, 'আয়']}
-                  />
-                  <Bar 
-                    dataKey="income" 
-                    radius={[6, 6, 0, 0]} 
-                    barSize={32}
-                  >
-                    {chartData.map((_entry, index) => (
-                      <Cell key={`cell-${index}`} fill={index === 5 ? '#6366f1' : '#c7d2fe'} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </div>
+      {/* Chart Section */}
+      <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-slate-800">মাসিক আয়</h3>
+          <button 
+            onClick={() => navigate('/reports')}
+            className="text-indigo-600 bg-indigo-50 p-2 rounded-full active:scale-90 transition-transform"
+          >
+            <ArrowUpRight size={18} />
+          </button>
         </div>
+        
+        <div className="h-64 w-full">
+          {!hasChartData ? (
+            <div className="h-full w-full flex flex-col items-center justify-center text-slate-300 gap-3 border-2 border-dashed border-slate-100 rounded-2xl">
+              <Wallet size={32} className="opacity-50" />
+              <p className="text-xs text-center px-4">পেমেন্ট রেকর্ড থাকলে চার্ট দেখা যাবে</p>
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis 
+                  dataKey="name" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 500}} 
+                />
+                <YAxis 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{fill: '#94a3b8', fontSize: 10}}
+                />
+                <Tooltip 
+                  cursor={{fill: '#f8fafc'}}
+                  contentStyle={{ 
+                    borderRadius: '12px', 
+                    border: 'none', 
+                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                    fontSize: '12px',
+                    fontWeight: 'bold'
+                  }}
+                  formatter={(value: number) => [`${currency} ${value.toLocaleString('bn-BD')}`, '']}
+                />
+                <Bar 
+                  dataKey="income" 
+                  radius={[4, 4, 4, 4]} 
+                  barSize={24}
+                >
+                  {chartData.map((_entry, index) => (
+                    <Cell key={`cell-${index}`} fill={index === 5 ? '#6366f1' : '#e0e7ff'} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </div>
 
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-          <h3 className="text-lg font-bold text-slate-800 mb-6">প্রজেক্ট সামারি</h3>
-          <div className="space-y-4">
-            {statusSummary.map((status) => (
-              <div key={status.label}>
-                <div className="flex justify-between items-center mb-1 text-sm">
-                  <span className="text-slate-600">{status.label}</span>
-                  <span className="font-bold text-slate-800">{status.count} টি</span>
-                </div>
-                <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                  <div 
-                    className={`${status.color} h-full transition-all duration-1000`} 
-                    style={{ width: `${totalProjects > 0 ? (status.count / totalProjects) * 100 : 0}%` }} 
-                  />
-                </div>
+      {/* Project Status Summary */}
+      <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+        <h3 className="font-bold text-slate-800 mb-4">প্রজেক্ট স্ট্যাটাস</h3>
+        <div className="space-y-4">
+          {statusSummary.map((status) => (
+            <div key={status.label}>
+              <div className="flex justify-between items-center mb-1.5 text-xs">
+                <span className="text-slate-600 font-medium">{status.label}</span>
+                <span className="font-bold text-slate-800">{status.count} টি</span>
               </div>
-            ))}
-          </div>
-          <div className="mt-8 pt-8 border-t border-slate-100">
-            <div className="bg-slate-50 p-4 rounded-xl flex items-center gap-4">
-              <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center text-slate-400 shadow-sm">
-                <Clock size={24} />
-              </div>
-              <div>
-                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">পরবর্তী ডেডলাইন</p>
-                <p className="text-sm font-semibold text-slate-600">
-                  {projects.length > 0 ? "শিডিউল চেক করুন" : "কোনো ডেডলাইন নেই"}
-                </p>
+              <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                <div 
+                  className={`${status.color} h-full transition-all duration-1000 rounded-full`} 
+                  style={{ width: `${totalProjects > 0 ? (status.count / totalProjects) * 100 : 0}%` }} 
+                />
               </div>
             </div>
-          </div>
+          ))}
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-          <h3 className="text-lg font-bold text-slate-800">সাম্প্রতিক প্রজেক্টসমূহ</h3>
+      {/* Recent Projects List (Cards) */}
+      <div>
+        <div className="flex items-center justify-between mb-3 px-1">
+          <h3 className="font-bold text-slate-800 text-lg">সাম্প্রতিক প্রজেক্ট</h3>
           <button 
             onClick={() => navigate('/projects')}
             className="text-indigo-600 text-sm font-semibold hover:underline"
           >
-            সব প্রজেক্ট দেখুন
+            সব দেখুন
           </button>
         </div>
         
         {recentProjects.length === 0 ? (
-          <div className="p-12 text-center text-slate-400">
-              <Inbox size={48} className="mx-auto mb-4 opacity-20" />
-              <p className="text-sm">সাম্প্রতিক কোনো প্রজেক্ট পাওয়া যায়নি</p>
+          <div className="bg-white p-10 rounded-3xl border border-slate-100 text-center text-slate-400">
+              <Inbox size={40} className="mx-auto mb-3 opacity-30" />
+              <p className="text-sm">কোনো প্রজেক্ট নেই</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-slate-500">
-                <tr>
-                  <th className="px-6 py-4 font-medium">প্রজেক্ট</th>
-                  <th className="px-6 py-4 font-medium">ক্লায়েন্ট</th>
-                  <th className="px-6 py-4 font-medium">টাইপ</th>
-                  <th className="px-6 py-4 font-medium">স্ট্যাটাস</th>
-                  <th className="px-6 py-4 text-right">বাজেট</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {recentProjects.map(p => (
-                  <tr key={p.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4 font-bold text-slate-800">{p.name}</td>
-                    <td className="px-6 py-4 text-slate-600">{p.clientname}</td>
-                    <td className="px-6 py-4">
-                      <span className="text-[10px] font-bold uppercase text-indigo-600 bg-indigo-50 px-2 py-1 rounded">
-                        {PROJECT_TYPE_LABELS[p.type]}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2 py-1 rounded-full text-[10px] font-bold
-                        ${p.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' : 
-                          p.status === 'In Progress' ? 'bg-blue-100 text-blue-700' : 
-                          'bg-amber-100 text-amber-700'}
-                      `}>
-                        {PROJECT_STATUS_LABELS[p.status]}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right font-bold text-slate-800">
-                      {currency} {(p.totalamount || 0).toLocaleString('bn-BD')}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="space-y-3">
+            {recentProjects.map(p => (
+              <div 
+                key={p.id} 
+                onClick={() => navigate('/projects')}
+                className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm active:scale-[0.99] transition-transform flex items-center justify-between"
+              >
+                <div className="flex-1 min-w-0 mr-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[10px] font-bold uppercase text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md truncate max-w-[80px]">
+                      {PROJECT_TYPE_LABELS[p.type]}
+                    </span>
+                    <span className={`w-2 h-2 rounded-full ${p.status === 'Completed' ? 'bg-emerald-500' : p.status === 'In Progress' ? 'bg-blue-500' : 'bg-amber-500'}`}></span>
+                  </div>
+                  <h4 className="font-bold text-slate-800 text-sm truncate">{p.name}</h4>
+                  <p className="text-xs text-slate-500 truncate">{p.clientname}</p>
+                </div>
+                <div className="text-right whitespace-nowrap">
+                  <p className="font-bold text-slate-800 text-sm">{currency} {p.totalamount.toLocaleString('bn-BD')}</p>
+                  <p className="text-[10px] text-slate-400 mt-1">{p.deadline}</p>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>

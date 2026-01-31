@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, Search, MoreVertical, Calendar, DollarSign, Briefcase, X, FolderOpen, Pencil, Trash2, Users, FileText, CheckCircle2, Clock, UserPlus, CalendarDays, Loader2, AlertCircle } from 'lucide-react';
+import { Plus, Search, MoreVertical, Calendar, DollarSign, Briefcase, X, FolderOpen, Pencil, Trash2, Users, FileText, CheckCircle2, Clock, UserPlus, CalendarDays, Loader2, AlertCircle, ChevronDown, Filter } from 'lucide-react';
 import { PROJECT_STATUS_LABELS, PROJECT_TYPE_LABELS } from '../constants';
 import { Project, ProjectStatus, ProjectType, Client } from '../types';
 import { useAppContext } from '../context/AppContext';
@@ -13,10 +13,12 @@ export const Projects: React.FC = () => {
   const [isModalOpen, setModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  
+  // For mobile dropdown menu on cards
+  const [actionMenuOpenId, setActionMenuOpenId] = useState<string | null>(null);
   
   const [showClientSuggestions, setShowClientSuggestions] = useState(false);
   const [clientSearch, setClientSearch] = useState('');
@@ -33,31 +35,12 @@ export const Projects: React.FC = () => {
     notes: ''
   });
 
-  const menuRef = useRef<HTMLDivElement>(null);
-  const suggestionRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setOpenMenuId(null);
-      }
-      if (suggestionRef.current && !suggestionRef.current.contains(event.target as Node)) {
-        setShowClientSuggestions(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const handleDeleteProject = async (e: React.MouseEvent, id: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
+  const handleDeleteProject = async (id: string) => {
     if (!user) return;
     
-    if (window.confirm('আপনি কি নিশ্চিত যে এই প্রজেক্টটি ডিলিট করতে চান? এই প্রজেক্টের সাথে সংশ্লিষ্ট কোনো আয় রেকর্ড থাকলে আগে সেগুলো ডিলিট করতে হবে।')) {
+    if (window.confirm('আপনি কি নিশ্চিত যে এই প্রজেক্টটি ডিলিট করতে চান?')) {
       setIsDeleting(id);
-      setOpenMenuId(null);
+      setActionMenuOpenId(null);
       
       try {
         const { error } = await supabase
@@ -68,13 +51,12 @@ export const Projects: React.FC = () => {
         
         if (error) {
           if (error.code === '23503') {
-            throw new Error('এই প্রজেক্টের পেমেন্ট রেকর্ড ডাটাবেসে আছে। প্রথমে "আয়" পেজ থেকে রেকর্ডগুলো ডিলিট করুন।');
+            throw new Error('এই প্রজেক্টের পেমেন্ট রেকর্ড আছে। আগে আয় রেকর্ড মুছুন।');
           }
           throw error;
         }
         
         showToast('প্রজেক্ট ডিলিট করা হয়েছে', 'success');
-        // Optimistically update local state for better UX
         setProjects(prev => prev.filter(p => p.id !== id));
         await refreshData();
       } catch (err: any) {
@@ -102,8 +84,7 @@ export const Projects: React.FC = () => {
     setModalOpen(true);
   };
 
-  const handleOpenEditModal = (e: React.MouseEvent, project: Project) => {
-    e.stopPropagation();
+  const handleOpenEditModal = (project: Project) => {
     setIsEditing(true);
     setActiveProjectId(project.id);
     setClientSearch(project.clientname);
@@ -113,7 +94,7 @@ export const Projects: React.FC = () => {
       deadline: project.deadline ? project.deadline.split('T')[0] : ''
     });
     setModalOpen(true);
-    setOpenMenuId(null);
+    setActionMenuOpenId(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -193,7 +174,7 @@ export const Projects: React.FC = () => {
   const clientSuggestions = clients.filter(c => 
     (c.name || '').toLowerCase().includes(clientSearch.toLowerCase())
   );
-
+  
   const isNewClient = clientSearch && !clients.some(c => c.name.toLowerCase() === clientSearch.trim().toLowerCase());
 
   const handleSelectClient = (client: Client) => {
@@ -203,196 +184,226 @@ export const Projects: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-4">
+      {/* Header & Add Button */}
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">প্রজেক্ট তালিকা</h1>
-          <p className="text-slate-500">আপনার সমস্ত ডাটা ডাটাবেসে সুরক্ষিত আছে।</p>
+          <h1 className="text-xl font-bold text-slate-800">প্রজেক্ট তালিকা</h1>
+          <p className="text-xs text-slate-500">{filteredProjects.length} টি প্রজেক্ট পাওয়া গেছে</p>
         </div>
         <button 
           onClick={handleOpenAddModal}
-          className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors shadow-sm"
+          className="bg-indigo-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-indigo-200 active:scale-90 transition-transform"
         >
-          <Plus size={20} />
-          <span>নতুন প্রজেক্ট</span>
+          <Plus size={24} />
         </button>
       </div>
 
-      <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col md:flex-row gap-4">
-        <div className="flex-1 flex items-center bg-slate-50 px-4 py-2.5 rounded-xl gap-2 border border-slate-200 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
+      {/* Search & Filter */}
+      <div className="flex gap-2">
+        <div className="flex-1 bg-white rounded-2xl border border-slate-200 px-4 py-2.5 flex items-center gap-2 shadow-sm">
           <Search size={18} className="text-slate-400" />
           <input 
             type="text" 
-            placeholder="প্রজেক্ট বা ক্লায়েন্ট নাম সার্চ করুন..." 
-            className="bg-transparent border-none focus:ring-0 text-sm w-full outline-none text-slate-900"
+            placeholder="সার্চ..." 
+            className="w-full bg-transparent outline-none text-sm font-medium"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 no-scrollbar">
-          <button onClick={() => setFilter('All')} className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors whitespace-nowrap ${filter === 'All' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}>সবগুলো</button>
-          {Object.entries(PROJECT_STATUS_LABELS).map(([key, label]) => (
-            <button key={key} onClick={() => setFilter(key as ProjectStatus)} className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors whitespace-nowrap ${filter === key ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}>{label}</button>
-          ))}
+        <div className="relative">
+          <select 
+            value={filter}
+            onChange={(e) => setFilter(e.target.value as any)}
+            className="appearance-none bg-white border border-slate-200 text-slate-700 py-2.5 pl-4 pr-10 rounded-2xl text-sm font-bold shadow-sm outline-none focus:border-indigo-500"
+          >
+            <option value="All">সবগুলো</option>
+            {Object.entries(PROJECT_STATUS_LABELS).map(([key, label]) => (
+              <option key={key} value={key}>{label}</option>
+            ))}
+          </select>
+          <Filter size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
         </div>
       </div>
 
-      {filteredProjects.length === 0 ? (
-        <div className="bg-white rounded-3xl border-2 border-dashed border-slate-200 p-20 flex flex-col items-center justify-center text-center">
-          <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center text-slate-300 mb-6">
-            <FolderOpen size={40} />
+      {/* Projects List (Cards) */}
+      <div className="space-y-4 pb-20">
+        {filteredProjects.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+            <FolderOpen size={48} className="mb-4 opacity-20" />
+            <p className="text-sm font-medium">কোনো প্রজেক্ট নেই</p>
           </div>
-          <h3 className="text-xl font-bold text-slate-800 mb-2">কোন প্রজেক্ট পাওয়া যায়নি</h3>
-          <p className="text-slate-500 max-w-xs mb-8">নতুন প্রজেক্ট শুরু করতে "নতুন প্রজেক্ট" বাটনে ক্লিক করুন।</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {filteredProjects.map((p) => (
-            <div key={p.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow group relative">
-              <div className="absolute top-4 right-4 z-10">
+        ) : (
+          filteredProjects.map((p) => (
+            <div key={p.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+              {/* Card Header */}
+              <div className="p-4 border-b border-slate-50 flex justify-between items-start">
+                <div className="flex-1 min-w-0 mr-3">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
+                    {PROJECT_TYPE_LABELS[p.type]}
+                  </span>
+                  <h3 className="font-bold text-slate-800 text-base mt-1.5 truncate">{p.name}</h3>
+                  <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+                    <Users size={12} /> {p.clientname}
+                  </p>
+                </div>
                 <button 
-                  onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === p.id ? null : p.id); }}
-                  className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-slate-50 rounded-lg transition-colors"
+                  onClick={() => setActionMenuOpenId(actionMenuOpenId === p.id ? null : p.id)}
+                  className="p-2 -mr-2 text-slate-300 hover:text-indigo-600 active:bg-slate-50 rounded-full"
                 >
-                   {isDeleting === p.id ? <Loader2 size={18} className="animate-spin text-rose-500" /> : <MoreVertical size={20} />}
+                  <MoreVertical size={20} />
                 </button>
-                {openMenuId === p.id && (
-                  <div ref={menuRef} className="absolute right-0 mt-2 w-44 bg-white rounded-xl shadow-xl border border-slate-100 py-2 animate-in fade-in zoom-in duration-100 z-50">
-                    <button onClick={(e) => handleOpenEditModal(e, p)} className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3 transition-colors">
-                      <Pencil size={16} className="text-indigo-500" />
-                      <span className="font-semibold">এডিট করুন</span>
-                    </button>
-                    <button 
-                      onClick={(e) => handleDeleteProject(e, p.id)} 
-                      className="w-full text-left px-4 py-2.5 text-sm text-rose-600 hover:bg-rose-50 flex items-center gap-3 transition-colors"
-                    >
-                      <Trash2 size={16} />
-                      <span className="font-semibold">ডিলিট করুন</span>
-                    </button>
+              </div>
+
+              {/* Action Menu (Dropdown inside card) */}
+              {actionMenuOpenId === p.id && (
+                <div className="bg-slate-50 px-4 py-2 flex gap-3 animate-in slide-in-from-top-2 duration-200">
+                  <button onClick={() => handleOpenEditModal(p)} className="flex-1 flex items-center justify-center gap-2 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-indigo-600 shadow-sm active:scale-95">
+                    <Pencil size={14} /> এডিট
+                  </button>
+                  <button onClick={() => handleDeleteProject(p.id)} className="flex-1 flex items-center justify-center gap-2 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-rose-600 shadow-sm active:scale-95">
+                    {isDeleting === p.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} ডিলিট
+                  </button>
+                </div>
+              )}
+
+              {/* Card Body */}
+              <div className="p-4 pt-3">
+                <div className="flex justify-between items-end mb-3">
+                  <div>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase mb-0.5">ডেডলাইন</p>
+                    <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+                      <Calendar size={14} className="text-slate-400" />
+                      {p.deadline}
+                    </div>
                   </div>
+                  <div className="text-right">
+                    <p className="text-[10px] text-slate-400 font-bold uppercase mb-0.5">বাজেট</p>
+                    <p className="text-lg font-bold text-slate-800">{currency} {p.totalamount.toLocaleString('bn-BD')}</p>
+                  </div>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="relative h-2 bg-slate-100 rounded-full overflow-hidden mb-2">
+                  <div 
+                    className="absolute top-0 left-0 h-full bg-indigo-500 rounded-full transition-all duration-500"
+                    style={{ width: `${p.totalamount > 0 ? (p.paidamount / p.totalamount) * 100 : 0}%` }}
+                  />
+                </div>
+                
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] font-bold text-slate-400">
+                    পরিশোধ: {Math.round(p.totalamount > 0 ? (p.paidamount / p.totalamount) * 100 : 0)}%
+                  </span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border
+                    ${p.status === 'Completed' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                      p.status === 'In Progress' ? 'bg-blue-50 text-blue-600 border-blue-100' : 
+                      'bg-amber-50 text-amber-600 border-amber-100'}
+                  `}>
+                    {PROJECT_STATUS_LABELS[p.status]}
+                  </span>
+                </div>
+
+                {p.dueamount > 0 && (
+                   <div className="mt-3 pt-2 border-t border-slate-50 flex justify-between items-center">
+                     <span className="text-xs font-medium text-slate-500">বাকি আছে</span>
+                     <span className="text-sm font-bold text-rose-500">{currency} {p.dueamount.toLocaleString('bn-BD')}</span>
+                   </div>
                 )}
               </div>
-              <div className="mb-4">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2 py-1 rounded">{PROJECT_TYPE_LABELS[p.type]}</span>
-                <h3 className="text-lg font-bold text-slate-800 mt-2 line-clamp-1 pr-8">{p.name}</h3>
-                <p className="text-slate-500 text-sm">{p.clientname}</p>
-              </div>
-              <div className="space-y-4 mb-6">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500 text-sm flex items-center gap-1"><DollarSign size={14} /> বাজেট</span>
-                  <span className="font-bold text-slate-800">{currency} {p.totalamount.toLocaleString('bn-BD')}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500 text-sm flex items-center gap-1"><Calendar size={14} /> ডেডলাইন</span>
-                  <span className="font-medium text-slate-700">{p.deadline}</span>
-                </div>
-              </div>
-              <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden mb-2">
-                <div className="bg-indigo-600 h-full transition-all duration-500" style={{ width: `${p.totalamount > 0 ? (p.paidamount / p.totalamount) * 100 : 0}%` }} />
-              </div>
-              <div className="flex justify-between text-xs mb-6">
-                <span className="text-slate-500">পরিশোধিত: {p.totalamount > 0 ? Math.round((p.paidamount / p.totalamount) * 100) : 0}%</span>
-                <span className="text-rose-500 font-semibold">বাকি: {currency} {p.dueamount.toLocaleString('bn-BD')}</span>
-              </div>
-              <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${p.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' : p.status === 'In Progress' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>{PROJECT_STATUS_LABELS[p.status]}</span>
-              </div>
             </div>
-          ))}
-        </div>
-      )}
+          ))
+        )}
+      </div>
 
+      {/* Bottom Sheet Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[100] flex items-end justify-center">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => !isSubmitting && setModalOpen(false)} />
-          <div className="relative bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-visible animate-in fade-in zoom-in duration-200">
-            <div className="px-6 py-4 border-b flex items-center justify-between bg-slate-50 rounded-t-3xl">
-              <h2 className="text-xl font-bold text-slate-800">
-                {isEditing ? 'প্রজেক্ট এডিট করুন' : 'নতুন প্রজেক্ট যোগ করুন'}
+          <div className="relative bg-white w-full rounded-t-3xl shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[90vh] flex flex-col">
+            
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-slate-800">
+                {isEditing ? 'প্রজেক্ট এডিট' : 'নতুন প্রজেক্ট'}
               </h2>
-              <button disabled={isSubmitting} onClick={() => setModalOpen(false)} className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-400 disabled:opacity-50">
+              <button disabled={isSubmitting} onClick={() => setModalOpen(false)} className="p-2 bg-slate-100 rounded-full text-slate-500">
                 <X size={20} />
               </button>
             </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto no-scrollbar overflow-x-visible">
+            
+            {/* Modal Form */}
+            <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
+              
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">প্রজেক্টের নাম</label>
-                <div className="relative">
-                   <Briefcase size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                   <input required type="text" value={newProject.name} onChange={e => setNewProject({...newProject, name: e.target.value})} className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-slate-900 font-bold" placeholder="যেমন: নতুন নাশীদ অ্যালবাম" />
-                </div>
+                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">প্রজেক্ট নাম</label>
+                <input required type="text" value={newProject.name} onChange={e => setNewProject({...newProject, name: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="নাম লিখুন..." />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="relative" ref={suggestionRef}>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">ক্লায়েন্টের নাম</label>
-                  <div className="relative">
-                    <Users size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input required type="text" autoComplete="off" value={clientSearch} onFocus={() => setShowClientSuggestions(true)} onChange={e => {setClientSearch(e.target.value); setShowClientSuggestions(true);}} className={`w-full pl-11 pr-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-slate-900 font-semibold ${showClientSuggestions ? 'border-indigo-300' : 'border-slate-200'}`} placeholder="নাম লিখুন বা সিলেক্ট করুন" />
-                    {showClientSuggestions && (clientSuggestions.length > 0 || isNewClient) && (
-                      <div className="absolute z-[110] w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-1">
-                        <div className="max-h-48 overflow-y-auto no-scrollbar py-2">
-                          {clientSuggestions.map(c => (
-                            <button key={c.id} type="button" onClick={() => handleSelectClient(c)} className="w-full text-left px-4 py-2.5 hover:bg-indigo-50 flex items-center justify-between transition-colors group">
-                              <span className="text-sm font-bold text-slate-700 group-hover:text-indigo-700">{c.name}</span>
-                              <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-500">{c.totalprojects}টি প্রজেক্ট</span>
-                            </button>
-                          ))}
-                          {isNewClient && (
-                            <div className="bg-emerald-50 p-3 px-4 border-t border-slate-100 flex items-center gap-3">
-                              <UserPlus size={16} className="text-emerald-600" />
-                              <p className="text-xs text-slate-700 font-medium leading-tight">"<span className="font-bold text-slate-900">{clientSearch}</span>" নতুন ক্লায়েন্ট হিসেবে যুক্ত হবে।</p>
-                            </div>
-                          )}
-                        </div>
+              <div className="relative">
+                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">ক্লায়েন্ট</label>
+                <input required type="text" value={clientSearch} onFocus={() => setShowClientSuggestions(true)} onChange={e => {setClientSearch(e.target.value); setShowClientSuggestions(true);}} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="ক্লায়েন্ট খুঁজুন..." />
+                
+                {showClientSuggestions && (clientSearch || clientSuggestions.length > 0) && (
+                  <div className="absolute bottom-full mb-2 w-full bg-white border border-slate-200 rounded-xl shadow-xl max-h-40 overflow-y-auto z-50">
+                    {clientSuggestions.map(c => (
+                      <div key={c.id} onClick={() => handleSelectClient(c)} className="px-4 py-3 border-b border-slate-50 hover:bg-indigo-50 font-medium text-sm">
+                        {c.name}
+                      </div>
+                    ))}
+                    {isNewClient && (
+                      <div className="px-4 py-3 bg-emerald-50 text-emerald-700 text-xs font-bold border-t">
+                        + নতুন ক্লায়েন্ট হিসেবে যোগ হবে
                       </div>
                     )}
                   </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                   <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">টাইপ</label>
+                   <select value={newProject.type} onChange={e => setNewProject({...newProject, type: e.target.value})} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none">
+                     {Object.entries(PROJECT_TYPE_LABELS).map(([key, label]) => (
+                       <option key={key} value={key}>{label}</option>
+                     ))}
+                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">প্রজেক্ট টাইপ</label>
-                  <select value={newProject.type} onChange={e => setNewProject({...newProject, type: e.target.value as ProjectType})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-slate-900 font-bold">
-                    {Object.entries(PROJECT_TYPE_LABELS).map(([key, label]) => (
-                      <option key={key} value={key}>{label}</option>
-                    ))}
-                  </select>
+                   <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">স্ট্যাটাস</label>
+                   <select value={newProject.status} onChange={e => setNewProject({...newProject, status: e.target.value})} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none">
+                     {Object.entries(PROJECT_STATUS_LABELS).map(([key, label]) => (
+                       <option key={key} value={key}>{label}</option>
+                     ))}
+                   </select>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">মোট বাজেট ({currency})</label>
-                  <input required type="number" value={newProject.totalamount || ''} onChange={e => setNewProject({...newProject, totalamount: Number(e.target.value)})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-slate-900 font-bold" />
+                  <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">বাজেট ({currency})</label>
+                  <input required type="number" value={newProject.totalamount || ''} onChange={e => setNewProject({...newProject, totalamount: Number(e.target.value)})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 outline-none" placeholder="0" />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">পরিশোধিত ({currency})</label>
-                  <input type="number" value={newProject.paidamount || ''} onChange={e => setNewProject({...newProject, paidamount: Number(e.target.value)})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-bold text-emerald-600" />
+                  <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">পরিশোধ ({currency})</label>
+                  <input type="number" value={newProject.paidamount || ''} onChange={e => setNewProject({...newProject, paidamount: Number(e.target.value)})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-emerald-600 outline-none" placeholder="0" />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">যুক্তের তারিখ</label>
-                  <input required type="date" value={newProject.createdat} onChange={e => setNewProject({...newProject, createdat: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 text-slate-900 font-semibold" />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">ডেডলাইন</label>
-                  <input required type="date" value={newProject.deadline} onChange={e => setNewProject({...newProject, deadline: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 text-slate-900 font-semibold" />
-                </div>
+                 <div>
+                   <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">শুরু</label>
+                   <input required type="date" value={newProject.createdat} onChange={e => setNewProject({...newProject, createdat: e.target.value})} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none" />
+                 </div>
+                 <div>
+                   <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">ডেডলাইন</label>
+                   <input required type="date" value={newProject.deadline} onChange={e => setNewProject({...newProject, deadline: e.target.value})} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none" />
+                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">বর্তমান অবস্থা</label>
-                <select value={newProject.status} onChange={e => setNewProject({...newProject, status: e.target.value as ProjectStatus})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-bold">
-                  {Object.entries(PROJECT_STATUS_LABELS).map(([key, label]) => (
-                    <option key={key} value={key}>{label}</option>
-                  ))}
-                </select>
-              </div>
-
-              <button type="submit" disabled={isSubmitting} className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 disabled:opacity-70 active:scale-95 transition-transform shadow-lg shadow-indigo-100">
-                {isSubmitting && <Loader2 size={24} className="animate-spin" />}
-                {isEditing ? 'পরিবর্তন সেভ করুন' : 'প্রজেক্ট সেভ করুন'}
+              <button type="submit" disabled={isSubmitting} className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg shadow-indigo-200 active:scale-95 transition-transform flex items-center justify-center gap-2 mt-4 mb-4">
+                {isSubmitting ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}
+                সেভ করুন
               </button>
             </form>
           </div>
