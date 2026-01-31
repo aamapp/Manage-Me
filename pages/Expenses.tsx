@@ -99,7 +99,7 @@ export const Expenses: React.FC = () => {
         <input 
           type="text" 
           placeholder="বিবরণ দিয়ে খুঁজুন..." 
-          className="w-full bg-transparent outline-none text-sm font-medium" 
+          className="w-full bg-transparent outline-none text-sm font-bold text-slate-800 placeholder:text-slate-400" 
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
@@ -139,49 +139,52 @@ export const Expenses: React.FC = () => {
         )}
       </div>
 
+      {/* Full Screen Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-end justify-center">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => !isSubmitting && setModalOpen(false)} />
-          <div className="relative bg-white w-full rounded-t-3xl shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[90vh] flex flex-col">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-slate-800">নতুন খরচ</h2>
-              <button disabled={isSubmitting} onClick={() => setModalOpen(false)} className="p-2 bg-slate-100 rounded-full text-slate-500 hover:bg-slate-200">
-                <X size={20} />
+        <div className="fixed inset-0 z-[100] bg-white flex flex-col animate-in slide-in-from-bottom duration-300">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-10">
+              <h2 className="text-xl font-bold text-slate-800">নতুন খরচ</h2>
+              <button disabled={isSubmitting} onClick={() => setModalOpen(false)} className="p-2 bg-slate-50 rounded-full text-slate-500 hover:bg-slate-100 transition-colors">
+                <X size={24} />
               </button>
             </div>
-            <form onSubmit={handleAddExpense} className="p-6 space-y-4 overflow-y-auto">
-              
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">বিবরণ</label>
-                <input required type="text" value={newExpense.notes} onChange={e => setNewExpense({...newExpense, notes: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-rose-500 outline-none text-sm" placeholder="কিসের জন্য খরচ?" />
-              </div>
+            
+            {/* Form */}
+            <div className="flex-1 overflow-y-auto">
+                <form onSubmit={handleAddExpense} className="p-6 space-y-5 pb-24">
+                  
+                  <div>
+                    <label className="text-sm font-bold text-slate-600 mb-2 block">বিবরণ</label>
+                    <input required type="text" value={newExpense.notes} onChange={e => setNewExpense({...newExpense, notes: e.target.value})} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-rose-500 outline-none text-base" placeholder="কিসের জন্য খরচ?" />
+                  </div>
 
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">পরিমাণ ({user?.currency})</label>
-                <input required type="number" value={newExpense.amount || ''} onChange={e => setNewExpense({...newExpense, amount: Number(e.target.value)})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-black text-xl text-rose-600 focus:ring-2 focus:ring-rose-500 outline-none" placeholder="0" />
-              </div>
+                  <div>
+                    <label className="text-sm font-bold text-slate-600 mb-2 block">পরিমাণ ({user?.currency})</label>
+                    <input required type="number" value={newExpense.amount || ''} onChange={e => setNewExpense({...newExpense, amount: Number(e.target.value)})} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-black text-xl text-rose-600 focus:ring-2 focus:ring-rose-500 outline-none" placeholder="0" />
+                  </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                   <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">তারিখ</label>
-                   <input required type="date" value={newExpense.date} onChange={e => setNewExpense({...newExpense, date: e.target.value})} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none" />
-                </div>
-                <div>
-                   <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">ক্যাটাগরি</label>
-                   <select value={newExpense.category} onChange={e => setNewExpense({...newExpense, category: e.target.value})} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none">
-                     {Object.entries(EXPENSE_CATEGORY_LABELS).map(([key, label]) => (
-                       <option key={key} value={key}>{label}</option>
-                     ))}
-                   </select>
-                </div>
-              </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-bold text-slate-600 mb-2 block">তারিখ</label>
+                      <input required type="date" value={newExpense.date} onChange={e => setNewExpense({...newExpense, date: e.target.value})} className="w-full px-3 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none" />
+                    </div>
+                    <div>
+                      <label className="text-sm font-bold text-slate-600 mb-2 block">ক্যাটাগরি</label>
+                      <select value={newExpense.category} onChange={e => setNewExpense({...newExpense, category: e.target.value})} className="w-full px-3 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none">
+                        {Object.entries(EXPENSE_CATEGORY_LABELS).map(([key, label]) => (
+                          <option key={key} value={key}>{label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
 
-              <button type="submit" disabled={isSubmitting} className="w-full bg-rose-600 text-white py-4 rounded-2xl font-bold text-base shadow-lg shadow-rose-200 active:scale-95 transition-transform flex items-center justify-center gap-2 mt-4 mb-4">
-                {isSubmitting ? <Loader2 className="animate-spin" /> : <Receipt />}
-                খরচ সেভ করুন
-              </button>
-            </form>
-          </div>
+                  <button type="submit" disabled={isSubmitting} className="w-full bg-rose-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg shadow-rose-200 active:scale-95 transition-transform flex items-center justify-center gap-2 mt-4">
+                    {isSubmitting ? <Loader2 className="animate-spin" /> : <Receipt />}
+                    খরচ সেভ করুন
+                  </button>
+                </form>
+            </div>
         </div>
       )}
     </div>

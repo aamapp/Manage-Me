@@ -11,7 +11,7 @@ export interface Project {
   paidamount: number;
   dueamount: number;
   status: ProjectStatus;
-  deadline: string;
+  deadline?: string | null;
   createdat: string;
   notes?: string;
   userid: string;
@@ -52,6 +52,7 @@ export interface User {
   name: string;
   phone?: string;
   occupation?: string;
+  avatar_url?: string;
   language: 'bn' | 'en';
   currency: '৳' | '$';
   role: 'user' | 'admin';

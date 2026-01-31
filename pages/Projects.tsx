@@ -16,12 +16,16 @@ export const Projects: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
   
   // New: State to control which card has its menu open
   const [activeCardMenuId, setActiveCardMenuId] = useState<string | null>(null);
   
   const [showClientSuggestions, setShowClientSuggestions] = useState(false);
   const [clientSearch, setClientSearch] = useState('');
+  
+  // Ref for click outside detection
+  const clientInputRef = useRef<HTMLDivElement>(null);
   
   const [newProject, setNewProject] = useState<any>({
     name: '',
@@ -38,8 +42,14 @@ export const Projects: React.FC = () => {
   // Close menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      // Close Card Menu
       if (activeCardMenuId && !(event.target as Element).closest('.action-menu-container')) {
         setActiveCardMenuId(null);
+      }
+      
+      // Close Client Suggestions
+      if (clientInputRef.current && !clientInputRef.current.contains(event.target as Node)) {
+        setShowClientSuggestions(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -80,6 +90,7 @@ export const Projects: React.FC = () => {
 
   const handleOpenAddModal = () => {
     setIsEditing(false);
+    setFormError(null);
     setClientSearch('');
     setNewProject({ 
       name: '',
@@ -97,6 +108,7 @@ export const Projects: React.FC = () => {
 
   const handleOpenEditModal = (project: Project) => {
     setIsEditing(true);
+    setFormError(null);
     setActiveProjectId(project.id);
     setClientSearch(project.clientname);
     setNewProject({
@@ -110,7 +122,18 @@ export const Projects: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newProject.name || !clientSearch || !user) return;
+    setFormError(null);
+    
+    // Validation
+    if (!newProject.name.trim()) {
+      setFormError('প্রজেক্টের নাম আবশ্যক');
+      return;
+    }
+    if (!clientSearch.trim()) {
+      setFormError('ক্লায়েন্টের নাম আবশ্যক');
+      return;
+    }
+    if (!user) return;
     
     setIsSubmitting(true);
     const totalamount = Number(newProject.totalamount) || 0;
@@ -118,6 +141,8 @@ export const Projects: React.FC = () => {
     const dueamount = totalamount - paidamount;
     const clientName = clientSearch.trim();
     const projectName = newProject.name.trim();
+    // Handle optional deadline: send null if empty string
+    const deadlineToSave = newProject.deadline ? newProject.deadline : null;
 
     try {
       const existingClient = clients.find(c => c.name.toLowerCase() === clientName.toLowerCase());
@@ -143,13 +168,14 @@ export const Projects: React.FC = () => {
           paidamount,
           dueamount,
           status: newProject.status,
-          deadline: newProject.deadline,
+          deadline: deadlineToSave,
           notes: newProject.notes
         }).eq('id', activeProjectId).eq('userid', user.id);
 
         if (updateError) throw updateError;
       } else {
-        const { error: insertError } = await supabase.from('projects').insert({
+        // Insert new project and get the returned data to use the ID
+        const { data: insertedProject, error: insertError } = await supabase.from('projects').insert({
           name: projectName,
           clientname: clientName,
           type: newProject.type,
@@ -157,19 +183,34 @@ export const Projects: React.FC = () => {
           paidamount,
           dueamount,
           status: newProject.status,
-          deadline: newProject.deadline,
+          deadline: deadlineToSave,
           notes: newProject.notes,
           userid: user.id
-        });
+        }).select().single();
         
         if (insertError) throw insertError;
+
+        // If paid amount is added during creation, also add it to income records
+        if (paidamount > 0 && insertedProject) {
+          const { error: incomeError } = await supabase.from('income_records').insert({
+            projectid: insertedProject.id,
+            projectname: insertedProject.name,
+            clientname: insertedProject.clientname,
+            amount: paidamount,
+            date: insertedProject.createdat || new Date().toISOString().split('T')[0],
+            method: 'নগদ (ক্যাশ)', // Default method for initial project creation
+            userid: user.id
+          });
+          
+          if (incomeError) console.error('Error auto-creating income record:', incomeError);
+        }
       }
       
       await refreshData();
       setModalOpen(false);
-      showToast(isEditing ? 'প্রজেক্ট আপডেট হয়েছে' : 'প্রজেক্ট সেভ হয়েছে', 'success');
+      showToast(isEditing ? 'প্রজেক্ট আপডেট হয়েছে' : 'প্রজেক্ট সেভ হয়েছে এবং আয় যুক্ত হয়েছে', 'success');
     } catch (err: any) {
-      showToast(err.message);
+      setFormError(err.message || 'ডাটা সেভ করতে সমস্যা হয়েছে');
     } finally {
       setIsSubmitting(false);
     }
@@ -217,7 +258,7 @@ export const Projects: React.FC = () => {
           <input 
             type="text" 
             placeholder="সার্চ..." 
-            className="w-full bg-transparent outline-none text-sm font-medium"
+            className="w-full bg-transparent outline-none text-sm font-bold text-slate-800 placeholder:text-slate-400"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -300,7 +341,7 @@ export const Projects: React.FC = () => {
                     <p className="text-[10px] text-slate-400 font-bold uppercase mb-0.5">ডেডলাইন</p>
                     <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
                       <Calendar size={14} className="text-slate-400" />
-                      {p.deadline}
+                      {p.deadline ? p.deadline : <span className="text-slate-400 text-xs italic">নির্ধারিত নেই</span>}
                     </div>
                   </div>
                   <div className="text-right">
@@ -342,97 +383,96 @@ export const Projects: React.FC = () => {
         )}
       </div>
 
-      {/* Bottom Sheet Modal */}
+      {/* Full Screen Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-end justify-center">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => !isSubmitting && setModalOpen(false)} />
-          <div className="relative bg-white w-full rounded-t-3xl shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[90vh] flex flex-col">
-            
-            {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-slate-800">
+        <div className="fixed inset-0 z-[100] bg-white flex flex-col animate-in slide-in-from-bottom duration-300">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-10">
+              <h2 className="text-xl font-bold text-slate-800">
                 {isEditing ? 'প্রজেক্ট এডিট' : 'নতুন প্রজেক্ট'}
               </h2>
-              <button disabled={isSubmitting} onClick={() => setModalOpen(false)} className="p-2 bg-slate-100 rounded-full text-slate-500 hover:bg-slate-200 transition-colors">
-                <X size={20} />
+              <button disabled={isSubmitting} onClick={() => setModalOpen(false)} className="p-2 bg-slate-50 rounded-full text-slate-500 hover:bg-slate-100 transition-colors">
+                <X size={24} />
               </button>
             </div>
             
-            {/* Modal Form */}
-            <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
-              
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">প্রজেক্ট নাম</label>
-                <input required type="text" value={newProject.name} onChange={e => setNewProject({...newProject, name: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none text-sm" placeholder="নাম লিখুন..." />
-              </div>
+            {/* Scrollable Form Content */}
+            <div className="flex-1 overflow-y-auto">
+                <form onSubmit={handleSubmit} className="p-6 space-y-5 pb-24">
+                  
+                  {/* Smart Error Banner */}
+                  {formError && (
+                    <div className="bg-rose-50 text-rose-600 p-4 rounded-xl flex items-start gap-3 border border-rose-100 animate-in slide-in-from-top-2">
+                       <AlertCircle size={20} className="shrink-0 mt-0.5" />
+                       <div>
+                         <p className="font-bold text-sm">ত্রুটি!</p>
+                         <p className="text-xs font-medium mt-0.5">{formError}</p>
+                       </div>
+                    </div>
+                  )}
 
-              <div className="relative">
-                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">ক্লায়েন্ট</label>
-                <input required type="text" value={clientSearch} onFocus={() => setShowClientSuggestions(true)} onChange={e => {setClientSearch(e.target.value); setShowClientSuggestions(true);}} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none text-sm" placeholder="ক্লায়েন্ট খুঁজুন..." />
-                
-                {showClientSuggestions && (clientSearch || clientSuggestions.length > 0) && (
-                  <div className="absolute bottom-full mb-2 w-full bg-white border border-slate-200 rounded-xl shadow-xl max-h-40 overflow-y-auto z-50">
-                    {clientSuggestions.map(c => (
-                      <div key={c.id} onClick={() => handleSelectClient(c)} className="px-4 py-3 border-b border-slate-50 hover:bg-indigo-50 font-medium text-xs cursor-pointer">
-                        {c.name}
-                      </div>
-                    ))}
-                    {isNewClient && (
-                      <div className="px-4 py-3 bg-emerald-50 text-emerald-700 text-[10px] font-bold border-t">
-                        + নতুন ক্লায়েন্ট হিসেবে যোগ হবে
+                  <div>
+                    <label className="text-sm font-bold text-slate-600 mb-2 block">প্রজেক্ট নাম</label>
+                    <input type="text" value={newProject.name} onChange={e => setNewProject({...newProject, name: e.target.value})} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none text-base" placeholder="নাম লিখুন..." />
+                  </div>
+
+                  <div className="relative" ref={clientInputRef}>
+                    <label className="text-sm font-bold text-slate-600 mb-2 block">ক্লায়েন্ট</label>
+                    <input type="text" value={clientSearch} onFocus={() => setShowClientSuggestions(true)} onChange={e => {setClientSearch(e.target.value); setShowClientSuggestions(true);}} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none text-base" placeholder="ক্লায়েন্ট খুঁজুন..." />
+                    
+                    {showClientSuggestions && (clientSearch || clientSuggestions.length > 0) && (
+                      <div className="absolute top-full mt-1 w-full bg-white border border-slate-100 rounded-xl shadow-2xl max-h-40 overflow-y-auto z-[60]">
+                        {clientSuggestions.map(c => (
+                          <div key={c.id} onClick={() => handleSelectClient(c)} className="px-4 py-3 border-b border-slate-50 hover:bg-indigo-50 font-medium text-sm cursor-pointer transition-colors text-slate-700">
+                            {c.name}
+                          </div>
+                        ))}
+                        {isNewClient && (
+                          <div className="px-4 py-3 bg-emerald-50 text-emerald-700 text-xs font-bold border-t">
+                            + নতুন ক্লায়েন্ট হিসেবে যোগ হবে
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
-                )}
-              </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                   <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">টাইপ</label>
-                   <select value={newProject.type} onChange={e => setNewProject({...newProject, type: e.target.value})} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xs text-slate-800 outline-none">
-                     {Object.entries(PROJECT_TYPE_LABELS).map(([key, label]) => (
-                       <option key={key} value={key}>{label}</option>
-                     ))}
-                   </select>
-                </div>
-                <div>
-                   <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">স্ট্যাটাস</label>
-                   <select value={newProject.status} onChange={e => setNewProject({...newProject, status: e.target.value})} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xs text-slate-800 outline-none">
-                     {Object.entries(PROJECT_STATUS_LABELS).map(([key, label]) => (
-                       <option key={key} value={key}>{label}</option>
-                     ))}
-                   </select>
-                </div>
-              </div>
+                  <div>
+                     <label className="text-sm font-bold text-slate-600 mb-2 block">স্ট্যাটাস</label>
+                     <select value={newProject.status} onChange={e => setNewProject({...newProject, status: e.target.value})} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 outline-none text-base">
+                       {Object.entries(PROJECT_STATUS_LABELS).map(([key, label]) => (
+                         <option key={key} value={key}>{label}</option>
+                       ))}
+                     </select>
+                  </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">বাজেট ({currency})</label>
-                  <input required type="number" value={newProject.totalamount || ''} onChange={e => setNewProject({...newProject, totalamount: Number(e.target.value)})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 outline-none text-sm" placeholder="0" />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">পরিশোধ ({currency})</label>
-                  <input type="number" value={newProject.paidamount || ''} onChange={e => setNewProject({...newProject, paidamount: Number(e.target.value)})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-emerald-600 outline-none text-sm" placeholder="0" />
-                </div>
-              </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-bold text-slate-600 mb-2 block">বাজেট ({currency})</label>
+                      <input type="number" value={newProject.totalamount || ''} onChange={e => setNewProject({...newProject, totalamount: Number(e.target.value)})} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 outline-none text-base" placeholder="0" />
+                    </div>
+                    <div>
+                      <label className="text-sm font-bold text-slate-600 mb-2 block">পরিশোধ ({currency})</label>
+                      <input type="number" value={newProject.paidamount || ''} onChange={e => setNewProject({...newProject, paidamount: Number(e.target.value)})} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-emerald-600 outline-none text-base" placeholder="0" />
+                    </div>
+                  </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                 <div>
-                   <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">শুরু</label>
-                   <input required type="date" value={newProject.createdat} onChange={e => setNewProject({...newProject, createdat: e.target.value})} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xs text-slate-800 outline-none" />
-                 </div>
-                 <div>
-                   <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">ডেডলাইন</label>
-                   <input required type="date" value={newProject.deadline} onChange={e => setNewProject({...newProject, deadline: e.target.value})} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xs text-slate-800 outline-none" />
-                 </div>
-              </div>
+                  <div className="grid grid-cols-2 gap-4">
+                     <div>
+                       <label className="text-sm font-bold text-slate-600 mb-2 block">শুরু</label>
+                       <input required type="date" value={newProject.createdat} onChange={e => setNewProject({...newProject, createdat: e.target.value})} className="w-full px-3 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none" />
+                     </div>
+                     <div>
+                       <label className="text-sm font-bold text-slate-600 mb-2 block">ডেডলাইন (অপশনাল)</label>
+                       <input type="date" value={newProject.deadline} onChange={e => setNewProject({...newProject, deadline: e.target.value})} className="w-full px-3 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none" />
+                     </div>
+                  </div>
 
-              <button type="submit" disabled={isSubmitting} className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold text-base shadow-lg shadow-indigo-200 active:scale-95 transition-transform flex items-center justify-center gap-2 mt-2 mb-4">
-                {isSubmitting ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}
-                সেভ করুন
-              </button>
-            </form>
-          </div>
+                  <button type="submit" disabled={isSubmitting} className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg shadow-indigo-200 active:scale-95 transition-transform flex items-center justify-center gap-2 mt-4">
+                    {isSubmitting ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}
+                    সেভ করুন
+                  </button>
+                </form>
+            </div>
         </div>
       )}
     </div>

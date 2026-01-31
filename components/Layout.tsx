@@ -7,10 +7,11 @@ import {
   BarChart3, Users 
 } from 'lucide-react';
 import { APP_NAME } from '../constants';
+import { User as UserType } from '../types';
 
 interface LayoutProps {
   children: React.ReactNode;
-  user: { name: string; email: string };
+  user: UserType;
   onLogout: () => void;
 }
 
@@ -45,9 +46,17 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
           <span className="font-bold text-slate-800 text-lg tracking-tight">{APP_NAME}</span>
         </div>
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-indigo-50 border border-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold text-sm shadow-sm">
-            {user.name.charAt(0)}
-          </div>
+          {user.avatar_url ? (
+            <img 
+              src={user.avatar_url} 
+              alt={user.name} 
+              className="w-9 h-9 rounded-full border border-slate-200 object-cover shadow-sm"
+            />
+          ) : (
+            <div className="w-9 h-9 bg-indigo-50 border border-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold text-sm shadow-sm">
+              {user.name.charAt(0)}
+            </div>
+          )}
         </div>
       </header>
 
@@ -105,8 +114,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
             <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-8" />
             
             <div className="flex items-center gap-4 mb-8 bg-slate-50 p-5 rounded-3xl border border-slate-100">
-              <div className="w-14 h-14 bg-indigo-600 rounded-full flex items-center justify-center text-white text-xl font-bold shadow-lg shadow-indigo-200">
-                {user.name.charAt(0)}
+               <div className="w-14 h-14 rounded-full overflow-hidden flex-shrink-0 bg-indigo-50 border border-indigo-100 flex items-center justify-center shadow-lg shadow-indigo-200">
+                 {user.avatar_url ? (
+                   <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
+                 ) : (
+                   <span className="text-indigo-600 text-xl font-bold">{user.name.charAt(0)}</span>
+                 )}
               </div>
               <div>
                 <h3 className="font-bold text-xl text-slate-800">{user.name}</h3>

@@ -81,6 +81,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           name: metadata?.name || 'User',
           phone: metadata?.phone || '',
           occupation: metadata?.occupation || '',
+          avatar_url: metadata?.avatar_url || '',
           language: metadata?.language || 'bn',
           currency: metadata?.currency || '৳',
           role: 'user'
@@ -100,6 +101,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           name: metadata?.name || 'User',
           phone: metadata?.phone || '',
           occupation: metadata?.occupation || '',
+          avatar_url: metadata?.avatar_url || '',
           language: metadata?.language || 'bn',
           currency: metadata?.currency || '৳',
           role: 'user'

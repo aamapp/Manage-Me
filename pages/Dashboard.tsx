@@ -216,7 +216,9 @@ export const Dashboard: React.FC = () => {
                 </div>
                 <div className="text-right whitespace-nowrap">
                   <p className="font-bold text-slate-800 text-sm">{currency} {p.totalamount.toLocaleString('bn-BD')}</p>
-                  <p className="text-[9px] text-slate-400 mt-0.5 font-bold bg-slate-50 px-1.5 py-0.5 rounded inline-block">{p.deadline}</p>
+                  <p className="text-[9px] text-slate-400 mt-0.5 font-bold bg-slate-50 px-1.5 py-0.5 rounded inline-block">
+                    {p.deadline ? p.deadline : 'No Date'}
+                  </p>
                 </div>
               </div>
             ))}

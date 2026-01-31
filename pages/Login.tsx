@@ -10,8 +10,8 @@ interface LoginProps {
 
 export const Login: React.FC<LoginProps> = ({ onLogin, onGoToSignup }) => {
   const [showPassword, setShowPassword] = useState(false);
-  const [email, setEmail] = useState('demo@manage-me.com');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

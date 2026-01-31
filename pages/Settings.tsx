@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { User as UserIcon, Bell, Shield, Palette, Globe, Save, CheckCircle2, Loader2 } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { User as UserIcon, Bell, Shield, Palette, Globe, Save, CheckCircle2, Loader2, Camera, UploadCloud, AlertCircle } from 'lucide-react';
 import { APP_NAME } from '../constants';
 import { useAppContext } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
@@ -16,11 +16,72 @@ export const Settings: React.FC = () => {
     currency: user?.currency || '৳'
   });
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0 || !user) return;
+    
+    const file = e.target.files[0];
+    const fileExt = file.name.split('.').pop();
+    // Use timestamp for unique filename
+    const fileName = `${Date.now()}.${fileExt}`;
+    // Organize files by user ID folder (Standard RLS pattern)
+    const filePath = `${user.id}/${fileName}`;
+
+    setIsUploading(true);
+
+    try {
+      // 1. Upload to Supabase Storage 'avatars' bucket
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file, {
+          upsert: true // Allow overwriting if filename exists
+        });
+
+      if (uploadError) {
+        // Handle RLS specific error
+        if (uploadError.message.includes('row-level security') || uploadError.message.includes('violates row-level security policy')) {
+            throw new Error("পারমিশন নেই: Supabase Storage-এ 'avatars' বাকেটে পলিসি (Policy) যুক্ত করুন।");
+        }
+        // Handle missing bucket
+        if (uploadError.message.includes('bucket not found')) {
+            throw new Error("'avatars' নামে স্টোরেজ বাকেট তৈরি করা নেই। Supabase ড্যাশবোর্ডে গিয়ে তৈরি করুন।");
+        }
+        throw uploadError;
+      }
+
+      // 2. Get Public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      // 3. Update User Metadata
+      const { error: updateError } = await supabase.auth.updateUser({
+        data: { avatar_url: publicUrl }
+      });
+
+      if (updateError) throw updateError;
+
+      // 4. Update Local State
+      setUser(prev => prev ? ({ ...prev, avatar_url: publicUrl }) : null);
+      showToast('প্রোফাইল ছবি আপডেট হয়েছে!', 'success');
+
+    } catch (error: any) {
+      console.error(error);
+      showToast(error.message || 'ছবি আপলোড করতে সমস্যা হয়েছে', 'error');
+    } finally {
+      setIsUploading(false);
+      // Reset input so same file can be selected again if needed
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   const handleSave = async () => {
@@ -69,13 +130,45 @@ export const Settings: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        <div className="p-6 border-b flex items-center gap-4 bg-slate-50/50">
-          <div className="w-14 h-14 bg-indigo-600 rounded-full flex items-center justify-center text-white text-xl font-bold">
-            {formData.name ? formData.name.charAt(0) : 'U'}
+        <div className="p-6 border-b flex items-center gap-5 bg-slate-50/50">
+          <div className="relative group">
+            <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-white shadow-lg bg-indigo-100 flex items-center justify-center relative">
+               {user.avatar_url ? (
+                 <img src={user.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+               ) : (
+                 <span className="text-indigo-600 text-3xl font-bold">{formData.name ? formData.name.charAt(0) : 'U'}</span>
+               )}
+               
+               {/* Uploading Overlay */}
+               {isUploading && (
+                 <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
+                   <Loader2 className="animate-spin text-white" size={24} />
+                 </div>
+               )}
+            </div>
+            
+            <button 
+              disabled={isUploading}
+              onClick={() => fileInputRef.current?.click()}
+              className="absolute bottom-0 right-0 bg-indigo-600 text-white p-2 rounded-full shadow-md hover:bg-indigo-700 active:scale-90 transition-transform cursor-pointer z-20"
+              title="ছবি পরিবর্তন করুন"
+            >
+              <Camera size={14} />
+            </button>
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              className="hidden" 
+              accept="image/*"
+              onChange={handleImageUpload}
+            />
           </div>
+          
           <div>
             <h3 className="text-lg font-bold text-slate-800">{formData.name || 'ইউজার'}</h3>
-            <p className="text-slate-500 text-xs">এডিট প্রোফাইল</p>
+            <p className="text-slate-500 text-xs font-medium flex items-center gap-1">
+              {formData.occupation || 'পেশা যুক্ত করা হয়নি'}
+            </p>
           </div>
         </div>
         

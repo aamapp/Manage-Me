@@ -6,10 +6,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Manage-Me | অডিও প্রজেক্ট ম্যানেজমেন্ট</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Baloo+Da+2:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Hind Siliguri"', 'sans-serif'],
+                    },
+                },
+            },
+        }
+    </script>
     <style>
         body {
-            font-family: 'Baloo Da 2', cursive;
+            font-family: 'Hind Siliguri', sans-serif !important;
             background-color: #f8fafc;
         }
         .bg-brand-purple { background-color: #6366f1; }
