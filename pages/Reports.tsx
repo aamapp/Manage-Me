@@ -107,22 +107,32 @@ export const Reports: React.FC = () => {
     const result = [];
     const now = new Date();
     
-    // Generate data for the last 6 months based on the filtered dataset
-    // Note: If a date filter is applied, this chart might look sparse, but it reflects the filtered data correctly.
+    // Generate data for the last 6 months
     for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const mIdx = d.getMonth();
-      const year = d.getFullYear();
+      // Calculate target month and year accurately
+      let targetMonthIndex = now.getMonth() - i;
+      let targetYear = now.getFullYear();
+      
+      // Handle year wrap-around
+      if (targetMonthIndex < 0) {
+        targetMonthIndex += 12;
+        targetYear -= 1;
+      }
 
       const monthlyIncome = filteredProjects
         .filter(p => {
-          const pd = new Date(p.createdat);
-          return pd.getMonth() === mIdx && pd.getFullYear() === year;
+          if (!p.createdat) return false;
+          // Parse string directly to prevent timezone shifts
+          const [yearStr, monthStr] = p.createdat.split('-');
+          const projYear = parseInt(yearStr);
+          const projMonthIndex = parseInt(monthStr) - 1;
+
+          return projMonthIndex === targetMonthIndex && projYear === targetYear;
         })
         .reduce((sum, p) => sum + (p.paidamount || 0), 0);
 
       result.push({
-        name: monthNames[mIdx],
+        name: monthNames[targetMonthIndex],
         income: monthlyIncome,
         expense: 0 
       });

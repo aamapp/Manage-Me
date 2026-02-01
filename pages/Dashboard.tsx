@@ -32,18 +32,30 @@ export const Dashboard: React.FC = () => {
     const result = [];
     const now = new Date();
     
+    // Generate last 6 months
     for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const mIdx = d.getMonth();
-      const year = d.getFullYear();
+      // Calculate target month and year correctly
+      let targetMonthIndex = now.getMonth() - i;
+      let targetYear = now.getFullYear();
       
+      // Handle year wrap-around (e.g. if now is Jan, prev months are last year)
+      if (targetMonthIndex < 0) {
+        targetMonthIndex += 12;
+        targetYear -= 1;
+      }
+
       const monthlySum = incomeRecords.filter(record => {
-        const recordDate = new Date(record.date);
-        return recordDate.getMonth() === mIdx && recordDate.getFullYear() === year;
+        if (!record.date) return false;
+        // Parse "YYYY-MM-DD" directly to avoid timezone issues with new Date()
+        const [yearStr, monthStr] = record.date.split('-');
+        const recYear = parseInt(yearStr);
+        const recMonthIndex = parseInt(monthStr) - 1; // 0-indexed for comparison
+        
+        return recMonthIndex === targetMonthIndex && recYear === targetYear;
       }).reduce((sum, rec) => sum + (rec.amount || 0), 0);
 
       result.push({
-        name: monthNames[mIdx],
+        name: monthNames[targetMonthIndex],
         income: monthlySum 
       });
     }

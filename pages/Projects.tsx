@@ -143,6 +143,7 @@ export const Projects: React.FC = () => {
     const projectName = newProject.name.trim();
     // Handle optional deadline: send null if empty string
     const deadlineToSave = newProject.deadline ? newProject.deadline : null;
+    const createdAtToSave = newProject.createdat || new Date().toISOString().split('T')[0];
 
     try {
       const existingClient = clients.find(c => c.name.toLowerCase() === clientName.toLowerCase());
@@ -169,6 +170,7 @@ export const Projects: React.FC = () => {
           dueamount,
           status: newProject.status,
           deadline: deadlineToSave,
+          createdat: createdAtToSave,
           notes: newProject.notes
         }).eq('id', activeProjectId).eq('userid', user.id);
 
@@ -184,6 +186,7 @@ export const Projects: React.FC = () => {
           dueamount,
           status: newProject.status,
           deadline: deadlineToSave,
+          createdat: createdAtToSave,
           notes: newProject.notes,
           userid: user.id
         }).select().single();
@@ -197,8 +200,8 @@ export const Projects: React.FC = () => {
             projectname: insertedProject.name,
             clientname: insertedProject.clientname,
             amount: paidamount,
-            date: insertedProject.createdat || new Date().toISOString().split('T')[0],
-            method: 'নগদ (ক্যাশ)', // Default method for initial project creation
+            date: createdAtToSave, // Use the project creation date selected in form
+            method: 'বিকাশ', // Default method changed to Bkash
             userid: user.id
           });
           
