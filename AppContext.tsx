@@ -1,0 +1,144 @@
+
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { Project, Client, User, IncomeRecord } from '../types';
+import { supabase, isConfigured } from '../lib/supabase';
+
+interface ToastState {
+  message: string;
+  type: 'success' | 'error';
+}
+
+interface AppContextType {
+  projects: Project[];
+  setProjects: React.Dispatch<React.SetStateAction<Project[]>>;
+  clients: Client[];
+  setClients: React.Dispatch<React.SetStateAction<Client[]>>;
+  incomeRecords: IncomeRecord[];
+  setIncomeRecords: React.Dispatch<React.SetStateAction<IncomeRecord[]>>;
+  user: User | null;
+  setUser: React.Dispatch<React.SetStateAction<User | null>>;
+  loading: boolean;
+  refreshData: () => Promise<void>;
+  toast: ToastState | null;
+  showToast: (message: string, type?: 'success' | 'error') => void;
+  hideToast: () => void;
+}
+
+const AppContext = createContext<AppContextType | undefined>(undefined);
+
+export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [incomeRecords, setIncomeRecords] = useState<IncomeRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState<ToastState | null>(null);
+
+  const showToast = useCallback((message: string, type: 'success' | 'error' = 'error') => {
+    setToast({ message, type });
+  }, []);
+
+  const hideToast = useCallback(() => {
+    setToast(null);
+  }, []);
+
+  const refreshData = async () => {
+    if (!user || !isConfigured) return;
+    try {
+      const [projRes, clientRes, incomeRes] = await Promise.all([
+        supabase.from('projects').select('*').eq('userid', user.id).order('createdat', { ascending: false }),
+        supabase.from('clients').select('*').eq('userid', user.id).order('name', { ascending: true }),
+        supabase.from('income_records').select('*').eq('userid', user.id).order('date', { ascending: false })
+      ]);
+
+      if (projRes.error) showToast(`প্রজেক্ট লোড এরর: ${projRes.error.message}`);
+      if (clientRes.error) showToast(`ক্লায়েন্ট লোড এরর: ${clientRes.error.message}`);
+      if (incomeRes.error) showToast(`আয় রেকর্ড লোড এরর: ${incomeRes.error.message}`);
+      
+      if (projRes.data) setProjects(projRes.data as any);
+      if (clientRes.data) setClients(clientRes.data as any);
+      if (incomeRes.data) setIncomeRecords(incomeRes.data as any);
+    } catch (error: any) {
+      showToast(`কানেকশন এরর: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!isConfigured) {
+      setLoading(false);
+      return;
+    }
+
+    const initSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const metadata = session.user.user_metadata;
+        setUser({
+          id: session.user.id,
+          email: session.user.email || '',
+          name: metadata?.name || 'User',
+          phone: metadata?.phone || '',
+          occupation: metadata?.occupation || '',
+          avatar_url: metadata?.avatar_url || '',
+          language: metadata?.language || 'bn',
+          currency: metadata?.currency || '৳',
+          role: 'user'
+        });
+      }
+      setLoading(false);
+    };
+
+    initSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        const metadata = session.user.user_metadata;
+        setUser({
+          id: session.user.id,
+          email: session.user.email || '',
+          name: metadata?.name || 'User',
+          phone: metadata?.phone || '',
+          occupation: metadata?.occupation || '',
+          avatar_url: metadata?.avatar_url || '',
+          language: metadata?.language || 'bn',
+          currency: metadata?.currency || '৳',
+          role: 'user'
+        });
+      } else {
+        setUser(null);
+        setProjects([]);
+        setClients([]);
+        setIncomeRecords([]);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [showToast]);
+
+  useEffect(() => {
+    if (user) {
+      refreshData();
+    }
+  }, [user]);
+
+  return (
+    <AppContext.Provider value={{ 
+      projects, setProjects, clients, setClients, 
+      incomeRecords, setIncomeRecords,
+      user, setUser, loading, refreshData,
+      toast, showToast, hideToast 
+    }}>
+      {children}
+    </AppContext.Provider>
+  );
+};
+
+export const useAppContext = () => {
+  const context = useContext(AppContext);
+  if (!context) {
+    throw new Error('useAppContext must be used within an AppProvider');
+  }
+  return context;
+};
