@@ -45,8 +45,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans w-full overflow-x-hidden selection:bg-indigo-100 selection:text-indigo-700 flex flex-col">
-      {/* Mobile Header (App Bar) - Fixed to stay at top */}
-      <header className="fixed top-0 inset-x-0 h-16 bg-white/90 backdrop-blur-md border-b border-slate-200/80 flex items-center justify-between px-5 z-40 max-w-[100vw] shadow-sm transition-all duration-200">
+      {/* Mobile Header (App Bar) - Changed to Sticky for better stability */}
+      <header className="sticky top-0 inset-x-0 h-16 bg-white/90 backdrop-blur-md border-b border-slate-200/80 flex items-center justify-between px-5 z-40 max-w-[100vw] shadow-sm transition-all duration-200">
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-indigo-200 ring-2 ring-white">
             M
@@ -69,14 +69,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
       </header>
 
       {/* Main Content Area */}
-      {/* Added pt-20 to compensate for fixed header height */}
-      <main className="flex-1 pt-20 pb-20 px-4 animate-in fade-in duration-300 w-full max-w-[100vw] overflow-x-hidden">
+      {/* Reduced top padding since header is now sticky (takes space in flow) */}
+      <main className="flex-1 pt-4 pb-20 px-4 animate-in fade-in duration-300 w-full max-w-[100vw] overflow-x-hidden">
         {children}
       </main>
 
-      {/* Fixed Bottom Navigation Bar - Thinner & Cleaner */}
+      {/* Fixed Bottom Navigation Bar */}
       <div className="fixed bottom-0 inset-x-0 z-50 bg-white border-t border-slate-100 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] pb-safe">
-        {/* Height reduced to h-[60px] for a thinner look */}
         <nav className="flex justify-between items-center px-6 h-[60px] w-full max-w-lg mx-auto">
           {PRIMARY_NAV.map((item) => {
             const isActive = location.pathname === item.path;
@@ -92,7 +91,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                   ${isActive ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}
                 `}
               >
-                {/* Clean design: No background pill, just color change */}
                 <div className={`transition-transform duration-200 ${isActive ? '-translate-y-0.5' : ''}`}>
                     {item.icon}
                 </div>
@@ -121,7 +119,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
         </nav>
       </div>
 
-      {/* "More" Menu Drawer (Bottom Sheet) */}
+      {/* "More" Menu Drawer */}
       {isMoreMenuOpen && (
         <div className="fixed inset-0 z-[100] flex flex-col justify-end">
           <div 
@@ -129,12 +127,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
             onClick={() => setMoreMenuOpen(false)}
           />
           
-          {/* Made max-height smaller (max-h-[75vh]) and reduced padding for a more compact look */}
           <div className="relative bg-white rounded-t-[2rem] p-4 pb-6 shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[75vh] overflow-y-auto w-full max-w-lg mx-auto border-t border-slate-100">
-            {/* Drag Handle */}
             <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-4" />
             
-            {/* User Profile Card inside Menu */}
             <div className="flex items-center gap-4 mb-5 bg-slate-50 p-3 rounded-3xl border border-slate-100 relative overflow-hidden">
                <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-100 rounded-full -mr-10 -mt-10 opacity-50 blur-xl"></div>
                

@@ -7,7 +7,7 @@ import {
 import { 
   TrendingUp,
   Wallet,
-  RefreshCcw, Clock, Receipt, Download, Share2, Hexagon, X
+  RefreshCcw, Clock, Receipt, Download, Share2, Hexagon, X, AlertCircle
 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { useAppContext } from '../context/AppContext';
@@ -153,14 +153,14 @@ export const Reports: React.FC = () => {
     setIsCapturing(true);
     
     try {
-      // Small delay to ensure DOM is ready
+      // Small delay to ensure DOM is ready and prevent blank areas
       await new Promise(resolve => setTimeout(resolve, 500));
       
       const element = reportRef.current;
       
       // Enhanced configuration for WebView/Mobile compatibility
       const canvas = await html2canvas(element, {
-        scale: 2, // Retain quality
+        scale: 2, // Retain high quality
         backgroundColor: '#ffffff',
         useCORS: true, // Essential for loading external profile images
         allowTaint: false, // Must be false to allow data extraction
@@ -173,33 +173,33 @@ export const Reports: React.FC = () => {
       // 1. Generate Data URL (Base64) - This is the fallback for display
       const dataUrl = canvas.toDataURL('image/png');
       
-      // 2. Generate Blob for Sharing
-      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
+      // 2. Open Preview Modal immediately (most reliable UX)
+      setPreviewImage(dataUrl);
       
-      if (!blob) throw new Error('Blob creation failed');
-
-      const fileName = `Report-${Date.now()}.png`;
-      const file = new File([blob], fileName, { type: 'image/png' });
-
-      // 3. Try Native Share (Preferred for Android)
-      let shared = false;
-      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      // 3. Try Native Share in background (Preferred for Android if supported)
+      if (navigator.share && navigator.canShare) {
           try {
-              await navigator.share({
-                  files: [file],
-                  title: 'Manage-Me Report',
-                  text: `Financial Report for ${user?.name}`
-              });
-              shared = true;
+              const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
+              if (blob) {
+                  const file = new File([blob], `Report-${Date.now()}.png`, { type: 'image/png' });
+                  if (navigator.canShare({ files: [file] })) {
+                    // Slight delay to let modal open first
+                    setTimeout(async () => {
+                        try {
+                            await navigator.share({
+                                files: [file],
+                                title: 'Manage-Me Report',
+                                text: `Financial Report for ${user?.name}`
+                            });
+                        } catch(e) {
+                            // Share cancelled or failed, user still has modal
+                        }
+                    }, 500);
+                  }
+              }
           } catch (error) {
-              console.warn('Native share failed or cancelled, falling back to preview.', error);
+              console.warn('Native share failed or cancelled', error);
           }
-      }
-
-      // 4. If Share failed or not supported, Open Preview Modal
-      // This solves the Android WebView "Download" issue by letting user Long-Press the image
-      if (!shared) {
-          setPreviewImage(dataUrl);
       }
 
       setIsCapturing(false);
@@ -491,16 +491,17 @@ export const Reports: React.FC = () => {
               </div>
 
               <div className="p-4 border-t bg-white">
-                 <div className="bg-amber-50 text-amber-800 p-3 rounded-xl text-xs font-bold mb-3 text-center border border-amber-100">
-                    ছবিটি গ্যালারিতে সেভ করতে ইমেজের উপর <span className="text-indigo-600">লং-প্রেস (Long Press)</span> করুন।
+                 <div className="bg-amber-50 text-amber-800 p-3 rounded-xl text-xs font-bold mb-3 text-center border border-amber-100 flex items-center justify-center gap-2">
+                    <AlertCircle size={16} className="shrink-0" />
+                    <span>ছবিটি গ্যালারিতে সেভ করতে <span className="text-indigo-600 font-black">লং-প্রেস (Long Press)</span> করুন।</span>
                  </div>
                  <a 
                    href={previewImage} 
-                   download={`Report_${new Date().getTime()}.png`}
+                   download={`Report-${new Date().getTime()}.png`}
                    className="w-full bg-indigo-600 text-white py-3.5 rounded-xl font-bold flex justify-center items-center gap-2 text-sm shadow-lg shadow-indigo-200 active:scale-95 transition-transform"
                  >
                     <Download size={18} />
-                    ডাউনলোড বাটন (বিকল্প)
+                    ডাউনলোড
                  </a>
               </div>
            </div>
