@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, Search, MoreVertical, Calendar, DollarSign, Briefcase, X, FolderOpen, Pencil, Trash2, Users, FileText, CheckCircle2, Clock, UserPlus, CalendarDays, Loader2, AlertCircle, ChevronDown, Filter } from 'lucide-react';
+import { Plus, Search, MoreVertical, Calendar, DollarSign, Briefcase, X, FolderOpen, Pencil, Trash2, Users, FileText, CheckCircle2, Clock, UserPlus, CalendarDays, Loader2, AlertCircle, ChevronDown, Filter, Music } from 'lucide-react';
 import { PROJECT_STATUS_LABELS, PROJECT_TYPE_LABELS } from '../constants';
 import { Project, ProjectStatus, ProjectType, Client } from '../types';
 import { useAppContext } from '../context/AppContext';
@@ -293,14 +293,18 @@ export const Projects: React.FC = () => {
             <div key={p.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm relative animate-in slide-in-from-bottom-2 duration-300">
               {/* Card Header */}
               <div className="p-4 border-b border-slate-50 flex justify-between items-start">
-                <div className="flex-1 min-w-0 mr-3">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
-                    {PROJECT_TYPE_LABELS[p.type]}
-                  </span>
-                  <h3 className="font-bold text-slate-800 text-base mt-1.5 truncate">{p.name}</h3>
-                  <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5 font-medium">
-                    <Users size={12} /> {p.clientname}
-                  </p>
+                <div className="flex items-center gap-3 flex-1 min-w-0 mr-3">
+                  {/* Smart Icon / Logo Placeholder */}
+                  <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                     <Music size={20} />
+                  </div>
+                  
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-bold text-slate-800 text-base truncate leading-tight">{p.name}</h3>
+                    <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5 font-medium">
+                      <Users size={12} /> {p.clientname}
+                    </p>
+                  </div>
                 </div>
                 
                 {/* Floating Action Menu Button */}

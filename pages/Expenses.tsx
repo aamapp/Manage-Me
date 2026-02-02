@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { Receipt, Plus, Search, Tag, X, ShoppingCart, Loader2, Trash2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Receipt, Plus, Search, Tag, X, ShoppingCart, Loader2, Trash2, MoreVertical, Pencil } from 'lucide-react';
 import { EXPENSE_CATEGORY_LABELS } from '../constants';
 import { useAppContext } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
@@ -13,8 +13,17 @@ export const Expenses: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   
+  // New states for Edit/Delete menu
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [activeExpenseId, setActiveExpenseId] = useState<string | null>(null);
+  
+  // Category input suggestion states
+  const [showCategorySuggestions, setShowCategorySuggestions] = useState(false);
+  const categoryInputRef = useRef<HTMLDivElement>(null);
+  
   const [newExpense, setNewExpense] = useState<any>({
-    category: 'Studio Rent',
+    category: '',
     date: new Date().toISOString().split('T')[0],
     amount: 0,
     notes: ''
@@ -41,40 +50,128 @@ export const Expenses: React.FC = () => {
     fetchExpenses();
   }, [user]);
 
-  const handleAddExpense = async (e: React.FormEvent) => {
+  // Click outside to close suggestions and menus
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      // Close Category Suggestions
+      if (categoryInputRef.current && !categoryInputRef.current.contains(event.target as Node)) {
+        setShowCategorySuggestions(false);
+      }
+      
+      // Close Action Menu
+      if (activeMenuId && !(event.target as Element).closest('.action-menu-container')) {
+        setActiveMenuId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [activeMenuId]);
+
+  // Derive unique categories from existing expenses for suggestions
+  const uniqueCategories = Array.from(new Set(expenses.map((e: any) => e.category as string).filter(Boolean))) as string[];
+  
+  // Removed default demo categories as per user request
+  const allSuggestions: string[] = uniqueCategories;
+
+  const filteredSuggestions = allSuggestions.filter(c => 
+    (EXPENSE_CATEGORY_LABELS[c] || c).toLowerCase().includes((newExpense.category || '').toLowerCase())
+  );
+
+  const handleSelectCategory = (category: string) => {
+    // Use localized label if available, otherwise use the category key itself
+    const label = EXPENSE_CATEGORY_LABELS[category] || category;
+    setNewExpense({ ...newExpense, category: label });
+    setShowCategorySuggestions(false);
+  };
+
+  const handleOpenAddModal = () => {
+    setIsEditing(false);
+    setActiveExpenseId(null);
+    setNewExpense({ category: '', date: new Date().toISOString().split('T')[0], amount: 0, notes: '' });
+    setModalOpen(true);
+  };
+
+  const handleOpenEditModal = (expense: any) => {
+    setIsEditing(true);
+    setActiveExpenseId(expense.id);
+    setNewExpense({
+      // Use localized label for input field when editing
+      category: EXPENSE_CATEGORY_LABELS[expense.category] || expense.category,
+      date: expense.date,
+      amount: expense.amount,
+      notes: expense.notes
+    });
+    setModalOpen(true);
+    setActiveMenuId(null);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newExpense.amount || !user) return;
+    if (!newExpense.amount || !newExpense.category || !user) return;
     
     setIsSubmitting(true);
-    const { error } = await supabase.from('expenses').insert({
-      category: newExpense.category,
-      amount: Number(newExpense.amount),
-      date: newExpense.date,
-      notes: newExpense.notes,
-      userid: user.id
-    });
+    
+    // Safety Check: Calculate amount if user typed "50+20" but didn't press '='
+    let finalAmount = newExpense.amount;
+    if (typeof finalAmount === 'string' && finalAmount.includes('+')) {
+      finalAmount = finalAmount.split('+').reduce((acc: number, curr: string) => acc + (parseFloat(curr) || 0), 0);
+    }
+    const parsedAmount = Number(finalAmount);
 
-    if (error) {
-      showToast(`সেভ হয়নি: ${error.message}`);
-    } else {
-      showToast('খরচ সফলভাবে সেভ হয়েছে', 'success');
+    try {
+      if (isEditing && activeExpenseId) {
+        // Update existing expense
+        const { error } = await supabase.from('expenses').update({
+          category: newExpense.category,
+          amount: parsedAmount,
+          date: newExpense.date,
+          notes: newExpense.notes
+        }).eq('id', activeExpenseId).eq('userid', user.id);
+
+        if (error) throw error;
+        showToast('খরচ আপডেট হয়েছে', 'success');
+      } else {
+        // Insert new expense
+        const { error } = await supabase.from('expenses').insert({
+          category: newExpense.category,
+          amount: parsedAmount,
+          date: newExpense.date,
+          notes: newExpense.notes,
+          userid: user.id
+        });
+
+        if (error) throw error;
+        showToast('খরচ সফলভাবে সেভ হয়েছে', 'success');
+      }
+      
       setModalOpen(false);
       fetchExpenses();
-      setNewExpense({ category: 'Studio Rent', date: new Date().toISOString().split('T')[0], amount: 0, notes: '' });
+      if (!isEditing) {
+        setNewExpense({ category: '', date: new Date().toISOString().split('T')[0], amount: 0, notes: '' });
+      }
+    } catch (error: any) {
+      showToast(`সমস্যা: ${error.message}`);
+    } finally {
+      setIsSubmitting(false);
     }
-    setIsSubmitting(false);
   };
 
   const handleDelete = async (id: string) => {
     if (window.confirm('আপনি কি এই খরচের রেকর্ডটি মুছে ফেলতে চান?')) {
-      const { error } = await supabase.from('expenses').delete().eq('id', id);
+      setActiveMenuId(null);
+      const { error } = await supabase.from('expenses').delete().eq('id', id).eq('userid', user?.id);
       if (error) showToast(error.message);
-      else fetchExpenses();
+      else {
+        showToast('খরচ মুছে ফেলা হয়েছে', 'success');
+        fetchExpenses();
+      }
     }
   };
 
   const filteredExpenses = expenses.filter(e => 
-    (e.notes || '').toLowerCase().includes(searchTerm.toLowerCase())
+    (e.notes || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+    (e.category || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (EXPENSE_CATEGORY_LABELS[e.category] || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const totalExpenseAll = expenses.reduce((acc, curr) => acc + curr.amount, 0);
@@ -87,7 +184,7 @@ export const Expenses: React.FC = () => {
           <p className="text-xs text-slate-500 font-medium">মোট খরচ: <span className="text-rose-600 font-bold">{user?.currency || '৳'} {totalExpenseAll.toLocaleString('bn-BD')}</span></p>
         </div>
         <button 
-          onClick={() => setModalOpen(true)}
+          onClick={handleOpenAddModal}
           className="bg-rose-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-rose-200 active:scale-90 transition-transform"
         >
           <Plus size={24} />
@@ -98,7 +195,7 @@ export const Expenses: React.FC = () => {
         <Search size={18} className="text-slate-400" />
         <input 
           type="text" 
-          placeholder="বিবরণ দিয়ে খুঁজুন..." 
+          placeholder="বিবরণ বা ক্যাটাগরি দিয়ে খুঁজুন..." 
           className="w-full bg-transparent outline-none text-sm font-bold text-slate-800 placeholder:text-slate-400" 
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
@@ -126,13 +223,38 @@ export const Expenses: React.FC = () => {
                 </div>
               </div>
               <div className="flex items-center gap-2 pl-2">
-                <span className="font-black text-rose-600 text-base">{user?.currency || '৳'} {expense.amount.toLocaleString('bn-BD')}</span>
-                <button 
-                  onClick={() => handleDelete(expense.id)}
-                  className="p-2 bg-slate-50 text-slate-300 hover:text-rose-600 rounded-full transition-colors"
-                >
-                  <Trash2 size={16} />
-                </button>
+                <span className="font-black text-rose-600 text-base mr-1">{user?.currency || '৳'} {expense.amount.toLocaleString('bn-BD')}</span>
+                
+                {/* Action Menu */}
+                <div className="relative action-menu-container">
+                    <button 
+                      onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveMenuId(activeMenuId === expense.id ? null : expense.id);
+                      }}
+                      className={`p-2 -mr-2 rounded-full transition-colors ${activeMenuId === expense.id ? 'bg-rose-50 text-rose-600' : 'text-slate-300 hover:text-rose-600 active:bg-slate-50'}`}
+                    >
+                      <MoreVertical size={20} />
+                    </button>
+
+                    {activeMenuId === expense.id && (
+                        <div className="absolute right-0 top-full mt-1 w-36 bg-white rounded-xl shadow-xl border border-slate-100 z-20 flex flex-col py-1.5 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); handleOpenEditModal(expense); }}
+                                className="w-full px-4 py-2.5 text-left text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-indigo-600 flex items-center gap-2 transition-colors"
+                            >
+                                <Pencil size={14} /> এডিট
+                            </button>
+                            <div className="h-px bg-slate-50 w-full my-0.5"></div>
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); handleDelete(expense.id); }}
+                                className="w-full px-4 py-2.5 text-left text-xs font-bold text-rose-500 hover:bg-rose-50 flex items-center gap-2 transition-colors"
+                            >
+                                <Trash2 size={14} /> ডিলিট
+                            </button>
+                        </div>
+                    )}
+                </div>
               </div>
             </div>
           ))
@@ -144,7 +266,9 @@ export const Expenses: React.FC = () => {
         <div className="fixed inset-0 z-[100] bg-white flex flex-col animate-in slide-in-from-bottom duration-300">
             {/* Header */}
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-10">
-              <h2 className="text-xl font-bold text-slate-800">নতুন খরচ</h2>
+              <h2 className="text-xl font-bold text-slate-800">
+                {isEditing ? 'খরচ এডিট' : 'নতুন খরচ'}
+              </h2>
               <button disabled={isSubmitting} onClick={() => setModalOpen(false)} className="p-2 bg-slate-50 rounded-full text-slate-500 hover:bg-slate-100 transition-colors">
                 <X size={24} />
               </button>
@@ -152,7 +276,7 @@ export const Expenses: React.FC = () => {
             
             {/* Form */}
             <div className="flex-1 overflow-y-auto">
-                <form onSubmit={handleAddExpense} className="p-6 space-y-5 pb-24">
+                <form onSubmit={handleSubmit} className="p-6 space-y-5 pb-24">
                   
                   <div>
                     <label className="text-sm font-bold text-slate-600 mb-2 block">বিবরণ</label>
@@ -160,8 +284,31 @@ export const Expenses: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="text-sm font-bold text-slate-600 mb-2 block">পরিমাণ ({user?.currency})</label>
-                    <input required type="number" value={newExpense.amount || ''} onChange={e => setNewExpense({...newExpense, amount: Number(e.target.value)})} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-black text-xl text-rose-600 focus:ring-2 focus:ring-rose-500 outline-none" placeholder="0" />
+                    <label className="text-sm font-bold text-slate-600 mb-2 block">
+                        পরিমাণ ({user?.currency})
+                        <span className="text-[10px] text-slate-400 font-normal ml-2">(হিসাব করতে 50+20= লিখুন)</span>
+                    </label>
+                    <input 
+                      required 
+                      type="text" 
+                      inputMode="decimal"
+                      value={newExpense.amount || ''} 
+                      onChange={(e) => {
+                          const val = e.target.value;
+                          // 1. Calculate if ends with '='
+                          if (val.endsWith('=')) {
+                              const parts = val.slice(0, -1).split('+');
+                              const sum = parts.reduce((acc: number, curr: string) => acc + (parseFloat(curr) || 0), 0);
+                              setNewExpense({...newExpense, amount: sum});
+                          } 
+                          // 2. Allow numbers, decimal points, and '+' only
+                          else if (/^[0-9.+\s]*$/.test(val)) {
+                              setNewExpense({...newExpense, amount: val});
+                          }
+                      }} 
+                      className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-black text-xl text-rose-600 focus:ring-2 focus:ring-rose-500 outline-none" 
+                      placeholder="0 বা 50+20=" 
+                    />
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
@@ -169,13 +316,37 @@ export const Expenses: React.FC = () => {
                       <label className="text-sm font-bold text-slate-600 mb-2 block">তারিখ</label>
                       <input required type="date" value={newExpense.date} onChange={e => setNewExpense({...newExpense, date: e.target.value})} className="w-full px-3 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none" />
                     </div>
-                    <div>
+                    
+                    {/* Category Input with Suggestions */}
+                    <div className="relative" ref={categoryInputRef}>
                       <label className="text-sm font-bold text-slate-600 mb-2 block">ক্যাটাগরি</label>
-                      <select value={newExpense.category} onChange={e => setNewExpense({...newExpense, category: e.target.value})} className="w-full px-3 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none">
-                        {Object.entries(EXPENSE_CATEGORY_LABELS).map(([key, label]) => (
-                          <option key={key} value={key}>{label}</option>
-                        ))}
-                      </select>
+                      <input 
+                        type="text"
+                        value={newExpense.category}
+                        onFocus={() => setShowCategorySuggestions(true)}
+                        onChange={e => {
+                          setNewExpense({...newExpense, category: e.target.value});
+                          setShowCategorySuggestions(true);
+                        }}
+                        className="w-full px-3 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none focus:ring-2 focus:ring-rose-500"
+                        placeholder="ক্যাটাগরি লিখুন..."
+                        required
+                      />
+                      
+                      {showCategorySuggestions && (newExpense.category || filteredSuggestions.length > 0) && (
+                        <div className="absolute top-full right-0 left-0 mt-1 w-full bg-white border border-slate-100 rounded-xl shadow-2xl max-h-40 overflow-y-auto z-[60]">
+                          {filteredSuggestions.map((cat, idx) => (
+                            <div key={idx} onClick={() => handleSelectCategory(cat)} className="px-4 py-3 border-b border-slate-50 hover:bg-rose-50 font-medium text-sm cursor-pointer transition-colors text-slate-700">
+                              {EXPENSE_CATEGORY_LABELS[cat] || cat}
+                            </div>
+                          ))}
+                          {!filteredSuggestions.some(c => (EXPENSE_CATEGORY_LABELS[c] || c).toLowerCase() === (newExpense.category || '').toLowerCase()) && newExpense.category && (
+                            <div className="px-4 py-3 bg-emerald-50 text-emerald-700 text-xs font-bold border-t">
+                              + নতুন ক্যাটাগরি হিসেবে যোগ হবে
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 

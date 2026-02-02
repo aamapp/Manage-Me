@@ -28,7 +28,7 @@ export interface Client {
 
 export interface Expense {
   id: string;
-  category: 'Studio Rent' | 'Gear' | 'Plugin' | 'Others';
+  category: string;
   amount: number;
   date: string;
   notes: string;

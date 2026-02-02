@@ -11,7 +11,9 @@ import {
   Clock, 
   Wallet,
   ArrowUpRight,
-  Inbox
+  Inbox,
+  Music,
+  Users
 } from 'lucide-react';
 import { StatCard } from '../components/StatCard';
 import { PROJECT_STATUS_LABELS, PROJECT_TYPE_LABELS } from '../constants';
@@ -216,16 +218,21 @@ export const Dashboard: React.FC = () => {
                 onClick={() => navigate('/projects')}
                 className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm active:scale-[0.98] transition-all flex items-center justify-between group"
               >
-                <div className="flex-1 min-w-0 mr-3">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded truncate max-w-[80px]">
-                      {PROJECT_TYPE_LABELS[p.type]}
-                    </span>
-                    <span className={`w-2 h-2 rounded-full ring-1 ring-white ${p.status === 'Completed' ? 'bg-emerald-500' : p.status === 'In Progress' ? 'bg-blue-500' : 'bg-amber-500'}`}></span>
-                  </div>
-                  <h4 className="font-bold text-slate-800 text-sm truncate mb-0.5">{p.name}</h4>
-                  <p className="text-[11px] text-slate-500 truncate font-medium">{p.clientname}</p>
+                <div className="flex items-center gap-3 flex-1 min-w-0 mr-3">
+                   {/* Smart Icon */}
+                   <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                     <Music size={20} />
+                   </div>
+                   
+                   <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-0.5">
+                         <h4 className="font-bold text-slate-800 text-sm truncate">{p.name}</h4>
+                         <span className={`w-2 h-2 rounded-full ring-1 ring-white shrink-0 ${p.status === 'Completed' ? 'bg-emerald-500' : p.status === 'In Progress' ? 'bg-blue-500' : 'bg-amber-500'}`}></span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 truncate font-medium">{p.clientname}</p>
+                   </div>
                 </div>
+                
                 <div className="text-right whitespace-nowrap">
                   <p className="font-bold text-slate-800 text-sm">{currency} {p.totalamount.toLocaleString('bn-BD')}</p>
                   <p className="text-[9px] text-slate-400 mt-0.5 font-bold bg-slate-50 px-1.5 py-0.5 rounded inline-block">
