@@ -5,9 +5,9 @@ import {
   PieChart, Pie, Cell
 } from 'recharts';
 import { 
-  TrendingUp, Image as ImageIcon,
+  TrendingUp,
   Wallet,
-  RefreshCcw, Clock, Receipt, Download, Share2, Hexagon
+  RefreshCcw, Clock, Receipt, Download, Share2, Hexagon, X
 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { useAppContext } from '../context/AppContext';
@@ -24,6 +24,9 @@ export const Reports: React.FC = () => {
   const [endDate, setEndDate] = useState('');
   const [isCapturing, setIsCapturing] = useState(false);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  
+  // State for Image Preview Modal (Fallback for Android)
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   // Fetch expenses specifically for the report
   useEffect(() => {
@@ -150,70 +153,60 @@ export const Reports: React.FC = () => {
     setIsCapturing(true);
     
     try {
-      // Small delay to ensure any re-renders are complete
-      await new Promise(resolve => setTimeout(resolve, 800));
+      // Small delay to ensure DOM is ready
+      await new Promise(resolve => setTimeout(resolve, 500));
       
       const element = reportRef.current;
       
+      // Enhanced configuration for WebView/Mobile compatibility
       const canvas = await html2canvas(element, {
-        scale: 2.0, // Reduced scale slightly for better performance on mobile
+        scale: 2, // Retain quality
         backgroundColor: '#ffffff',
+        useCORS: true, // Essential for loading external profile images
+        allowTaint: false, // Must be false to allow data extraction
         logging: false,
-        useCORS: true, 
-        allowTaint: true,
-        scrollY: -window.scrollY, 
-        height: element.scrollHeight, 
-        windowHeight: element.scrollHeight + 100,
-        onclone: (clonedDoc) => {
-            const clonedElement = clonedDoc.getElementById('report-container');
-            if (clonedElement) {
-                clonedElement.style.height = 'auto';
-                clonedElement.style.overflow = 'visible';
-            }
-        }
+        scrollY: -window.scrollY, // Correct scrolling offset
+        windowWidth: element.scrollWidth, // Capture full width
+        windowHeight: element.scrollHeight // Capture full height
       });
 
-      // Use Blob approach instead of DataURL for better Android compatibility
-      canvas.toBlob(async (blob) => {
-        if (!blob) {
-            alert('ইমেজ জেনারেট করতে সমস্যা হয়েছে।');
-            setIsCapturing(false);
-            return;
-        }
+      // 1. Generate Data URL (Base64) - This is the fallback for display
+      const dataUrl = canvas.toDataURL('image/png');
+      
+      // 2. Generate Blob for Sharing
+      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
+      
+      if (!blob) throw new Error('Blob creation failed');
 
-        const fileName = `Report_${user?.name?.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.png`;
-        const file = new File([blob], fileName, { type: 'image/png' });
+      const fileName = `Report-${Date.now()}.png`;
+      const file = new File([blob], fileName, { type: 'image/png' });
 
-        // Try Native Share API first (Best for Android WebView)
-        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-            try {
-                await navigator.share({
-                    files: [file],
-                    title: 'Manage-Me Report',
-                    text: `Financial Report for ${user?.name}`
-                });
-                setIsCapturing(false);
-            } catch (error) {
-                console.log('Share was cancelled or failed', error);
-                setIsCapturing(false);
-            }
-        } else {
-            // Fallback for Desktop or browsers without Share API
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = fileName;
-            document.body.appendChild(link); // Append to body is crucial for some browsers
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-            setIsCapturing(false);
-        }
-      }, 'image/png', 1.0);
+      // 3. Try Native Share (Preferred for Android)
+      let shared = false;
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+          try {
+              await navigator.share({
+                  files: [file],
+                  title: 'Manage-Me Report',
+                  text: `Financial Report for ${user?.name}`
+              });
+              shared = true;
+          } catch (error) {
+              console.warn('Native share failed or cancelled, falling back to preview.', error);
+          }
+      }
+
+      // 4. If Share failed or not supported, Open Preview Modal
+      // This solves the Android WebView "Download" issue by letting user Long-Press the image
+      if (!shared) {
+          setPreviewImage(dataUrl);
+      }
+
+      setIsCapturing(false);
 
     } catch (err) {
       console.error(err);
-      alert('রিপোর্ট তৈরিতে সমস্যা হয়েছে।');
+      alert('রিপোর্ট তৈরিতে সমস্যা হয়েছে। আবার চেষ্টা করুন।');
       setIsCapturing(false);
     }
   };
@@ -481,6 +474,38 @@ export const Reports: React.FC = () => {
             <div className="h-1.5 w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-rose-500"></div>
         </div>
       </div>
+
+      {/* Image Preview Modal (Fallback for Android WebView) */}
+      {previewImage && (
+        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+           <div className="bg-white rounded-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+              <div className="p-4 border-b flex justify-between items-center bg-slate-50">
+                 <h3 className="font-bold text-slate-800 text-sm">রিপোর্ট প্রিভিউ</h3>
+                 <button onClick={() => setPreviewImage(null)} className="p-2 bg-slate-200 rounded-full text-slate-600 hover:bg-slate-300 transition-colors">
+                    <X size={20} />
+                 </button>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto p-4 bg-slate-100 flex justify-center items-center">
+                 <img src={previewImage} alt="Report Preview" className="max-w-full h-auto shadow-lg rounded-lg object-contain" />
+              </div>
+
+              <div className="p-4 border-t bg-white">
+                 <div className="bg-amber-50 text-amber-800 p-3 rounded-xl text-xs font-bold mb-3 text-center border border-amber-100">
+                    ছবিটি গ্যালারিতে সেভ করতে ইমেজের উপর <span className="text-indigo-600">লং-প্রেস (Long Press)</span> করুন।
+                 </div>
+                 <a 
+                   href={previewImage} 
+                   download={`Report_${new Date().getTime()}.png`}
+                   className="w-full bg-indigo-600 text-white py-3.5 rounded-xl font-bold flex justify-center items-center gap-2 text-sm shadow-lg shadow-indigo-200 active:scale-95 transition-transform"
+                 >
+                    <Download size={18} />
+                    ডাউনলোড বাটন (বিকল্প)
+                 </a>
+              </div>
+           </div>
+        </div>
+      )}
     </div>
   );
 };
