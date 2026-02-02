@@ -22,7 +22,7 @@ export const Toast: React.FC<ToastProps> = ({ message, type, onClose }) => {
   const iconColor = type === 'success' ? 'text-emerald-500' : 'text-rose-500';
 
   return (
-    <div className="fixed top-6 right-6 z-[200] animate-in slide-in-from-right-10 duration-300">
+    <div className="fixed top-24 right-6 z-[200] animate-in slide-in-from-right-10 duration-300">
       <div className={`${bgColor} ${borderColor} ${textColor} border-2 px-4 py-3 rounded-2xl shadow-xl flex items-center gap-3 min-w-[300px]`}>
         <div className={iconColor}>
           {type === 'success' ? <CheckCircle size={24} /> : <XCircle size={24} />}
