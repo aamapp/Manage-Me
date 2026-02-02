@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { Delete, ChevronDown } from 'lucide-react';
+import { Delete } from 'lucide-react';
 
 interface NumericKeypadProps {
   isOpen: boolean;
@@ -20,7 +20,8 @@ export const NumericKeypad: React.FC<NumericKeypadProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      const val = initialValue === 0 ? '' : String(initialValue);
+      const stringVal = String(initialValue);
+      const val = stringVal === '0' ? '' : stringVal;
       setBuffer(val);
     }
   }, [isOpen, initialValue]);
@@ -59,7 +60,7 @@ export const NumericKeypad: React.FC<NumericKeypadProps> = ({
       const formattedResult = String(Math.round(result * 100) / 100);
       updateParent(formattedResult);
     } catch (e) {
-      // Keep as is if invalid
+      // Ignore
     }
   };
 
@@ -68,11 +69,33 @@ export const NumericKeypad: React.FC<NumericKeypadProps> = ({
     onClose();
   };
 
+  // Ultra Compact Key Button Component
+  const KeyBtn = ({ label, onClick, className = "", icon, spanRow }: any) => (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onClick();
+      }}
+      className={`
+        relative flex items-center justify-center
+        text-base font-bold transition-all duration-75
+        rounded-md shadow-[0_1px_0_0_rgba(0,0,0,0.05)] border-b border-transparent
+        active:border-none active:translate-y-[1px] active:shadow-none
+        ${spanRow ? 'row-span-2 h-full' : 'h-9'} 
+        ${className}
+      `}
+    >
+      {icon || label}
+    </button>
+  );
+
   return (
-    <div className="fixed inset-0 z-[150] flex flex-col justify-end">
-      {/* 1. Backdrop Layer: Covers the whole screen behind the keypad */}
+    <div className="fixed inset-0 z-[1000] flex flex-col justify-end pointer-events-none">
+      {/* Backdrop - Transparent click-through/close area */}
       <div 
-        className="absolute inset-0 bg-transparent" 
+        className="absolute inset-0 bg-slate-900/10 pointer-events-auto" 
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -80,91 +103,66 @@ export const NumericKeypad: React.FC<NumericKeypadProps> = ({
         }} 
       />
 
-      {/* 2. Content Layer: The actual keypad */}
+      {/* Keypad Content */}
       <div 
-        className="relative bg-slate-100 shadow-2xl animate-in slide-in-from-bottom duration-200 border-t border-slate-200 pb-safe z-10"
-        onClick={(e) => {
-          // Critical: Stop clicks inside keypad from bubbling to backdrop
-          e.stopPropagation();
-        }}
+        className="relative bg-slate-100 shadow-2xl animate-in slide-in-from-bottom duration-200 rounded-t-2xl overflow-hidden pointer-events-auto pb-safe"
+        onClick={(e) => e.stopPropagation()}
       >
-        
-        {/* Top Control Bar */}
-        <div className="h-10 bg-slate-200/50 flex items-center justify-between px-4 border-b border-slate-300/50">
-           <div className="flex gap-4 overflow-x-auto no-scrollbar">
-              {/* Optional chips can go here */}
-           </div>
-           <button 
-             type="button"
-             onClick={handleDone}
-             className="ml-auto text-indigo-600 font-bold text-sm bg-transparent px-2 py-1 flex items-center gap-1"
-           >
-             <ChevronDown size={20} />
-           </button>
+        {/* Very Compact Drag Handle */}
+        <div className="h-3 flex items-center justify-center cursor-pointer active:opacity-50" onClick={handleDone}>
+           <div className="w-8 h-1 bg-slate-300 rounded-full mt-1"></div>
         </div>
 
-        {/* Buttons Grid */}
-        <div className="grid grid-cols-4 gap-[1px] bg-slate-300 p-[1px]">
+        {/* Tighter Grid Container */}
+        <div className="grid grid-cols-4 gap-0.5 p-1 pb-1.5">
+            
             {/* Row 1 */}
-            <KeyBtn label="C" onClick={handleClear} className="text-rose-500 font-bold" />
-            <KeyBtn label="÷" onClick={() => handlePress('/')} className="text-indigo-600 text-xl" />
-            <KeyBtn label="×" onClick={() => handlePress('*')} className="text-indigo-600 text-xl" />
-            <KeyBtn label="⌫" onClick={handleBackspace} className="text-slate-600" icon={<Delete size={20} />} />
+            <KeyBtn label="AC" onClick={handleClear} className="bg-slate-200 text-slate-600 border-slate-300 text-xs" />
+            <KeyBtn label="%" onClick={() => handlePress('%')} className="bg-slate-200 text-slate-600 border-slate-300 text-xs" />
+            <KeyBtn label="÷" onClick={() => handlePress('/')} className="bg-indigo-50 text-indigo-600 text-lg font-medium border-indigo-100" />
+            <KeyBtn label="×" onClick={() => handlePress('*')} className="bg-indigo-50 text-indigo-600 text-lg font-medium border-indigo-100" />
 
             {/* Row 2 */}
-            <KeyBtn label="7" onClick={() => handlePress('7')} />
-            <KeyBtn label="8" onClick={() => handlePress('8')} />
-            <KeyBtn label="9" onClick={() => handlePress('9')} />
-            <KeyBtn label="-" onClick={() => handlePress('-')} className="text-indigo-600 text-3xl pb-1" />
+            <KeyBtn label="7" onClick={() => handlePress('7')} className="bg-white text-slate-800 border-slate-200" />
+            <KeyBtn label="8" onClick={() => handlePress('8')} className="bg-white text-slate-800 border-slate-200" />
+            <KeyBtn label="9" onClick={() => handlePress('9')} className="bg-white text-slate-800 border-slate-200" />
+            <KeyBtn label="-" onClick={() => handlePress('-')} className="bg-indigo-50 text-indigo-600 text-lg font-medium border-indigo-100" />
 
             {/* Row 3 */}
-            <KeyBtn label="4" onClick={() => handlePress('4')} />
-            <KeyBtn label="5" onClick={() => handlePress('5')} />
-            <KeyBtn label="6" onClick={() => handlePress('6')} />
-            <KeyBtn label="+" onClick={() => handlePress('+')} className="text-indigo-600 text-2xl" />
+            <KeyBtn label="4" onClick={() => handlePress('4')} className="bg-white text-slate-800 border-slate-200" />
+            <KeyBtn label="5" onClick={() => handlePress('5')} className="bg-white text-slate-800 border-slate-200" />
+            <KeyBtn label="6" onClick={() => handlePress('6')} className="bg-white text-slate-800 border-slate-200" />
+            
+            {/* Plus Button - Spans 2 Rows */}
+            <KeyBtn 
+              label="+" 
+              onClick={() => handlePress('+')} 
+              spanRow 
+              className="bg-indigo-50 text-indigo-600 text-lg font-medium border-indigo-100" 
+            />
 
             {/* Row 4 */}
-            <div className="col-span-3 grid grid-cols-3 gap-[1px]">
-                <KeyBtn label="1" onClick={() => handlePress('1')} />
-                <KeyBtn label="2" onClick={() => handlePress('2')} />
-                <KeyBtn label="3" onClick={() => handlePress('3')} />
-                
-                <KeyBtn label="." onClick={() => handlePress('.')} className="text-xl font-bold" />
-                <KeyBtn label="0" onClick={() => handlePress('0')} />
-                <KeyBtn label="00" onClick={() => handlePress('00')} />
-            </div>
+            <KeyBtn label="1" onClick={() => handlePress('1')} className="bg-white text-slate-800 border-slate-200" />
+            <KeyBtn label="2" onClick={() => handlePress('2')} className="bg-white text-slate-800 border-slate-200" />
+            <KeyBtn label="3" onClick={() => handlePress('3')} className="bg-white text-slate-800 border-slate-200" />
+
+            {/* Row 5 */}
+            <KeyBtn 
+              icon={<Delete size={16} strokeWidth={2.5}/>} 
+              onClick={handleBackspace} 
+              className="bg-slate-200 text-rose-500 border-slate-300" 
+            />
+            <KeyBtn label="0" onClick={() => handlePress('0')} className="bg-white text-slate-800 border-slate-200" />
+            <KeyBtn label="." onClick={() => handlePress('.')} className="bg-white text-slate-800 text-lg pb-1 border-slate-200" />
             
-            {/* Equal / Done Button - Spans 2 rows height equivalent */}
-            <button 
-              type="button"
-              onClick={handleDone}
-              className="bg-indigo-600 active:bg-indigo-700 text-white flex items-center justify-center h-full min-h-[108px] transition-colors"
-            >
-              <div className="flex flex-col items-center">
-                 <span className="text-2xl font-bold">=</span>
-                 <span className="text-[10px] font-medium uppercase mt-1">Done</span>
-              </div>
-            </button>
+            {/* Equal Button */}
+            <KeyBtn 
+              label="=" 
+              onClick={handleDone} 
+              className="bg-indigo-600 text-white text-lg font-medium border-indigo-800 shadow-indigo-200" 
+            />
         </div>
       </div>
     </div>
   );
 };
-
-const KeyBtn = ({ label, onClick, className = "", icon }: any) => (
-  <button
-    type="button"
-    onClick={(e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      onClick();
-    }}
-    className={`
-      bg-white active:bg-slate-200 h-14 flex items-center justify-center
-      text-slate-800 text-xl font-semibold transition-colors
-      ${className}
-    `}
-  >
-    {icon || label}
-  </button>
-);

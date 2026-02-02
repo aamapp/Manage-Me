@@ -22,6 +22,10 @@ interface AppContextType {
   toast: ToastState | null;
   showToast: (message: string, type?: 'success' | 'error') => void;
   hideToast: () => void;
+  isAppLocked: boolean;
+  setIsAppLocked: React.Dispatch<React.SetStateAction<boolean>>;
+  appPin: string | null;
+  setAppPin: (pin: string | null) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -33,6 +37,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [incomeRecords, setIncomeRecords] = useState<IncomeRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<ToastState | null>(null);
+  
+  // App Lock State
+  const [isAppLocked, setIsAppLocked] = useState(false);
+  const [appPin, setAppPinState] = useState<string | null>(null);
 
   const showToast = useCallback((message: string, type: 'success' | 'error' = 'error') => {
     setToast({ message, type });
@@ -41,6 +49,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const hideToast = useCallback(() => {
     setToast(null);
   }, []);
+
+  // Helper to update PIN in state and local storage
+  const setAppPin = (pin: string | null) => {
+    if (pin) {
+        localStorage.setItem('manage_me_pin', pin);
+    } else {
+        localStorage.removeItem('manage_me_pin');
+    }
+    setAppPinState(pin);
+  };
 
   const refreshData = async () => {
     if (!user || !isConfigured) return;
@@ -66,6 +84,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   useEffect(() => {
+    // Check for saved PIN on load
+    const savedPin = localStorage.getItem('manage_me_pin');
+    if (savedPin) {
+        setAppPinState(savedPin);
+        setIsAppLocked(true); // Lock initially if PIN exists
+    }
+
     if (!isConfigured) {
       setLoading(false);
       return;
@@ -128,7 +153,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       projects, setProjects, clients, setClients, 
       incomeRecords, setIncomeRecords,
       user, setUser, loading, refreshData,
-      toast, showToast, hideToast 
+      toast, showToast, hideToast,
+      isAppLocked, setIsAppLocked,
+      appPin, setAppPin
     }}>
       {children}
     </AppContext.Provider>

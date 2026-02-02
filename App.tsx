@@ -1,12 +1,13 @@
-import React, { Suspense, lazy } from 'react';
-import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
+
+import React, { Suspense, lazy, useEffect } from 'react';
+import { HashRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { Layout } from './components/Layout';
 import { Toast } from './components/Toast';
+import { AppLock } from './components/AppLock'; // Import AppLock
 import { AppProvider, useAppContext } from './context/AppContext';
 import { supabase, isConfigured } from './lib/supabase';
 
-// Direct imports for main pages to prevent navigation flickering/loading states
-// This fixes the issue where users feel like they are "going through another page"
+// Direct imports for main pages
 import { Dashboard } from './pages/Dashboard';
 import { Projects } from './pages/Projects';
 import { Clients } from './pages/Clients';
@@ -15,21 +16,34 @@ import { Expenses } from './pages/Expenses';
 import { Categories } from './pages/Categories';
 import { Reports } from './pages/Reports';
 import { Settings } from './pages/Settings';
+import { UpdatePassword } from './pages/UpdatePassword'; // Import new page
 
-// Keep Auth pages lazy loaded as they are separate flows
 const Login = lazy(() => import('./pages/Login').then(module => ({ default: module.Login })));
 const Signup = lazy(() => import('./pages/Signup').then(module => ({ default: module.Signup })));
 
-// A simple loading fallback for lazy loaded components (Auth only now)
-const PageLoader = () => (
-  <div className="h-full w-full flex flex-col items-center justify-center py-20">
-    <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-    <p className="text-slate-400 text-sm font-medium animate-pulse">লোড হচ্ছে...</p>
-  </div>
-);
+// Separate component to handle Auth Events inside Router context
+const AuthListener: React.FC = () => {
+  const navigate = useNavigate();
+  const { showToast } = useAppContext();
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        showToast('পাসওয়ার্ড রিকভারি মোড চালু হয়েছে। দয়া করে নতুন পাসওয়ার্ড দিন।', 'success');
+        navigate('/update-password');
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [navigate, showToast]);
+
+  return null;
+};
 
 const AppContent: React.FC = () => {
-  const { user, loading, toast, showToast, hideToast } = useAppContext();
+  const { user, loading, toast, showToast, hideToast, isAppLocked, setIsAppLocked, appPin } = useAppContext();
 
   const handleLogin = async (email: string, password?: string) => {
     if (!isConfigured) {
@@ -70,6 +84,27 @@ const AppContent: React.FC = () => {
       showToast(err.message || 'একটি সমস্যা হয়েছে।');
     }
   };
+  
+  const handleResetPassword = async (email: string) => {
+    if (!isConfigured) {
+      showToast('সুপাবেজ কনফিগারেশন চেক করুন।');
+      return;
+    }
+    try {
+      // Using window.location.origin avoids hash conflict issues
+      // Ensure this URL is added to Supabase > Authentication > URL Configuration > Redirect URLs
+      const redirectTo = window.location.origin;
+      
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: redirectTo,
+      });
+      
+      if (error) throw error;
+      showToast('পাসওয়ার্ড রিসেট লিংক ইমেইলে পাঠানো হয়েছে।', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'ইমেইল পাঠাতে সমস্যা হয়েছে।');
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -91,8 +126,20 @@ const AppContent: React.FC = () => {
     );
   }
 
+  // Show Lock Screen if App is Locked and User is logged in
+  if (isAppLocked && appPin) {
+    return (
+      <AppLock 
+        mode="unlock" 
+        savedPin={appPin} 
+        onSuccess={() => setIsAppLocked(false)} 
+      />
+    );
+  }
+
   return (
     <HashRouter>
+      <AuthListener />
       {toast && (
         <Toast 
           message={toast.message} 
@@ -115,19 +162,20 @@ const AppContent: React.FC = () => {
         <Routes>
           <Route 
             path="/login" 
-            element={!user ? <Login onLogin={handleLogin} onGoToSignup={() => window.location.hash = '/signup'} /> : <Navigate to="/dashboard" replace />} 
+            element={!user ? <Login onLogin={handleLogin} onResetPassword={handleResetPassword} onGoToSignup={() => window.location.hash = '/signup'} /> : <Navigate to="/dashboard" replace />} 
           />
           <Route 
             path="/signup" 
             element={!user ? <Signup onSignup={handleSignup} onGoToLogin={() => window.location.hash = '/login'} /> : <Navigate to="/dashboard" replace />} 
           />
           
+          <Route path="/update-password" element={<UpdatePassword />} />
+
           <Route 
             path="/*" 
             element={
               user ? (
                 <Layout user={user} onLogout={handleLogout}>
-                  {/* Suspense removed from here as pages are now directly imported */}
                   <Routes>
                     <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/projects" element={<Projects />} />

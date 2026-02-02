@@ -34,7 +34,7 @@ export const StatCard: React.FC<StatCardProps> = ({ title, value, icon, isCurren
             {isCurrency ? (
               <>
                 <span className="text-base font-bold opacity-80 mr-1">{currency}</span>
-                {Number(safeValue).toLocaleString('bn-BD')}
+                {Number(safeValue).toLocaleString('en-US')}
               </>
             ) : safeValue}
           </h3>
@@ -62,7 +62,7 @@ export const StatCard: React.FC<StatCardProps> = ({ title, value, icon, isCurren
       </div>
       <div>
          <h3 className={`text-xl font-bold ${style.text} tracking-tight`}>
-          {isCurrency ? `${currency} ${Number(safeValue).toLocaleString('bn-BD')}` : safeValue}
+          {isCurrency ? `${currency} ${Number(safeValue).toLocaleString('en-US')}` : safeValue}
         </h3>
       </div>
     </div>

@@ -1,5 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Plus, Search, MoreVertical, Calendar, DollarSign, Briefcase, X, FolderOpen, Pencil, Trash2, Users, FileText, CheckCircle2, Clock, UserPlus, CalendarDays, Loader2, AlertCircle, ChevronDown, Filter, Music, Calculator } from 'lucide-react';
 import { PROJECT_STATUS_LABELS, PROJECT_TYPE_LABELS } from '../constants';
 import { Project, ProjectStatus, ProjectType, Client } from '../types';
@@ -299,7 +300,7 @@ export const Projects: React.FC = () => {
         </div>
       </div>
 
-      {/* Projects List (Cards instead of Table) */}
+      {/* Projects List */}
       <div className="space-y-4 pb-12">
         {filteredProjects.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-slate-400">
@@ -312,11 +313,9 @@ export const Projects: React.FC = () => {
               {/* Card Header */}
               <div className="p-4 border-b border-slate-50 flex justify-between items-start">
                 <div className="flex items-center gap-3 flex-1 min-w-0 mr-3">
-                  {/* Smart Icon / Logo Placeholder */}
                   <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
                      <Music size={20} />
                   </div>
-                  
                   <div className="min-w-0 flex-1">
                     <h3 className="font-bold text-slate-800 text-base truncate leading-tight">{p.name}</h3>
                     <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5 font-medium">
@@ -408,42 +407,42 @@ export const Projects: React.FC = () => {
         )}
       </div>
 
-      {/* Full Screen Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-[100] bg-white flex flex-col animate-in slide-in-from-bottom duration-300">
-            {/* Header */}
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-10">
-              <h2 className="text-xl font-bold text-slate-800">
+      {/* Full Screen Modal with Portal */}
+      {isModalOpen && createPortal(
+        <div className="fixed inset-0 z-[1000] bg-white flex flex-col h-[100dvh] animate-in fade-in duration-200">
+            {/* Header - Compact */}
+            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
+              <h2 className="text-base font-bold text-slate-800">
                 {isEditing ? 'প্রজেক্ট এডিট' : 'নতুন প্রজেক্ট'}
               </h2>
               <button disabled={isSubmitting} onClick={() => setModalOpen(false)} className="p-2 bg-slate-50 rounded-full text-slate-500 hover:bg-slate-100 transition-colors">
-                <X size={24} />
+                <X size={20} />
               </button>
             </div>
             
-            {/* Scrollable Form Content */}
+            {/* Form - Compact Layout */}
             <div className="flex-1 overflow-y-auto">
-                <form onSubmit={handleSubmit} className="p-6 space-y-5 pb-24">
+                <form onSubmit={handleSubmit} className="px-4 pt-3 pb-24 space-y-4">
                   
                   {/* Smart Error Banner */}
                   {formError && (
-                    <div className="bg-rose-50 text-rose-600 p-4 rounded-xl flex items-start gap-3 border border-rose-100 animate-in slide-in-from-top-2">
-                       <AlertCircle size={20} className="shrink-0 mt-0.5" />
+                    <div className="bg-rose-50 text-rose-600 p-3 rounded-xl flex items-start gap-2 border border-rose-100 animate-in slide-in-from-top-2">
+                       <AlertCircle size={16} className="shrink-0 mt-0.5" />
                        <div>
-                         <p className="font-bold text-sm">ত্রুটি!</p>
-                         <p className="text-xs font-medium mt-0.5">{formError}</p>
+                         <p className="font-bold text-xs">ত্রুটি!</p>
+                         <p className="text-[10px] font-medium mt-0.5">{formError}</p>
                        </div>
                     </div>
                   )}
 
                   <div>
-                    <label className="text-sm font-bold text-slate-600 mb-2 block">প্রজেক্ট নাম</label>
-                    <input type="text" value={newProject.name} onChange={e => setNewProject({...newProject, name: e.target.value})} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none text-base" placeholder="নাম লিখুন..." />
+                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">প্রজেক্ট নাম</label>
+                    <input type="text" value={newProject.name} onChange={e => setNewProject({...newProject, name: e.target.value})} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none text-sm" placeholder="নাম লিখুন..." />
                   </div>
 
                   <div className="relative" ref={clientInputRef}>
-                    <label className="text-sm font-bold text-slate-600 mb-2 block">ক্লায়েন্ট</label>
-                    <input type="text" value={clientSearch} onFocus={() => setShowClientSuggestions(true)} onChange={e => {setClientSearch(e.target.value); setShowClientSuggestions(true);}} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none text-base" placeholder="ক্লায়েন্ট খুঁজুন..." />
+                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">ক্লায়েন্ট</label>
+                    <input type="text" value={clientSearch} onFocus={() => setShowClientSuggestions(true)} onChange={e => {setClientSearch(e.target.value); setShowClientSuggestions(true);}} className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none text-sm" placeholder="ক্লায়েন্ট খুঁজুন..." />
                     
                     {showClientSuggestions && (clientSearch || clientSuggestions.length > 0) && (
                       <div className="absolute top-full mt-1 w-full bg-white border border-slate-100 rounded-xl shadow-2xl max-h-40 overflow-y-auto z-[60]">
@@ -462,49 +461,49 @@ export const Projects: React.FC = () => {
                   </div>
 
                   <div>
-                     <label className="text-sm font-bold text-slate-600 mb-2 block">স্ট্যাটাস</label>
-                     <select value={newProject.status} onChange={e => setNewProject({...newProject, status: e.target.value})} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 outline-none text-base">
+                     <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">স্ট্যাটাস</label>
+                     <select value={newProject.status} onChange={e => setNewProject({...newProject, status: e.target.value})} className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-800 outline-none text-sm focus:ring-2 focus:ring-indigo-500">
                        {Object.entries(PROJECT_STATUS_LABELS).map(([key, label]) => (
                          <option key={key} value={key}>{label}</option>
                        ))}
                      </select>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-sm font-bold text-slate-600 mb-2 block">বাজেট ({currency})</label>
+                      <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">বাজেট ({currency})</label>
                       <div 
                         onClick={() => openKeypad('total')}
-                        className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 active:bg-slate-100 transition-colors flex items-center justify-between cursor-pointer"
+                        className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 active:bg-slate-100 transition-colors flex items-center justify-between cursor-pointer"
                       >
-                         <span>{newProject.totalamount || 0}</span>
-                         <Calculator size={18} className="text-slate-400" />
+                         <span className="text-sm">{newProject.totalamount || 0}</span>
+                         <Calculator size={16} className="text-slate-400" />
                       </div>
                     </div>
                     <div>
-                      <label className="text-sm font-bold text-slate-600 mb-2 block">পরিশোধ ({currency})</label>
+                      <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">পরিশোধ ({currency})</label>
                       <div 
                         onClick={() => openKeypad('paid')}
-                        className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-emerald-600 active:bg-slate-100 transition-colors flex items-center justify-between cursor-pointer"
+                        className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-emerald-600 active:bg-slate-100 transition-colors flex items-center justify-between cursor-pointer"
                       >
-                         <span>{newProject.paidamount || 0}</span>
-                         <Calculator size={18} className="text-slate-400" />
+                         <span className="text-sm">{newProject.paidamount || 0}</span>
+                         <Calculator size={16} className="text-slate-400" />
                       </div>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-3">
                      <div>
-                       <label className="text-sm font-bold text-slate-600 mb-2 block">শুরু</label>
-                       <input required type="date" value={newProject.createdat} onChange={e => setNewProject({...newProject, createdat: e.target.value})} className="w-full px-3 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none" />
+                       <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">শুরু</label>
+                       <input required type="date" value={newProject.createdat} onChange={e => setNewProject({...newProject, createdat: e.target.value})} className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500" />
                      </div>
                      <div>
-                       <label className="text-sm font-bold text-slate-600 mb-2 block">ডেডলাইন (অপশনাল)</label>
-                       <input type="date" value={newProject.deadline} onChange={e => setNewProject({...newProject, deadline: e.target.value})} className="w-full px-3 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none" />
+                       <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">ডেডলাইন (অপশনাল)</label>
+                       <input type="date" value={newProject.deadline} onChange={e => setNewProject({...newProject, deadline: e.target.value})} className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500" />
                      </div>
                   </div>
 
-                  <button type="submit" disabled={isSubmitting} className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg shadow-indigo-200 active:scale-95 transition-transform flex items-center justify-center gap-2 mt-4">
+                  <button type="submit" disabled={isSubmitting} className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold text-base shadow-lg shadow-indigo-200 active:scale-95 transition-transform flex items-center justify-center gap-2 mt-4">
                     {isSubmitting ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}
                     সেভ করুন
                   </button>
@@ -519,7 +518,8 @@ export const Projects: React.FC = () => {
               initialValue={activeAmountField === 'total' ? newProject.totalamount : newProject.paidamount}
               title={activeAmountField === 'total' ? 'বাজেট পরিমাণ' : 'পরিশোধ পরিমাণ'}
             />
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

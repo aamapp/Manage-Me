@@ -19,10 +19,21 @@
         }
     </script>
     <style>
+        /* Force Light Mode for Form Elements */
+        :root {
+            color-scheme: light;
+        }
+        
         body {
             font-family: 'Hind Siliguri', sans-serif !important;
             background-color: #f8fafc;
         }
+        
+        /* Ensure inputs always render in light mode (fixes mobile dark mode issues) */
+        input, select, textarea {
+            color-scheme: light;
+        }
+
         .bg-brand-purple { background-color: #6366f1; }
         .text-brand-purple { color: #6366f1; }
         .border-brand-purple { border-color: #6366f1; }
@@ -56,7 +67,8 @@
     "react-router-dom": "https://esm.sh/react-router-dom@^7.13.0",
     "recharts": "https://esm.sh/recharts@^3.7.0",
     "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
-    "html2canvas": "https://esm.sh/html2canvas@1.4.1"
+    "html2canvas": "https://esm.sh/html2canvas@1.4.1",
+    "react-dom": "https://esm.sh/react-dom@^19.2.4"
   }
 }
 </script>

@@ -1,5 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { TrendingUp, Plus, Search, Calendar, DollarSign, X, ReceiptText, Briefcase, CreditCard, AlertCircle, MoreVertical, Pencil, Trash2, Users, Loader2, CalendarDays, Wallet, Clock, Zap, Rocket, Landmark, Banknote, Calculator } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Project, IncomeRecord } from '../types';
@@ -386,30 +387,30 @@ export const Income: React.FC = () => {
         )}
       </div>
 
-      {/* Full Screen Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-[100] bg-white flex flex-col animate-in slide-in-from-bottom duration-300">
-            {/* Header */}
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-10">
-              <h2 className="text-xl font-bold text-slate-800">{isEditing ? 'এডিট পেমেন্ট' : 'নতুন পেমেন্ট'}</h2>
+      {/* Full Screen Modal with Portal */}
+      {isModalOpen && createPortal(
+        <div className="fixed inset-0 z-[1000] bg-white flex flex-col h-[100dvh] animate-in fade-in duration-200">
+            {/* Header - Compact */}
+            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
+              <h2 className="text-base font-bold text-slate-800">{isEditing ? 'এডিট পেমেন্ট' : 'নতুন পেমেন্ট'}</h2>
               <button disabled={isSubmitting} onClick={() => setModalOpen(false)} className="p-2 bg-slate-50 rounded-full text-slate-500 hover:bg-slate-100 transition-colors">
-                <X size={24} />
+                <X size={20} />
               </button>
             </div>
             
-            {/* Form */}
+            {/* Form - Compact Layout */}
             <div className="flex-1 overflow-y-auto">
-                <form onSubmit={handleSubmit} className="p-6 space-y-5 pb-24">
+                <form onSubmit={handleSubmit} className="px-4 pt-3 pb-24 space-y-4">
                   {error && <div className="p-3 bg-rose-50 text-rose-600 text-xs rounded-xl font-bold flex items-center gap-2"><AlertCircle size={14} /> {error}</div>}
                   
                   <div className="relative" ref={projectInputRef}>
-                    <label className="text-sm font-bold text-slate-600 mb-2 block">প্রজেক্ট</label>
+                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">প্রজেক্ট</label>
                     <input 
                         type="text" 
                         value={projectSearch} 
                         onFocus={() => setShowSuggestions(true)} 
                         onChange={e => {setProjectSearch(e.target.value); setShowSuggestions(true);}} 
-                        className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none text-base" 
+                        className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none text-sm" 
                         placeholder="প্রজেক্ট খুঁজুন..." 
                     />
                     {showSuggestions && projectSuggestions.length > 0 && (
@@ -433,24 +434,24 @@ export const Income: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="text-sm font-bold text-slate-600 mb-2 block">পরিমাণ ({currency})</label>
+                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">পরিমাণ ({currency})</label>
                     <div 
                       onClick={() => setShowKeypad(true)}
-                      className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-black text-xl text-emerald-600 active:bg-slate-100 transition-colors flex items-center justify-between cursor-pointer"
+                      className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-black text-xl text-emerald-600 active:bg-slate-100 transition-colors flex items-center justify-between cursor-pointer"
                     >
                        <span>{newPayment.amount || 0}</span>
-                       <Calculator size={20} className="text-slate-400" />
+                       <Calculator size={18} className="text-slate-400" />
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-sm font-bold text-slate-600 mb-2 block">তারিখ</label>
-                      <input required type="date" value={newPayment.date} onChange={e => setNewPayment({...newPayment, date: e.target.value})} className="w-full px-3 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none" />
+                      <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">তারিখ</label>
+                      <input required type="date" value={newPayment.date} onChange={e => setNewPayment({...newPayment, date: e.target.value})} className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500" />
                     </div>
                     <div>
-                      <label className="text-sm font-bold text-slate-600 mb-2 block">পদ্ধতি</label>
-                      <select value={newPayment.method} onChange={e => setNewPayment({...newPayment, method: e.target.value})} className="w-full px-3 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none">
+                      <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">পদ্ধতি</label>
+                      <select value={newPayment.method} onChange={e => setNewPayment({...newPayment, method: e.target.value})} className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500">
                         <option value="বিকাশ">বিকাশ</option>
                         <option value="নগদ">নগদ</option>
                         <option value="রকেট">রকেট</option>
@@ -460,7 +461,7 @@ export const Income: React.FC = () => {
                     </div>
                   </div>
 
-                  <button type="submit" disabled={isSubmitting} className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg shadow-emerald-200 active:scale-95 transition-transform flex items-center justify-center gap-2 mt-4">
+                  <button type="submit" disabled={isSubmitting} className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold text-base shadow-lg shadow-emerald-200 active:scale-95 transition-transform flex items-center justify-center gap-2 mt-4">
                     {isSubmitting ? <Loader2 className="animate-spin" /> : <Wallet />}
                     সেভ করুন
                   </button>
@@ -475,7 +476,8 @@ export const Income: React.FC = () => {
               initialValue={newPayment.amount}
               title="পেমেন্ট পরিমাণ"
             />
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

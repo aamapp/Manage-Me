@@ -1,12 +1,13 @@
 
 import React, { useState, useRef } from 'react';
-import { User as UserIcon, Bell, Shield, Palette, Globe, Save, CheckCircle2, Loader2, Camera, UploadCloud, AlertCircle } from 'lucide-react';
+import { User as UserIcon, Bell, Shield, Palette, Globe, Save, CheckCircle2, Loader2, Camera, UploadCloud, AlertCircle, Lock, Key } from 'lucide-react';
 import { APP_NAME } from '../constants';
 import { useAppContext } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
+import { AppLock } from '../components/AppLock';
 
 export const Settings: React.FC = () => {
-  const { user, setUser, showToast } = useAppContext();
+  const { user, setUser, showToast, appPin, setAppPin } = useAppContext();
   const [formData, setFormData] = useState({
     name: user?.name || '',
     email: user?.email || '',
@@ -17,7 +18,13 @@ export const Settings: React.FC = () => {
   });
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
+  
+  // Security State
+  const [newPassword, setNewPassword] = useState('');
+  const [isChangingPass, setIsChangingPass] = useState(false);
+  
+  // 'setup' means setting a new pin, 'disable' means verifying pin to turn it off
+  const [pinAction, setPinAction] = useState<'setup' | 'disable' | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -31,55 +38,36 @@ export const Settings: React.FC = () => {
     
     const file = e.target.files[0];
     const fileExt = file.name.split('.').pop();
-    // Use timestamp for unique filename
-    const fileName = `${Date.now()}.${fileExt}`;
-    // Organize files by user ID folder (Standard RLS pattern)
-    const filePath = `${user.id}/${fileName}`;
+    const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+    const filePath = fileName;
 
     setIsUploading(true);
 
     try {
-      // 1. Upload to Supabase Storage 'avatars' bucket
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(filePath, file, {
-          upsert: true // Allow overwriting if filename exists
-        });
+        .upload(filePath, file, { upsert: true });
 
-      if (uploadError) {
-        // Handle RLS specific error
-        if (uploadError.message.includes('row-level security') || uploadError.message.includes('violates row-level security policy')) {
-            throw new Error("পারমিশন নেই: Supabase Storage-এ 'avatars' বাকেটে পলিসি (Policy) যুক্ত করুন।");
-        }
-        // Handle missing bucket
-        if (uploadError.message.includes('bucket not found')) {
-            throw new Error("'avatars' নামে স্টোরেজ বাকেট তৈরি করা নেই। Supabase ড্যাশবোর্ডে গিয়ে তৈরি করুন।");
-        }
-        throw uploadError;
-      }
+      if (uploadError) throw uploadError;
 
-      // 2. Get Public URL
       const { data: { publicUrl } } = supabase.storage
         .from('avatars')
         .getPublicUrl(filePath);
 
-      // 3. Update User Metadata
       const { error: updateError } = await supabase.auth.updateUser({
         data: { avatar_url: publicUrl }
       });
 
       if (updateError) throw updateError;
 
-      // 4. Update Local State
       setUser(prev => prev ? ({ ...prev, avatar_url: publicUrl }) : null);
       showToast('প্রোফাইল ছবি আপডেট হয়েছে!', 'success');
 
     } catch (error: any) {
       console.error(error);
-      showToast(error.message || 'ছবি আপলোড করতে সমস্যা হয়েছে', 'error');
+      showToast('ছবি আপলোড করতে সমস্যা হয়েছে', 'error');
     } finally {
       setIsUploading(false);
-      // Reset input so same file can be selected again if needed
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
@@ -110,14 +98,52 @@ export const Settings: React.FC = () => {
         currency: formData.currency as '৳' | '$'
       }) : null);
 
-      setShowSuccess(true);
       showToast('সেটিংস সফলভাবে সেভ হয়েছে', 'success');
-      setTimeout(() => setShowSuccess(false), 3000);
     } catch (err: any) {
       showToast(`সেভ করতে সমস্যা হয়েছে: ${err.message}`, 'error');
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleChangePassword = async () => {
+    if (!newPassword || newPassword.length < 6) {
+        showToast('পাসওয়ার্ড অন্তত ৬ অক্ষরের হতে হবে', 'error');
+        return;
+    }
+    setIsChangingPass(true);
+    try {
+        const { error } = await supabase.auth.updateUser({ password: newPassword });
+        if (error) throw error;
+        showToast('পাসওয়ার্ড পরিবর্তন সফল হয়েছে', 'success');
+        setNewPassword('');
+    } catch (err: any) {
+        showToast(`ভুল: ${err.message}`, 'error');
+    } finally {
+        setIsChangingPass(false);
+    }
+  };
+
+  const handlePinToggle = () => {
+      if (appPin) {
+          // If PIN exists, we want to disable it. 
+          // Open AppLock in 'unlock' mode to verify current PIN first.
+          setPinAction('disable');
+      } else {
+          // If no PIN, we want to setup a new one.
+          setPinAction('setup');
+      }
+  };
+
+  const handlePinSuccess = (pin: string) => {
+      if (pinAction === 'setup') {
+          setAppPin(pin);
+          showToast('অ্যাপ লক চালু করা হয়েছে!', 'success');
+      } else if (pinAction === 'disable') {
+          setAppPin(null);
+          showToast('অ্যাপ লক বন্ধ করা হয়েছে', 'success');
+      }
+      setPinAction(null);
   };
 
   if (!user) return null;
@@ -126,10 +152,11 @@ export const Settings: React.FC = () => {
     <div className="space-y-6 pb-20">
       <div>
         <h1 className="text-2xl font-bold text-slate-800">সেটিংস</h1>
-        <p className="text-slate-500">প্রোফাইল কনফিগারেশন</p>
+        <p className="text-slate-500">প্রোফাইল এবং সিকিউরিটি কনফিগারেশন</p>
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        {/* Profile Header */}
         <div className="p-6 border-b flex items-center gap-5 bg-slate-50/50">
           <div className="relative group">
             <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-white shadow-lg bg-indigo-100 flex items-center justify-center relative">
@@ -138,137 +165,117 @@ export const Settings: React.FC = () => {
                ) : (
                  <span className="text-indigo-600 text-3xl font-bold">{formData.name ? formData.name.charAt(0) : 'U'}</span>
                )}
-               
-               {/* Uploading Overlay */}
                {isUploading && (
                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
                    <Loader2 className="animate-spin text-white" size={24} />
                  </div>
                )}
             </div>
-            
             <button 
               disabled={isUploading}
               onClick={() => fileInputRef.current?.click()}
               className="absolute bottom-0 right-0 bg-indigo-600 text-white p-2 rounded-full shadow-md hover:bg-indigo-700 active:scale-90 transition-transform cursor-pointer z-20"
-              title="ছবি পরিবর্তন করুন"
             >
               <Camera size={14} />
             </button>
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              className="hidden" 
-              accept="image/*"
-              onChange={handleImageUpload}
-            />
+            <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
           </div>
-          
           <div>
             <h3 className="text-lg font-bold text-slate-800">{formData.name || 'ইউজার'}</h3>
-            <p className="text-slate-500 text-xs font-medium flex items-center gap-1">
-              {formData.occupation || 'পেশা যুক্ত করা হয়নি'}
-            </p>
+            <p className="text-slate-500 text-xs font-medium">{formData.occupation || 'পেশা যুক্ত করা হয়নি'}</p>
           </div>
         </div>
         
-        <div className="p-6 space-y-5">
-          <div className="grid grid-cols-1 gap-5">
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">পূর্ণ নাম</label>
-              <input 
-                type="text" 
-                name="name"
-                value={formData.name} 
-                onChange={handleChange}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 transition-all font-medium" 
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">ইমেইল</label>
-              <input 
-                type="email" 
-                name="email"
-                value={formData.email} 
-                disabled
-                className="w-full px-4 py-3 bg-slate-100 border border-slate-200 rounded-xl outline-none text-slate-500 font-medium cursor-not-allowed" 
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">ফোন নম্বর</label>
-              <input 
-                type="text" 
-                name="phone"
-                value={formData.phone} 
-                onChange={handleChange}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 transition-all font-medium" 
-                placeholder="আপনার ফোন নম্বর"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">পেশা</label>
-              <input 
-                type="text" 
-                name="occupation"
-                value={formData.occupation} 
-                onChange={handleChange}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 transition-all font-medium" 
-                placeholder="যেমন: সাউন্ড ইঞ্জিনিয়ার"
-              />
-            </div>
-          </div>
-          
-          <div className="pt-4 border-t border-slate-100">
-            <h4 className="font-bold text-slate-800 mb-4 flex items-center gap-2 text-sm">
-              <Globe size={16} className="text-indigo-600" />
-              অ্যাপলিকেশন সেটিংস
-            </h4>
-            <div className="grid grid-cols-1 gap-5">
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">ভাষা</label>
-                <select 
-                  name="language"
-                  value={formData.language}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 font-medium cursor-pointer"
-                >
-                  <option value="bn">বাংলা</option>
-                  <option value="en">English</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">মুদ্রা (Currency)</label>
-                <select 
-                  name="currency"
-                  value={formData.currency}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 font-medium cursor-pointer"
-                >
-                  <option value="৳">টাকা (৳)</option>
-                  <option value="$">ইউএস ডলার ($)</option>
-                </select>
-              </div>
-            </div>
+        <div className="p-6 space-y-8">
+          {/* General Settings */}
+          <div className="space-y-4">
+             <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">পূর্ণ নাম</label>
+                  <input type="text" name="name" value={formData.name} onChange={handleChange} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 font-medium" />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">পেশা</label>
+                  <input type="text" name="occupation" value={formData.occupation} onChange={handleChange} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 font-medium" placeholder="যেমন: সাউন্ড ইঞ্জিনিয়ার" />
+                </div>
+                <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">মুদ্রা (Currency)</label>
+                    <select name="currency" value={formData.currency} onChange={handleChange} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 font-medium cursor-pointer">
+                    <option value="৳">টাকা (৳)</option>
+                    <option value="$">ইউএস ডলার ($)</option>
+                    </select>
+                </div>
+             </div>
+             <button onClick={handleSave} disabled={isSaving} className="w-full flex justify-center items-center gap-2 px-6 py-3.5 rounded-xl font-bold bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95 transition-all shadow-lg shadow-indigo-100 mt-2">
+                {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+                {isSaving ? 'সেভ হচ্ছে...' : 'পরিবর্তন সেভ করুন'}
+             </button>
           </div>
 
-          <div className="pt-6">
-            <button 
-              onClick={handleSave}
-              disabled={isSaving}
-              className={`w-full flex justify-center items-center gap-2 px-8 py-4 rounded-xl font-bold transition-all shadow-lg 
-                ${isSaving ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-100 active:scale-95'}
-              `}
-            >
-              {isSaving ? (
-                <Loader2 size={20} className="animate-spin" />
-              ) : (
-                <Save size={20} />
-              )}
-              {isSaving ? 'সেভ হচ্ছে...' : 'পরিবর্তন সেভ করুন'}
-            </button>
+          {/* Security Section */}
+          <div className="pt-6 border-t border-slate-100">
+             <h4 className="font-bold text-slate-800 mb-4 flex items-center gap-2 text-sm">
+               <Shield size={16} className="text-indigo-600" />
+               সিকিউরিটি
+             </h4>
+
+             {/* App Lock */}
+             <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6 flex items-center justify-between">
+                 <div className="flex items-center gap-3">
+                     <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${appPin ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-200 text-slate-500'}`}>
+                         <Lock size={20} />
+                     </div>
+                     <div>
+                         <p className="font-bold text-slate-800 text-sm">অ্যাপ লক</p>
+                         <p className="text-xs text-slate-500">{appPin ? 'পিন কোড চালু আছে' : 'পিন কোড দিয়ে অ্যাপ লক করুন'}</p>
+                     </div>
+                 </div>
+                 <button 
+                    onClick={handlePinToggle}
+                    className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${appPin ? 'bg-indigo-600' : 'bg-slate-300'}`}
+                 >
+                     <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform duration-300 shadow-sm ${appPin ? 'left-7' : 'left-1'}`}></div>
+                 </button>
+             </div>
+
+             {/* Change Password */}
+             <div className="space-y-3">
+                <label className="block text-sm font-semibold text-slate-700">পাসওয়ার্ড পরিবর্তন</label>
+                <div className="flex gap-2">
+                    <div className="relative flex-1">
+                        <Key size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input 
+                            type="password" 
+                            placeholder="নতুন পাসওয়ার্ড দিন..." 
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            className="w-full pl-9 pr-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-medium"
+                        />
+                    </div>
+                    <button 
+                        onClick={handleChangePassword}
+                        disabled={!newPassword || isChangingPass}
+                        className="bg-slate-800 text-white px-4 rounded-xl font-bold text-sm hover:bg-slate-900 active:scale-95 transition-all whitespace-nowrap"
+                    >
+                        {isChangingPass ? <Loader2 size={16} className="animate-spin" /> : 'আপডেট'}
+                    </button>
+                </div>
+             </div>
           </div>
         </div>
       </div>
+
+      {/* Pin Action Modal (Setup or Disable) */}
+      {pinAction && (
+          <AppLock 
+            // If we are disabling, we use 'unlock' mode (verify current pin).
+            // If we are setting up, we use 'setup' mode.
+            mode={pinAction === 'disable' ? 'unlock' : 'setup'}
+            savedPin={pinAction === 'disable' ? appPin : undefined}
+            onSuccess={handlePinSuccess}
+            onCancel={() => setPinAction(null)}
+          />
+      )}
     </div>
   );
 };

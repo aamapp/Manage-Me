@@ -1,5 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Users, Plus, Search, Phone, MoreHorizontal, X, Pencil, Trash2, Loader2, ChevronRight } from 'lucide-react';
 import { CURRENCY } from '../constants';
 import { Client } from '../types';
@@ -232,9 +233,9 @@ export const Clients: React.FC = () => {
         )}
       </div>
 
-      {/* Full Screen Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-[100] bg-white flex flex-col animate-in slide-in-from-bottom duration-300">
+      {/* Full Screen Modal with Portal */}
+      {isModalOpen && createPortal(
+        <div className="fixed inset-0 z-[1000] bg-white flex flex-col h-[100dvh] animate-in fade-in duration-200">
             {/* Header */}
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-10">
               <h2 className="text-xl font-bold text-slate-800">
@@ -261,7 +262,8 @@ export const Clients: React.FC = () => {
                   </button>
                 </form>
             </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

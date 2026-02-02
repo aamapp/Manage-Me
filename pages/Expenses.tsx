@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Receipt, Plus, Search, Tag, X, ShoppingCart, Loader2, Trash2, MoreVertical, Pencil, Calculator } from 'lucide-react';
 import { EXPENSE_CATEGORY_LABELS } from '../constants';
 import { useAppContext } from '../context/AppContext';
@@ -266,50 +267,50 @@ export const Expenses: React.FC = () => {
         )}
       </div>
 
-      {/* Full Screen Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-[100] bg-white flex flex-col animate-in slide-in-from-bottom duration-300">
-            {/* Header */}
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-10">
-              <h2 className="text-xl font-bold text-slate-800">
+      {/* Full Screen Modal with Portal */}
+      {isModalOpen && createPortal(
+        <div className="fixed inset-0 z-[1000] bg-white flex flex-col h-[100dvh] animate-in fade-in duration-200">
+            {/* Header - Compact */}
+            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
+              <h2 className="text-base font-bold text-slate-800">
                 {isEditing ? 'খরচ এডিট' : 'নতুন খরচ'}
               </h2>
               <button disabled={isSubmitting} onClick={() => setModalOpen(false)} className="p-2 bg-slate-50 rounded-full text-slate-500 hover:bg-slate-100 transition-colors">
-                <X size={24} />
+                <X size={20} />
               </button>
             </div>
             
-            {/* Form */}
+            {/* Form - Compact Layout */}
             <div className="flex-1 overflow-y-auto">
-                <form onSubmit={handleSubmit} className="p-6 space-y-5 pb-24">
+                <form onSubmit={handleSubmit} className="px-4 pt-3 pb-24 space-y-4">
                   
                   <div>
-                    <label className="text-sm font-bold text-slate-600 mb-2 block">বিবরণ</label>
-                    <input required type="text" value={newExpense.notes} onChange={e => setNewExpense({...newExpense, notes: e.target.value})} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-rose-500 outline-none text-base" placeholder="কিসের জন্য খরচ?" />
+                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">বিবরণ</label>
+                    <input required type="text" value={newExpense.notes} onChange={e => setNewExpense({...newExpense, notes: e.target.value})} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-rose-500 outline-none text-sm" placeholder="কিসের জন্য খরচ?" />
                   </div>
 
                   <div>
-                    <label className="text-sm font-bold text-slate-600 mb-2 block">
+                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
                         পরিমাণ ({user?.currency})
                     </label>
                     <div 
                       onClick={() => setShowKeypad(true)}
-                      className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-black text-xl text-rose-600 active:bg-slate-100 transition-colors flex items-center justify-between cursor-pointer"
+                      className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-black text-xl text-rose-600 active:bg-slate-100 transition-colors flex items-center justify-between cursor-pointer"
                     >
                        <span>{newExpense.amount || 0}</span>
-                       <Calculator size={20} className="text-slate-400" />
+                       <Calculator size={18} className="text-slate-400" />
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-sm font-bold text-slate-600 mb-2 block">তারিখ</label>
-                      <input required type="date" value={newExpense.date} onChange={e => setNewExpense({...newExpense, date: e.target.value})} className="w-full px-3 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none" />
+                      <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">তারিখ</label>
+                      <input required type="date" value={newExpense.date} onChange={e => setNewExpense({...newExpense, date: e.target.value})} className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none focus:ring-2 focus:ring-rose-500" />
                     </div>
                     
                     {/* Category Input with Suggestions */}
                     <div className="relative" ref={categoryInputRef}>
-                      <label className="text-sm font-bold text-slate-600 mb-2 block">ক্যাটাগরি</label>
+                      <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">ক্যাটাগরি</label>
                       <input 
                         type="text"
                         value={newExpense.category}
@@ -318,7 +319,7 @@ export const Expenses: React.FC = () => {
                           setNewExpense({...newExpense, category: e.target.value});
                           setShowCategorySuggestions(true);
                         }}
-                        className="w-full px-3 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none focus:ring-2 focus:ring-rose-500"
+                        className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none focus:ring-2 focus:ring-rose-500"
                         placeholder="ক্যাটাগরি লিখুন..."
                         required
                       />
@@ -340,7 +341,7 @@ export const Expenses: React.FC = () => {
                     </div>
                   </div>
 
-                  <button type="submit" disabled={isSubmitting} className="w-full bg-rose-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg shadow-rose-200 active:scale-95 transition-transform flex items-center justify-center gap-2 mt-4">
+                  <button type="submit" disabled={isSubmitting} className="w-full bg-rose-600 text-white py-4 rounded-2xl font-bold text-base shadow-lg shadow-rose-200 active:scale-95 transition-transform flex items-center justify-center gap-2 mt-4">
                     {isSubmitting ? <Loader2 className="animate-spin" /> : <Receipt />}
                     খরচ সেভ করুন
                   </button>
@@ -355,7 +356,8 @@ export const Expenses: React.FC = () => {
               initialValue={newExpense.amount}
               title="খরচের পরিমাণ"
             />
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
