@@ -1,11 +1,11 @@
 
 import React, { useEffect, useState } from 'react';
-import { X, Check, Delete, Calculator, Equal } from 'lucide-react';
+import { Delete, ChevronDown } from 'lucide-react';
 
 interface NumericKeypadProps {
   isOpen: boolean;
   onClose: () => void;
-  onValueChange: (value: number) => void;
+  onValueChange: (value: string | number) => void;
   initialValue?: number | string;
   title?: string;
 }
@@ -14,149 +14,157 @@ export const NumericKeypad: React.FC<NumericKeypadProps> = ({
   isOpen, 
   onClose, 
   onValueChange, 
-  initialValue = '',
-  title = 'পরিমাণ লিখুন'
+  initialValue = ''
 }) => {
-  const [display, setDisplay] = useState('0');
-  const [isResult, setIsResult] = useState(false);
+  const [buffer, setBuffer] = useState('');
 
   useEffect(() => {
     if (isOpen) {
-      setDisplay(initialValue ? String(initialValue) : '0');
-      setIsResult(true); // Treat initial value as a result so next type overwrites it
+      const val = initialValue === 0 ? '' : String(initialValue);
+      setBuffer(val);
     }
   }, [isOpen, initialValue]);
 
   if (!isOpen) return null;
 
+  const updateParent = (newVal: string) => {
+    setBuffer(newVal);
+    onValueChange(newVal);
+  };
+
   const handlePress = (val: string) => {
-    if (isResult) {
-      if (['+', '-', '*', '/'].includes(val)) {
-        // Continue calculating with previous result
-        setDisplay(display + val);
-        setIsResult(false);
-      } else {
-        // Start new number
-        setDisplay(val);
-        setIsResult(false);
-      }
+    let newVal = buffer;
+    if (buffer === '0' && val !== '.') {
+        newVal = val;
     } else {
-      if (display === '0' && !['+', '-', '*', '/', '.'].includes(val)) {
-        setDisplay(val);
-      } else {
-        setDisplay(display + val);
-      }
+        newVal = buffer + val;
     }
+    updateParent(newVal);
   };
 
   const handleClear = () => {
-    setDisplay('0');
-    setIsResult(false);
+    updateParent('');
   };
 
   const handleBackspace = () => {
-    if (display.length > 1) {
-      setDisplay(display.slice(0, -1));
-    } else {
-      setDisplay('0');
-    }
+    const newVal = buffer.length > 0 ? buffer.slice(0, -1) : '';
+    updateParent(newVal);
   };
 
   const handleCalculate = () => {
     try {
-      // Safe evaluation of the math expression
+      // Safe evaluation
       // eslint-disable-next-line no-new-func
-      const result = new Function('return ' + display)();
-      const formattedResult = String(Math.round(result * 100) / 100); // 2 decimal places
-      setDisplay(formattedResult);
-      setIsResult(true);
-      return formattedResult;
+      const result = new Function('return ' + (buffer || '0'))();
+      const formattedResult = String(Math.round(result * 100) / 100);
+      updateParent(formattedResult);
     } catch (e) {
-      return display;
+      // Keep as is if invalid
     }
   };
 
-  const handleSubmit = () => {
-    const finalVal = handleCalculate();
-    onValueChange(parseFloat(finalVal) || 0);
+  const handleDone = () => {
+    handleCalculate();
     onClose();
   };
 
-  const buttons = [
-    { label: 'AC', action: handleClear, style: 'text-rose-500 font-bold bg-rose-50' },
-    { label: '⌫', action: handleBackspace, style: 'text-slate-600 bg-slate-50' },
-    { label: '/', action: () => handlePress('/'), style: 'text-indigo-600 bg-indigo-50 font-bold text-xl' },
-    { label: '×', action: () => handlePress('*'), style: 'text-indigo-600 bg-indigo-50 font-bold text-xl' },
-    { label: '7', action: () => handlePress('7'), style: 'text-slate-800 bg-white font-bold text-xl' },
-    { label: '8', action: () => handlePress('8'), style: 'text-slate-800 bg-white font-bold text-xl' },
-    { label: '9', action: () => handlePress('9'), style: 'text-slate-800 bg-white font-bold text-xl' },
-    { label: '-', action: () => handlePress('-'), style: 'text-indigo-600 bg-indigo-50 font-bold text-xl' },
-    { label: '4', action: () => handlePress('4'), style: 'text-slate-800 bg-white font-bold text-xl' },
-    { label: '5', action: () => handlePress('5'), style: 'text-slate-800 bg-white font-bold text-xl' },
-    { label: '6', action: () => handlePress('6'), style: 'text-slate-800 bg-white font-bold text-xl' },
-    { label: '+', action: () => handlePress('+'), style: 'text-indigo-600 bg-indigo-50 font-bold text-xl' },
-    { label: '1', action: () => handlePress('1'), style: 'text-slate-800 bg-white font-bold text-xl' },
-    { label: '2', action: () => handlePress('2'), style: 'text-slate-800 bg-white font-bold text-xl' },
-    { label: '3', action: () => handlePress('3'), style: 'text-slate-800 bg-white font-bold text-xl' },
-    { label: '=', action: handleCalculate, style: 'row-span-2 bg-indigo-600 text-white font-bold text-2xl flex items-center justify-center' },
-    { label: '0', action: () => handlePress('0'), style: 'col-span-2 text-slate-800 bg-white font-bold text-xl' },
-    { label: '.', action: () => handlePress('.'), style: 'text-slate-800 bg-white font-bold text-xl' },
-  ];
-
   return (
     <div className="fixed inset-0 z-[150] flex flex-col justify-end">
-      {/* Backdrop */}
+      {/* 1. Backdrop Layer: Covers the whole screen behind the keypad */}
       <div 
-        className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200"
-        onClick={handleSubmit} // Closing by clicking outside saves the value
+        className="absolute inset-0 bg-transparent" 
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          handleDone();
+        }} 
       />
 
-      {/* Keypad Container */}
-      <div className="relative bg-slate-100 rounded-t-[2.5rem] shadow-2xl animate-in slide-in-from-bottom duration-300 overflow-hidden">
+      {/* 2. Content Layer: The actual keypad */}
+      <div 
+        className="relative bg-slate-100 shadow-2xl animate-in slide-in-from-bottom duration-200 border-t border-slate-200 pb-safe z-10"
+        onClick={(e) => {
+          // Critical: Stop clicks inside keypad from bubbling to backdrop
+          e.stopPropagation();
+        }}
+      >
         
-        {/* Header / Display Area */}
-        <div className="bg-white px-6 py-5 border-b border-slate-100 flex flex-col items-end justify-center min-h-[100px] relative">
-           
-           {/* Top Controls */}
-           <div className="absolute top-4 left-6 flex items-center gap-2">
-             <div className="p-1.5 bg-indigo-50 rounded-lg text-indigo-600">
-               <Calculator size={16} />
-             </div>
-             <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">{title}</span>
+        {/* Top Control Bar */}
+        <div className="h-10 bg-slate-200/50 flex items-center justify-between px-4 border-b border-slate-300/50">
+           <div className="flex gap-4 overflow-x-auto no-scrollbar">
+              {/* Optional chips can go here */}
            </div>
-
            <button 
-              onClick={handleSubmit}
-              className="absolute top-4 right-6 p-2 bg-indigo-600 text-white rounded-full hover:bg-indigo-700 active:scale-90 transition-transform shadow-lg shadow-indigo-200"
+             type="button"
+             onClick={handleDone}
+             className="ml-auto text-indigo-600 font-bold text-sm bg-transparent px-2 py-1 flex items-center gap-1"
            >
-              <Check size={20} strokeWidth={3} />
+             <ChevronDown size={20} />
            </button>
-
-           {/* The Result Display */}
-           <div className="w-full text-right mt-6 overflow-x-auto whitespace-nowrap scrollbar-hide">
-              <span className="text-4xl font-black text-slate-800 tracking-tight">{display}</span>
-           </div>
         </div>
 
         {/* Buttons Grid */}
-        <div className="p-4 grid grid-cols-4 gap-3 h-[380px] pb-8">
-          {buttons.map((btn, idx) => (
-            <button
-              key={idx}
-              onClick={(e) => {
-                e.preventDefault();
-                btn.action();
-              }}
-              className={`
-                ${btn.style} 
-                rounded-2xl shadow-sm border-b-[3px] border-slate-200 active:border-b-0 active:translate-y-[3px] transition-all flex items-center justify-center select-none h-full w-full
-              `}
+        <div className="grid grid-cols-4 gap-[1px] bg-slate-300 p-[1px]">
+            {/* Row 1 */}
+            <KeyBtn label="C" onClick={handleClear} className="text-rose-500 font-bold" />
+            <KeyBtn label="÷" onClick={() => handlePress('/')} className="text-indigo-600 text-xl" />
+            <KeyBtn label="×" onClick={() => handlePress('*')} className="text-indigo-600 text-xl" />
+            <KeyBtn label="⌫" onClick={handleBackspace} className="text-slate-600" icon={<Delete size={20} />} />
+
+            {/* Row 2 */}
+            <KeyBtn label="7" onClick={() => handlePress('7')} />
+            <KeyBtn label="8" onClick={() => handlePress('8')} />
+            <KeyBtn label="9" onClick={() => handlePress('9')} />
+            <KeyBtn label="-" onClick={() => handlePress('-')} className="text-indigo-600 text-3xl pb-1" />
+
+            {/* Row 3 */}
+            <KeyBtn label="4" onClick={() => handlePress('4')} />
+            <KeyBtn label="5" onClick={() => handlePress('5')} />
+            <KeyBtn label="6" onClick={() => handlePress('6')} />
+            <KeyBtn label="+" onClick={() => handlePress('+')} className="text-indigo-600 text-2xl" />
+
+            {/* Row 4 */}
+            <div className="col-span-3 grid grid-cols-3 gap-[1px]">
+                <KeyBtn label="1" onClick={() => handlePress('1')} />
+                <KeyBtn label="2" onClick={() => handlePress('2')} />
+                <KeyBtn label="3" onClick={() => handlePress('3')} />
+                
+                <KeyBtn label="." onClick={() => handlePress('.')} className="text-xl font-bold" />
+                <KeyBtn label="0" onClick={() => handlePress('0')} />
+                <KeyBtn label="00" onClick={() => handlePress('00')} />
+            </div>
+            
+            {/* Equal / Done Button - Spans 2 rows height equivalent */}
+            <button 
+              type="button"
+              onClick={handleDone}
+              className="bg-indigo-600 active:bg-indigo-700 text-white flex items-center justify-center h-full min-h-[108px] transition-colors"
             >
-              {btn.label}
+              <div className="flex flex-col items-center">
+                 <span className="text-2xl font-bold">=</span>
+                 <span className="text-[10px] font-medium uppercase mt-1">Done</span>
+              </div>
             </button>
-          ))}
         </div>
       </div>
     </div>
   );
 };
+
+const KeyBtn = ({ label, onClick, className = "", icon }: any) => (
+  <button
+    type="button"
+    onClick={(e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      onClick();
+    }}
+    className={`
+      bg-white active:bg-slate-200 h-14 flex items-center justify-center
+      text-slate-800 text-xl font-semibold transition-colors
+      ${className}
+    `}
+  >
+    {icon || label}
+  </button>
+);
