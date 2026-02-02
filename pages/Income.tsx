@@ -1,9 +1,10 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { TrendingUp, Plus, Search, Calendar, DollarSign, X, ReceiptText, Briefcase, CreditCard, AlertCircle, MoreVertical, Pencil, Trash2, Users, Loader2, CalendarDays, Wallet, Clock, Zap, Rocket, Landmark, Banknote } from 'lucide-react';
+import { TrendingUp, Plus, Search, Calendar, DollarSign, X, ReceiptText, Briefcase, CreditCard, AlertCircle, MoreVertical, Pencil, Trash2, Users, Loader2, CalendarDays, Wallet, Clock, Zap, Rocket, Landmark, Banknote, Calculator } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Project, IncomeRecord } from '../types';
 import { supabase } from '../lib/supabase';
+import { NumericKeypad } from '../components/NumericKeypad';
 
 // Custom Bkash Icon to match the brand logo shape (Origami Bird)
 const BkashIcon = ({ size = 16, className = "" }: { size?: number, className?: string }) => (
@@ -41,6 +42,9 @@ export const Income: React.FC = () => {
   // Mobile action menu state
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   
+  // Keypad State
+  const [showKeypad, setShowKeypad] = useState(false);
+
   // Ref for click outside detection
   const projectInputRef = useRef<HTMLDivElement>(null);
 
@@ -430,13 +434,13 @@ export const Income: React.FC = () => {
 
                   <div>
                     <label className="text-sm font-bold text-slate-600 mb-2 block">পরিমাণ ({currency})</label>
-                    <input 
-                      required type="number" 
-                      value={newPayment.amount || ''} 
-                      onChange={e => setNewPayment({...newPayment, amount: Number(e.target.value)})} 
-                      className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-black text-xl text-emerald-600 focus:ring-2 focus:ring-emerald-500 outline-none" 
-                      placeholder="0.00"
-                    />
+                    <div 
+                      onClick={() => setShowKeypad(true)}
+                      className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-black text-xl text-emerald-600 active:bg-slate-100 transition-colors flex items-center justify-between cursor-pointer"
+                    >
+                       <span>{newPayment.amount || 0}</span>
+                       <Calculator size={20} className="text-slate-400" />
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
@@ -462,6 +466,15 @@ export const Income: React.FC = () => {
                   </button>
                 </form>
             </div>
+
+            {/* Numeric Keypad */}
+            <NumericKeypad 
+              isOpen={showKeypad}
+              onClose={() => setShowKeypad(false)}
+              onValueChange={(val) => setNewPayment({...newPayment, amount: val})}
+              initialValue={newPayment.amount}
+              title="পেমেন্ট পরিমাণ"
+            />
         </div>
       )}
     </div>

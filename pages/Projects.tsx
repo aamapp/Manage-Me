@@ -1,10 +1,11 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, Search, MoreVertical, Calendar, DollarSign, Briefcase, X, FolderOpen, Pencil, Trash2, Users, FileText, CheckCircle2, Clock, UserPlus, CalendarDays, Loader2, AlertCircle, ChevronDown, Filter, Music } from 'lucide-react';
+import { Plus, Search, MoreVertical, Calendar, DollarSign, Briefcase, X, FolderOpen, Pencil, Trash2, Users, FileText, CheckCircle2, Clock, UserPlus, CalendarDays, Loader2, AlertCircle, ChevronDown, Filter, Music, Calculator } from 'lucide-react';
 import { PROJECT_STATUS_LABELS, PROJECT_TYPE_LABELS } from '../constants';
 import { Project, ProjectStatus, ProjectType, Client } from '../types';
 import { useAppContext } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
+import { NumericKeypad } from '../components/NumericKeypad';
 
 export const Projects: React.FC = () => {
   const { projects, setProjects, clients, setClients, user, refreshData, showToast } = useAppContext();
@@ -21,6 +22,10 @@ export const Projects: React.FC = () => {
   // New: State to control which card has its menu open
   const [activeCardMenuId, setActiveCardMenuId] = useState<string | null>(null);
   
+  // Keypad State
+  const [showKeypad, setShowKeypad] = useState(false);
+  const [activeAmountField, setActiveAmountField] = useState<'total' | 'paid' | null>(null);
+
   const [showClientSuggestions, setShowClientSuggestions] = useState(false);
   const [clientSearch, setClientSearch] = useState('');
   
@@ -236,6 +241,19 @@ export const Projects: React.FC = () => {
     setClientSearch(client.name);
     setNewProject({ ...newProject, clientname: client.name });
     setShowClientSuggestions(false);
+  };
+
+  const openKeypad = (field: 'total' | 'paid') => {
+    setActiveAmountField(field);
+    setShowKeypad(true);
+  };
+
+  const handleKeypadValue = (val: number) => {
+    if (activeAmountField === 'total') {
+      setNewProject({ ...newProject, totalamount: val });
+    } else if (activeAmountField === 'paid') {
+      setNewProject({ ...newProject, paidamount: val });
+    }
   };
 
   return (
@@ -455,11 +473,23 @@ export const Projects: React.FC = () => {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="text-sm font-bold text-slate-600 mb-2 block">বাজেট ({currency})</label>
-                      <input type="number" value={newProject.totalamount || ''} onChange={e => setNewProject({...newProject, totalamount: Number(e.target.value)})} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 outline-none text-base" placeholder="0" />
+                      <div 
+                        onClick={() => openKeypad('total')}
+                        className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 active:bg-slate-100 transition-colors flex items-center justify-between cursor-pointer"
+                      >
+                         <span>{newProject.totalamount || 0}</span>
+                         <Calculator size={18} className="text-slate-400" />
+                      </div>
                     </div>
                     <div>
                       <label className="text-sm font-bold text-slate-600 mb-2 block">পরিশোধ ({currency})</label>
-                      <input type="number" value={newProject.paidamount || ''} onChange={e => setNewProject({...newProject, paidamount: Number(e.target.value)})} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-emerald-600 outline-none text-base" placeholder="0" />
+                      <div 
+                        onClick={() => openKeypad('paid')}
+                        className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-emerald-600 active:bg-slate-100 transition-colors flex items-center justify-between cursor-pointer"
+                      >
+                         <span>{newProject.paidamount || 0}</span>
+                         <Calculator size={18} className="text-slate-400" />
+                      </div>
                     </div>
                   </div>
 
@@ -480,6 +510,15 @@ export const Projects: React.FC = () => {
                   </button>
                 </form>
             </div>
+            
+            {/* Numeric Keypad */}
+            <NumericKeypad 
+              isOpen={showKeypad}
+              onClose={() => setShowKeypad(false)}
+              onValueChange={handleKeypadValue}
+              initialValue={activeAmountField === 'total' ? newProject.totalamount : newProject.paidamount}
+              title={activeAmountField === 'total' ? 'বাজেট পরিমাণ' : 'পরিশোধ পরিমাণ'}
+            />
         </div>
       )}
     </div>

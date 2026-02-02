@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Receipt, Plus, Search, Tag, X, ShoppingCart, Loader2, Trash2, MoreVertical, Pencil } from 'lucide-react';
+import { Receipt, Plus, Search, Tag, X, ShoppingCart, Loader2, Trash2, MoreVertical, Pencil, Calculator } from 'lucide-react';
 import { EXPENSE_CATEGORY_LABELS } from '../constants';
 import { useAppContext } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
+import { NumericKeypad } from '../components/NumericKeypad';
 
 export const Expenses: React.FC = () => {
   const { user, showToast } = useAppContext();
@@ -18,6 +19,9 @@ export const Expenses: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [activeExpenseId, setActiveExpenseId] = useState<string | null>(null);
   
+  // Keypad State
+  const [showKeypad, setShowKeypad] = useState(false);
+
   // Category input suggestion states
   const [showCategorySuggestions, setShowCategorySuggestions] = useState(false);
   const categoryInputRef = useRef<HTMLDivElement>(null);
@@ -111,7 +115,8 @@ export const Expenses: React.FC = () => {
     
     setIsSubmitting(true);
     
-    // Safety Check: Calculate amount if user typed "50+20" but didn't press '='
+    // Amount is now handled by NumericKeypad, so it's already a number or calculable string
+    // But double check just in case
     let finalAmount = newExpense.amount;
     if (typeof finalAmount === 'string' && finalAmount.includes('+')) {
       finalAmount = finalAmount.split('+').reduce((acc: number, curr: string) => acc + (parseFloat(curr) || 0), 0);
@@ -286,29 +291,14 @@ export const Expenses: React.FC = () => {
                   <div>
                     <label className="text-sm font-bold text-slate-600 mb-2 block">
                         পরিমাণ ({user?.currency})
-                        <span className="text-[10px] text-slate-400 font-normal ml-2">(হিসাব করতে 50+20= লিখুন)</span>
                     </label>
-                    <input 
-                      required 
-                      type="text" 
-                      inputMode="decimal"
-                      value={newExpense.amount || ''} 
-                      onChange={(e) => {
-                          const val = e.target.value;
-                          // 1. Calculate if ends with '='
-                          if (val.endsWith('=')) {
-                              const parts = val.slice(0, -1).split('+');
-                              const sum = parts.reduce((acc: number, curr: string) => acc + (parseFloat(curr) || 0), 0);
-                              setNewExpense({...newExpense, amount: sum});
-                          } 
-                          // 2. Allow numbers, decimal points, and '+' only
-                          else if (/^[0-9.+\s]*$/.test(val)) {
-                              setNewExpense({...newExpense, amount: val});
-                          }
-                      }} 
-                      className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-black text-xl text-rose-600 focus:ring-2 focus:ring-rose-500 outline-none" 
-                      placeholder="0 বা 50+20=" 
-                    />
+                    <div 
+                      onClick={() => setShowKeypad(true)}
+                      className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-black text-xl text-rose-600 active:bg-slate-100 transition-colors flex items-center justify-between cursor-pointer"
+                    >
+                       <span>{newExpense.amount || 0}</span>
+                       <Calculator size={20} className="text-slate-400" />
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
@@ -356,6 +346,15 @@ export const Expenses: React.FC = () => {
                   </button>
                 </form>
             </div>
+            
+            {/* Numeric Keypad */}
+            <NumericKeypad 
+              isOpen={showKeypad}
+              onClose={() => setShowKeypad(false)}
+              onValueChange={(val) => setNewExpense({...newExpense, amount: val})}
+              initialValue={newExpense.amount}
+              title="খরচের পরিমাণ"
+            />
         </div>
       )}
     </div>
