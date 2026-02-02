@@ -156,7 +156,7 @@ export const Reports: React.FC = () => {
       const element = reportRef.current;
       
       const canvas = await html2canvas(element, {
-        scale: 2.5, // High resolution
+        scale: 2.0, // Reduced scale slightly for better performance on mobile
         backgroundColor: '#ffffff',
         logging: false,
         useCORS: true, 
@@ -173,15 +173,47 @@ export const Reports: React.FC = () => {
         }
       });
 
-      const image = canvas.toDataURL("image/png", 1.0);
-      const link = document.createElement('a');
-      link.href = image;
-      link.download = `Report_${user?.name}_${new Date().toISOString().split('T')[0]}.png`;
-      link.click();
+      // Use Blob approach instead of DataURL for better Android compatibility
+      canvas.toBlob(async (blob) => {
+        if (!blob) {
+            alert('ইমেজ জেনারেট করতে সমস্যা হয়েছে।');
+            setIsCapturing(false);
+            return;
+        }
+
+        const fileName = `Report_${user?.name?.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.png`;
+        const file = new File([blob], fileName, { type: 'image/png' });
+
+        // Try Native Share API first (Best for Android WebView)
+        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+            try {
+                await navigator.share({
+                    files: [file],
+                    title: 'Manage-Me Report',
+                    text: `Financial Report for ${user?.name}`
+                });
+                setIsCapturing(false);
+            } catch (error) {
+                console.log('Share was cancelled or failed', error);
+                setIsCapturing(false);
+            }
+        } else {
+            // Fallback for Desktop or browsers without Share API
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            document.body.appendChild(link); // Append to body is crucial for some browsers
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            setIsCapturing(false);
+        }
+      }, 'image/png', 1.0);
+
     } catch (err) {
       console.error(err);
-      alert('ছবি তৈরিতে সমস্যা হয়েছে।');
-    } finally {
+      alert('রিপোর্ট তৈরিতে সমস্যা হয়েছে।');
       setIsCapturing(false);
     }
   };
@@ -237,8 +269,8 @@ export const Reports: React.FC = () => {
             disabled={!hasData || isCapturing}
             className="w-full bg-indigo-600 text-white px-5 py-3.5 rounded-xl font-bold flex justify-center items-center gap-2 text-sm disabled:opacity-50 shadow-lg shadow-indigo-200 active:scale-[0.98] transition-all hover:bg-indigo-700"
           >
-            {isCapturing ? <RefreshCcw size={18} className="animate-spin" /> : <Download size={18} />}
-            <span>{isCapturing ? 'তৈরি হচ্ছে...' : 'ডাউনলোড রিপোর্ট'}</span>
+            {isCapturing ? <RefreshCcw size={18} className="animate-spin" /> : <Share2 size={18} />}
+            <span>{isCapturing ? 'তৈরি হচ্ছে...' : 'রিপোর্ট শেয়ার / ডাউনলোড'}</span>
           </button>
         </div>
       </div>

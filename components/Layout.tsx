@@ -44,9 +44,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans w-full overflow-x-hidden selection:bg-indigo-100 selection:text-indigo-700">
-      {/* Mobile Header (App Bar) */}
-      <header className="fixed top-0 inset-x-0 h-16 bg-white/90 backdrop-blur-md border-b border-slate-200/80 flex items-center justify-between px-5 z-40 max-w-[100vw] shadow-sm">
+    <div className="min-h-screen bg-slate-50 font-sans w-full overflow-x-hidden selection:bg-indigo-100 selection:text-indigo-700 flex flex-col">
+      {/* Mobile Header (App Bar) - Changed to Sticky for Rubber Band Effect */}
+      <header className="sticky top-0 inset-x-0 h-16 bg-white/90 backdrop-blur-md border-b border-slate-200/80 flex items-center justify-between px-5 z-40 max-w-[100vw] shadow-sm transition-all duration-200">
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-indigo-200 ring-2 ring-white">
             M
@@ -69,8 +69,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
       </header>
 
       {/* Main Content Area */}
-      {/* Reduced bottom padding to match thinner nav bar */}
-      <main className="pt-20 pb-20 px-4 animate-in fade-in duration-300 w-full max-w-[100vw] overflow-x-hidden">
+      {/* Removed pt-20 because header is now sticky and takes up space naturally */}
+      <main className="flex-1 pb-20 px-4 animate-in fade-in duration-300 w-full max-w-[100vw] overflow-x-hidden mt-4">
         {children}
       </main>
 
