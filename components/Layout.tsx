@@ -4,8 +4,10 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { 
   LayoutDashboard, Briefcase, TrendingUp, Receipt, Menu, 
   X, LogOut, Settings, 
-  BarChart3, Users, Tags
+  BarChart3, Users, Tags,
+  Info, Globe, Phone, Facebook, Instagram, Send, MessageCircle
 } from 'lucide-react';
+import { createPortal } from 'react-dom';
 import { APP_NAME } from '../constants';
 import { User as UserType } from '../types';
 
@@ -17,6 +19,7 @@ interface LayoutProps {
 
 export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   const [isMoreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [isAboutOpen, setAboutOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -43,15 +46,32 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
     }, 150);
   };
 
+  // Developer Contact Links
+  const DEVELOPER_INFO = {
+    // Google Drive Direct Link created from ID: 1SQpzaFRvgwEaKI8wbnNkvt_JhrxrjhGb
+    image: "https://drive.google.com/uc?export=view&id=1SQpzaFRvgwEaKI8wbnNkvt_JhrxrjhGb",
+    name: "আব্দুল্লাহ আল মামুন",
+    title: "Full Stack Developer",
+    facebook: "https://facebook.com/share/1C5Sw9sBRR/",
+    whatsapp: "https://wa.me/8801612505145",
+    instagram: "https://instagram.com/h.m.abdullah_al_mamun?igsh=d3NpZjBjYWRhMXly",
+    telegram: "https://t.me/abdullahalmamunofficial",
+    website: "https://aam.infinityfreeapp.com/",
+    phone: "tel:+8801612505145"
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 font-sans w-full overflow-x-hidden selection:bg-indigo-100 selection:text-indigo-700 flex flex-col">
       {/* Mobile Header (App Bar) - Fixed to ensure it stays on top */}
       <header className="fixed top-0 inset-x-0 h-16 bg-white/90 backdrop-blur-md border-b border-slate-200/80 flex items-center justify-between px-5 z-40 max-w-[100vw] shadow-sm transition-all duration-200">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-indigo-200 ring-2 ring-white">
+        <div 
+          onClick={() => setAboutOpen(true)}
+          className="flex items-center gap-2.5 cursor-pointer active:opacity-70 transition-opacity group"
+        >
+          <div className="w-9 h-9 bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-indigo-200 ring-2 ring-white group-active:scale-95 transition-transform">
             M
           </div>
-          <span className="font-bold text-slate-800 text-lg tracking-tight">{APP_NAME}</span>
+          <span className="font-bold text-slate-800 text-lg tracking-tight group-hover:text-indigo-600 transition-colors">{APP_NAME}</span>
         </div>
         <div className="flex items-center gap-3">
           {user.avatar_url ? (
@@ -182,6 +202,107 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ABOUT & DEVELOPER MODAL */}
+      {isAboutOpen && createPortal(
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4">
+           {/* Backdrop */}
+           <div 
+             className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300"
+             onClick={() => setAboutOpen(false)}
+           />
+
+           <div className="relative bg-white w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+              {/* Decorative Header */}
+              <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 p-6 pt-8 text-center relative">
+                 <div className="absolute top-0 left-0 w-full h-full overflow-hidden opacity-20">
+                    <div className="absolute -top-10 -right-10 w-40 h-40 bg-white rounded-full blur-3xl"></div>
+                    <div className="absolute bottom-10 -left-10 w-32 h-32 bg-purple-500 rounded-full blur-3xl"></div>
+                 </div>
+                 
+                 <div className="relative z-10 flex flex-col items-center">
+                    <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-indigo-700 font-black text-3xl mb-3 shadow-lg ring-4 ring-white/20">
+                      M
+                    </div>
+                    <h2 className="text-2xl font-black text-white tracking-tight">{APP_NAME}</h2>
+                    <p className="text-indigo-200 text-xs font-bold uppercase tracking-widest mt-1">ভার্সন ১.০.০</p>
+                 </div>
+                 
+                 <button 
+                   onClick={() => setAboutOpen(false)}
+                   className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+                 >
+                   <X size={20} />
+                 </button>
+              </div>
+
+              <div className="p-6">
+                {/* App Description */}
+                <div className="text-center mb-6">
+                   <p className="text-slate-500 text-sm leading-relaxed">
+                     অডিও প্রফেশনালদের জন্য একটি পূর্ণাঙ্গ প্রজেক্ট এবং আর্থিক ব্যবস্থাপনা সিস্টেম। আপনার সাউন্ড ডিজাইনিং ক্যারিয়ারকে সহজ ও গোছানো রাখুন।
+                   </p>
+                </div>
+
+                {/* Developer Info Section */}
+                <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                    <div className="flex flex-col items-center mb-4 -mt-10">
+                        <div className="w-20 h-20 rounded-full border-4 border-white shadow-md overflow-hidden bg-slate-200">
+                            <img src={DEVELOPER_INFO.image} alt="Developer" className="w-full h-full object-cover" />
+                        </div>
+                        <h3 className="font-bold text-slate-800 mt-2">{DEVELOPER_INFO.name}</h3>
+                        <p className="text-xs text-slate-500 font-medium">{DEVELOPER_INFO.title}</p>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3">
+                        {/* Facebook */}
+                        <a href={DEVELOPER_INFO.facebook} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-1 p-2 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors">
+                            <Facebook size={20} />
+                            <span className="text-[10px] font-bold">ফেইসবুক</span>
+                        </a>
+                        
+                        {/* WhatsApp */}
+                        <a href={DEVELOPER_INFO.whatsapp} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-1 p-2 rounded-xl bg-green-50 text-green-600 hover:bg-green-100 transition-colors">
+                            <MessageCircle size={20} />
+                            <span className="text-[10px] font-bold">হোয়াটসঅ্যাপ</span>
+                        </a>
+
+                        {/* Phone */}
+                        <a href={DEVELOPER_INFO.phone} className="flex flex-col items-center gap-1 p-2 rounded-xl bg-slate-200 text-slate-700 hover:bg-slate-300 transition-colors">
+                            <Phone size={20} />
+                            <span className="text-[10px] font-bold">কল করুন</span>
+                        </a>
+
+                        {/* Instagram */}
+                        <a href={DEVELOPER_INFO.instagram} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-1 p-2 rounded-xl bg-pink-50 text-pink-600 hover:bg-pink-100 transition-colors">
+                            <Instagram size={20} />
+                            <span className="text-[10px] font-bold">ইন্সটাগ্রাম</span>
+                        </a>
+
+                        {/* Telegram */}
+                        <a href={DEVELOPER_INFO.telegram} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-1 p-2 rounded-xl bg-sky-50 text-sky-600 hover:bg-sky-100 transition-colors">
+                            <Send size={20} />
+                            <span className="text-[10px] font-bold">টেলিগ্রাম</span>
+                        </a>
+
+                        {/* Website */}
+                        <a href={DEVELOPER_INFO.website} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-1 p-2 rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors">
+                            <Globe size={20} />
+                            <span className="text-[10px] font-bold">ওয়েবসাইট</span>
+                        </a>
+                    </div>
+                </div>
+                
+                <div className="mt-6 text-center">
+                   <p className="text-[10px] text-slate-400 font-medium">
+                     Developed with ❤️ by <span className="text-indigo-600 font-bold">{DEVELOPER_INFO.name}</span>
+                   </p>
+                </div>
+              </div>
+           </div>
+        </div>,
+        document.body
       )}
     </div>
   );
