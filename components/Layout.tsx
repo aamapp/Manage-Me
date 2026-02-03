@@ -48,8 +48,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
 
   // Developer Contact Links
   const DEVELOPER_INFO = {
-    // Google Drive Direct Link created from ID: 1SQpzaFRvgwEaKI8wbnNkvt_JhrxrjhGb
-    image: "https://drive.google.com/uc?export=view&id=1SQpzaFRvgwEaKI8wbnNkvt_JhrxrjhGb",
+    // Using Google Drive Thumbnail API for better embedding reliability
+    image: "https://drive.google.com/thumbnail?id=1SQpzaFRvgwEaKI8wbnNkvt_JhrxrjhGb&sz=w500",
     name: "আব্দুল্লাহ আল মামুন",
     title: "Full Stack Developer",
     facebook: "https://facebook.com/share/1C5Sw9sBRR/",
@@ -229,11 +229,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                     <p className="text-indigo-200 text-xs font-bold uppercase tracking-widest mt-1">ভার্সন ১.০.০</p>
                  </div>
                  
+                 {/* Improved Close Button for Better Touch Responsiveness */}
                  <button 
                    onClick={() => setAboutOpen(false)}
-                   className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+                   className="absolute top-3 right-3 w-10 h-10 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full text-white transition-all z-50 active:scale-90"
+                   aria-label="Close"
                  >
-                   <X size={20} />
+                   <X size={22} />
                  </button>
               </div>
 
@@ -249,7 +251,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                 <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
                     <div className="flex flex-col items-center mb-4 -mt-10">
                         <div className="w-20 h-20 rounded-full border-4 border-white shadow-md overflow-hidden bg-slate-200">
-                            <img src={DEVELOPER_INFO.image} alt="Developer" className="w-full h-full object-cover" />
+                            <img 
+                              src={DEVELOPER_INFO.image} 
+                              alt="Developer" 
+                              className="w-full h-full object-cover" 
+                              referrerPolicy="no-referrer"
+                            />
                         </div>
                         <h3 className="font-bold text-slate-800 mt-2">{DEVELOPER_INFO.name}</h3>
                         <p className="text-xs text-slate-500 font-medium">{DEVELOPER_INFO.title}</p>
