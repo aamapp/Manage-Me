@@ -7,6 +7,7 @@ import { Project, ProjectStatus, ProjectType, Client } from '../types';
 import { useAppContext } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
 import { NumericKeypad } from '../components/NumericKeypad';
+import { ConfirmModal } from '../components/ConfirmModal';
 
 export const Projects: React.FC = () => {
   const { projects, setProjects, clients, setClients, user, refreshData, showToast } = useAppContext();
@@ -17,9 +18,13 @@ export const Projects: React.FC = () => {
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   
+  // Delete Modal State
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   // New: State to control which card has its menu open
   const [activeCardMenuId, setActiveCardMenuId] = useState<string | null>(null);
   
@@ -62,35 +67,40 @@ export const Projects: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [activeCardMenuId]);
 
-  const handleDeleteProject = async (id: string) => {
-    if (!user) return;
+  const initiateDelete = (id: string) => {
+    setProjectToDelete(id);
+    setShowDeleteModal(true);
+    setActiveCardMenuId(null);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!user || !projectToDelete) return;
     
-    if (window.confirm('আপনি কি নিশ্চিত যে এই প্রজেক্টটি ডিলিট করতে চান?')) {
-      setIsDeleting(id);
-      setActiveCardMenuId(null);
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase
+        .from('projects')
+        .delete()
+        .eq('id', projectToDelete)
+        .eq('userid', user.id);
       
-      try {
-        const { error } = await supabase
-          .from('projects')
-          .delete()
-          .eq('id', id)
-          .eq('userid', user.id);
-        
-        if (error) {
-          if (error.code === '23503') {
-            throw new Error('এই প্রজেক্টের পেমেন্ট রেকর্ড আছে। আগে আয় রেকর্ড মুছুন।');
-          }
-          throw error;
+      if (error) {
+        if (error.code === '23503') {
+          throw new Error('এই প্রজেক্টের পেমেন্ট রেকর্ড আছে। আগে আয় রেকর্ড মুছুন।');
         }
-        
-        showToast('প্রজেক্ট ডিলিট করা হয়েছে', 'success');
-        setProjects(prev => prev.filter(p => p.id !== id));
-        await refreshData();
-      } catch (err: any) {
-        showToast(err.message || 'ডিলিট করতে সমস্যা হয়েছে');
-      } finally {
-        setIsDeleting(null);
+        throw error;
       }
+      
+      showToast('প্রজেক্ট ডিলিট করা হয়েছে', 'success');
+      setProjects(prev => prev.filter(p => p.id !== projectToDelete));
+      await refreshData();
+      setShowDeleteModal(false);
+    } catch (err: any) {
+      showToast(err.message || 'ডিলিট করতে সমস্যা হয়েছে');
+      setShowDeleteModal(false); // Close on error to reset
+    } finally {
+      setIsDeleting(false);
+      setProjectToDelete(null);
     }
   };
 
@@ -347,11 +357,10 @@ export const Projects: React.FC = () => {
                             </button>
                             <div className="h-px bg-slate-50 w-full my-0.5"></div>
                             <button 
-                                onClick={(e) => { e.stopPropagation(); handleDeleteProject(p.id); }}
+                                onClick={(e) => { e.stopPropagation(); initiateDelete(p.id); }}
                                 className="w-full px-4 py-2.5 text-left text-xs font-bold text-rose-500 hover:bg-rose-50 flex items-center gap-2 transition-colors"
                             >
-                                {isDeleting === p.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} 
-                                ডিলিট
+                                <Trash2 size={14} /> ডিলিট
                             </button>
                         </div>
                     )}
@@ -406,6 +415,15 @@ export const Projects: React.FC = () => {
           ))
         )}
       </div>
+
+      <ConfirmModal 
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleConfirmDelete}
+        title="প্রজেক্ট ডিলিট"
+        message="আপনি কি নিশ্চিত যে এই প্রজেক্টটি ডিলিট করতে চান? এর সাথে যুক্ত সকল তথ্য মুছে যাবে।"
+        isProcessing={isDeleting}
+      />
 
       {/* Full Screen Modal with Portal */}
       {isModalOpen && createPortal(

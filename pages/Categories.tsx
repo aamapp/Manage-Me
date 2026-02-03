@@ -4,6 +4,7 @@ import { Tags, Edit2, Trash2, X, Save, Loader2, AlertTriangle, CheckCircle2 } fr
 import { useAppContext } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
 import { EXPENSE_CATEGORY_LABELS } from '../constants';
+import { ConfirmModal } from '../components/ConfirmModal';
 
 export const Categories: React.FC = () => {
   const { user, showToast } = useAppContext();
@@ -13,6 +14,11 @@ export const Categories: React.FC = () => {
   const [targetCategory, setTargetCategory] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  
+  // Delete Modal
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchCategories = async () => {
     if (!user) return;
@@ -80,24 +86,32 @@ export const Categories: React.FC = () => {
     }
   };
 
-  const handleDelete = async (categoryName: string) => {
-    if (!user) return;
-    const confirmMsg = `সতর্কতা: আপনি "${categoryName}" ক্যাটাগরি ডিলিট করছেন। এর সাথে যুক্ত সকল খরচের রেকর্ড মুছে যাবে। আপনি কি নিশ্চিত?`;
+  const initiateDelete = (categoryName: string) => {
+    setCategoryToDelete(categoryName);
+    setShowDeleteModal(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!user || !categoryToDelete) return;
+    setIsDeleting(true);
     
-    if (window.confirm(confirmMsg)) {
-       try {
-         const { error } = await supabase
-           .from('expenses')
-           .delete()
-           .eq('category', categoryName)
-           .eq('userid', user.id);
-         
-         if (error) throw error;
-         showToast('ক্যাটাগরি এবং সংশ্লিষ্ট খরচ মুছে ফেলা হয়েছে', 'success');
-         fetchCategories();
-       } catch (err: any) {
-         showToast(err.message);
-       }
+    try {
+        const { error } = await supabase
+        .from('expenses')
+        .delete()
+        .eq('category', categoryToDelete)
+        .eq('userid', user.id);
+        
+        if (error) throw error;
+        showToast('ক্যাটাগরি এবং সংশ্লিষ্ট খরচ মুছে ফেলা হয়েছে', 'success');
+        fetchCategories();
+        setShowDeleteModal(false);
+    } catch (err: any) {
+        showToast(err.message);
+        setShowDeleteModal(false);
+    } finally {
+        setIsDeleting(false);
+        setCategoryToDelete(null);
     }
   };
 
@@ -139,7 +153,7 @@ export const Categories: React.FC = () => {
                   <Edit2 size={16} />
                 </button>
                 <button 
-                  onClick={() => handleDelete(cat.name)}
+                  onClick={() => initiateDelete(cat.name)}
                   className="p-2 bg-rose-50 text-rose-500 rounded-xl hover:bg-rose-100 transition-colors"
                 >
                   <Trash2 size={16} />
@@ -149,6 +163,15 @@ export const Categories: React.FC = () => {
           ))
         )}
       </div>
+
+      <ConfirmModal 
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleConfirmDelete}
+        title="ক্যাটাগরি ডিলিট"
+        message={`সতর্কতা: আপনি "${categoryToDelete}" ক্যাটাগরি ডিলিট করছেন। এর সাথে যুক্ত সকল খরচের রেকর্ড মুছে যাবে। আপনি কি নিশ্চিত?`}
+        isProcessing={isDeleting}
+      />
 
       {/* Rename Modal */}
       {isRenameModalOpen && (

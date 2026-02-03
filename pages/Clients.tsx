@@ -6,6 +6,7 @@ import { CURRENCY } from '../constants';
 import { Client } from '../types';
 import { useAppContext } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
+import { ConfirmModal } from '../components/ConfirmModal';
 
 export const Clients: React.FC = () => {
   const { clients, projects, setClients, user, refreshData, showToast } = useAppContext();
@@ -13,9 +14,13 @@ export const Clients: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [activeClientId, setActiveClientId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  
+  // Delete Modal State
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [clientToDelete, setClientToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   const [newClient, setNewClient] = useState<Partial<Client>>({
     name: '',
@@ -42,27 +47,33 @@ export const Clients: React.FC = () => {
     return { totalProjects, totalEarnings };
   };
 
-  const handleDeleteClient = async (id: string) => {
-    if (!user) return;
-    if (window.confirm('আপনি কি নিশ্চিত? ক্লায়েন্ট ডিলিট করলে ডাটাবেস থেকে মুছে যাবে।')) {
-      setIsDeleting(id);
-      setActiveMenuId(null);
-      try {
-        const { error } = await supabase
-          .from('clients')
-          .delete()
-          .eq('id', id)
-          .eq('userid', user.id);
-        
-        if (error) throw error;
-        
-        showToast('ক্লায়েন্ট ডিলিট করা হয়েছে', 'success');
-        await refreshData();
-      } catch (err: any) {
-        showToast(`সমস্যা: ${err.message}`);
-      } finally {
-        setIsDeleting(null);
-      }
+  const initiateDelete = (id: string) => {
+    setClientToDelete(id);
+    setShowDeleteModal(true);
+    setActiveMenuId(null);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!user || !clientToDelete) return;
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase
+        .from('clients')
+        .delete()
+        .eq('id', clientToDelete)
+        .eq('userid', user.id);
+      
+      if (error) throw error;
+      
+      showToast('ক্লায়েন্ট ডিলিট করা হয়েছে', 'success');
+      await refreshData();
+      setShowDeleteModal(false);
+    } catch (err: any) {
+      showToast(`সমস্যা: ${err.message}`);
+      setShowDeleteModal(false);
+    } finally {
+      setIsDeleting(false);
+      setClientToDelete(null);
     }
   };
 
@@ -206,11 +217,10 @@ export const Clients: React.FC = () => {
                               </button>
                               <div className="h-px bg-slate-50 w-full my-0.5"></div>
                               <button 
-                                  onClick={(e) => { e.stopPropagation(); handleDeleteClient(client.id); }}
+                                  onClick={(e) => { e.stopPropagation(); initiateDelete(client.id); }}
                                   className="w-full px-4 py-2.5 text-left text-xs font-bold text-rose-500 hover:bg-rose-50 flex items-center gap-2 transition-colors"
                               >
-                                  {isDeleting === client.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} 
-                                  ডিলিট
+                                  <Trash2 size={14} /> ডিলিট
                               </button>
                           </div>
                       )}
@@ -232,6 +242,15 @@ export const Clients: React.FC = () => {
           })
         )}
       </div>
+
+      <ConfirmModal 
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleConfirmDelete}
+        title="ক্লায়েন্ট ডিলিট"
+        message="আপনি কি নিশ্চিত? ক্লায়েন্ট ডিলিট করলে ডাটাবেস থেকে মুছে যাবে এবং পুনরুদ্ধার করা যাবে না।"
+        isProcessing={isDeleting}
+      />
 
       {/* Full Screen Modal with Portal */}
       {isModalOpen && createPortal(

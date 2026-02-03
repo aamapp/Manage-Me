@@ -6,6 +6,7 @@ import { useAppContext } from '../context/AppContext';
 import { Project, IncomeRecord } from '../types';
 import { supabase } from '../lib/supabase';
 import { NumericKeypad } from '../components/NumericKeypad';
+import { ConfirmModal } from '../components/ConfirmModal';
 
 // Custom Bkash Icon to match the brand logo shape (Origami Bird)
 const BkashIcon = ({ size = 16, className = "" }: { size?: number, className?: string }) => (
@@ -38,7 +39,11 @@ export const Income: React.FC = () => {
   const [selectedProjectDue, setSelectedProjectDue] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  
+  // Delete Modal
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [paymentToDelete, setPaymentToDelete] = useState<{id: string, payment: any} | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // Mobile action menu state
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
@@ -95,39 +100,45 @@ export const Income: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [activeMenuId]);
 
-  const handleDeletePayment = async (id: string, payment: any) => {
-    if (!user) return;
-    if (window.confirm('আপনি কি নিশ্চিত? এটি ডিলিট করলে প্রজেক্টের বকেয়া আবার বেড়ে যাবে।')) {
-      setIsDeleting(id);
-      setActiveMenuId(null);
-      
-      try {
-        const { error: delError } = await supabase
-          .from('income_records')
-          .delete()
-          .eq('id', id)
-          .eq('userid', user.id);
-        
-        if (delError) throw delError;
+  const initiateDelete = (id: string, payment: any) => {
+    setPaymentToDelete({ id, payment });
+    setShowDeleteModal(true);
+    setActiveMenuId(null);
+  };
 
-        const projectId = payment.projectid || payment.projectId;
-        const targetProj = projects.find(p => p.id === projectId);
-        if (targetProj) {
-          const newPaid = Math.max(0, targetProj.paidamount - payment.amount);
-          await supabase.from('projects').update({
-            paidamount: newPaid,
-            dueamount: targetProj.totalamount - newPaid
-          }).eq('id', targetProj.id).eq('userid', user.id);
-        }
-        
-        showToast('পেমেন্ট রেকর্ড ডিলিট করা হয়েছে', 'success');
-        await fetchIncome();
-        await refreshData();
-      } catch (err: any) {
-        showToast(`ভুল: ${err.message}`);
-      } finally {
-        setIsDeleting(null);
+  const handleConfirmDelete = async () => {
+    if (!user || !paymentToDelete) return;
+    setIsDeleting(true);
+    
+    try {
+      const { error: delError } = await supabase
+        .from('income_records')
+        .delete()
+        .eq('id', paymentToDelete.id)
+        .eq('userid', user.id);
+      
+      if (delError) throw delError;
+
+      const projectId = paymentToDelete.payment.projectid || paymentToDelete.payment.projectId;
+      const targetProj = projects.find(p => p.id === projectId);
+      if (targetProj) {
+        const newPaid = Math.max(0, targetProj.paidamount - paymentToDelete.payment.amount);
+        await supabase.from('projects').update({
+          paidamount: newPaid,
+          dueamount: targetProj.totalamount - newPaid
+        }).eq('id', targetProj.id).eq('userid', user.id);
       }
+      
+      showToast('পেমেন্ট রেকর্ড ডিলিট করা হয়েছে', 'success');
+      await fetchIncome();
+      await refreshData();
+      setShowDeleteModal(false);
+    } catch (err: any) {
+      showToast(`ভুল: ${err.message}`);
+      setShowDeleteModal(false);
+    } finally {
+      setIsDeleting(false);
+      setPaymentToDelete(null);
     }
   };
 
@@ -356,7 +367,7 @@ export const Income: React.FC = () => {
                               </button>
                               <div className="h-px bg-slate-50 w-full my-0.5"></div>
                               <button 
-                                  onClick={(e) => { e.stopPropagation(); handleDeletePayment(payment.id, payment); }}
+                                  onClick={(e) => { e.stopPropagation(); initiateDelete(payment.id, payment); }}
                                   className="w-full px-4 py-2.5 text-left text-xs font-bold text-rose-500 hover:bg-rose-50 flex items-center gap-2 transition-colors"
                               >
                                    <Trash2 size={14} /> ডিলিট
@@ -386,6 +397,15 @@ export const Income: React.FC = () => {
           })
         )}
       </div>
+
+      <ConfirmModal 
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleConfirmDelete}
+        title="পেমেন্ট ডিলিট"
+        message="আপনি কি নিশ্চিত? এটি ডিলিট করলে প্রজেক্টের বকেয়া আবার বেড়ে যাবে।"
+        isProcessing={isDeleting}
+      />
 
       {/* Full Screen Modal with Portal */}
       {isModalOpen && createPortal(

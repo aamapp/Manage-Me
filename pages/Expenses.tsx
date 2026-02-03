@@ -6,6 +6,7 @@ import { EXPENSE_CATEGORY_LABELS } from '../constants';
 import { useAppContext } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
 import { NumericKeypad } from '../components/NumericKeypad';
+import { ConfirmModal } from '../components/ConfirmModal';
 
 export const Expenses: React.FC = () => {
   const { user, showToast } = useAppContext();
@@ -19,6 +20,11 @@ export const Expenses: React.FC = () => {
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [activeExpenseId, setActiveExpenseId] = useState<string | null>(null);
+  
+  // Delete Modal
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // Keypad State
   const [showKeypad, setShowKeypad] = useState(false);
@@ -162,15 +168,29 @@ export const Expenses: React.FC = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (window.confirm('আপনি কি এই খরচের রেকর্ডটি মুছে ফেলতে চান?')) {
-      setActiveMenuId(null);
-      const { error } = await supabase.from('expenses').delete().eq('id', id).eq('userid', user?.id);
+  const initiateDelete = (id: string) => {
+    setExpenseToDelete(id);
+    setShowDeleteModal(true);
+    setActiveMenuId(null);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!expenseToDelete) return;
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase.from('expenses').delete().eq('id', expenseToDelete).eq('userid', user?.id);
       if (error) showToast(error.message);
       else {
         showToast('খরচ মুছে ফেলা হয়েছে', 'success');
         fetchExpenses();
       }
+      setShowDeleteModal(false);
+    } catch(err: any) {
+      showToast(err.message);
+      setShowDeleteModal(false);
+    } finally {
+      setIsDeleting(false);
+      setExpenseToDelete(null);
     }
   };
 
@@ -253,7 +273,7 @@ export const Expenses: React.FC = () => {
                             </button>
                             <div className="h-px bg-slate-50 w-full my-0.5"></div>
                             <button 
-                                onClick={(e) => { e.stopPropagation(); handleDelete(expense.id); }}
+                                onClick={(e) => { e.stopPropagation(); initiateDelete(expense.id); }}
                                 className="w-full px-4 py-2.5 text-left text-xs font-bold text-rose-500 hover:bg-rose-50 flex items-center gap-2 transition-colors"
                             >
                                 <Trash2 size={14} /> ডিলিট
@@ -266,6 +286,15 @@ export const Expenses: React.FC = () => {
           ))
         )}
       </div>
+
+      <ConfirmModal 
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleConfirmDelete}
+        title="খরচ ডিলিট"
+        message="আপনি কি এই খরচের রেকর্ডটি মুছে ফেলতে চান?"
+        isProcessing={isDeleting}
+      />
 
       {/* Full Screen Modal with Portal */}
       {isModalOpen && createPortal(
