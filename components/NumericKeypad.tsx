@@ -17,13 +17,7 @@ export const NumericKeypad: React.FC<NumericKeypadProps> = ({
   initialValue = ''
 }) => {
   const [buffer, setBuffer] = useState('');
-  const drawerRef = useRef<HTMLDivElement>(null);
-  const bufferRef = useRef(buffer);
-
-  // Keep bufferRef in sync with buffer state for event listeners
-  useEffect(() => {
-    bufferRef.current = buffer;
-  }, [buffer]);
+  const keypadRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -33,31 +27,35 @@ export const NumericKeypad: React.FC<NumericKeypadProps> = ({
     }
   }, [isOpen, initialValue]);
 
-  // Handle clicks outside the keypad
+  // Handle click outside to close (simulating backdrop behavior but allowing interactions with specific triggers)
   useEffect(() => {
     if (!isOpen) return;
 
-    const handleClickOutside = (event: MouseEvent) => {
-      // If clicking inside the drawer, ignore
-      if (drawerRef.current && drawerRef.current.contains(event.target as Node)) {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as Element;
+      
+      // If click is inside keypad, ignore
+      if (keypadRef.current && keypadRef.current.contains(target)) {
         return;
       }
 
-      // If clicking on a trigger element (input field), ignore to allow context switch
-      // This is the key fix to keep keypad open when switching fields
-      if ((event.target as Element).closest('.keypad-trigger')) {
+      // If click is on a trigger button (e.g. input field that opens keypad), ignore to allow context switch
+      if (target.closest('.keypad-trigger')) {
         return;
       }
 
-      // Otherwise, treat as "Done" (Calculate and Close)
+      // Otherwise calculate and close
       handleDone();
     };
 
     document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
     };
-  }, [isOpen]); // Dependencies: isOpen. handleDone is stable via refs/closures in this context.
+  }, [isOpen, buffer]); // Depend on buffer to ensure handleDone uses latest value
 
   if (!isOpen) return null;
 
@@ -87,19 +85,18 @@ export const NumericKeypad: React.FC<NumericKeypadProps> = ({
 
   const handleCalculate = () => {
     try {
-      // Use bufferRef to access latest value inside event listener closure
+      // Safe evaluation
       // eslint-disable-next-line no-new-func
-      const result = new Function('return ' + (bufferRef.current || '0'))();
+      const result = new Function('return ' + (buffer || '0'))();
       const formattedResult = String(Math.round(result * 100) / 100);
-      return formattedResult;
+      updateParent(formattedResult);
     } catch (e) {
-      return bufferRef.current;
+      // Ignore
     }
   };
 
   const handleDone = () => {
-    const result = handleCalculate();
-    onValueChange(result);
+    handleCalculate();
     onClose();
   };
 
@@ -127,18 +124,15 @@ export const NumericKeypad: React.FC<NumericKeypadProps> = ({
 
   return (
     <div className="fixed inset-0 z-[1000] flex flex-col justify-end pointer-events-none">
-      {/* Backdrop - Visual Only, Non-blocking so clicks pass through to inputs */}
-      <div className="absolute inset-0 bg-slate-900/10 pointer-events-none" />
-
       {/* Keypad Content */}
       <div 
-        ref={drawerRef}
-        className="relative bg-slate-100 shadow-2xl animate-in slide-in-from-bottom duration-200 rounded-t-2xl overflow-hidden pointer-events-auto pb-safe"
+        ref={keypadRef}
+        className="relative bg-slate-100 shadow-2xl animate-in slide-in-from-bottom duration-200 rounded-t-2xl overflow-hidden pointer-events-auto pb-safe border-t border-slate-200/50"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Very Compact Drag Handle */}
-        <div className="h-3 flex items-center justify-center cursor-pointer active:opacity-50" onClick={handleDone}>
-           <div className="w-8 h-1 bg-slate-300 rounded-full mt-1"></div>
+        <div className="h-4 flex items-center justify-center cursor-pointer active:opacity-50" onClick={handleDone}>
+           <div className="w-8 h-1 bg-slate-300 rounded-full"></div>
         </div>
 
         {/* Tighter Grid Container */}

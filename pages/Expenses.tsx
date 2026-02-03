@@ -116,19 +116,23 @@ export const Expenses: React.FC = () => {
     setActiveMenuId(null);
   };
 
+  const safeEval = (val: any) => {
+    try {
+      // eslint-disable-next-line no-new-func
+      return new Function('return ' + (val || '0'))();
+    } catch {
+      return 0;
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newExpense.amount || !newExpense.category || !user) return;
     
     setIsSubmitting(true);
     
-    // Amount is now handled by NumericKeypad, so it's already a number or calculable string
-    // But double check just in case
-    let finalAmount = newExpense.amount;
-    if (typeof finalAmount === 'string' && finalAmount.includes('+')) {
-      finalAmount = finalAmount.split('+').reduce((acc: number, curr: string) => acc + (parseFloat(curr) || 0), 0);
-    }
-    const parsedAmount = Number(finalAmount);
+    // Evaluate possible math expressions
+    const parsedAmount = Number(safeEval(newExpense.amount)) || 0;
 
     try {
       if (isEditing && activeExpenseId) {
@@ -296,10 +300,8 @@ export const Expenses: React.FC = () => {
         isProcessing={isDeleting}
       />
 
-      {/* Full Screen Modal with Portal */}
       {isModalOpen && createPortal(
         <div className="fixed inset-0 z-[1000] bg-white flex flex-col h-[100dvh] animate-in fade-in duration-200">
-            {/* Header - Compact */}
             <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
               <h2 className="text-base font-bold text-slate-800">
                 {isEditing ? 'খরচ এডিট' : 'নতুন খরচ'}
@@ -309,7 +311,6 @@ export const Expenses: React.FC = () => {
               </button>
             </div>
             
-            {/* Form - Compact Layout */}
             <div className="flex-1 overflow-y-auto">
                 <form onSubmit={handleSubmit} className="px-4 pt-3 pb-24 space-y-4">
                   
@@ -377,7 +378,6 @@ export const Expenses: React.FC = () => {
                 </form>
             </div>
             
-            {/* Numeric Keypad */}
             <NumericKeypad 
               isOpen={showKeypad}
               onClose={() => setShowKeypad(false)}

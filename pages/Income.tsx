@@ -167,6 +167,15 @@ export const Income: React.FC = () => {
     setActiveMenuId(null);
   };
 
+  const safeEval = (val: any) => {
+    try {
+      // eslint-disable-next-line no-new-func
+      return new Function('return ' + (val || '0'))();
+    } catch {
+      return 0;
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -176,7 +185,7 @@ export const Income: React.FC = () => {
     }
 
     setIsSubmitting(true);
-    const amount = Number(newPayment.amount) || 0;
+    const amount = Number(safeEval(newPayment.amount)) || 0;
     const selectedProject = projects.find(p => p.id === selectedProjectId);
 
     try {
@@ -264,7 +273,6 @@ export const Income: React.FC = () => {
 
   const totalIncome = payments.reduce((acc, curr) => acc + curr.amount, 0);
 
-  // Helper to determine icon and color based on payment method
   const getPaymentMethodStyle = (method: string) => {
     switch(method) {
       case 'বিকাশ': 
@@ -345,7 +353,6 @@ export const Income: React.FC = () => {
                      </div>
                   </div>
                   
-                  {/* Floating Action Menu */}
                   <div className="relative action-menu-container">
                       <button 
                         onClick={(e) => {
@@ -407,10 +414,8 @@ export const Income: React.FC = () => {
         isProcessing={isDeleting}
       />
 
-      {/* Full Screen Modal with Portal */}
       {isModalOpen && createPortal(
         <div className="fixed inset-0 z-[1000] bg-white flex flex-col h-[100dvh] animate-in fade-in duration-200">
-            {/* Header - Compact */}
             <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
               <h2 className="text-base font-bold text-slate-800">{isEditing ? 'এডিট পেমেন্ট' : 'নতুন পেমেন্ট'}</h2>
               <button disabled={isSubmitting} onClick={() => setModalOpen(false)} className="p-2 bg-slate-50 rounded-full text-slate-500 hover:bg-slate-100 transition-colors">
@@ -418,7 +423,6 @@ export const Income: React.FC = () => {
               </button>
             </div>
             
-            {/* Form - Compact Layout */}
             <div className="flex-1 overflow-y-auto">
                 <form onSubmit={handleSubmit} className="px-4 pt-3 pb-24 space-y-4">
                   {error && <div className="p-3 bg-rose-50 text-rose-600 text-xs rounded-xl font-bold flex items-center gap-2"><AlertCircle size={14} /> {error}</div>}
@@ -443,7 +447,6 @@ export const Income: React.FC = () => {
                         ))}
                       </div>
                     )}
-                    {/* Display Selected Project Due Amount */}
                     {selectedProjectId && (
                       <div className="flex justify-end mt-2 animate-in slide-in-from-top-1">
                         <div className="text-xs font-bold text-slate-600 bg-slate-50 border border-slate-200 px-2 py-1 rounded-lg">
@@ -487,8 +490,7 @@ export const Income: React.FC = () => {
                   </button>
                 </form>
             </div>
-
-            {/* Numeric Keypad */}
+            
             <NumericKeypad 
               isOpen={showKeypad}
               onClose={() => setShowKeypad(false)}

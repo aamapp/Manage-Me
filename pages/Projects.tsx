@@ -136,6 +136,16 @@ export const Projects: React.FC = () => {
     setActiveCardMenuId(null);
   };
 
+  // Helper to safely evaluate math expressions
+  const safeEval = (val: any) => {
+    try {
+      // eslint-disable-next-line no-new-func
+      return new Function('return ' + (val || '0'))();
+    } catch {
+      return 0;
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
@@ -152,23 +162,25 @@ export const Projects: React.FC = () => {
     if (!user) return;
     
     setIsSubmitting(true);
-    const totalamount = Number(newProject.totalamount) || 0;
-    const paidamount = Number(newProject.paidamount) || 0;
-    const dueamount = totalamount - paidamount;
+    
+    // Evaluate possible math expressions from keypad
+    const totalamount = Number(safeEval(newProject.totalamount)) || 0;
+    const paidInput = Number(safeEval(newProject.paidamount)) || 0;
+    
     const clientName = clientSearch.trim();
     const projectName = newProject.name.trim();
-    // Handle optional deadline: send null if empty string
     const deadlineToSave = newProject.deadline ? newProject.deadline : null;
     const createdAtToSave = newProject.createdat || new Date().toISOString().split('T')[0];
 
     try {
+      // 1. Handle Client Creation
       const existingClient = clients.find(c => c.name.toLowerCase() === clientName.toLowerCase());
       if (!existingClient) {
         const { data: clientData, error: clientError } = await supabase.from('clients').insert({
           name: clientName,
           contact: 'যোগ করা হয়নি',
           totalprojects: 1,
-          totalearnings: paidamount,
+          totalearnings: paidInput,
           userid: user.id
         }).select().single();
         
@@ -176,14 +188,17 @@ export const Projects: React.FC = () => {
         if (clientData) setClients(prev => [clientData as any, ...prev]);
       }
 
+      // 2. Insert/Update Project
       if (isEditing && activeProjectId) {
+        const existingProject = projects.find(p => p.id === activeProjectId);
+        const currentPaid = existingProject ? existingProject.paidamount : 0;
+        
         const { error: updateError } = await supabase.from('projects').update({
           name: projectName,
           clientname: clientName,
           type: newProject.type,
           totalamount,
-          paidamount,
-          dueamount,
+          dueamount: totalamount - currentPaid, 
           status: newProject.status,
           deadline: deadlineToSave,
           createdat: createdAtToSave,
@@ -191,15 +206,17 @@ export const Projects: React.FC = () => {
         }).eq('id', activeProjectId).eq('userid', user.id);
 
         if (updateError) throw updateError;
+        showToast('প্রজেক্ট আপডেট করা হয়েছে', 'success');
       } else {
-        // Insert new project and get the returned data to use the ID
+        // NEW PROJECT LOGIC
+        // Step A: Insert Project
         const { data: insertedProject, error: insertError } = await supabase.from('projects').insert({
           name: projectName,
           clientname: clientName,
           type: newProject.type,
           totalamount,
-          paidamount,
-          dueamount,
+          paidamount: paidInput,
+          dueamount: totalamount - paidInput,
           status: newProject.status,
           deadline: deadlineToSave,
           createdat: createdAtToSave,
@@ -208,26 +225,40 @@ export const Projects: React.FC = () => {
         }).select().single();
         
         if (insertError) throw insertError;
+        const pId = insertedProject.id;
 
-        // If paid amount is added during creation, also add it to income records
-        if (paidamount > 0 && insertedProject) {
-          const { error: incomeError } = await supabase.from('income_records').insert({
-            projectid: insertedProject.id,
-            projectname: insertedProject.name,
-            clientname: insertedProject.clientname,
-            amount: paidamount,
-            date: createdAtToSave, // Use the project creation date selected in form
-            method: 'বিকাশ', // Default method changed to Bkash
-            userid: user.id
-          });
-          
-          if (incomeError) console.error('Error auto-creating income record:', incomeError);
+        // Step B: Insert Income Record if needed
+        if (paidInput > 0) {
+            const { error: incomeError } = await supabase.from('income_records').insert({
+                projectid: pId,
+                projectname: projectName,
+                clientname: clientName,
+                amount: paidInput,
+                date: createdAtToSave,
+                method: 'বিকাশ',
+                userid: user.id
+            });
+
+            if (incomeError) {
+               console.error("Income error", incomeError);
+            } else {
+               // Step C: Force Update Project to ensure consistency
+               await supabase.from('projects').update({
+                   paidamount: paidInput,
+                   dueamount: totalamount - paidInput
+               }).eq('id', pId).eq('userid', user.id);
+            }
         }
+        
+        showToast('নতুন প্রজেক্ট তৈরি হয়েছে', 'success');
       }
       
-      await refreshData();
       setModalOpen(false);
-      showToast(isEditing ? 'প্রজেক্ট আপডেট হয়েছে' : 'প্রজেক্ট সেভ হয়েছে এবং আয় যুক্ত হয়েছে', 'success');
+      
+      setTimeout(async () => {
+         await refreshData();
+      }, 800);
+      
     } catch (err: any) {
       setFormError(err.message || 'ডাটা সেভ করতে সমস্যা হয়েছে');
     } finally {
@@ -259,7 +290,7 @@ export const Projects: React.FC = () => {
     setShowKeypad(true);
   };
 
-  const handleKeypadValue = (val: number) => {
+  const handleKeypadValue = (val: number | string) => {
     if (activeAmountField === 'total') {
       setNewProject({ ...newProject, totalamount: val });
     } else if (activeAmountField === 'paid') {
