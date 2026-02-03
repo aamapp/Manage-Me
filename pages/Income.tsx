@@ -457,7 +457,7 @@ export const Income: React.FC = () => {
                     <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">পরিমাণ ({currency})</label>
                     <div 
                       onClick={() => setShowKeypad(true)}
-                      className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-black text-xl text-emerald-600 active:bg-slate-100 transition-colors flex items-center justify-between cursor-pointer"
+                      className="keypad-trigger w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-black text-xl text-emerald-600 active:bg-slate-100 transition-colors flex items-center justify-between cursor-pointer"
                     >
                        <span>{newPayment.amount || 0}</span>
                        <Calculator size={18} className="text-slate-400" />

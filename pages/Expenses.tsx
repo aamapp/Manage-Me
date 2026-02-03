@@ -324,7 +324,7 @@ export const Expenses: React.FC = () => {
                     </label>
                     <div 
                       onClick={() => setShowKeypad(true)}
-                      className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-black text-xl text-rose-600 active:bg-slate-100 transition-colors flex items-center justify-between cursor-pointer"
+                      className="keypad-trigger w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-black text-xl text-rose-600 active:bg-slate-100 transition-colors flex items-center justify-between cursor-pointer"
                     >
                        <span>{newExpense.amount || 0}</span>
                        <Calculator size={18} className="text-slate-400" />

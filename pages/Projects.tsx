@@ -492,7 +492,7 @@ export const Projects: React.FC = () => {
                       <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">বাজেট ({currency})</label>
                       <div 
                         onClick={() => openKeypad('total')}
-                        className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 active:bg-slate-100 transition-colors flex items-center justify-between cursor-pointer"
+                        className="keypad-trigger w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 active:bg-slate-100 transition-colors flex items-center justify-between cursor-pointer"
                       >
                          <span className="text-sm">{newProject.totalamount || 0}</span>
                          <Calculator size={16} className="text-slate-400" />
@@ -502,7 +502,7 @@ export const Projects: React.FC = () => {
                       <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">পরিশোধ ({currency})</label>
                       <div 
                         onClick={() => openKeypad('paid')}
-                        className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-emerald-600 active:bg-slate-100 transition-colors flex items-center justify-between cursor-pointer"
+                        className="keypad-trigger w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-emerald-600 active:bg-slate-100 transition-colors flex items-center justify-between cursor-pointer"
                       >
                          <span className="text-sm">{newProject.paidamount || 0}</span>
                          <Calculator size={16} className="text-slate-400" />

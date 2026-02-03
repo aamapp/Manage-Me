@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Delete } from 'lucide-react';
 
 interface NumericKeypadProps {
@@ -17,6 +17,13 @@ export const NumericKeypad: React.FC<NumericKeypadProps> = ({
   initialValue = ''
 }) => {
   const [buffer, setBuffer] = useState('');
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const bufferRef = useRef(buffer);
+
+  // Keep bufferRef in sync with buffer state for event listeners
+  useEffect(() => {
+    bufferRef.current = buffer;
+  }, [buffer]);
 
   useEffect(() => {
     if (isOpen) {
@@ -25,6 +32,32 @@ export const NumericKeypad: React.FC<NumericKeypadProps> = ({
       setBuffer(val);
     }
   }, [isOpen, initialValue]);
+
+  // Handle clicks outside the keypad
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      // If clicking inside the drawer, ignore
+      if (drawerRef.current && drawerRef.current.contains(event.target as Node)) {
+        return;
+      }
+
+      // If clicking on a trigger element (input field), ignore to allow context switch
+      // This is the key fix to keep keypad open when switching fields
+      if ((event.target as Element).closest('.keypad-trigger')) {
+        return;
+      }
+
+      // Otherwise, treat as "Done" (Calculate and Close)
+      handleDone();
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen]); // Dependencies: isOpen. handleDone is stable via refs/closures in this context.
 
   if (!isOpen) return null;
 
@@ -54,18 +87,19 @@ export const NumericKeypad: React.FC<NumericKeypadProps> = ({
 
   const handleCalculate = () => {
     try {
-      // Safe evaluation
+      // Use bufferRef to access latest value inside event listener closure
       // eslint-disable-next-line no-new-func
-      const result = new Function('return ' + (buffer || '0'))();
+      const result = new Function('return ' + (bufferRef.current || '0'))();
       const formattedResult = String(Math.round(result * 100) / 100);
-      updateParent(formattedResult);
+      return formattedResult;
     } catch (e) {
-      // Ignore
+      return bufferRef.current;
     }
   };
 
   const handleDone = () => {
-    handleCalculate();
+    const result = handleCalculate();
+    onValueChange(result);
     onClose();
   };
 
@@ -93,18 +127,12 @@ export const NumericKeypad: React.FC<NumericKeypadProps> = ({
 
   return (
     <div className="fixed inset-0 z-[1000] flex flex-col justify-end pointer-events-none">
-      {/* Backdrop - Transparent click-through/close area */}
-      <div 
-        className="absolute inset-0 bg-slate-900/10 pointer-events-auto" 
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          handleDone();
-        }} 
-      />
+      {/* Backdrop - Visual Only, Non-blocking so clicks pass through to inputs */}
+      <div className="absolute inset-0 bg-slate-900/10 pointer-events-none" />
 
       {/* Keypad Content */}
       <div 
+        ref={drawerRef}
         className="relative bg-slate-100 shadow-2xl animate-in slide-in-from-bottom duration-200 rounded-t-2xl overflow-hidden pointer-events-auto pb-safe"
         onClick={(e) => e.stopPropagation()}
       >
