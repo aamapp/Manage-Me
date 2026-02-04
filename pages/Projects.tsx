@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
-import { Plus, Search, MoreVertical, Calendar, DollarSign, Briefcase, X, FolderOpen, Pencil, Trash2, Users, FileText, CheckCircle2, Clock, UserPlus, CalendarDays, Loader2, AlertCircle, ChevronDown, Filter, Music, Calculator } from 'lucide-react';
+import { Plus, Search, MoreVertical, Calendar, DollarSign, Briefcase, X, FolderOpen, Pencil, Trash2, Users, FileText, CheckCircle2, Clock, UserPlus, CalendarDays, Loader2, AlertCircle, ChevronDown, Filter, Music, Calculator, Eye, Wallet } from 'lucide-react';
 import { PROJECT_STATUS_LABELS, PROJECT_TYPE_LABELS } from '../constants';
 import { Project, ProjectStatus, ProjectType, Client } from '../types';
 import { useAppContext } from '../context/AppContext';
@@ -35,6 +35,9 @@ export const Projects: React.FC = () => {
 
   // New: State to control which card has its menu open
   const [activeCardMenuId, setActiveCardMenuId] = useState<string | null>(null);
+  
+  // New: State for View Details Modal
+  const [viewProject, setViewProject] = useState<Project | null>(null);
   
   // Keypad State
   const [showKeypad, setShowKeypad] = useState(false);
@@ -156,6 +159,7 @@ export const Projects: React.FC = () => {
     });
     setModalOpen(true);
     setActiveCardMenuId(null);
+    setViewProject(null); // Close view modal if open
   };
 
   // Helper to safely evaluate math expressions
@@ -421,98 +425,77 @@ export const Projects: React.FC = () => {
           </div>
         ) : (
           filteredProjects.map((p) => (
-            <div key={p.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm relative animate-in slide-in-from-bottom-2 duration-300">
-              {/* Card Header */}
-              <div className="p-4 border-b border-slate-50 flex justify-between items-start">
-                <div className="flex items-center gap-3 flex-1 min-w-0 mr-3">
-                  <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                     <Music size={20} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-bold text-slate-800 text-base truncate leading-tight">{p.name}</h3>
-                    <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5 font-medium">
-                      <Users size={12} /> {p.clientname}
-                    </p>
-                  </div>
-                </div>
+            <div key={p.id} className="group bg-white rounded-2xl p-3 border border-slate-100 shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden">
+                {/* Status Indicator Line */}
+                <div className={`absolute left-0 top-0 bottom-0 w-1 ${p.status === 'Completed' ? 'bg-emerald-500' : p.status === 'In Progress' ? 'bg-blue-500' : 'bg-amber-500'}`}></div>
                 
-                {/* Floating Action Menu Button */}
-                <div className="relative action-menu-container">
-                    <button 
-                      onClick={(e) => {
-                          e.stopPropagation();
-                          setActiveCardMenuId(activeCardMenuId === p.id ? null : p.id);
-                      }}
-                      className={`p-2 -mr-2 rounded-full transition-colors ${activeCardMenuId === p.id ? 'bg-indigo-50 text-indigo-600' : 'text-slate-300 hover:text-indigo-600 active:bg-slate-50'}`}
-                    >
-                      <MoreVertical size={20} />
-                    </button>
-
-                    {/* Dropdown Menu */}
-                    {activeCardMenuId === p.id && (
-                        <div className="absolute right-0 top-full mt-1 w-36 bg-white rounded-xl shadow-xl border border-slate-100 z-20 flex flex-col py-1.5 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
-                            <button 
-                                onClick={(e) => { e.stopPropagation(); handleOpenEditModal(p); }}
-                                className="w-full px-4 py-2.5 text-left text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-indigo-600 flex items-center gap-2 transition-colors"
-                            >
-                                <Pencil size={14} /> এডিট
-                            </button>
-                            <div className="h-px bg-slate-50 w-full my-0.5"></div>
-                            <button 
-                                onClick={(e) => { e.stopPropagation(); initiateDelete(p.id); }}
-                                className="w-full px-4 py-2.5 text-left text-xs font-bold text-rose-500 hover:bg-rose-50 flex items-center gap-2 transition-colors"
-                            >
-                                <Trash2 size={14} /> ডিলিট
-                            </button>
-                        </div>
-                    )}
-                </div>
-              </div>
-
-              {/* Card Body */}
-              <div className="p-4 pt-3">
-                <div className="flex justify-between items-end mb-3">
-                  <div>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase mb-0.5">ডেডলাইন</p>
-                    <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
-                      <Calendar size={14} className="text-slate-400" />
-                      {p.deadline ? p.deadline : <span className="text-slate-400 text-xs italic">নির্ধারিত নেই</span>}
+                <div className="flex items-center justify-between pl-2">
+                  <div className="flex items-center gap-3 flex-1 min-w-0 mr-2">
+                    {/* Icon based on Type */}
+                    <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-sm ${
+                        p.type === 'NasheedSong' ? 'bg-indigo-50 text-indigo-600' :
+                        p.type === 'Ads' ? 'bg-purple-50 text-purple-600' :
+                        'bg-cyan-50 text-cyan-600'
+                    }`}>
+                       <Music size={20} strokeWidth={2.5} />
+                    </div>
+                    
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-bold text-slate-800 text-[15px] truncate leading-tight mb-0.5">{p.name}</h3>
+                      <div className="flex items-center gap-2 overflow-hidden">
+                          <p className="text-[11px] text-slate-500 font-bold truncate flex items-center gap-1 bg-slate-50 px-1.5 py-0.5 rounded-md shrink-0">
+                            <Users size={10} /> {p.clientname}
+                          </p>
+                          {p.dueamount > 0 && (
+                              <span className="text-[10px] font-black text-rose-500 bg-rose-50 px-1.5 py-0.5 rounded-md truncate shrink-0 border border-rose-100">
+                                বকেয়া: {currency}{p.dueamount.toLocaleString('bn-BD')}
+                              </span>
+                          )}
+                      </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-[10px] text-slate-400 font-bold uppercase mb-0.5">বাজেট</p>
-                    <p className="text-lg font-bold text-slate-800">{currency} {p.totalamount.toLocaleString('bn-BD')}</p>
+                  
+                  {/* Actions */}
+                  <div className="flex items-center">
+                      <button 
+                        onClick={() => setViewProject(p)}
+                        className="w-10 h-10 flex items-center justify-center rounded-full text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all active:scale-90"
+                      >
+                         <Eye size={20} strokeWidth={2} />
+                      </button>
+
+                      <div className="relative action-menu-container">
+                        <button 
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveCardMenuId(activeCardMenuId === p.id ? null : p.id);
+                            }}
+                            className={`w-10 h-10 flex items-center justify-center rounded-full transition-all active:scale-90 ${activeCardMenuId === p.id ? 'bg-slate-100 text-slate-800' : 'text-slate-300 hover:text-slate-600 hover:bg-slate-50'}`}
+                        >
+                            <MoreVertical size={20} strokeWidth={2} />
+                        </button>
+
+                        {/* Dropdown Menu */}
+                        {activeCardMenuId === p.id && (
+                            <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-xl shadow-xl border border-slate-100 z-20 flex flex-col py-1.5 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); handleOpenEditModal(p); }}
+                                    className="w-full px-4 py-3 text-left text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-indigo-600 flex items-center gap-2 transition-colors"
+                                >
+                                    <Pencil size={14} /> এডিট করুন
+                                </button>
+                                <div className="h-px bg-slate-50 w-full my-0.5"></div>
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); initiateDelete(p.id); }}
+                                    className="w-full px-4 py-3 text-left text-xs font-bold text-rose-500 hover:bg-rose-50 flex items-center gap-2 transition-colors"
+                                >
+                                    <Trash2 size={14} /> ডিলিট করুন
+                                </button>
+                            </div>
+                        )}
+                    </div>
                   </div>
                 </div>
-
-                {/* Progress Bar */}
-                <div className="relative h-2 bg-slate-100 rounded-full overflow-hidden mb-2">
-                  <div 
-                    className="absolute top-0 left-0 h-full bg-indigo-500 rounded-full transition-all duration-500"
-                    style={{ width: `${p.totalamount > 0 ? (p.paidamount / p.totalamount) * 100 : 0}%` }}
-                  />
-                </div>
-                
-                <div className="flex justify-between items-center">
-                  <span className="text-[10px] font-bold text-slate-500">
-                    পরিশোধ: <span className="text-slate-800">{Math.round(p.totalamount > 0 ? (p.paidamount / p.totalamount) * 100 : 0)}%</span>
-                  </span>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border
-                    ${p.status === 'Completed' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
-                      p.status === 'In Progress' ? 'bg-blue-50 text-blue-600 border-blue-100' : 
-                      'bg-amber-50 text-amber-600 border-amber-100'}
-                  `}>
-                    {PROJECT_STATUS_LABELS[p.status]}
-                  </span>
-                </div>
-
-                {p.dueamount > 0 && (
-                   <div className="mt-3 pt-2 border-t border-slate-50 flex justify-between items-center">
-                     <span className="text-xs font-medium text-slate-500">বাকি আছে</span>
-                     <span className="text-sm font-bold text-rose-500">{currency} {p.dueamount.toLocaleString('bn-BD')}</span>
-                   </div>
-                )}
-              </div>
             </div>
           ))
         )}
@@ -527,7 +510,112 @@ export const Projects: React.FC = () => {
         isProcessing={isDeleting}
       />
 
-      {/* Full Screen Modal with Portal */}
+      {/* View Project Details Modal (Popup) */}
+      {viewProject && createPortal(
+          <div className="fixed inset-0 z-[1000] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+             <div className="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-100">
+                {/* Header with Color Coding based on Status */}
+                <div className={`p-6 relative ${viewProject.status === 'Completed' ? 'bg-emerald-600' : viewProject.status === 'In Progress' ? 'bg-blue-600' : 'bg-amber-500'}`}>
+                    <button 
+                        onClick={() => setViewProject(null)} 
+                        className="absolute top-4 right-4 p-2 bg-white/20 hover:bg-white/30 rounded-full text-white transition-colors backdrop-blur-md"
+                    >
+                        <X size={20} />
+                    </button>
+                    
+                    <div className="flex flex-col items-center text-center">
+                        <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-white mb-3 shadow-inner ring-1 ring-white/30">
+                            <Music size={32} />
+                        </div>
+                        <h2 className="text-xl font-bold text-white mb-1 leading-tight">{viewProject.name}</h2>
+                        <span className="inline-block px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-white text-[10px] font-bold border border-white/20">
+                            {PROJECT_STATUS_LABELS[viewProject.status]}
+                        </span>
+                    </div>
+                </div>
+
+                <div className="p-6 space-y-5">
+                    {/* Basic Info - Removed Type, Full Width Client */}
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                        <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">ক্লায়েন্ট</p>
+                        <p className="font-bold text-slate-700 text-sm flex items-center gap-1.5">
+                            <Users size={14} className="text-indigo-500"/> {viewProject.clientname}
+                        </p>
+                    </div>
+
+                    {/* Dates */}
+                    <div className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100">
+                         <div>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">শুরু</p>
+                            <p className="font-bold text-slate-700 text-xs flex items-center gap-1">
+                                <Calendar size={12} /> {viewProject.createdat ? viewProject.createdat.split('T')[0] : 'N/A'}
+                            </p>
+                         </div>
+                         <div className="h-8 w-px bg-slate-200"></div>
+                         <div className="text-right">
+                            <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">ডেডলাইন</p>
+                            <p className={`font-bold text-xs flex items-center gap-1 justify-end ${viewProject.deadline ? 'text-slate-700' : 'text-slate-400 italic'}`}>
+                                <Clock size={12} /> {viewProject.deadline ? viewProject.deadline.split('T')[0] : 'নির্ধারিত নেই'}
+                            </p>
+                         </div>
+                    </div>
+
+                    {/* Financials */}
+                    <div className="space-y-3">
+                        <p className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                            <Wallet size={14} className="text-emerald-500" /> পেমেন্ট বিবরণ
+                        </p>
+                        
+                        <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 space-y-3">
+                             <div className="flex justify-between items-center">
+                                 <span className="text-xs font-bold text-slate-500">বাজেট</span>
+                                 <span className="text-sm font-black text-slate-800">{currency} {viewProject.totalamount.toLocaleString('bn-BD')}</span>
+                             </div>
+                             
+                             {/* Progress Bar */}
+                             <div className="relative h-2.5 bg-slate-200 rounded-full overflow-hidden">
+                                <div 
+                                    className="absolute top-0 left-0 h-full bg-emerald-500 rounded-full transition-all duration-500"
+                                    style={{ width: `${viewProject.totalamount > 0 ? (viewProject.paidamount / viewProject.totalamount) * 100 : 0}%` }}
+                                />
+                             </div>
+
+                             <div className="flex justify-between items-center pt-1">
+                                 <div>
+                                     <p className="text-[10px] font-bold text-emerald-600">পরিশোধ</p>
+                                     <p className="text-xs font-bold text-emerald-700">{currency} {viewProject.paidamount.toLocaleString('bn-BD')}</p>
+                                 </div>
+                                 <div className="text-right">
+                                    {viewProject.dueamount > 0 ? (
+                                        <>
+                                            <p className="text-[10px] font-bold text-rose-500">বাকি আছে</p>
+                                            <p className="text-xs font-bold text-rose-600">{currency} {viewProject.dueamount.toLocaleString('bn-BD')}</p>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <p className="text-[10px] font-bold text-emerald-500">বাকি</p>
+                                            <p className="text-xs font-bold text-emerald-600">নেই</p>
+                                        </>
+                                    )}
+                                 </div>
+                             </div>
+                        </div>
+                    </div>
+
+                    {/* Notes */}
+                    {viewProject.notes && (
+                        <div className="bg-amber-50 p-3 rounded-xl border border-amber-100">
+                             <p className="text-[10px] font-bold text-amber-600 uppercase mb-1">নোটস</p>
+                             <p className="text-xs font-medium text-amber-800 leading-relaxed">{viewProject.notes}</p>
+                        </div>
+                    )}
+                </div>
+             </div>
+          </div>,
+          document.body
+      )}
+
+      {/* Add/Edit Modal (Full Screen with Portal) */}
       {isModalOpen && createPortal(
         <div className="fixed inset-0 z-[1000] bg-white flex flex-col h-[100dvh] animate-in fade-in duration-200">
             {/* Header - Compact */}
