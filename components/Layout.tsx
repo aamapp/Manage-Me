@@ -40,7 +40,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   ];
 
   const handleNavigation = (path: string) => {
-    navigate(path);
+    // Using replace: true prevents adding to history stack for main menu navigation
+    // This makes the back button feel more native (exiting instead of going back through all tabs)
+    navigate(path, { replace: true });
     setTimeout(() => {
         setMoreMenuOpen(false);
     }, 150);
@@ -104,7 +106,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                 key={item.path}
                 onClick={() => {
                   setMoreMenuOpen(false);
-                  navigate(item.path);
+                  // Using replace: true prevents stack buildup
+                  navigate(item.path, { replace: true });
                 }}
                 className={`
                   flex flex-col items-center justify-center w-full h-full gap-1 transition-colors duration-200

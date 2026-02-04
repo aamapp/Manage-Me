@@ -389,7 +389,7 @@ export const Projects: React.FC = () => {
 
       {/* Search & Filter */}
       <div className="flex gap-2">
-        <div className="flex-1 bg-white rounded-2xl border border-slate-200 px-4 py-2.5 flex items-center gap-2 shadow-sm">
+        <div className="flex-1 bg-white rounded-2xl border border-slate-200 px-4 py-2.5 flex items-center gap-2 shadow-sm focus-within:ring-2 focus-within:ring-indigo-100 transition-shadow">
           <Search size={18} className="text-slate-400" />
           <input 
             type="text" 
@@ -425,43 +425,35 @@ export const Projects: React.FC = () => {
           </div>
         ) : (
           filteredProjects.map((p) => (
-            <div key={p.id} className="group bg-white rounded-2xl p-3 border border-slate-100 shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden">
-                {/* Status Indicator Line */}
-                <div className={`absolute left-0 top-0 bottom-0 w-1 ${p.status === 'Completed' ? 'bg-emerald-500' : p.status === 'In Progress' ? 'bg-blue-500' : 'bg-amber-500'}`}></div>
-                
-                <div className="flex items-center justify-between pl-2">
+            <div key={p.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm relative animate-in slide-in-from-bottom-2 duration-300">
+                {/* Minimal Card Layout */}
+                <div className="p-4 flex justify-between items-center">
                   <div className="flex items-center gap-3 flex-1 min-w-0 mr-2">
-                    {/* Icon based on Type */}
-                    <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-sm ${
-                        p.type === 'NasheedSong' ? 'bg-indigo-50 text-indigo-600' :
-                        p.type === 'Ads' ? 'bg-purple-50 text-purple-600' :
-                        'bg-cyan-50 text-cyan-600'
-                    }`}>
-                       <Music size={20} strokeWidth={2.5} />
+                    <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                       <Music size={20} />
                     </div>
-                    
                     <div className="min-w-0 flex-1">
-                      <h3 className="font-bold text-slate-800 text-[15px] truncate leading-tight mb-0.5">{p.name}</h3>
-                      <div className="flex items-center gap-2 overflow-hidden">
-                          <p className="text-[11px] text-slate-500 font-bold truncate flex items-center gap-1 bg-slate-50 px-1.5 py-0.5 rounded-md shrink-0">
-                            <Users size={10} /> {p.clientname}
-                          </p>
-                          {p.dueamount > 0 && (
-                              <span className="text-[10px] font-black text-rose-500 bg-rose-50 px-1.5 py-0.5 rounded-md truncate shrink-0 border border-rose-100">
+                      <h3 className="font-bold text-slate-800 text-sm truncate leading-tight">{p.name}</h3>
+                      <p className="text-[11px] text-slate-500 font-medium truncate flex items-center gap-1">
+                        <Users size={10} /> {p.clientname}
+                      </p>
+                      {p.dueamount > 0 && (
+                          <div className="mt-1 flex items-center gap-1">
+                              <span className="text-[10px] font-bold text-rose-500 bg-rose-50 px-1.5 py-0.5 rounded">
                                 বকেয়া: {currency}{p.dueamount.toLocaleString('bn-BD')}
                               </span>
-                          )}
-                      </div>
+                          </div>
+                      )}
                     </div>
                   </div>
                   
-                  {/* Actions */}
-                  <div className="flex items-center">
+                  {/* Actions: View Details (Eye) and Menu */}
+                  <div className="flex items-center gap-2">
                       <button 
                         onClick={() => setViewProject(p)}
-                        className="w-10 h-10 flex items-center justify-center rounded-full text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all active:scale-90"
+                        className="p-2 bg-blue-50 text-blue-600 rounded-full active:scale-95 transition-all shadow-sm"
                       >
-                         <Eye size={20} strokeWidth={2} />
+                         <Eye size={18} />
                       </button>
 
                       <div className="relative action-menu-container">
@@ -470,26 +462,26 @@ export const Projects: React.FC = () => {
                                 e.stopPropagation();
                                 setActiveCardMenuId(activeCardMenuId === p.id ? null : p.id);
                             }}
-                            className={`w-10 h-10 flex items-center justify-center rounded-full transition-all active:scale-90 ${activeCardMenuId === p.id ? 'bg-slate-100 text-slate-800' : 'text-slate-300 hover:text-slate-600 hover:bg-slate-50'}`}
+                            className={`p-2 rounded-full transition-colors ${activeCardMenuId === p.id ? 'bg-indigo-50 text-indigo-600' : 'text-slate-300 hover:text-indigo-600 bg-slate-50'}`}
                         >
-                            <MoreVertical size={20} strokeWidth={2} />
+                            <MoreVertical size={18} />
                         </button>
 
                         {/* Dropdown Menu */}
                         {activeCardMenuId === p.id && (
-                            <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-xl shadow-xl border border-slate-100 z-20 flex flex-col py-1.5 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
+                            <div className="absolute right-0 top-full mt-1 w-36 bg-white rounded-xl shadow-xl border border-slate-100 z-20 flex flex-col py-1.5 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
                                 <button 
                                     onClick={(e) => { e.stopPropagation(); handleOpenEditModal(p); }}
-                                    className="w-full px-4 py-3 text-left text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-indigo-600 flex items-center gap-2 transition-colors"
+                                    className="w-full px-4 py-2.5 text-left text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-indigo-600 flex items-center gap-2 transition-colors"
                                 >
-                                    <Pencil size={14} /> এডিট করুন
+                                    <Pencil size={14} /> এডিট
                                 </button>
                                 <div className="h-px bg-slate-50 w-full my-0.5"></div>
                                 <button 
                                     onClick={(e) => { e.stopPropagation(); initiateDelete(p.id); }}
-                                    className="w-full px-4 py-3 text-left text-xs font-bold text-rose-500 hover:bg-rose-50 flex items-center gap-2 transition-colors"
+                                    className="w-full px-4 py-2.5 text-left text-xs font-bold text-rose-500 hover:bg-rose-50 flex items-center gap-2 transition-colors"
                                 >
-                                    <Trash2 size={14} /> ডিলিট করুন
+                                    <Trash2 size={14} /> ডিলিট
                                 </button>
                             </div>
                         )}
@@ -535,7 +527,7 @@ export const Projects: React.FC = () => {
                 </div>
 
                 <div className="p-6 space-y-5">
-                    {/* Basic Info - Removed Type, Full Width Client */}
+                    {/* Basic Info - Full Width Client */}
                     <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                         <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">ক্লায়েন্ট</p>
                         <p className="font-bold text-slate-700 text-sm flex items-center gap-1.5">
