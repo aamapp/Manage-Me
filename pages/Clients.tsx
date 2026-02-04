@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Users, Plus, Search, Phone, MoreHorizontal, X, Pencil, Trash2, Loader2, ChevronRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { CURRENCY } from '../constants';
 import { Client } from '../types';
 import { useAppContext } from '../context/AppContext';
@@ -10,6 +11,7 @@ import { ConfirmModal } from '../components/ConfirmModal';
 
 export const Clients: React.FC = () => {
   const { clients, projects, setClients, user, refreshData, showToast } = useAppContext();
+  const navigate = useNavigate();
   const [isModalOpen, setModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [activeClientId, setActiveClientId] = useState<string | null>(null);
@@ -141,6 +143,10 @@ export const Clients: React.FC = () => {
     }
   };
 
+  const handleViewClientProjects = (clientName: string) => {
+    navigate('/projects', { state: { clientFilter: clientName } });
+  };
+
   const filteredClients = clients.filter(c => 
     (c.name || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -191,7 +197,6 @@ export const Clients: React.FC = () => {
                     </div>
                     <div>
                       <h3 className="font-bold text-slate-800 text-base">{client.name}</h3>
-                      {/* Removed contact display */}
                     </div>
                   </div>
                   
@@ -228,8 +233,14 @@ export const Clients: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 mt-4 bg-slate-50 p-3 rounded-xl">
-                  <div className="text-center border-r border-slate-200">
-                    <p className="text-[10px] text-slate-400 font-bold uppercase mb-0.5">প্রজেক্ট</p>
+                  {/* Clickable Projects Stat */}
+                  <div 
+                    onClick={() => handleViewClientProjects(client.name)}
+                    className="text-center border-r border-slate-200 cursor-pointer active:opacity-60 transition-opacity"
+                  >
+                    <p className="text-[10px] text-slate-400 font-bold uppercase mb-0.5 flex items-center justify-center gap-1">
+                      প্রজেক্ট <ChevronRight size={10} />
+                    </p>
                     <p className="font-bold text-slate-800 text-base">{stats.totalProjects} টি</p>
                   </div>
                   <div className="text-center">

@@ -7,7 +7,7 @@ interface StatCardProps {
   value: string | number;
   icon: React.ReactNode;
   isCurrency?: boolean;
-  variant?: 'primary' | 'default' | 'success' | 'warning' | 'info';
+  variant?: 'primary' | 'default' | 'success' | 'warning' | 'info' | 'danger';
 }
 
 export const StatCard: React.FC<StatCardProps> = ({ title, value, icon, isCurrency, variant = 'default' }) => {
@@ -47,7 +47,8 @@ export const StatCard: React.FC<StatCardProps> = ({ title, value, icon, isCurren
     default: { bg: 'bg-white', text: 'text-slate-800', border: 'border-slate-100', iconBg: 'bg-slate-50', iconColor: 'text-slate-500' },
     success: { bg: 'bg-white', text: 'text-slate-800', border: 'border-emerald-100', iconBg: 'bg-emerald-50', iconColor: 'text-emerald-500' },
     warning: { bg: 'bg-white', text: 'text-slate-800', border: 'border-amber-100', iconBg: 'bg-amber-50', iconColor: 'text-amber-500' },
-    info: { bg: 'bg-white', text: 'text-slate-800', border: 'border-blue-100', iconBg: 'bg-blue-50', iconColor: 'text-blue-500' }
+    info: { bg: 'bg-white', text: 'text-slate-800', border: 'border-blue-100', iconBg: 'bg-blue-50', iconColor: 'text-blue-500' },
+    danger: { bg: 'bg-white', text: 'text-slate-800', border: 'border-rose-100', iconBg: 'bg-rose-50', iconColor: 'text-rose-500' }
   };
 
   const style = variantStyles[variant] || variantStyles.default;

@@ -1,6 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useLocation } from 'react-router-dom';
 import { Plus, Search, MoreVertical, Calendar, DollarSign, Briefcase, X, FolderOpen, Pencil, Trash2, Users, FileText, CheckCircle2, Clock, UserPlus, CalendarDays, Loader2, AlertCircle, ChevronDown, Filter, Music, Calculator } from 'lucide-react';
 import { PROJECT_STATUS_LABELS, PROJECT_TYPE_LABELS } from '../constants';
 import { Project, ProjectStatus, ProjectType, Client } from '../types';
@@ -11,8 +12,15 @@ import { ConfirmModal } from '../components/ConfirmModal';
 
 export const Projects: React.FC = () => {
   const { projects, setProjects, clients, setClients, user, refreshData, showToast } = useAppContext();
+  const location = useLocation();
   const currency = user?.currency || '৳';
-  const [filter, setFilter] = useState<ProjectStatus | 'All'>('All');
+  
+  // Added 'Due' to the type for local filtering
+  const [filter, setFilter] = useState<ProjectStatus | 'All' | 'Due'>('All');
+  
+  // New state for Client Filtering
+  const [clientFilter, setClientFilter] = useState<string | null>(null);
+  
   const [isModalOpen, setModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
@@ -49,6 +57,20 @@ export const Projects: React.FC = () => {
     clientname: '',
     notes: ''
   });
+
+  // Effect to handle navigation from Dashboard or Clients page
+  useEffect(() => {
+    if (location.state) {
+        if (location.state.filter) {
+            setFilter(location.state.filter);
+        }
+        if (location.state.clientFilter) {
+            setClientFilter(location.state.clientFilter);
+        }
+        // Clear history state to avoid getting stuck if they navigate back/forth without clicking the card
+        window.history.replaceState({}, document.title);
+    }
+  }, [location]);
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -206,6 +228,17 @@ export const Projects: React.FC = () => {
         }).eq('id', activeProjectId).eq('userid', user.id);
 
         if (updateError) throw updateError;
+
+        // --- NEW: Sync Income Records ---
+        // If Project Name or Client Name changed, update all associated income records
+        if (existingProject && (existingProject.name !== projectName || existingProject.clientname !== clientName)) {
+             await supabase.from('income_records').update({
+                projectname: projectName,
+                clientname: clientName
+             }).eq('projectid', activeProjectId).eq('userid', user.id);
+        }
+        // --------------------------------
+
         showToast('প্রজেক্ট আপডেট করা হয়েছে', 'success');
       } else {
         // NEW PROJECT LOGIC
@@ -267,7 +300,23 @@ export const Projects: React.FC = () => {
   };
 
   const filteredProjects = projects.filter(p => {
-    const matchesFilter = filter === 'All' || p.status === filter;
+    let matchesFilter = false;
+    
+    // Check Status Filter
+    if (filter === 'All') {
+        matchesFilter = true;
+    } else if (filter === 'Due') {
+        // Only show projects where dueamount > 0
+        matchesFilter = p.dueamount > 0;
+    } else {
+        matchesFilter = p.status === filter;
+    }
+
+    // Check Client Filter (if active)
+    if (clientFilter && p.clientname !== clientFilter) {
+        matchesFilter = false;
+    }
+
     const matchesSearch = (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
                           (p.clientname || '').toLowerCase().includes(searchTerm.toLowerCase());
     return matchesFilter && matchesSearch;
@@ -298,6 +347,10 @@ export const Projects: React.FC = () => {
     }
   };
 
+  const clearClientFilter = () => {
+    setClientFilter(null);
+  };
+
   return (
     <div className="space-y-4">
       {/* Header & Add Button */}
@@ -313,6 +366,22 @@ export const Projects: React.FC = () => {
           <Plus size={24} />
         </button>
       </div>
+
+      {/* Active Client Filter Banner */}
+      {clientFilter && (
+        <div className="bg-indigo-50 border border-indigo-100 p-3 rounded-2xl flex items-center justify-between animate-in fade-in slide-in-from-top-2">
+            <div className="flex items-center gap-2 text-indigo-700">
+                <Users size={16} />
+                <span className="text-sm font-bold">ক্লায়েন্ট: {clientFilter}</span>
+            </div>
+            <button 
+                onClick={clearClientFilter}
+                className="p-1.5 bg-white rounded-full text-indigo-400 hover:text-rose-500 transition-colors shadow-sm"
+            >
+                <X size={14} />
+            </button>
+        </div>
+      )}
 
       {/* Search & Filter */}
       <div className="flex gap-2">
@@ -333,6 +402,7 @@ export const Projects: React.FC = () => {
             className="appearance-none bg-white border border-slate-200 text-slate-700 py-2.5 pl-4 pr-10 rounded-2xl text-xs font-bold shadow-sm outline-none focus:border-indigo-500 h-full"
           >
             <option value="All">সবগুলো</option>
+            <option value="Due">বকেয়া প্রজেক্ট</option>
             {Object.entries(PROJECT_STATUS_LABELS).map(([key, label]) => (
               <option key={key} value={key}>{label}</option>
             ))}
@@ -347,6 +417,7 @@ export const Projects: React.FC = () => {
           <div className="flex flex-col items-center justify-center py-20 text-slate-400">
             <FolderOpen size={48} className="mb-4 opacity-20" />
             <p className="text-sm font-medium">কোনো প্রজেক্ট নেই</p>
+            {clientFilter && <p className="text-xs mt-1">এই ক্লায়েন্টের জন্য কোনো প্রজেক্ট পাওয়া যায়নি</p>}
           </div>
         ) : (
           filteredProjects.map((p) => (

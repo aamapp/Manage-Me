@@ -8,15 +8,14 @@ import {
 import { 
   Briefcase, 
   CheckCircle2, 
-  Clock, 
   Wallet,
   ArrowUpRight,
   Inbox,
   Music,
-  Users
+  LayoutDashboard,
+  AlertCircle
 } from 'lucide-react';
 import { StatCard } from '../components/StatCard';
-import { PROJECT_STATUS_LABELS, PROJECT_TYPE_LABELS } from '../constants';
 import { useAppContext } from '../context/AppContext';
 
 export const Dashboard: React.FC = () => {
@@ -24,10 +23,11 @@ export const Dashboard: React.FC = () => {
   const { projects, incomeRecords, user } = useAppContext();
   const currency = user?.currency || '৳';
 
-  const totalIncome = incomeRecords.reduce((acc, curr) => acc + (curr.amount || 0), 0);
+  // Calculate Stats
+  const totalCollected = incomeRecords.reduce((acc, curr) => acc + (curr.amount || 0), 0);
+  const totalBudget = projects.reduce((acc, curr) => acc + (curr.totalamount || 0), 0);
+  const totalDue = projects.reduce((acc, curr) => acc + (curr.dueamount || 0), 0);
   const totalProjects = projects.length;
-  const completedProjects = projects.filter(p => p.status === 'Completed').length;
-  const ongoingProjects = projects.filter(p => p.status === 'In Progress').length;
 
   const chartData = useMemo(() => {
     const monthNames = ['জানু', 'ফেব্রু', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্টে', 'অক্টো', 'নভে', 'ডিসে'];
@@ -66,46 +66,63 @@ export const Dashboard: React.FC = () => {
 
   const hasChartData = chartData.some(d => d.income > 0);
 
+  // Added 'key' to identify status for filtering
   const statusSummary = [
-    { label: 'পেন্ডিং', count: projects.filter(p => p.status === 'Pending').length, color: 'bg-amber-500' },
-    { label: 'চলমান', count: projects.filter(p => p.status === 'In Progress').length, color: 'bg-blue-500' },
-    { label: 'সম্পন্ন', count: projects.filter(p => p.status === 'Completed').length, color: 'bg-emerald-500' },
+    { key: 'Pending', label: 'পেন্ডিং', count: projects.filter(p => p.status === 'Pending').length, color: 'bg-amber-500' },
+    { key: 'In Progress', label: 'চলমান', count: projects.filter(p => p.status === 'In Progress').length, color: 'bg-blue-500' },
+    { key: 'Completed', label: 'সম্পন্ন', count: projects.filter(p => p.status === 'Completed').length, color: 'bg-emerald-500' },
   ];
 
   const recentProjects = [...projects].sort((a, b) => b.createdat.localeCompare(a.createdat)).slice(0, 5);
+
+  const handleDueClick = () => {
+    // Navigate to projects page with a state to trigger the 'Due' filter
+    navigate('/projects', { state: { filter: 'Due' } });
+  };
+
+  const handleStatusClick = (statusKey: string) => {
+    navigate('/projects', { state: { filter: statusKey } });
+  };
 
   return (
     <div className="space-y-5 w-full max-w-full overflow-hidden pt-2">
       {/* Stats Grid - Compact 2x2 Layout */}
       <div className="grid grid-cols-2 gap-3">
-        {/* Primary Income Card */}
+        {/* Row 1: Total Budget & Total Collected */}
         <StatCard 
-          title="মোট আয়" 
-          value={totalIncome} 
+          title="মোট বাজেট" 
+          value={totalBudget} 
           isCurrency={true} 
-          icon={<Wallet />} 
-          variant="primary"
+          icon={<Briefcase />} 
+          variant="primary" // Purple
         />
         
-        {/* Secondary Cards */}
+        <StatCard 
+          title="মোট আদায়" 
+          value={totalCollected} 
+          isCurrency={true} 
+          icon={<Wallet />} 
+          variant="success" // Green
+        />
+
+        {/* Row 2: Total Projects & Total Due */}
         <StatCard 
           title="মোট প্রজেক্ট" 
           value={totalProjects} 
-          icon={<Briefcase />} 
-          variant="default"
+          icon={<LayoutDashboard />} 
+          variant="default" // White/Grey
         />
-        <StatCard 
-          title="সম্পন্ন" 
-          value={completedProjects} 
-          icon={<CheckCircle2 />} 
-          variant="success"
-        />
-        <StatCard 
-          title="চলমান" 
-          value={ongoingProjects} 
-          icon={<Clock />} 
-          variant="info"
-        />
+        
+        {/* Made Total Due Card Clickable */}
+        <div onClick={handleDueClick} className="cursor-pointer active:scale-95 transition-transform">
+          <StatCard 
+            title="মোট বকেয়া" 
+            value={totalDue} 
+            isCurrency={true} 
+            icon={<AlertCircle />} 
+            variant="danger" // Red
+          />
+        </div>
       </div>
 
       {/* Chart Section */}
@@ -177,8 +194,12 @@ export const Dashboard: React.FC = () => {
         <h3 className="font-bold text-slate-800 mb-4 text-sm">প্রজেক্ট স্ট্যাটাস</h3>
         <div className="space-y-3">
           {statusSummary.map((status) => (
-            <div key={status.label}>
-              <div className="flex justify-between items-center mb-1.5 text-xs">
+            <div 
+                key={status.key} 
+                onClick={() => handleStatusClick(status.key)}
+                className="cursor-pointer group"
+            >
+              <div className="flex justify-between items-center mb-1.5 text-xs group-active:opacity-60 transition-opacity">
                 <span className="text-slate-600 font-bold">{status.label}</span>
                 <span className="font-bold text-slate-800 bg-slate-50 px-2 py-0.5 rounded text-[10px]">{status.count}</span>
               </div>
