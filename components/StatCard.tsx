@@ -67,9 +67,9 @@ export const StatCard: React.FC<StatCardProps> = ({ title, value, icon, isCurren
         <div className={`absolute -right-5 -top-5 w-20 h-20 rounded-full bg-gradient-to-br ${themes.gradient} opacity-[0.04] blur-xl transition-all duration-500 group-hover:opacity-[0.1] group-hover:scale-125`}></div>
 
         <div className="flex justify-between items-start z-10 h-full">
-            <div className="flex flex-col justify-between h-full">
-                <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">{title}</p>
-                <h3 className="text-xl font-black text-slate-800 tracking-tight mt-1">
+            <div className="flex flex-col justify-between h-full w-full min-w-0 pr-2">
+                <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wider truncate">{title}</p>
+                <h3 className="text-xl font-black text-slate-800 tracking-tight mt-1 truncate">
                     {isCurrency ? (
                         <span className="flex items-baseline gap-0.5">
                             <span className="text-xs text-slate-400 font-bold">{currency}</span>
@@ -81,7 +81,7 @@ export const StatCard: React.FC<StatCardProps> = ({ title, value, icon, isCurren
                 </h3>
             </div>
             
-            <div className={`w-9 h-9 rounded-xl ${themes.iconBg} flex items-center justify-center shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6`}>
+            <div className={`w-9 h-9 rounded-xl ${themes.iconBg} flex items-center justify-center shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6 shrink-0`}>
                 {React.cloneElement(icon as React.ReactElement<any>, { size: 18, strokeWidth: 2.5 })}
             </div>
         </div>
