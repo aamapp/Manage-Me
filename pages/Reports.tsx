@@ -16,7 +16,7 @@ import { supabase } from '../lib/supabase';
 import { Expense } from '../types';
 
 export const Reports: React.FC = () => {
-  const { projects, user } = useAppContext();
+  const { projects, user, adminSelectedUserId } = useAppContext();
   const currency = user?.currency || '৳';
   const reportRef = useRef<HTMLDivElement>(null);
 
@@ -32,15 +32,25 @@ export const Reports: React.FC = () => {
   useEffect(() => {
     const fetchExpenses = async () => {
       if (!user) return;
-      const { data } = await supabase
-        .from('expenses')
-        .select('*')
-        .eq('userid', user.id);
+      let query = supabase.from('expenses').select('*');
+      
+      // Filter Logic:
+      // 1. If Admin has selected a user -> Show ONLY that user's data
+      // 2. If Normal User -> Show ONLY their own data
+      // 3. If Admin with NO selection -> Show ALL data (for aggregate report)
+      
+      if (user.role === 'admin' && adminSelectedUserId) {
+        query = query.eq('userid', adminSelectedUserId);
+      } else if (user.role !== 'admin') {
+         query = query.eq('userid', user.id);
+      }
+      
+      const { data } = await query;
       
       if (data) setExpenses(data);
     };
     fetchExpenses();
-  }, [user]);
+  }, [user, adminSelectedUserId]); // Re-fetch when admin selects a user
 
   const filteredProjects = useMemo(() => {
     return projects.filter(p => {
@@ -234,7 +244,9 @@ export const Reports: React.FC = () => {
     <div className="space-y-6 pb-20">
       <div className="flex flex-col gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">রিপোর্ট</h1>
+          <h1 className="text-2xl font-bold text-slate-800">
+             {user?.role === 'admin' ? (adminSelectedUserId ? 'ইউজার রিপোর্ট' : 'রিপোর্ট (অ্যাডমিন ভিউ)') : 'রিপোর্ট'}
+          </h1>
           <p className="text-slate-500">আর্থিক প্রবৃদ্ধি পর্যবেক্ষণ করুন।</p>
         </div>
         

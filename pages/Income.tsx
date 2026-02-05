@@ -24,7 +24,7 @@ const BkashIcon = ({ size = 16, className = "" }: { size?: number, className?: s
 );
 
 export const Income: React.FC = () => {
-  const { projects, user, showToast, refreshData } = useAppContext();
+  const { projects, user, showToast, refreshData, adminSelectedUserId } = useAppContext();
   const currency = user?.currency || '৳';
   
   const [payments, setPayments] = useState<any[]>([]);
@@ -65,11 +65,21 @@ export const Income: React.FC = () => {
   const fetchIncome = async () => {
     if (!user) return;
     setLoading(true);
-    const { data, error } = await supabase
-      .from('income_records')
-      .select('*')
-      .eq('userid', user.id)
-      .order('date', { ascending: false });
+
+    let query = supabase.from('income_records').select('*');
+    
+    // Filter Logic:
+    // 1. If Admin has selected a user -> Show ONLY that user's data
+    // 2. If Normal User -> Show ONLY their own data
+    // 3. If Admin with NO selection -> Show ALL data
+    
+    if (user.role === 'admin' && adminSelectedUserId) {
+        query = query.eq('userid', adminSelectedUserId);
+    } else if (user.role !== 'admin') {
+        query = query.eq('userid', user.id);
+    }
+
+    const { data, error } = await query.order('date', { ascending: false });
     
     if (error) {
       showToast(`আয় লোড করতে সমস্যা: ${error.message}`);
@@ -81,7 +91,7 @@ export const Income: React.FC = () => {
 
   useEffect(() => {
     fetchIncome();
-  }, [user]);
+  }, [user, adminSelectedUserId]); // Re-fetch when admin selects a user
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -111,22 +121,26 @@ export const Income: React.FC = () => {
     setIsDeleting(true);
     
     try {
-      const { error: delError } = await supabase
-        .from('income_records')
-        .delete()
-        .eq('id', paymentToDelete.id)
-        .eq('userid', user.id);
+      let query = supabase.from('income_records').delete().eq('id', paymentToDelete.id);
+      
+      // If not admin, restrict delete to own records
+      if (user.role !== 'admin') {
+        query = query.eq('userid', user.id);
+      }
+
+      const { error: delError } = await query;
       
       if (delError) throw delError;
 
       const projectId = paymentToDelete.payment.projectid || paymentToDelete.payment.projectId;
       const targetProj = projects.find(p => p.id === projectId);
+      
       if (targetProj) {
         const newPaid = Math.max(0, targetProj.paidamount - paymentToDelete.payment.amount);
         await supabase.from('projects').update({
           paidamount: newPaid,
           dueamount: targetProj.totalamount - newPaid
-        }).eq('id', targetProj.id).eq('userid', user.id);
+        }).eq('id', targetProj.id);
       }
       
       showToast('পেমেন্ট রেকর্ড ডিলিট করা হয়েছে', 'success');
@@ -187,17 +201,26 @@ export const Income: React.FC = () => {
     setIsSubmitting(true);
     const amount = Number(safeEval(newPayment.amount)) || 0;
     const selectedProject = projects.find(p => p.id === selectedProjectId);
+    
+    // Use selected user ID if admin is viewing a specific user, otherwise current user ID
+    const targetUserId = (user.role === 'admin' && adminSelectedUserId) ? adminSelectedUserId : user.id;
 
     try {
       if (isEditing && activePaymentId) {
         const oldPayment = payments.find(p => p.id === activePaymentId);
         const delta = amount - (oldPayment?.amount || 0);
 
-        const { error: updErr } = await supabase.from('income_records').update({
+        let query = supabase.from('income_records').update({
           amount,
           date: newPayment.date,
           method: newPayment.method
-        }).eq('id', activePaymentId).eq('userid', user.id);
+        }).eq('id', activePaymentId);
+
+        if (user.role !== 'admin') {
+            query = query.eq('userid', user.id);
+        }
+
+        const { error: updErr } = await query;
 
         if (updErr) throw updErr;
 
@@ -206,7 +229,7 @@ export const Income: React.FC = () => {
           await supabase.from('projects').update({
             paidamount: newPaid,
             dueamount: Math.max(0, selectedProject.totalamount - newPaid)
-          }).eq('id', selectedProjectId).eq('userid', user.id);
+          }).eq('id', selectedProjectId);
         }
         showToast('রেকর্ড আপডেট করা হয়েছে', 'success');
       } else {
@@ -217,7 +240,7 @@ export const Income: React.FC = () => {
           amount,
           date: newPayment.date,
           method: newPayment.method,
-          userid: user.id
+          userid: targetUserId
         });
 
         if (insErr) throw insErr;
@@ -227,7 +250,7 @@ export const Income: React.FC = () => {
           await supabase.from('projects').update({
             paidamount: newPaid,
             dueamount: Math.max(0, selectedProject.totalamount - newPaid)
-          }).eq('id', selectedProjectId).eq('userid', user.id);
+          }).eq('id', selectedProjectId);
         }
         showToast('নতুন পেমেন্ট রেকর্ড করা হয়েছে', 'success');
       }
@@ -307,7 +330,9 @@ export const Income: React.FC = () => {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-slate-800">আয় (পেমেন্ট)</h1>
+          <h1 className="text-xl font-bold text-slate-800">
+            {user?.role === 'admin' ? (adminSelectedUserId ? 'ইউজার আয়' : 'আয় (অ্যাডমিন ভিউ)') : 'আয় (পেমেন্ট)'}
+          </h1>
           <p className="text-xs text-slate-500 font-medium">মোট আয়: <span className="text-emerald-600 font-bold">{currency} {totalIncome.toLocaleString('bn-BD')}</span></p>
         </div>
         <button 

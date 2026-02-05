@@ -5,11 +5,12 @@ import {
   LayoutDashboard, Briefcase, TrendingUp, Receipt, Menu, 
   X, LogOut, Settings, 
   BarChart3, Users, Tags,
-  Info, Globe, Phone, Facebook, Instagram, Send, MessageCircle
+  Info, Globe, Phone, Facebook, Instagram, Send, MessageCircle, ArrowLeft, UserCog
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { APP_NAME } from '../constants';
 import { User as UserType } from '../types';
+import { useAppContext } from '../context/AppContext';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -20,8 +21,12 @@ interface LayoutProps {
 export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   const [isMoreMenuOpen, setMoreMenuOpen] = useState(false);
   const [isAboutOpen, setAboutOpen] = useState(false);
+  const { adminSelectedUserId, setAdminSelectedUserId } = useAppContext();
   const location = useLocation();
   const navigate = useNavigate();
+
+  const isAdmin = user.role === 'admin';
+  const showAdminUserList = isAdmin && !adminSelectedUserId;
 
   // Primary Tabs for Bottom Nav (Most used features)
   const PRIMARY_NAV = [
@@ -40,17 +45,19 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   ];
 
   const handleNavigation = (path: string) => {
-    // Using replace: true prevents adding to history stack for main menu navigation
-    // This makes the back button feel more native (exiting instead of going back through all tabs)
     navigate(path, { replace: true });
     setTimeout(() => {
         setMoreMenuOpen(false);
     }, 150);
   };
 
+  const handleBackToUsers = () => {
+    setAdminSelectedUserId(null);
+    navigate('/admin-users');
+  };
+
   // Developer Contact Links
   const DEVELOPER_INFO = {
-    // Using Google Drive Thumbnail API for better embedding reliability
     image: "https://drive.google.com/thumbnail?id=1SQpzaFRvgwEaKI8wbnNkvt_JhrxrjhGb&sz=w500",
     name: "আব্দুল্লাহ আল মামুন",
     title: "Full Stack Developer",
@@ -66,16 +73,34 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
     <div className="min-h-screen bg-slate-50 font-sans w-full overflow-x-hidden selection:bg-indigo-100 selection:text-indigo-700 flex flex-col">
       {/* Mobile Header (App Bar) - Fixed to ensure it stays on top */}
       <header className="fixed top-0 inset-x-0 h-16 bg-white/90 backdrop-blur-md border-b border-slate-200/80 flex items-center justify-between px-5 z-40 max-w-[100vw] shadow-sm transition-all duration-200">
-        <div 
-          onClick={() => setAboutOpen(true)}
-          className="flex items-center gap-2.5 cursor-pointer active:opacity-70 transition-opacity group"
-        >
-          <div className="w-9 h-9 bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-indigo-200 ring-2 ring-white group-active:scale-95 transition-transform">
-            M
-          </div>
-          <span className="font-bold text-slate-800 text-lg tracking-tight group-hover:text-indigo-600 transition-colors">{APP_NAME}</span>
+        <div className="flex items-center gap-2">
+            {/* Show Back Button for Admin if User Selected */}
+            {isAdmin && adminSelectedUserId ? (
+                 <button 
+                    onClick={handleBackToUsers}
+                    className="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center text-slate-600 active:scale-95 transition-transform"
+                 >
+                    <ArrowLeft size={20} />
+                 </button>
+            ) : (
+                <div 
+                  onClick={() => setAboutOpen(true)}
+                  className="flex items-center gap-2.5 cursor-pointer active:opacity-70 transition-opacity group"
+                >
+                  <div className="w-9 h-9 bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-indigo-200 ring-2 ring-white group-active:scale-95 transition-transform">
+                    M
+                  </div>
+                  <span className="font-bold text-slate-800 text-lg tracking-tight group-hover:text-indigo-600 transition-colors">{APP_NAME}</span>
+                </div>
+            )}
         </div>
+
         <div className="flex items-center gap-3">
+          {isAdmin && adminSelectedUserId && (
+               <span className="text-[10px] font-bold bg-indigo-50 text-indigo-600 px-2 py-1 rounded-md border border-indigo-100">
+                 User View
+               </span>
+          )}
           {user.avatar_url ? (
             <img 
               src={user.avatar_url} 
@@ -91,56 +116,55 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
       </header>
 
       {/* Main Content Area */}
-      {/* Added pt-20 to push content down below the fixed header (16 + 4 units spacing) */}
       <main className="flex-1 pt-20 pb-20 px-4 animate-in fade-in duration-300 w-full max-w-[100vw] overflow-x-hidden">
         {children}
       </main>
 
-      {/* Fixed Bottom Navigation Bar */}
-      <div className="fixed bottom-0 inset-x-0 z-50 bg-white border-t border-slate-100 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] pb-safe">
-        <nav className="flex justify-between items-center px-6 h-[60px] w-full max-w-lg mx-auto">
-          {PRIMARY_NAV.map((item) => {
-            const isActive = location.pathname === item.path;
-            return (
+      {/* Fixed Bottom Navigation Bar - Hide if Admin is on User List page */}
+      {(!isAdmin || adminSelectedUserId) && (
+          <div className="fixed bottom-0 inset-x-0 z-50 bg-white border-t border-slate-100 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] pb-safe">
+            <nav className="flex justify-between items-center px-6 h-[60px] w-full max-w-lg mx-auto">
+              {PRIMARY_NAV.map((item) => {
+                const isActive = location.pathname === item.path;
+                return (
+                  <button
+                    key={item.path}
+                    onClick={() => {
+                      setMoreMenuOpen(false);
+                      navigate(item.path, { replace: true });
+                    }}
+                    className={`
+                      flex flex-col items-center justify-center w-full h-full gap-1 transition-colors duration-200
+                      ${isActive ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}
+                    `}
+                  >
+                    <div className={`transition-transform duration-200 ${isActive ? '-translate-y-0.5' : ''}`}>
+                        {item.icon}
+                    </div>
+                    <span className={`text-[10px] font-bold ${isActive ? 'text-indigo-600' : 'text-slate-500'} ${isActive ? 'opacity-100' : 'opacity-80'}`}>
+                        {item.name}
+                    </span>
+                  </button>
+                );
+              })}
+              
               <button
-                key={item.path}
-                onClick={() => {
-                  setMoreMenuOpen(false);
-                  // Using replace: true prevents stack buildup
-                  navigate(item.path, { replace: true });
-                }}
+                onClick={() => setMoreMenuOpen(true)}
                 className={`
                   flex flex-col items-center justify-center w-full h-full gap-1 transition-colors duration-200
-                  ${isActive ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}
+                  ${isMoreMenuOpen ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}
                 `}
               >
-                <div className={`transition-transform duration-200 ${isActive ? '-translate-y-0.5' : ''}`}>
-                    {item.icon}
+                <div className={`transition-transform duration-200 ${isMoreMenuOpen ? '-translate-y-0.5' : ''}`}>
+                    <Menu size={22} />
                 </div>
-                <span className={`text-[10px] font-bold ${isActive ? 'text-indigo-600' : 'text-slate-500'} ${isActive ? 'opacity-100' : 'opacity-80'}`}>
-                    {item.name}
+                <span className={`text-[10px] font-bold ${isMoreMenuOpen ? 'text-indigo-600' : 'text-slate-500'} ${isMoreMenuOpen ? 'opacity-100' : 'opacity-80'}`}>
+                    মেনু
                 </span>
               </button>
-            );
-          })}
-          
-          {/* Menu Button */}
-          <button
-            onClick={() => setMoreMenuOpen(true)}
-            className={`
-              flex flex-col items-center justify-center w-full h-full gap-1 transition-colors duration-200
-              ${isMoreMenuOpen ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}
-            `}
-          >
-            <div className={`transition-transform duration-200 ${isMoreMenuOpen ? '-translate-y-0.5' : ''}`}>
-                <Menu size={22} />
-            </div>
-            <span className={`text-[10px] font-bold ${isMoreMenuOpen ? 'text-indigo-600' : 'text-slate-500'} ${isMoreMenuOpen ? 'opacity-100' : 'opacity-80'}`}>
-                মেনু
-            </span>
-          </button>
-        </nav>
-      </div>
+            </nav>
+          </div>
+      )}
 
       {/* "More" Menu Drawer */}
       {isMoreMenuOpen && (
@@ -165,9 +189,22 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
               </div>
               <div className="relative z-10">
                 <h3 className="font-bold text-lg text-slate-800">{user.name}</h3>
-                <p className="text-xs text-slate-500 font-medium">{user.email}</p>
+                <p className="text-xs text-slate-500 font-medium">{isAdmin ? 'Admin' : user.email}</p>
               </div>
             </div>
+
+            {isAdmin && (
+                <button
+                    onClick={() => {
+                        handleBackToUsers();
+                        setMoreMenuOpen(false);
+                    }}
+                    className="w-full flex items-center justify-center gap-2 p-3.5 mb-4 rounded-2xl bg-indigo-50 text-indigo-600 font-bold text-sm active:scale-[0.98] transition-all border border-indigo-100"
+                >
+                    <UserCog size={18} />
+                    ইউজার লিস্টে ফিরে যান
+                </button>
+            )}
 
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 px-2">অন্যান্য মেনু</h3>
 
@@ -207,7 +244,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
         </div>
       )}
 
-      {/* ABOUT & DEVELOPER MODAL */}
+      {/* ABOUT MODAL (Developer Info) - Keeps existing code structure... */}
       {isAboutOpen && createPortal(
         <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4">
            {/* Backdrop */}
@@ -217,7 +254,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
            />
 
            <div className="relative bg-white w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
-              {/* Decorative Header */}
               <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 p-6 pt-8 text-center relative">
                  <div className="absolute top-0 left-0 w-full h-full overflow-hidden opacity-20">
                     <div className="absolute -top-10 -right-10 w-40 h-40 bg-white rounded-full blur-3xl"></div>
@@ -232,7 +268,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                     <p className="text-indigo-200 text-xs font-bold uppercase tracking-widest mt-1">ভার্সন ১.০.০</p>
                  </div>
                  
-                 {/* Improved Close Button for Better Touch Responsiveness */}
                  <button 
                    onClick={() => setAboutOpen(false)}
                    className="absolute top-3 right-3 w-10 h-10 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full text-white transition-all z-50 active:scale-90"
@@ -243,14 +278,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
               </div>
 
               <div className="p-6">
-                {/* App Description */}
                 <div className="text-center mb-6">
                    <p className="text-slate-500 text-sm leading-relaxed">
                      অডিও প্রফেশনালদের জন্য একটি পূর্ণাঙ্গ প্রজেক্ট এবং আর্থিক ব্যবস্থাপনা সিস্টেম। আপনার সাউন্ড ডিজাইনিং ক্যারিয়ারকে সহজ ও গোছানো রাখুন।
                    </p>
                 </div>
 
-                {/* Developer Info Section */}
                 <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
                     <div className="flex flex-col items-center mb-4 -mt-10">
                         <div className="w-20 h-20 rounded-full border-4 border-white shadow-md overflow-hidden bg-slate-200">
@@ -266,37 +299,26 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                     </div>
 
                     <div className="grid grid-cols-3 gap-3">
-                        {/* Facebook */}
                         <a href={DEVELOPER_INFO.facebook} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-1 p-2 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors">
                             <Facebook size={20} />
                             <span className="text-[10px] font-bold">ফেইসবুক</span>
                         </a>
-                        
-                        {/* WhatsApp */}
                         <a href={DEVELOPER_INFO.whatsapp} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-1 p-2 rounded-xl bg-green-50 text-green-600 hover:bg-green-100 transition-colors">
                             <MessageCircle size={20} />
                             <span className="text-[10px] font-bold">হোয়াটসঅ্যাপ</span>
                         </a>
-
-                        {/* Phone */}
                         <a href={DEVELOPER_INFO.phone} className="flex flex-col items-center gap-1 p-2 rounded-xl bg-slate-200 text-slate-700 hover:bg-slate-300 transition-colors">
                             <Phone size={20} />
                             <span className="text-[10px] font-bold">কল করুন</span>
                         </a>
-
-                        {/* Instagram */}
                         <a href={DEVELOPER_INFO.instagram} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-1 p-2 rounded-xl bg-pink-50 text-pink-600 hover:bg-pink-100 transition-colors">
                             <Instagram size={20} />
                             <span className="text-[10px] font-bold">ইন্সটাগ্রাম</span>
                         </a>
-
-                        {/* Telegram */}
                         <a href={DEVELOPER_INFO.telegram} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-1 p-2 rounded-xl bg-sky-50 text-sky-600 hover:bg-sky-100 transition-colors">
                             <Send size={20} />
                             <span className="text-[10px] font-bold">টেলিগ্রাম</span>
                         </a>
-
-                        {/* Website */}
                         <a href={DEVELOPER_INFO.website} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-1 p-2 rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors">
                             <Globe size={20} />
                             <span className="text-[10px] font-bold">ওয়েবসাইট</span>

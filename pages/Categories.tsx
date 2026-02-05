@@ -7,7 +7,7 @@ import { EXPENSE_CATEGORY_LABELS } from '../constants';
 import { ConfirmModal } from '../components/ConfirmModal';
 
 export const Categories: React.FC = () => {
-  const { user, showToast } = useAppContext();
+  const { user, showToast, adminSelectedUserId } = useAppContext();
   const [categories, setCategories] = useState<{name: string, count: number, total: number}[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRenameModalOpen, setRenameModalOpen] = useState(false);
@@ -23,10 +23,20 @@ export const Categories: React.FC = () => {
   const fetchCategories = async () => {
     if (!user) return;
     setLoading(true);
-    const { data, error } = await supabase
-      .from('expenses')
-      .select('category, amount')
-      .eq('userid', user.id);
+    let query = supabase.from('expenses').select('category, amount');
+    
+    // Filter Logic:
+    // 1. If Admin has selected a user -> Show ONLY that user's data
+    // 2. If Normal User -> Show ONLY their own data
+    // 3. If Admin with NO selection -> Show ALL data
+    
+    if (user.role === 'admin' && adminSelectedUserId) {
+        query = query.eq('userid', adminSelectedUserId);
+    } else if (user.role !== 'admin') {
+        query = query.eq('userid', user.id);
+    }
+
+    const { data, error } = await query;
     
     if (error) {
       showToast('ডাটা লোড করতে সমস্যা হয়েছে');
@@ -55,7 +65,7 @@ export const Categories: React.FC = () => {
 
   useEffect(() => {
     fetchCategories();
-  }, [user]);
+  }, [user, adminSelectedUserId]); // Re-fetch when admin selects a user
 
   const handleOpenRename = (currentName: string) => {
     setTargetCategory(currentName);
@@ -68,11 +78,23 @@ export const Categories: React.FC = () => {
     setIsProcessing(true);
 
     try {
-      const { error } = await supabase
+      let query = supabase
         .from('expenses')
         .update({ category: newName.trim() })
-        .eq('category', targetCategory)
-        .eq('userid', user.id);
+        .eq('category', targetCategory);
+        
+      if (user.role !== 'admin') {
+         query = query.eq('userid', user.id);
+      }
+      
+      // If admin is viewing specific user, ensure we only rename for that user if possible
+      // Note: Current DB structure doesn't easily allow filtering UPDATE by user if userid isn't unique to the category logic
+      // But since expenses row has userid, we SHOULD limit it to avoid touching other users' data if names collide globally
+      if (user.role === 'admin' && adminSelectedUserId) {
+          query = query.eq('userid', adminSelectedUserId);
+      }
+
+      const { error } = await query;
 
       if (error) throw error;
       
@@ -96,11 +118,18 @@ export const Categories: React.FC = () => {
     setIsDeleting(true);
     
     try {
-        const { error } = await supabase
-        .from('expenses')
-        .delete()
-        .eq('category', categoryToDelete)
-        .eq('userid', user.id);
+        let query = supabase.from('expenses').delete().eq('category', categoryToDelete);
+        
+        if (user.role !== 'admin') {
+            query = query.eq('userid', user.id);
+        }
+        
+        // Ensure Admin only deletes for selected user
+        if (user.role === 'admin' && adminSelectedUserId) {
+            query = query.eq('userid', adminSelectedUserId);
+        }
+
+        const { error } = await query;
         
         if (error) throw error;
         showToast('ক্যাটাগরি এবং সংশ্লিষ্ট খরচ মুছে ফেলা হয়েছে', 'success');
@@ -119,7 +148,9 @@ export const Categories: React.FC = () => {
     <div className="space-y-4 pb-20">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-slate-800">খরচের খাত</h1>
+          <h1 className="text-xl font-bold text-slate-800">
+             {user?.role === 'admin' ? (adminSelectedUserId ? 'ইউজার খরচ খাত' : 'খরচের খাত (অ্যাডমিন)') : 'খরচের খাত'}
+          </h1>
           <p className="text-xs text-slate-500 font-medium">ক্যাটাগরি ম্যানেজমেন্ট</p>
         </div>
         <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">

@@ -8,7 +8,8 @@ import {
   Receipt, 
   BarChart3, 
   Settings, 
-  LogOut 
+  LogOut,
+  UserCog
 } from 'lucide-react';
 
 export const APP_NAME = "Manage-Me";
@@ -22,6 +23,10 @@ export const NAVIGATION = [
   { name: 'খরচ', path: '/expenses', icon: <Receipt size={20} /> },
   { name: 'রিপোর্ট', path: '/reports', icon: <BarChart3 size={20} /> },
   { name: 'সেটিংস', path: '/settings', icon: <Settings size={20} /> },
+];
+
+export const ADMIN_NAVIGATION = [
+  { name: 'ইউজার লিস্ট', path: '/admin-users', icon: <UserCog size={20} /> },
 ];
 
 export const PROJECT_STATUS_LABELS: Record<string, string> = {

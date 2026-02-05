@@ -3,7 +3,7 @@ import React, { Suspense, lazy, useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { Layout } from './components/Layout';
 import { Toast } from './components/Toast';
-import { AppLock } from './components/AppLock'; // Import AppLock
+import { AppLock } from './components/AppLock'; 
 import { AppProvider, useAppContext } from './context/AppContext';
 import { supabase, isConfigured } from './lib/supabase';
 
@@ -16,12 +16,12 @@ import { Expenses } from './pages/Expenses';
 import { Categories } from './pages/Categories';
 import { Reports } from './pages/Reports';
 import { Settings } from './pages/Settings';
-import { UpdatePassword } from './pages/UpdatePassword'; // Import new page
+import { UpdatePassword } from './pages/UpdatePassword';
+import { AdminUserList } from './pages/AdminUserList'; // New Import
 
 const Login = lazy(() => import('./pages/Login').then(module => ({ default: module.Login })));
 const Signup = lazy(() => import('./pages/Signup').then(module => ({ default: module.Signup })));
 
-// Separate component to handle Auth Events inside Router context
 const AuthListener: React.FC = () => {
   const navigate = useNavigate();
   const { showToast } = useAppContext();
@@ -91,14 +91,10 @@ const AppContent: React.FC = () => {
       return;
     }
     try {
-      // Using window.location.origin avoids hash conflict issues
-      // Ensure this URL is added to Supabase > Authentication > URL Configuration > Redirect URLs
       const redirectTo = window.location.origin;
-      
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: redirectTo,
       });
-      
       if (error) throw error;
       showToast('পাসওয়ার্ড রিসেট লিংক ইমেইলে পাঠানো হয়েছে।', 'success');
     } catch (err: any) {
@@ -126,7 +122,6 @@ const AppContent: React.FC = () => {
     );
   }
 
-  // Show Lock Screen if App is Locked and User is logged in
   if (isAppLocked && appPin) {
     return (
       <AppLock 
@@ -162,7 +157,7 @@ const AppContent: React.FC = () => {
         <Routes>
           <Route 
             path="/login" 
-            element={!user ? <Login onLogin={handleLogin} onResetPassword={handleResetPassword} onGoToSignup={() => window.location.hash = '/signup'} /> : <Navigate to="/dashboard" replace />} 
+            element={!user ? <Login onLogin={handleLogin} onResetPassword={handleResetPassword} onGoToSignup={() => window.location.hash = '/signup'} /> : <Navigate to={user.role === 'admin' ? "/admin-users" : "/dashboard"} replace />} 
           />
           <Route 
             path="/signup" 
@@ -177,6 +172,7 @@ const AppContent: React.FC = () => {
               user ? (
                 <Layout user={user} onLogout={handleLogout}>
                   <Routes>
+                    <Route path="/admin-users" element={user.role === 'admin' ? <AdminUserList /> : <Navigate to="/dashboard" replace />} />
                     <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/projects" element={<Projects />} />
                     <Route path="/clients" element={<Clients />} />
@@ -185,7 +181,8 @@ const AppContent: React.FC = () => {
                     <Route path="/categories" element={<Categories />} />
                     <Route path="/reports" element={<Reports />} />
                     <Route path="/settings" element={<Settings />} />
-                    <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                    {/* Default Route Logic */}
+                    <Route path="*" element={<Navigate to={user.role === 'admin' ? "/admin-users" : "/dashboard"} replace />} />
                   </Routes>
                 </Layout>
               ) : (

@@ -9,7 +9,7 @@ import { NumericKeypad } from '../components/NumericKeypad';
 import { ConfirmModal } from '../components/ConfirmModal';
 
 export const Expenses: React.FC = () => {
-  const { user, showToast } = useAppContext();
+  const { user, showToast, adminSelectedUserId } = useAppContext();
   const [expenses, setExpenses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setModalOpen] = useState(false);
@@ -23,7 +23,7 @@ export const Expenses: React.FC = () => {
   
   // Delete Modal
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null);
+  const [expenseToDelete, setExpenseToDelete] = useState<{id: string, userid: string} | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   
   // Keypad State
@@ -43,11 +43,20 @@ export const Expenses: React.FC = () => {
   const fetchExpenses = async () => {
     if (!user) return;
     setLoading(true);
-    const { data, error } = await supabase
-      .from('expenses')
-      .select('*')
-      .eq('userid', user.id)
-      .order('date', { ascending: false });
+    let query = supabase.from('expenses').select('*');
+    
+    // Filter Logic:
+    // 1. If Admin has selected a user -> Show ONLY that user's data
+    // 2. If Normal User -> Show ONLY their own data
+    // 3. If Admin with NO selection -> Show ALL data
+    
+    if (user.role === 'admin' && adminSelectedUserId) {
+        query = query.eq('userid', adminSelectedUserId);
+    } else if (user.role !== 'admin') {
+        query = query.eq('userid', user.id);
+    }
+
+    const { data, error } = await query.order('date', { ascending: false });
     
     if (error) {
       showToast(`খরচ লোড এরর: ${error.message}`);
@@ -59,7 +68,7 @@ export const Expenses: React.FC = () => {
 
   useEffect(() => {
     fetchExpenses();
-  }, [user]);
+  }, [user, adminSelectedUserId]); // Re-fetch when admin selects a user
 
   // Click outside to close suggestions and menus
   useEffect(() => {
@@ -81,7 +90,6 @@ export const Expenses: React.FC = () => {
   // Derive unique categories from existing expenses for suggestions
   const uniqueCategories = Array.from(new Set(expenses.map((e: any) => e.category as string).filter(Boolean))) as string[];
   
-  // Removed default demo categories as per user request
   const allSuggestions: string[] = uniqueCategories;
 
   const filteredSuggestions = allSuggestions.filter(c => 
@@ -133,17 +141,25 @@ export const Expenses: React.FC = () => {
     
     // Evaluate possible math expressions
     const parsedAmount = Number(safeEval(newExpense.amount)) || 0;
+    
+    // Use selected user ID if admin is viewing a specific user, otherwise current user ID
+    const targetUserId = (user.role === 'admin' && adminSelectedUserId) ? adminSelectedUserId : user.id;
 
     try {
       if (isEditing && activeExpenseId) {
-        // Update existing expense
-        const { error } = await supabase.from('expenses').update({
+        let query = supabase.from('expenses').update({
           category: newExpense.category,
           amount: parsedAmount,
           date: newExpense.date,
           notes: newExpense.notes
-        }).eq('id', activeExpenseId).eq('userid', user.id);
+        }).eq('id', activeExpenseId);
+        
+        // If not admin, restrict to own records
+        if (user.role !== 'admin') {
+            query = query.eq('userid', user.id);
+        }
 
+        const { error } = await query;
         if (error) throw error;
         showToast('খরচ আপডেট হয়েছে', 'success');
       } else {
@@ -153,7 +169,7 @@ export const Expenses: React.FC = () => {
           amount: parsedAmount,
           date: newExpense.date,
           notes: newExpense.notes,
-          userid: user.id
+          userid: targetUserId
         });
 
         if (error) throw error;
@@ -172,8 +188,8 @@ export const Expenses: React.FC = () => {
     }
   };
 
-  const initiateDelete = (id: string) => {
-    setExpenseToDelete(id);
+  const initiateDelete = (id: string, userid: string) => {
+    setExpenseToDelete({id, userid});
     setShowDeleteModal(true);
     setActiveMenuId(null);
   };
@@ -182,7 +198,14 @@ export const Expenses: React.FC = () => {
     if (!expenseToDelete) return;
     setIsDeleting(true);
     try {
-      const { error } = await supabase.from('expenses').delete().eq('id', expenseToDelete).eq('userid', user?.id);
+      let query = supabase.from('expenses').delete().eq('id', expenseToDelete.id);
+      
+      // If not admin, restrict to own records
+      if (user?.role !== 'admin') {
+          query = query.eq('userid', user?.id);
+      }
+      
+      const { error } = await query;
       if (error) showToast(error.message);
       else {
         showToast('খরচ মুছে ফেলা হয়েছে', 'success');
@@ -210,7 +233,9 @@ export const Expenses: React.FC = () => {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-slate-800">খরচসমূহ</h1>
+          <h1 className="text-xl font-bold text-slate-800">
+             {user?.role === 'admin' ? (adminSelectedUserId ? 'ইউজার খরচ' : 'খরচসমূহ (অ্যাডমিন ভিউ)') : 'খরচসমূহ'}
+          </h1>
           <p className="text-xs text-slate-500 font-medium">মোট খরচ: <span className="text-rose-600 font-bold">{user?.currency || '৳'} {totalExpenseAll.toLocaleString('bn-BD')}</span></p>
         </div>
         <button 
@@ -277,7 +302,7 @@ export const Expenses: React.FC = () => {
                             </button>
                             <div className="h-px bg-slate-50 w-full my-0.5"></div>
                             <button 
-                                onClick={(e) => { e.stopPropagation(); initiateDelete(expense.id); }}
+                                onClick={(e) => { e.stopPropagation(); initiateDelete(expense.id, expense.userid); }}
                                 className="w-full px-4 py-2.5 text-left text-xs font-bold text-rose-500 hover:bg-rose-50 flex items-center gap-2 transition-colors"
                             >
                                 <Trash2 size={14} /> ডিলিট
