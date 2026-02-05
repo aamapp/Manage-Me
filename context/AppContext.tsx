@@ -170,6 +170,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [adminSelectedUserId, allProjects, allClients, allIncomeRecords, user]);
 
+  // Helper to sync user state with DB profile
+  const syncUserWithProfile = async (sessionUser: any) => {
+      if (!sessionUser) return null;
+      
+      const metadata = sessionUser.user_metadata;
+      
+      // Fetch fresh profile data from DB (Source of Truth)
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', sessionUser.id)
+        .single();
+      
+      // Prioritize DB profile over auth metadata for name/avatar
+      return {
+          id: sessionUser.id,
+          email: sessionUser.email || '',
+          name: profile?.name || metadata?.name || 'User',
+          phone: metadata?.phone || '',
+          occupation: metadata?.occupation || '',
+          avatar_url: profile?.avatar_url || metadata?.avatar_url || '',
+          language: metadata?.language || 'bn',
+          currency: metadata?.currency || '৳',
+          role: metadata?.role || 'user'
+      };
+  };
+
   useEffect(() => {
     const savedPin = localStorage.getItem('manage_me_pin');
     if (savedPin) {
@@ -185,38 +212,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const initSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        const metadata = session.user.user_metadata;
-        setUser({
-          id: session.user.id,
-          email: session.user.email || '',
-          name: metadata?.name || 'User',
-          phone: metadata?.phone || '',
-          occupation: metadata?.occupation || '',
-          avatar_url: metadata?.avatar_url || '',
-          language: metadata?.language || 'bn',
-          currency: metadata?.currency || '৳',
-          role: metadata?.role || 'user'
-        });
+        const userData = await syncUserWithProfile(session.user);
+        setUser(userData);
       }
       setLoading(false);
     };
 
     initSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
-        const metadata = session.user.user_metadata;
-        setUser({
-          id: session.user.id,
-          email: session.user.email || '',
-          name: metadata?.name || 'User',
-          phone: metadata?.phone || '',
-          occupation: metadata?.occupation || '',
-          avatar_url: metadata?.avatar_url || '',
-          language: metadata?.language || 'bn',
-          currency: metadata?.currency || '৳',
-          role: metadata?.role || 'user'
-        });
+        const userData = await syncUserWithProfile(session.user);
+        setUser(userData);
       } else {
         setUser(null);
         setProjects([]);

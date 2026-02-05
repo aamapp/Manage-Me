@@ -54,11 +54,20 @@ export const Settings: React.FC = () => {
         .from('avatars')
         .getPublicUrl(filePath);
 
-      const { error: updateError } = await supabase.auth.updateUser({
+      // Update Auth Metadata
+      const { error: authError } = await supabase.auth.updateUser({
         data: { avatar_url: publicUrl }
       });
 
-      if (updateError) throw updateError;
+      if (authError) throw authError;
+
+      // Update Profiles Table (Source of Truth)
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', user.id);
+
+      if (profileError) console.error("Profile update failed", profileError);
 
       setUser(prev => prev ? ({ ...prev, avatar_url: publicUrl }) : null);
       showToast('প্রোফাইল ছবি আপডেট হয়েছে!', 'success');
@@ -77,6 +86,7 @@ export const Settings: React.FC = () => {
     setIsSaving(true);
     
     try {
+      // 1. Update Auth Metadata
       const { data, error } = await supabase.auth.updateUser({
         data: {
           name: formData.name,
@@ -88,6 +98,17 @@ export const Settings: React.FC = () => {
       });
 
       if (error) throw error;
+
+      // 2. Update Profiles Table (Source of Truth)
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ 
+            name: formData.name,
+            // Add other fields to profiles if your schema supports them
+        })
+        .eq('id', user.id);
+        
+      if (profileError) console.error("Profile update failed", profileError);
 
       setUser(prev => prev ? ({
         ...prev,
