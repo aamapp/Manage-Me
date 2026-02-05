@@ -1,10 +1,10 @@
 
 import React, { useState } from 'react';
 import { APP_NAME } from '../constants';
-import { Mail, Lock, Music, Eye, EyeOff, ArrowLeft, Send } from 'lucide-react';
+import { Mail, Lock, Music, Eye, EyeOff, ArrowLeft, Send, Loader2 } from 'lucide-react';
 
 interface LoginProps {
-  onLogin: (email: string, password?: string) => void;
+  onLogin: (email: string, password?: string) => Promise<void>;
   onResetPassword: (email: string) => Promise<void>;
   onGoToSignup: () => void;
 }
@@ -16,9 +16,11 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onResetPassword, onGoToSi
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onLogin(email, password);
+    setIsLoading(true);
+    await onLogin(email, password);
+    setIsLoading(false);
   };
 
   const handleResetSubmit = async (e: React.FormEvent) => {
@@ -109,9 +111,10 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onResetPassword, onGoToSi
 
                 <button 
                   type="submit"
-                  className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-indigo-700 active:scale-95 transition-all shadow-lg shadow-indigo-200 mt-2"
+                  disabled={isLoading}
+                  className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-indigo-700 active:scale-95 transition-all shadow-lg shadow-indigo-200 mt-2 flex items-center justify-center gap-2"
                 >
-                  প্রবেশ করুন
+                  {isLoading ? <Loader2 size={24} className="animate-spin" /> : 'প্রবেশ করুন'}
                 </button>
               </form>
 

@@ -9,9 +9,8 @@ import { NumericKeypad } from '../components/NumericKeypad';
 import { ConfirmModal } from '../components/ConfirmModal';
 
 export const Expenses: React.FC = () => {
-  const { user, showToast, adminSelectedUserId } = useAppContext();
-  const [expenses, setExpenses] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Use cached expenses from AppContext
+  const { user, showToast, adminSelectedUserId, expenses, setExpenses, refreshData } = useAppContext();
   const [isModalOpen, setModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -40,35 +39,7 @@ export const Expenses: React.FC = () => {
     notes: ''
   });
 
-  const fetchExpenses = async () => {
-    if (!user) return;
-    setLoading(true);
-    let query = supabase.from('expenses').select('*');
-    
-    // Filter Logic:
-    // 1. If Admin has selected a user -> Show ONLY that user's data
-    // 2. If Normal User -> Show ONLY their own data
-    // 3. If Admin with NO selection -> Show ALL data
-    
-    if (user.role === 'admin' && adminSelectedUserId) {
-        query = query.eq('userid', adminSelectedUserId);
-    } else if (user.role !== 'admin') {
-        query = query.eq('userid', user.id);
-    }
-
-    const { data, error } = await query.order('date', { ascending: false });
-    
-    if (error) {
-      showToast(`খরচ লোড এরর: ${error.message}`);
-    } else {
-      setExpenses(data || []);
-    }
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    fetchExpenses();
-  }, [user, adminSelectedUserId]); // Re-fetch when admin selects a user
+  // Removed fetchExpenses() logic because it is now handled globally in AppContext
 
   // Click outside to close suggestions and menus
   useEffect(() => {
@@ -177,7 +148,7 @@ export const Expenses: React.FC = () => {
       }
       
       setModalOpen(false);
-      fetchExpenses();
+      await refreshData(); // Refresh global context
       if (!isEditing) {
         setNewExpense({ category: '', date: new Date().toISOString().split('T')[0], amount: 0, notes: '' });
       }
@@ -209,7 +180,7 @@ export const Expenses: React.FC = () => {
       if (error) showToast(error.message);
       else {
         showToast('খরচ মুছে ফেলা হয়েছে', 'success');
-        fetchExpenses();
+        await refreshData(); // Refresh global context
       }
       setShowDeleteModal(false);
     } catch(err: any) {
@@ -258,16 +229,14 @@ export const Expenses: React.FC = () => {
       </div>
 
       <div className="space-y-3 pb-20">
-        {loading ? (
-          <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-rose-600" size={24} /></div>
-        ) : filteredExpenses.length === 0 ? (
+        {filteredExpenses.length === 0 ? (
           <div className="py-20 text-center text-slate-400">
             <ShoppingCart size={48} className="mx-auto mb-4 opacity-20" />
             <p className="text-sm font-medium">কোনো খরচ নেই</p>
           </div>
         ) : (
           filteredExpenses.map((expense) => (
-            <div key={expense.id} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
+            <div key={expense.id} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between animate-in slide-in-from-bottom-2 duration-300">
               <div className="flex items-center gap-3 overflow-hidden">
                 <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
                   <Tag size={18} />

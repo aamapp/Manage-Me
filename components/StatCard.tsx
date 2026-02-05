@@ -7,65 +7,84 @@ interface StatCardProps {
   value: string | number;
   icon: React.ReactNode;
   isCurrency?: boolean;
-  variant?: 'primary' | 'default' | 'success' | 'warning' | 'info' | 'danger';
+  color: 'indigo' | 'emerald' | 'rose' | 'blue' | 'amber' | 'purple';
+  onClick?: () => void;
 }
 
-export const StatCard: React.FC<StatCardProps> = ({ title, value, icon, isCurrency, variant = 'default' }) => {
+export const StatCard: React.FC<StatCardProps> = ({ title, value, icon, isCurrency, color, onClick }) => {
   const { user } = useAppContext();
   const currency = user?.currency || '৳';
   
   const numValue = typeof value === 'string' ? parseFloat(value) : value;
   const safeValue = isNaN(numValue as number) ? 0 : numValue;
 
-  if (variant === 'primary') {
-    return (
-      <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-2xl p-4 shadow-lg shadow-indigo-200 text-white flex flex-col justify-between h-24">
-        <div className="absolute -right-4 -top-4 bg-white/10 w-24 h-24 rounded-full blur-2xl"></div>
-        
-        <div className="flex justify-between items-start z-10">
-          <p className="text-indigo-100 text-xs font-bold uppercase tracking-wider">{title}</p>
-          <div className="bg-white/20 p-1.5 rounded-lg backdrop-blur-sm">
-            {React.cloneElement(icon as React.ReactElement<any>, { size: 16, color: 'white' })}
-          </div>
-        </div>
-        
-        <div className="z-10">
-          <h3 className="text-xl font-bold tracking-tight">
-            {isCurrency ? (
-              <>
-                <span className="text-base font-bold opacity-80 mr-1">{currency}</span>
-                {Number(safeValue).toLocaleString('en-US')}
-              </>
-            ) : safeValue}
-          </h3>
-        </div>
-      </div>
-    );
-  }
-
-  const variantStyles = {
-    default: { bg: 'bg-white', text: 'text-slate-800', border: 'border-slate-100', iconBg: 'bg-slate-50', iconColor: 'text-slate-500' },
-    success: { bg: 'bg-white', text: 'text-slate-800', border: 'border-emerald-100', iconBg: 'bg-emerald-50', iconColor: 'text-emerald-500' },
-    warning: { bg: 'bg-white', text: 'text-slate-800', border: 'border-amber-100', iconBg: 'bg-amber-50', iconColor: 'text-amber-500' },
-    info: { bg: 'bg-white', text: 'text-slate-800', border: 'border-blue-100', iconBg: 'bg-blue-50', iconColor: 'text-blue-500' },
-    danger: { bg: 'bg-white', text: 'text-slate-800', border: 'border-rose-100', iconBg: 'bg-rose-50', iconColor: 'text-rose-500' }
-  };
-
-  const style = variantStyles[variant] || variantStyles.default;
+  // Premium Color Themes
+  const themes = {
+    indigo: { 
+      iconBg: 'bg-indigo-50 text-indigo-600', 
+      ring: 'group-hover:ring-indigo-100',
+      gradient: 'from-indigo-500 to-violet-600'
+    },
+    emerald: { 
+      iconBg: 'bg-emerald-50 text-emerald-600', 
+      ring: 'group-hover:ring-emerald-100',
+      gradient: 'from-emerald-500 to-teal-600'
+    },
+    rose: { 
+      iconBg: 'bg-rose-50 text-rose-600', 
+      ring: 'group-hover:ring-rose-100',
+      gradient: 'from-rose-500 to-pink-600'
+    },
+    blue: { 
+      iconBg: 'bg-blue-50 text-blue-600', 
+      ring: 'group-hover:ring-blue-100',
+      gradient: 'from-blue-500 to-cyan-600'
+    },
+    amber: { 
+      iconBg: 'bg-amber-50 text-amber-600', 
+      ring: 'group-hover:ring-amber-100',
+      gradient: 'from-amber-500 to-orange-600'
+    },
+    purple: { 
+      iconBg: 'bg-purple-50 text-purple-600', 
+      ring: 'group-hover:ring-purple-100',
+      gradient: 'from-purple-500 to-fuchsia-600'
+    },
+  }[color];
 
   return (
-    <div className={`${style.bg} border ${style.border} rounded-2xl p-3 shadow-sm flex flex-col justify-between h-24`}>
-      <div className="flex justify-between items-start">
-        <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">{title}</p>
-        <div className={`${style.iconBg} ${style.iconColor} p-1.5 rounded-lg`}>
-          {React.cloneElement(icon as React.ReactElement<any>, { size: 16 })}
+    <div 
+      onClick={onClick}
+      className={`
+        relative overflow-hidden bg-white rounded-2xl p-4 
+        border border-slate-100 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] 
+        flex flex-col justify-between h-24 group transition-all duration-300
+        ${onClick ? 'cursor-pointer active:scale-95 hover:shadow-lg' : ''}
+        hover:border-transparent hover:ring-2 ${themes.ring}
+      `}
+    >
+        {/* Abstract Background Gradient Blob */}
+        <div className={`absolute -right-5 -top-5 w-20 h-20 rounded-full bg-gradient-to-br ${themes.gradient} opacity-[0.04] blur-xl transition-all duration-500 group-hover:opacity-[0.1] group-hover:scale-125`}></div>
+
+        <div className="flex justify-between items-start z-10 h-full">
+            <div className="flex flex-col justify-between h-full">
+                <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">{title}</p>
+                <h3 className="text-xl font-black text-slate-800 tracking-tight mt-1">
+                    {isCurrency ? (
+                        <span className="flex items-baseline gap-0.5">
+                            <span className="text-xs text-slate-400 font-bold">{currency}</span>
+                            {Number(safeValue).toLocaleString('en-US')}
+                        </span>
+                    ) : (
+                        Number(safeValue).toLocaleString('en-US')
+                    )}
+                </h3>
+            </div>
+            
+            <div className={`w-9 h-9 rounded-xl ${themes.iconBg} flex items-center justify-center shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6`}>
+                {React.cloneElement(icon as React.ReactElement<any>, { size: 18, strokeWidth: 2.5 })}
+            </div>
         </div>
-      </div>
-      <div>
-         <h3 className={`text-xl font-bold ${style.text} tracking-tight`}>
-          {isCurrency ? `${currency} ${Number(safeValue).toLocaleString('en-US')}` : safeValue}
-        </h3>
-      </div>
     </div>
   );
 };

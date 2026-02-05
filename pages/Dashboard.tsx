@@ -7,13 +7,13 @@ import {
 } from 'recharts';
 import { 
   Briefcase, 
-  CheckCircle2, 
   Wallet,
   ArrowUpRight,
   Inbox,
   Music,
   LayoutDashboard,
-  AlertCircle
+  AlertCircle,
+  Users
 } from 'lucide-react';
 import { StatCard } from '../components/StatCard';
 import { useAppContext } from '../context/AppContext';
@@ -86,15 +86,15 @@ export const Dashboard: React.FC = () => {
 
   return (
     <div className="space-y-5 w-full max-w-full overflow-hidden pt-2">
-      {/* Stats Grid - Compact 2x2 Layout */}
+      {/* Stats Grid - Unified Premium Look */}
       <div className="grid grid-cols-2 gap-3">
-        {/* Row 1: Total Budget & Total Collected */}
+        {/* Row 1 */}
         <StatCard 
           title="মোট বাজেট" 
           value={totalBudget} 
           isCurrency={true} 
           icon={<Briefcase />} 
-          variant="primary" // Purple
+          color="indigo" 
         />
         
         <StatCard 
@@ -102,27 +102,25 @@ export const Dashboard: React.FC = () => {
           value={totalCollected} 
           isCurrency={true} 
           icon={<Wallet />} 
-          variant="success" // Green
+          color="emerald" 
         />
 
-        {/* Row 2: Total Projects & Total Due */}
+        {/* Row 2 */}
         <StatCard 
           title="মোট প্রজেক্ট" 
           value={totalProjects} 
           icon={<LayoutDashboard />} 
-          variant="default" // White/Grey
+          color="blue" 
         />
         
-        {/* Made Total Due Card Clickable */}
-        <div onClick={handleDueClick} className="cursor-pointer active:scale-95 transition-transform">
-          <StatCard 
-            title="মোট বকেয়া" 
-            value={totalDue} 
-            isCurrency={true} 
-            icon={<AlertCircle />} 
-            variant="danger" // Red
-          />
-        </div>
+        <StatCard 
+          title="মোট বকেয়া" 
+          value={totalDue} 
+          isCurrency={true} 
+          icon={<AlertCircle />} 
+          color="rose" 
+          onClick={handleDueClick}
+        />
       </div>
 
       {/* Chart Section */}
@@ -250,7 +248,9 @@ export const Dashboard: React.FC = () => {
                          <h4 className="font-bold text-slate-800 text-sm truncate">{p.name}</h4>
                          <span className={`w-2 h-2 rounded-full ring-1 ring-white shrink-0 ${p.status === 'Completed' ? 'bg-emerald-500' : p.status === 'In Progress' ? 'bg-blue-500' : 'bg-amber-500'}`}></span>
                       </div>
-                      <p className="text-[11px] text-slate-500 truncate font-medium">{p.clientname}</p>
+                      <p className="text-[11px] text-slate-500 truncate font-medium flex items-center gap-1">
+                         <Users size={10} /> {p.clientname}
+                      </p>
                    </div>
                 </div>
                 

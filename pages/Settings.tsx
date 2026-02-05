@@ -1,5 +1,5 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { User as UserIcon, Bell, Shield, Palette, Globe, Save, CheckCircle2, Loader2, Camera, UploadCloud, AlertCircle, Lock, Key } from 'lucide-react';
 import { APP_NAME } from '../constants';
 import { useAppContext } from '../context/AppContext';
@@ -27,6 +27,19 @@ export const Settings: React.FC = () => {
   const [pinAction, setPinAction] = useState<'setup' | 'disable' | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Sync form data if user updates externally
+  useEffect(() => {
+    if (user) {
+        setFormData(prev => ({
+            ...prev,
+            name: user.name || prev.name,
+            phone: user.phone || prev.phone,
+            occupation: user.occupation || prev.occupation,
+            currency: user.currency || prev.currency
+        }));
+    }
+  }, [user]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -83,48 +96,57 @@ export const Settings: React.FC = () => {
 
   const handleSave = async () => {
     if (!user) return;
+    
+    // 1. UI Loading State (Visual Feedback)
     setIsSaving(true);
     
-    try {
-      // 1. Update Auth Metadata
-      const { data, error } = await supabase.auth.updateUser({
-        data: {
-          name: formData.name,
-          phone: formData.phone,
-          occupation: formData.occupation,
-          language: formData.language,
-          currency: formData.currency
-        }
-      });
-
-      if (error) throw error;
-
-      // 2. Update Profiles Table (Source of Truth)
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ 
-            name: formData.name,
-            // Add other fields to profiles if your schema supports them
-        })
-        .eq('id', user.id);
-        
-      if (profileError) console.error("Profile update failed", profileError);
-
-      setUser(prev => prev ? ({
-        ...prev,
+    // Snapshot for rollback
+    const previousUser = { ...user };
+    
+    // 2. Optimistic Update (Immediate Context Update)
+    const updatedUser = {
+        ...user,
         name: formData.name,
         phone: formData.phone,
         occupation: formData.occupation,
         language: formData.language as 'bn' | 'en',
-        currency: formData.currency as '৳' | '$'
-      }) : null);
+        currency: formData.currency
+    };
+    setUser(updatedUser);
 
-      showToast('সেটিংস সফলভাবে সেভ হয়েছে', 'success');
-    } catch (err: any) {
-      showToast(`সেভ করতে সমস্যা হয়েছে: ${err.message}`, 'error');
-    } finally {
-      setIsSaving(false);
-    }
+    // 3. Fake delay to show spinner briefly (UX)
+    await new Promise(resolve => setTimeout(resolve, 600));
+    
+    // 4. Stop Loading & Show Success IMMEDIATELY
+    setIsSaving(false);
+    showToast('সেটিংস সেভ হয়েছে', 'success');
+
+    // 5. Background Network Sync (Fire & Forget)
+    // We do NOT await this in the UI thread
+    (async () => {
+        try {
+            const { error } = await supabase.auth.updateUser({
+                data: {
+                    name: formData.name,
+                    phone: formData.phone,
+                    occupation: formData.occupation,
+                    language: formData.language,
+                    currency: formData.currency
+                }
+            });
+
+            if (error) throw error;
+
+            // Update profiles table silently
+            await supabase.from('profiles').update({ name: formData.name }).eq('id', user.id);
+
+        } catch (err) {
+            console.error("Background Sync Error:", err);
+            // Revert UI on critical failure only
+            setUser(previousUser);
+            showToast('নেটওয়ার্ক সমস্যার কারণে সেভ হয়নি', 'error');
+        }
+    })();
   };
 
   const handleChangePassword = async () => {
@@ -147,11 +169,8 @@ export const Settings: React.FC = () => {
 
   const handlePinToggle = () => {
       if (appPin) {
-          // If PIN exists, we want to disable it. 
-          // Open AppLock in 'unlock' mode to verify current PIN first.
           setPinAction('disable');
       } else {
-          // If no PIN, we want to setup a new one.
           setPinAction('setup');
       }
   };
@@ -222,8 +241,14 @@ export const Settings: React.FC = () => {
                 <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-2">মুদ্রা (Currency)</label>
                     <select name="currency" value={formData.currency} onChange={handleChange} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 font-medium cursor-pointer">
-                    <option value="৳">টাকা (৳)</option>
-                    <option value="$">ইউএস ডলার ($)</option>
+                        <option value="৳">টাকা (৳)</option>
+                        <option value="$">ইউএস ডলার ($)</option>
+                        <option value="₹">ইন্ডিয়ান রুপি (₹)</option>
+                        <option value="€">ইউরো (€)</option>
+                        <option value="£">পাউন্ড (£)</option>
+                        <option value="SAR">সৌদি রিয়াল (SAR)</option>
+                        <option value="AED">আমিরাতি দিরহাম (AED)</option>
+                        <option value="MYR">মালয়েশিয়ান রিঙ্গিত (MYR)</option>
                     </select>
                 </div>
              </div>
@@ -300,3 +325,4 @@ export const Settings: React.FC = () => {
     </div>
   );
 };
+    

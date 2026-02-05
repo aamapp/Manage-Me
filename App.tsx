@@ -43,7 +43,8 @@ const AuthListener: React.FC = () => {
 };
 
 const AppContent: React.FC = () => {
-  const { user, loading, toast, showToast, hideToast, isAppLocked, setIsAppLocked, appPin } = useAppContext();
+  // Added 'setUser' to destructuring to enable manual optimistic logout
+  const { user, setUser, loading, toast, showToast, hideToast, isAppLocked, setIsAppLocked, appPin } = useAppContext();
 
   const handleLogin = async (email: string, password?: string) => {
     if (!isConfigured) {
@@ -52,7 +53,15 @@ const AppContent: React.FC = () => {
     }
     if (!password) return;
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      // Create a timeout promise to prevent infinite loading
+      const loginPromise = supabase.auth.signInWithPassword({ email, password });
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('ইন্টারনেট স্লো। দয়া করে আবার চেষ্টা করুন।')), 10000)
+      );
+
+      // Race against the timeout
+      const { error } = await Promise.race([loginPromise, timeoutPromise]) as any;
+      
       if (error) {
         showToast(error.message);
       } else {
@@ -103,11 +112,17 @@ const AppContent: React.FC = () => {
   };
 
   const handleLogout = async () => {
+    // OPTIMISTIC LOGOUT:
+    // 1. Clear local state IMMEDIATELY (This triggers the redirect to Login page)
+    setUser(null);
+    showToast('লগআউট সফল হয়েছে।', 'success');
+
+    // 2. Perform network logout in background (Fire and forget)
+    // We do NOT await this, so UI doesn't freeze if internet is slow
     try {
       await supabase.auth.signOut();
-      showToast('লগআউট সফল হয়েছে।', 'success');
     } catch (err) {
-      console.error('Logout error:', err);
+      console.warn('Background logout error (likely network related):', err);
     }
   };
 

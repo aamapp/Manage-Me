@@ -54,7 +54,7 @@ export interface User {
   occupation?: string;
   avatar_url?: string;
   language: 'bn' | 'en';
-  currency: '৳' | '$';
+  currency: string;
   role: 'user' | 'admin';
 }
 

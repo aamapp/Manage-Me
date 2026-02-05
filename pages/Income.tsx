@@ -24,11 +24,10 @@ const BkashIcon = ({ size = 16, className = "" }: { size?: number, className?: s
 );
 
 export const Income: React.FC = () => {
-  const { projects, user, showToast, refreshData, adminSelectedUserId } = useAppContext();
+  // Use incomeRecords directly from context (cached data)
+  const { projects, incomeRecords, user, showToast, refreshData, adminSelectedUserId } = useAppContext();
   const currency = user?.currency || '৳';
   
-  const [payments, setPayments] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [isModalOpen, setModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [activePaymentId, setActivePaymentId] = useState<string | null>(null);
@@ -61,37 +60,6 @@ export const Income: React.FC = () => {
     amount: 0,
     method: 'বিকাশ'
   });
-
-  const fetchIncome = async () => {
-    if (!user) return;
-    setLoading(true);
-
-    let query = supabase.from('income_records').select('*');
-    
-    // Filter Logic:
-    // 1. If Admin has selected a user -> Show ONLY that user's data
-    // 2. If Normal User -> Show ONLY their own data
-    // 3. If Admin with NO selection -> Show ALL data
-    
-    if (user.role === 'admin' && adminSelectedUserId) {
-        query = query.eq('userid', adminSelectedUserId);
-    } else if (user.role !== 'admin') {
-        query = query.eq('userid', user.id);
-    }
-
-    const { data, error } = await query.order('date', { ascending: false });
-    
-    if (error) {
-      showToast(`আয় লোড করতে সমস্যা: ${error.message}`);
-    } else {
-      setPayments(data || []);
-    }
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    fetchIncome();
-  }, [user, adminSelectedUserId]); // Re-fetch when admin selects a user
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -144,7 +112,6 @@ export const Income: React.FC = () => {
       }
       
       showToast('পেমেন্ট রেকর্ড ডিলিট করা হয়েছে', 'success');
-      await fetchIncome();
       await refreshData();
       setShowDeleteModal(false);
     } catch (err: any) {
@@ -207,7 +174,7 @@ export const Income: React.FC = () => {
 
     try {
       if (isEditing && activePaymentId) {
-        const oldPayment = payments.find(p => p.id === activePaymentId);
+        const oldPayment = incomeRecords.find(p => p.id === activePaymentId);
         const delta = amount - (oldPayment?.amount || 0);
 
         let query = supabase.from('income_records').update({
@@ -256,7 +223,6 @@ export const Income: React.FC = () => {
       }
 
       setModalOpen(false);
-      await fetchIncome();
       await refreshData();
     } catch (err: any) {
       setError(err.message);
@@ -274,7 +240,7 @@ export const Income: React.FC = () => {
     setActivePaymentId(null);
   };
 
-  const filteredPayments = payments.filter(p => 
+  const filteredPayments = incomeRecords.filter(p => 
     (p.projectname || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (p.clientname || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -294,7 +260,7 @@ export const Income: React.FC = () => {
     setError(null);
   };
 
-  const totalIncome = payments.reduce((acc, curr) => acc + curr.amount, 0);
+  const totalIncome = incomeRecords.reduce((acc, curr) => acc + curr.amount, 0);
 
   const getPaymentMethodStyle = (method: string) => {
     switch(method) {
@@ -355,9 +321,7 @@ export const Income: React.FC = () => {
       </div>
 
       <div className="space-y-3 pb-20">
-        {loading ? (
-          <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-emerald-600" size={24} /></div>
-        ) : filteredPayments.length === 0 ? (
+        {filteredPayments.length === 0 ? (
           <div className="py-20 text-center text-slate-400">
             <ReceiptText size={48} className="mx-auto mb-4 opacity-20" />
             <p className="text-sm font-medium">কোনো পেমেন্ট নেই</p>
