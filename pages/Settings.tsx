@@ -14,8 +14,7 @@ export const Settings: React.FC = () => {
     phone: user?.phone || '',
     occupation: user?.occupation || '',
     language: user?.language || 'bn',
-    currency: user?.currency || '৳',
-    avatar_url: user?.avatar_url || ''
+    currency: user?.currency || '৳'
   });
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -39,7 +38,6 @@ export const Settings: React.FC = () => {
     
     const file = e.target.files[0];
     const fileExt = file.name.split('.').pop();
-    // Unique timestamp to prevent cache issues
     const fileName = `${user.id}/${Date.now()}.${fileExt}`;
     const filePath = fileName;
 
@@ -56,9 +54,23 @@ export const Settings: React.FC = () => {
         .from('avatars')
         .getPublicUrl(filePath);
 
-      // Only update local state for preview
-      setFormData(prev => ({ ...prev, avatar_url: publicUrl }));
-      showToast('ছবি আপলোড হয়েছে! নিচে "পরিবর্তন সেভ করুন" বাটনে ক্লিক করুন।', 'success');
+      // Update Auth Metadata
+      const { error: authError } = await supabase.auth.updateUser({
+        data: { avatar_url: publicUrl }
+      });
+
+      if (authError) throw authError;
+
+      // Update Profiles Table (Source of Truth)
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', user.id);
+
+      if (profileError) console.error("Profile update failed", profileError);
+
+      setUser(prev => prev ? ({ ...prev, avatar_url: publicUrl }) : null);
+      showToast('প্রোফাইল ছবি আপডেট হয়েছে!', 'success');
 
     } catch (error: any) {
       console.error(error);
@@ -81,8 +93,7 @@ export const Settings: React.FC = () => {
           phone: formData.phone,
           occupation: formData.occupation,
           language: formData.language,
-          currency: formData.currency,
-          avatar_url: formData.avatar_url
+          currency: formData.currency
         }
       });
 
@@ -93,7 +104,7 @@ export const Settings: React.FC = () => {
         .from('profiles')
         .update({ 
             name: formData.name,
-            avatar_url: formData.avatar_url
+            // Add other fields to profiles if your schema supports them
         })
         .eq('id', user.id);
         
@@ -105,8 +116,7 @@ export const Settings: React.FC = () => {
         phone: formData.phone,
         occupation: formData.occupation,
         language: formData.language as 'bn' | 'en',
-        currency: formData.currency as '৳' | '$',
-        avatar_url: formData.avatar_url
+        currency: formData.currency as '৳' | '$'
       }) : null);
 
       showToast('সেটিংস সফলভাবে সেভ হয়েছে', 'success');
@@ -167,46 +177,33 @@ export const Settings: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        {/* Profile Header (Centered & Improved for Mobile) */}
-        <div className="p-8 border-b flex flex-col items-center gap-4 bg-slate-50/50">
-          <div 
-             onClick={() => !isUploading && fileInputRef.current?.click()}
-             className="w-28 h-28 rounded-full bg-white border-4 border-slate-200 shadow-md flex items-center justify-center overflow-hidden relative group cursor-pointer transition-all active:scale-95"
-          >
-             {formData.avatar_url ? (
-               <img src={formData.avatar_url} alt="Profile" className="w-full h-full object-cover" />
-             ) : (
-               <span className="text-slate-400 text-4xl font-bold">{formData.name ? formData.name.charAt(0) : 'U'}</span>
-             )}
-             
-             {/* Hover/Tap Overlay */}
-             <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                <UploadCloud className="text-white" size={32} />
-             </div>
-
-             {/* Loading State */}
-             {isUploading && (
-               <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10">
-                 <Loader2 className="animate-spin text-white" size={32} />
-               </div>
-             )}
+        {/* Profile Header */}
+        <div className="p-6 border-b flex items-center gap-5 bg-slate-50/50">
+          <div className="relative group">
+            <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-white shadow-lg bg-indigo-100 flex items-center justify-center relative">
+               {user.avatar_url ? (
+                 <img src={user.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+               ) : (
+                 <span className="text-indigo-600 text-3xl font-bold">{formData.name ? formData.name.charAt(0) : 'U'}</span>
+               )}
+               {isUploading && (
+                 <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
+                   <Loader2 className="animate-spin text-white" size={24} />
+                 </div>
+               )}
+            </div>
+            <button 
+              disabled={isUploading}
+              onClick={() => fileInputRef.current?.click()}
+              className="absolute bottom-0 right-0 bg-indigo-600 text-white p-2 rounded-full shadow-md hover:bg-indigo-700 active:scale-90 transition-transform cursor-pointer z-20"
+            >
+              <Camera size={14} />
+            </button>
+            <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
           </div>
-          
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            className="hidden" 
-            accept="image/*" 
-            onChange={handleImageUpload} 
-          />
-          
-          <div className="text-center">
-             <h3 className="text-xl font-bold text-slate-800">{formData.name || 'ইউজার'}</h3>
-             <p className="text-slate-500 text-sm font-medium">{formData.email}</p>
-             <p className="text-indigo-600 text-xs font-bold mt-2 flex items-center justify-center gap-1">
-                <Camera size={12} />
-                ছবি পরিবর্তন করতে বৃত্তে ক্লিক করুন
-             </p>
+          <div>
+            <h3 className="text-lg font-bold text-slate-800">{formData.name || 'ইউজার'}</h3>
+            <p className="text-slate-500 text-xs font-medium">{formData.occupation || 'পেশা যুক্ত করা হয়নি'}</p>
           </div>
         </div>
         
@@ -230,7 +227,7 @@ export const Settings: React.FC = () => {
                     </select>
                 </div>
              </div>
-             <button onClick={handleSave} disabled={isSaving || isUploading} className="w-full flex justify-center items-center gap-2 px-6 py-3.5 rounded-xl font-bold bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95 transition-all shadow-lg shadow-indigo-100 mt-2">
+             <button onClick={handleSave} disabled={isSaving} className="w-full flex justify-center items-center gap-2 px-6 py-3.5 rounded-xl font-bold bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95 transition-all shadow-lg shadow-indigo-100 mt-2">
                 {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
                 {isSaving ? 'সেভ হচ্ছে...' : 'পরিবর্তন সেভ করুন'}
              </button>
