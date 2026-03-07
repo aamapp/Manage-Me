@@ -8,9 +8,9 @@ import {
   Info, Globe, Phone, Facebook, Instagram, Send, MessageCircle, ArrowLeft, UserCog
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
-import { APP_NAME } from '../constants';
-import { User as UserType } from '../types';
-import { useAppContext } from '../context/AppContext';
+import { APP_NAME } from '@/constants';
+import { User as UserType } from '@/types';
+import { useAppContext } from '@/context/AppContext';
 
 interface LayoutProps {
   children: React.ReactNode;
