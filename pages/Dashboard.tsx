@@ -1,4 +1,3 @@
-
 import React, { useMemo } from 'react';
 import { useNavigate } from "react-router-dom";
 import { 
@@ -22,6 +21,11 @@ export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const { projects, incomeRecords, user } = useAppContext();
   const currency = user?.currency || '৳';
+
+  const [isMounted, setIsMounted] = React.useState(false);
+  React.useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Calculate Stats
   const totalCollected = incomeRecords.reduce((acc, curr) => acc + (curr.amount || 0), 0);
@@ -139,13 +143,13 @@ export const Dashboard: React.FC = () => {
         </div>
         
         <div className="h-48 w-full -ml-2">
-          {!hasChartData ? (
+          {!isMounted ? null : !hasChartData ? (
             <div className="h-full w-full flex flex-col items-center justify-center text-slate-300 gap-2 border-2 border-dashed border-slate-100 rounded-2xl ml-2">
               <Wallet size={28} className="opacity-50" />
               <p className="text-[10px] text-center px-4 font-medium">পেমেন্ট রেকর্ড থাকলে চার্ট দেখা যাবে</p>
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <BarChart data={chartData} margin={{ top: 10, right: 0, left: -15, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis 
