@@ -10,15 +10,21 @@ import {
   RefreshCcw, Clock, Receipt, Download, Share2, Hexagon, X, AlertCircle
 } from 'lucide-react';
 import html2canvas from 'html2canvas';
-import { useAppContext } from '../context/AppContext';
-import { APP_NAME } from '../constants';
-import { supabase } from '../lib/supabase';
-import { Expense } from '../types';
+import { useAppContext } from '@/context/AppContext';
+import { APP_NAME } from '@/constants';
+import { supabase } from '@/lib/supabase';
+import { Expense } from '@/types';
+import { DatePicker } from '@/components/DatePicker';
 
 export const Reports: React.FC = () => {
   const { projects, user, adminSelectedUserId } = useAppContext();
   const currency = user?.currency || '৳';
   const reportRef = useRef<HTMLDivElement>(null);
+
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -253,14 +259,19 @@ export const Reports: React.FC = () => {
         {/* Filter Section */}
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col gap-4">
             <div className="grid grid-cols-2 gap-4">
-            <div>
-                <label className="block text-xs font-bold text-slate-600 uppercase mb-2">শুরু তারিখ</label>
-                <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 border rounded-xl outline-none text-sm font-bold text-slate-700 cursor-pointer" />
-            </div>
-            <div>
-                <label className="block text-xs font-bold text-slate-600 uppercase mb-2">শেষ তারিখ</label>
-                <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 border rounded-xl outline-none text-sm font-bold text-slate-700 cursor-pointer" />
-            </div>
+              <DatePicker 
+                label="শুরু তারিখ"
+                value={startDate}
+                onChange={setStartDate}
+                placeholder="শুরু তারিখ"
+              />
+              <DatePicker 
+                label="শেষ তারিখ"
+                value={endDate}
+                onChange={setEndDate}
+                placeholder="শেষ তারিখ"
+                align="right"
+              />
             </div>
             {(startDate || endDate) && (
             <button onClick={resetFilter} className="w-full py-2 bg-slate-100 text-slate-600 rounded-xl font-bold text-sm hover:bg-slate-200 transition-colors">ফিল্টার রিসেট করুন</button>
@@ -371,7 +382,7 @@ export const Reports: React.FC = () => {
                 </div>
 
                 {/* Charts Area */}
-                {!hasData ? (
+                {!isMounted ? null : !hasData ? (
                     <div className="p-12 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
                         <Hexagon size={32} className="mx-auto mb-2 opacity-20" />
                         <p className="text-xs font-medium">কোনো ডাটা পাওয়া যায়নি</p>
@@ -385,7 +396,7 @@ export const Reports: React.FC = () => {
                                 <h3 className="font-bold text-sm text-slate-800">মাসিক আয়ের বিবরণ</h3>
                             </div>
                             <div className="h-48 w-full">
-                                <ResponsiveContainer width="100%" height="100%">
+                                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                                     <BarChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                     <XAxis dataKey="name" tick={{fontSize: 10, fill: '#64748b', fontWeight: 600}} axisLine={false} tickLine={false} dy={5} />
@@ -411,7 +422,7 @@ export const Reports: React.FC = () => {
                             <div className="flex flex-col md:flex-row items-center gap-6">
                                 {/* Chart */}
                                 <div className="h-56 w-full md:w-1/2 relative flex items-center justify-center">
-                                    <ResponsiveContainer width="100%" height="100%">
+                                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                                         <PieChart>
                                         <Pie 
                                             data={financialData} 

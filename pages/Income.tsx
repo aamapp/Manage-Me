@@ -5,8 +5,9 @@ import { TrendingUp, Plus, Search, Calendar, DollarSign, X, ReceiptText, Briefca
 import { useAppContext } from '../context/AppContext';
 import { Project, IncomeRecord } from '../types';
 import { supabase } from '../lib/supabase';
-import { NumericKeypad } from '../components/NumericKeypad';
-import { ConfirmModal } from '../components/ConfirmModal';
+import { NumericKeypad } from '@/components/NumericKeypad';
+import { ConfirmModal } from '@/components/ConfirmModal';
+import { DatePicker } from '@/components/DatePicker';
 
 // Custom Bkash Icon to match the brand logo shape (Origami Bird)
 const BkashIcon = ({ size = 16, className = "" }: { size?: number, className?: string }) => (
@@ -457,10 +458,12 @@ export const Income: React.FC = () => {
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">তারিখ</label>
-                      <input required type="date" value={newPayment.date} onChange={e => setNewPayment({...newPayment, date: e.target.value})} className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500" />
-                    </div>
+                    <DatePicker 
+                      label="তারিখ"
+                      value={newPayment.date}
+                      onChange={(date) => setNewPayment({...newPayment, date: date})}
+                      placeholder="তারিখ"
+                    />
                     <div>
                       <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">পদ্ধতি</label>
                       <select value={newPayment.method} onChange={e => setNewPayment({...newPayment, method: e.target.value})} className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500">

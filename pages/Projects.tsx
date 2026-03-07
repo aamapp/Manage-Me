@@ -10,9 +10,9 @@ import { PROJECT_STATUS_LABELS, PROJECT_TYPE_LABELS } from '../constants';
 import { Project, ProjectStatus, ProjectType, Client } from '../types';
 import { useAppContext } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
-import { NumericKeypad } from '../components/NumericKeypad';
-import { ConfirmModal } from '../components/ConfirmModal';
-import { DatePicker } from '../components/DatePicker';
+import { NumericKeypad } from '@/components/NumericKeypad';
+import { ConfirmModal } from '@/components/ConfirmModal';
+import { DatePicker } from '@/components/DatePicker';
 
 export const Projects: React.FC = () => {
   const { projects, setProjects, clients, setClients, user, refreshData, showToast } = useAppContext();
@@ -465,6 +465,22 @@ export const Projects: React.FC = () => {
           <p className="text-xs text-slate-500 font-medium">{filteredProjects.length} টি প্রজেক্ট পাওয়া গেছে</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {clientFilter && clientStats && (
+            <div className="hidden md:flex items-center gap-3 mr-2 bg-white border border-slate-100 px-3 py-1.5 rounded-xl shadow-sm">
+                <div className="text-center border-r border-slate-100 pr-3">
+                  <p className="text-[8px] font-bold text-slate-400 uppercase leading-none mb-1">বাজেট</p>
+                  <p className="text-[11px] font-black text-slate-700 leading-none">{currency}{clientStats.total.toLocaleString('bn-BD')}</p>
+                </div>
+                <div className="text-center border-r border-slate-100 pr-3">
+                  <p className="text-[8px] font-bold text-emerald-500 uppercase leading-none mb-1">আদায়</p>
+                  <p className="text-[11px] font-black text-emerald-600 leading-none">{currency}{clientStats.paid.toLocaleString('bn-BD')}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-[8px] font-bold text-rose-500 uppercase leading-none mb-1">বকেয়া</p>
+                  <p className="text-[11px] font-black text-rose-600 leading-none">{currency}{clientStats.due.toLocaleString('bn-BD')}</p>
+                </div>
+            </div>
+          )}
           <button 
             onClick={handleOpenAddModal}
             className="bg-indigo-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-indigo-200 active:scale-90 transition-transform"
@@ -578,35 +594,44 @@ export const Projects: React.FC = () => {
         {/* Active Client Filter Banner & Stats */}
         {clientFilter && (
           <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
-            <div className="bg-indigo-50 border border-indigo-100 p-3 rounded-2xl flex items-center justify-between shadow-sm">
-                <div className="flex items-center gap-2 text-indigo-700">
-                    <div className="w-7 h-7 bg-white rounded-lg flex items-center justify-center text-indigo-600 shadow-sm">
-                      <Users size={14} />
+            <div className="bg-indigo-600 border border-indigo-500 p-3 rounded-2xl flex items-center justify-between shadow-lg shadow-indigo-100">
+                <div className="flex items-center gap-3 text-white">
+                    <div className="w-9 h-9 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center text-white shadow-inner">
+                      <Users size={18} />
                     </div>
-                    <span className="text-sm font-bold">ক্লায়েন্ট: {clientFilter}</span>
+                    <div>
+                      <p className="text-[10px] font-bold text-indigo-100 uppercase leading-none mb-1">সিলেক্টেড ক্লায়েন্ট</p>
+                      <h3 className="text-base font-black leading-none">{clientFilter}</h3>
+                    </div>
                 </div>
                 <button 
                     onClick={clearClientFilter}
                     data-html2canvas-ignore="true"
-                    className="p-1.5 bg-white rounded-full text-indigo-400 hover:text-rose-500 transition-colors shadow-sm active:scale-90"
+                    className="p-2 bg-white/20 hover:bg-white/30 rounded-full text-white transition-all active:scale-90"
                 >
-                    <X size={14} />
+                    <X size={16} />
                 </button>
             </div>
 
             {clientStats && (
               <div className="grid grid-cols-3 gap-2">
-                <div className="bg-white border border-slate-100 p-2.5 rounded-2xl shadow-sm">
-                  <p className="text-[9px] font-bold text-slate-400 uppercase leading-none mb-1.5">মোট বাজেট</p>
-                  <p className="text-[13px] font-black text-slate-700 leading-none">{currency}{clientStats.total.toLocaleString('bn-BD')}</p>
+                <div className="bg-white border border-slate-100 p-3 rounded-2xl shadow-sm hover:border-indigo-100 transition-colors group">
+                  <p className="text-[9px] font-bold text-slate-400 uppercase leading-none mb-2 flex items-center gap-1">
+                    <DollarSign size={10} className="text-slate-300 group-hover:text-indigo-400 transition-colors" /> মোট বাজেট
+                  </p>
+                  <p className="text-sm font-black text-slate-800 leading-none">{currency}{clientStats.total.toLocaleString('bn-BD')}</p>
                 </div>
-                <div className="bg-white border border-slate-100 p-2.5 rounded-2xl shadow-sm">
-                  <p className="text-[9px] font-bold text-emerald-500 uppercase leading-none mb-1.5">মোট আদায়</p>
-                  <p className="text-[13px] font-black text-emerald-600 leading-none">{currency}{clientStats.paid.toLocaleString('bn-BD')}</p>
+                <div className="bg-white border border-slate-100 p-3 rounded-2xl shadow-sm hover:border-emerald-100 transition-colors group">
+                  <p className="text-[9px] font-bold text-emerald-500 uppercase leading-none mb-2 flex items-center gap-1">
+                    <Wallet size={10} className="text-emerald-300 group-hover:text-emerald-500 transition-colors" /> মোট আদায়
+                  </p>
+                  <p className="text-sm font-black text-emerald-600 leading-none">{currency}{clientStats.paid.toLocaleString('bn-BD')}</p>
                 </div>
-                <div className="bg-white border border-slate-100 p-2.5 rounded-2xl shadow-sm">
-                  <p className="text-[9px] font-bold text-rose-500 uppercase leading-none mb-1.5">মোট বকেয়া</p>
-                  <p className="text-[13px] font-black text-rose-600 leading-none">{currency}{clientStats.due.toLocaleString('bn-BD')}</p>
+                <div className="bg-white border border-slate-100 p-3 rounded-2xl shadow-sm hover:border-rose-100 transition-colors group">
+                  <p className="text-[9px] font-bold text-rose-500 uppercase leading-none mb-2 flex items-center gap-1">
+                    <AlertCircle size={10} className="text-rose-300 group-hover:text-rose-500 transition-colors" /> মোট বকেয়া
+                  </p>
+                  <p className="text-sm font-black text-rose-600 leading-none">{currency}{clientStats.due.toLocaleString('bn-BD')}</p>
                 </div>
               </div>
             )}

@@ -4,7 +4,7 @@ import { User as UserIcon, Bell, Shield, Palette, Globe, Save, CheckCircle2, Loa
 import { APP_NAME } from '../constants';
 import { useAppContext } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
-import { AppLock } from '../components/AppLock';
+import { AppLock } from '@/components/AppLock';
 
 export const Settings: React.FC = () => {
   const { user, setUser, showToast, appPin, setAppPin } = useAppContext();

@@ -5,8 +5,9 @@ import { Receipt, Plus, Search, Tag, X, ShoppingCart, Loader2, Trash2, MoreVerti
 import { EXPENSE_CATEGORY_LABELS } from '../constants';
 import { useAppContext } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
-import { NumericKeypad } from '../components/NumericKeypad';
-import { ConfirmModal } from '../components/ConfirmModal';
+import { NumericKeypad } from '@/components/NumericKeypad';
+import { ConfirmModal } from '@/components/ConfirmModal';
+import { DatePicker } from '@/components/DatePicker';
 
 export const Expenses: React.FC = () => {
   // Use cached expenses from AppContext
@@ -327,10 +328,12 @@ export const Expenses: React.FC = () => {
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">তারিখ</label>
-                      <input required type="date" value={newExpense.date} onChange={e => setNewExpense({...newExpense, date: e.target.value})} className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none focus:ring-2 focus:ring-rose-500" />
-                    </div>
+                    <DatePicker 
+                      label="তারিখ"
+                      value={newExpense.date}
+                      onChange={(date) => setNewExpense({...newExpense, date: date})}
+                      placeholder="তারিখ"
+                    />
                     
                     {/* Category Input with Suggestions */}
                     <div className="relative" ref={categoryInputRef}>

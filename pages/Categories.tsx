@@ -4,7 +4,7 @@ import { Tags, Edit2, Trash2, X, Save, Loader2, AlertTriangle, CheckCircle2 } fr
 import { useAppContext } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
 import { EXPENSE_CATEGORY_LABELS } from '../constants';
-import { ConfirmModal } from '../components/ConfirmModal';
+import { ConfirmModal } from '@/components/ConfirmModal';
 
 export const Categories: React.FC = () => {
   const { user, showToast, adminSelectedUserId } = useAppContext();

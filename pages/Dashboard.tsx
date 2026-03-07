@@ -1,3 +1,4 @@
+
 import React, { useMemo } from 'react';
 import { useNavigate } from "react-router-dom";
 import { 
@@ -14,7 +15,7 @@ import {
   AlertCircle,
   Users
 } from 'lucide-react';
-import { StatCard } from '../components/StatCard';
+import { StatCard } from '@/components/StatCard';
 import { useAppContext } from '../context/AppContext';
 
 export const Dashboard: React.FC = () => {

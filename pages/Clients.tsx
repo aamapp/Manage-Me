@@ -7,7 +7,7 @@ import { CURRENCY } from '../constants';
 import { Client } from '../types';
 import { useAppContext } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
-import { ConfirmModal } from '../components/ConfirmModal';
+import { ConfirmModal } from '@/components/ConfirmModal';
 
 export const Clients: React.FC = () => {
   const { clients, projects, setClients, user, refreshData, showToast } = useAppContext();
