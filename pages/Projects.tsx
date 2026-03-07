@@ -465,22 +465,6 @@ export const Projects: React.FC = () => {
           <p className="text-xs text-slate-500 font-medium">{filteredProjects.length} টি প্রজেক্ট পাওয়া গেছে</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {clientFilter && clientStats && (
-            <div className="hidden md:flex items-center gap-3 mr-2 bg-white border border-slate-100 px-3 py-1.5 rounded-xl shadow-sm">
-                <div className="text-center border-r border-slate-100 pr-3">
-                  <p className="text-[8px] font-bold text-slate-400 uppercase leading-none mb-1">বাজেট</p>
-                  <p className="text-[11px] font-black text-slate-700 leading-none">{currency}{clientStats.total.toLocaleString('bn-BD')}</p>
-                </div>
-                <div className="text-center border-r border-slate-100 pr-3">
-                  <p className="text-[8px] font-bold text-emerald-500 uppercase leading-none mb-1">আদায়</p>
-                  <p className="text-[11px] font-black text-emerald-600 leading-none">{currency}{clientStats.paid.toLocaleString('bn-BD')}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-[8px] font-bold text-rose-500 uppercase leading-none mb-1">বকেয়া</p>
-                  <p className="text-[11px] font-black text-rose-600 leading-none">{currency}{clientStats.due.toLocaleString('bn-BD')}</p>
-                </div>
-            </div>
-          )}
           <button 
             onClick={handleOpenAddModal}
             className="bg-indigo-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-indigo-200 active:scale-90 transition-transform"
@@ -594,44 +578,35 @@ export const Projects: React.FC = () => {
         {/* Active Client Filter Banner & Stats */}
         {clientFilter && (
           <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
-            <div className="bg-indigo-600 border border-indigo-500 p-3 rounded-2xl flex items-center justify-between shadow-lg shadow-indigo-100">
-                <div className="flex items-center gap-3 text-white">
-                    <div className="w-9 h-9 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center text-white shadow-inner">
-                      <Users size={18} />
+            <div className="bg-indigo-50 border border-indigo-100 p-3 rounded-2xl flex items-center justify-between shadow-sm">
+                <div className="flex items-center gap-2 text-indigo-700">
+                    <div className="w-7 h-7 bg-white rounded-lg flex items-center justify-center text-indigo-600 shadow-sm">
+                      <Users size={14} />
                     </div>
-                    <div>
-                      <p className="text-[10px] font-bold text-indigo-100 uppercase leading-none mb-1">সিলেক্টেড ক্লায়েন্ট</p>
-                      <h3 className="text-base font-black leading-none">{clientFilter}</h3>
-                    </div>
+                    <span className="text-sm font-bold">ক্লায়েন্ট: {clientFilter}</span>
                 </div>
                 <button 
                     onClick={clearClientFilter}
                     data-html2canvas-ignore="true"
-                    className="p-2 bg-white/20 hover:bg-white/30 rounded-full text-white transition-all active:scale-90"
+                    className="p-1.5 bg-white rounded-full text-indigo-400 hover:text-rose-500 transition-colors shadow-sm active:scale-90"
                 >
-                    <X size={16} />
+                    <X size={14} />
                 </button>
             </div>
 
             {clientStats && (
               <div className="grid grid-cols-3 gap-2">
-                <div className="bg-white border border-slate-100 p-3 rounded-2xl shadow-sm hover:border-indigo-100 transition-colors group">
-                  <p className="text-[9px] font-bold text-slate-400 uppercase leading-none mb-2 flex items-center gap-1">
-                    <DollarSign size={10} className="text-slate-300 group-hover:text-indigo-400 transition-colors" /> মোট বাজেট
-                  </p>
-                  <p className="text-sm font-black text-slate-800 leading-none">{currency}{clientStats.total.toLocaleString('bn-BD')}</p>
+                <div className="bg-white border border-slate-100 p-3 rounded-2xl shadow-sm">
+                  <p className="text-xs font-bold text-slate-400 uppercase leading-none mb-2">মোট বাজেট</p>
+                  <p className="text-base font-black text-slate-700 leading-none">{currency}{clientStats.total.toLocaleString('bn-BD')}</p>
                 </div>
-                <div className="bg-white border border-slate-100 p-3 rounded-2xl shadow-sm hover:border-emerald-100 transition-colors group">
-                  <p className="text-[9px] font-bold text-emerald-500 uppercase leading-none mb-2 flex items-center gap-1">
-                    <Wallet size={10} className="text-emerald-300 group-hover:text-emerald-500 transition-colors" /> মোট আদায়
-                  </p>
-                  <p className="text-sm font-black text-emerald-600 leading-none">{currency}{clientStats.paid.toLocaleString('bn-BD')}</p>
+                <div className="bg-white border border-slate-100 p-3 rounded-2xl shadow-sm">
+                  <p className="text-xs font-bold text-emerald-500 uppercase leading-none mb-2">মোট আদায়</p>
+                  <p className="text-base font-black text-emerald-600 leading-none">{currency}{clientStats.paid.toLocaleString('bn-BD')}</p>
                 </div>
-                <div className="bg-white border border-slate-100 p-3 rounded-2xl shadow-sm hover:border-rose-100 transition-colors group">
-                  <p className="text-[9px] font-bold text-rose-500 uppercase leading-none mb-2 flex items-center gap-1">
-                    <AlertCircle size={10} className="text-rose-300 group-hover:text-rose-500 transition-colors" /> মোট বকেয়া
-                  </p>
-                  <p className="text-sm font-black text-rose-600 leading-none">{currency}{clientStats.due.toLocaleString('bn-BD')}</p>
+                <div className="bg-white border border-slate-100 p-3 rounded-2xl shadow-sm">
+                  <p className="text-xs font-bold text-rose-500 uppercase leading-none mb-2">মোট বকেয়া</p>
+                  <p className="text-base font-black text-rose-600 leading-none">{currency}{clientStats.due.toLocaleString('bn-BD')}</p>
                 </div>
               </div>
             )}
@@ -660,18 +635,18 @@ export const Projects: React.FC = () => {
                         <p className="text-[11px] text-slate-500 font-medium truncate flex items-center gap-1 mt-1">
                           <Users size={10} className="shrink-0" /> {p.clientname}
                         </p>
-                        <div className="mt-2.5 flex flex-nowrap items-center gap-1 overflow-hidden">
-                          <div className="flex items-center gap-1 bg-slate-100 px-1.5 py-1 rounded-lg shrink-0">
-                            <span className="text-[8px] font-bold text-slate-400 uppercase">বাজেট</span>
-                            <span className="text-[10px] font-black text-slate-700">{currency}{p.totalamount.toLocaleString('bn-BD')}</span>
+                        <div className="mt-2.5 flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
+                          <div className="flex items-center gap-1 bg-slate-100 px-2 py-1 rounded-lg shrink-0">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase">বাজেট</span>
+                            <span className="text-xs font-black text-slate-800">{currency}{p.totalamount.toLocaleString('bn-BD')}</span>
                           </div>
-                          <div className="flex items-center gap-1 bg-emerald-50 px-1.5 py-1 rounded-lg shrink-0">
-                            <span className="text-[8px] font-bold text-emerald-400 uppercase">আদায়</span>
-                            <span className="text-[10px] font-black text-emerald-600">{currency}{p.paidamount.toLocaleString('bn-BD')}</span>
+                          <div className="flex items-center gap-1 bg-emerald-50 px-2 py-1 rounded-lg shrink-0">
+                            <span className="text-[10px] font-bold text-emerald-500 uppercase">আদায়</span>
+                            <span className="text-xs font-black text-emerald-700">{currency}{p.paidamount.toLocaleString('bn-BD')}</span>
                           </div>
-                          <div className={`flex items-center gap-1 px-1.5 py-1 rounded-lg shrink-0 ${p.dueamount > 0 ? 'bg-rose-50' : 'bg-slate-50'}`}>
-                            <span className={`text-[8px] font-bold uppercase ${p.dueamount > 0 ? 'text-rose-400' : 'text-slate-400'}`}>বকেয়া</span>
-                            <span className={`text-[10px] font-black ${p.dueamount > 0 ? 'text-rose-600' : 'text-slate-400'}`}>{currency}{p.dueamount.toLocaleString('bn-BD')}</span>
+                          <div className={`flex items-center gap-1 px-2 py-1 rounded-lg shrink-0 ${p.dueamount > 0 ? 'bg-rose-50' : 'bg-slate-50'}`}>
+                            <span className={`text-[10px] font-bold uppercase ${p.dueamount > 0 ? 'text-rose-500' : 'text-slate-500'}`}>বকেয়া</span>
+                            <span className={`text-xs font-black ${p.dueamount > 0 ? 'text-rose-700' : 'text-slate-500'}`}>{currency}{p.dueamount.toLocaleString('bn-BD')}</span>
                           </div>
                         </div>
                       </div>
@@ -765,26 +740,26 @@ export const Projects: React.FC = () => {
 
                 <div className="p-6 space-y-5">
                     {/* Basic Info - Full Width Client */}
-                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                        <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">ক্লায়েন্ট</p>
-                        <p className="font-bold text-slate-700 text-sm flex items-center gap-1.5">
-                            <Users size={14} className="text-indigo-500"/> {viewProject.clientname}
-                        </p>
-                    </div>
+                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                            <p className="text-xs text-slate-400 font-bold uppercase mb-1">ক্লায়েন্ট</p>
+                            <p className="font-bold text-slate-700 text-base flex items-center gap-1.5">
+                                <Users size={16} className="text-indigo-500"/> {viewProject.clientname}
+                            </p>
+                        </div>
 
                     {/* Dates */}
-                    <div className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100">
+                    <div className="flex justify-between items-center bg-slate-50 p-4 rounded-xl border border-slate-100">
                          <div>
-                            <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">শুরু</p>
-                            <p className="font-bold text-slate-700 text-xs flex items-center gap-1">
-                                <Calendar size={12} /> {viewProject.createdat ? viewProject.createdat.split('T')[0] : 'N/A'}
+                            <p className="text-xs text-slate-400 font-bold uppercase mb-1">শুরু</p>
+                            <p className="font-bold text-slate-700 text-sm flex items-center gap-1">
+                                <Calendar size={14} /> {viewProject.createdat ? viewProject.createdat.split('T')[0] : 'N/A'}
                             </p>
                          </div>
                          <div className="h-8 w-px bg-slate-200"></div>
                          <div className="text-right">
-                            <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">ডেডলাইন</p>
-                            <p className={`font-bold text-xs flex items-center gap-1 justify-end ${viewProject.deadline ? 'text-slate-700' : 'text-slate-400 italic'}`}>
-                                <Clock size={12} /> {viewProject.deadline ? viewProject.deadline.split('T')[0] : 'নির্ধারিত নেই'}
+                            <p className="text-xs text-slate-400 font-bold uppercase mb-1">ডেডলাইন</p>
+                            <p className={`font-bold text-sm flex items-center gap-1 justify-end ${viewProject.deadline ? 'text-slate-700' : 'text-slate-400 italic'}`}>
+                                <Clock size={14} /> {viewProject.deadline ? viewProject.deadline.split('T')[0] : 'নির্ধারিত নেই'}
                             </p>
                          </div>
                     </div>
@@ -797,12 +772,12 @@ export const Projects: React.FC = () => {
                         
                         <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 space-y-3">
                              <div className="flex justify-between items-center">
-                                 <span className="text-xs font-bold text-slate-500">বাজেট</span>
-                                 <span className="text-sm font-black text-slate-800">{currency} {viewProject.totalamount.toLocaleString('bn-BD')}</span>
+                                 <span className="text-sm font-bold text-slate-500">বাজেট</span>
+                                 <span className="text-base font-black text-slate-800">{currency} {viewProject.totalamount.toLocaleString('bn-BD')}</span>
                              </div>
                              
                              {/* Progress Bar */}
-                             <div className="relative h-2.5 bg-slate-200 rounded-full overflow-hidden">
+                             <div className="relative h-3 bg-slate-200 rounded-full overflow-hidden">
                                 <div 
                                     className="absolute top-0 left-0 h-full bg-emerald-500 rounded-full transition-all duration-500"
                                     style={{ width: `${viewProject.totalamount > 0 ? (viewProject.paidamount / viewProject.totalamount) * 100 : 0}%` }}
@@ -811,19 +786,19 @@ export const Projects: React.FC = () => {
 
                              <div className="flex justify-between items-center pt-1">
                                  <div>
-                                     <p className="text-[10px] font-bold text-emerald-600">পরিশোধ</p>
-                                     <p className="text-xs font-bold text-emerald-700">{currency} {viewProject.paidamount.toLocaleString('bn-BD')}</p>
+                                     <p className="text-xs font-bold text-emerald-600">পরিশোধ</p>
+                                     <p className="text-sm font-bold text-emerald-700">{currency} {viewProject.paidamount.toLocaleString('bn-BD')}</p>
                                  </div>
                                  <div className="text-right">
                                     {viewProject.dueamount > 0 ? (
                                         <>
-                                            <p className="text-[10px] font-bold text-rose-500">বাকি আছে</p>
-                                            <p className="text-xs font-bold text-rose-600">{currency} {viewProject.dueamount.toLocaleString('bn-BD')}</p>
+                                            <p className="text-xs font-bold text-rose-500">বাকি আছে</p>
+                                            <p className="text-sm font-bold text-rose-600">{currency} {viewProject.dueamount.toLocaleString('bn-BD')}</p>
                                         </>
                                     ) : (
                                         <>
-                                            <p className="text-[10px] font-bold text-emerald-500">বাকি</p>
-                                            <p className="text-xs font-bold text-emerald-600">নেই</p>
+                                            <p className="text-xs font-bold text-emerald-500">বাকি</p>
+                                            <p className="text-sm font-bold text-emerald-600">নেই</p>
                                         </>
                                     )}
                                  </div>
