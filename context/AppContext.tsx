@@ -1,11 +1,11 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { Project, Client, User, IncomeRecord, UserProfile, Expense } from '../types';
-import { supabase, isConfigured } from '../lib/supabase';
+import { Project, Client, User, IncomeRecord, UserProfile, Expense } from '@/types';
+import { supabase, isConfigured } from '@/lib/supabase';
 
 interface ToastState {
   message: string;
-  type: 'success' | 'error';
+  type: 'success' | 'error' | 'info';
 }
 
 interface AppContextType {
@@ -33,7 +33,7 @@ interface AppContextType {
   loading: boolean;
   refreshData: () => Promise<void>;
   toast: ToastState | null;
-  showToast: (message: string, type?: 'success' | 'error') => void;
+  showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
   hideToast: () => void;
   isAppLocked: boolean;
   setIsAppLocked: React.Dispatch<React.SetStateAction<boolean>>;
@@ -78,7 +78,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Performance optimization: Prevent multiple simultaneous refreshes
   const isFetchingRef = useRef(false);
 
-  const showToast = useCallback((message: string, type: 'success' | 'error' = 'error') => {
+  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'error') => {
     setToast({ message, type });
   }, []);
 
