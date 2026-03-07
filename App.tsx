@@ -1,26 +1,26 @@
 
 import React, { Suspense, lazy, useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
-import { Layout } from './components/Layout';
-import { Toast } from './components/Toast';
-import { AppLock } from './components/AppLock'; 
-import { AppProvider, useAppContext } from './context/AppContext';
-import { supabase, isConfigured } from './lib/supabase';
+import { Layout } from '@/components/Layout';
+import { Toast } from '@/components/Toast';
+import { AppLock } from '@/components/AppLock'; 
+import { AppProvider, useAppContext } from '@/context/AppContext';
+import { supabase, isConfigured } from '@/lib/supabase';
 
 // Direct imports for main pages
-import { Dashboard } from './pages/Dashboard';
-import { Projects } from './pages/Projects';
-import { Clients } from './pages/Clients';
-import { Income } from './pages/Income';
-import { Expenses } from './pages/Expenses';
-import { Categories } from './pages/Categories';
-import { Reports } from './pages/Reports';
-import { Settings } from './pages/Settings';
-import { UpdatePassword } from './pages/UpdatePassword';
-import { AdminUserList } from './pages/AdminUserList'; // New Import
+import { Dashboard } from '@/pages/Dashboard';
+import { Projects } from '@/pages/Projects';
+import { Clients } from '@/pages/Clients';
+import { Income } from '@/pages/Income';
+import { Expenses } from '@/pages/Expenses';
+import { Categories } from '@/pages/Categories';
+import { Reports } from '@/pages/Reports';
+import { Settings } from '@/pages/Settings';
+import { UpdatePassword } from '@/pages/UpdatePassword';
+import { AdminUserList } from '@/pages/AdminUserList'; // New Import
 
-const Login = lazy(() => import('./pages/Login').then(module => ({ default: module.Login })));
-const Signup = lazy(() => import('./pages/Signup').then(module => ({ default: module.Signup })));
+const Login = lazy(() => import('@/pages/Login').then(module => ({ default: module.Login })));
+const Signup = lazy(() => import('@/pages/Signup').then(module => ({ default: module.Signup })));
 
 const AuthListener: React.FC = () => {
   const navigate = useNavigate();
