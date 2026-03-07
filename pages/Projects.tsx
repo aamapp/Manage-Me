@@ -2,13 +2,17 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
-import { Plus, Search, MoreVertical, Calendar, DollarSign, Briefcase, X, FolderOpen, Pencil, Trash2, Users, FileText, CheckCircle2, Clock, UserPlus, CalendarDays, Loader2, AlertCircle, ChevronDown, Filter, Music, Calculator, Eye, Wallet } from 'lucide-react';
+import { Plus, Search, MoreVertical, Calendar, DollarSign, Briefcase, X, FolderOpen, Pencil, Trash2, Users, FileText, CheckCircle2, Clock, UserPlus, CalendarDays, Loader2, AlertCircle, ChevronDown, Filter, Music, Calculator, Eye, Wallet, Download } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import html2canvas from 'html2canvas';
 import { PROJECT_STATUS_LABELS, PROJECT_TYPE_LABELS } from '../constants';
 import { Project, ProjectStatus, ProjectType, Client } from '../types';
 import { useAppContext } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
 import { NumericKeypad } from '../components/NumericKeypad';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { DatePicker } from '../components/DatePicker';
 
 export const Projects: React.FC = () => {
   const { projects, setProjects, clients, setClients, user, refreshData, showToast } = useAppContext();
@@ -38,6 +42,10 @@ export const Projects: React.FC = () => {
   
   // New: State for View Details Modal
   const [viewProject, setViewProject] = useState<Project | null>(null);
+  
+  // Date Range State
+  const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' });
+  const [showDateFilter, setShowDateFilter] = useState(false);
   
   // Keypad State
   const [showKeypad, setShowKeypad] = useState(false);
@@ -303,29 +311,6 @@ export const Projects: React.FC = () => {
     }
   };
 
-  const filteredProjects = projects.filter(p => {
-    let matchesFilter = false;
-    
-    // Check Status Filter
-    if (filter === 'All') {
-        matchesFilter = true;
-    } else if (filter === 'Due') {
-        // Only show projects where dueamount > 0
-        matchesFilter = p.dueamount > 0;
-    } else {
-        matchesFilter = p.status === filter;
-    }
-
-    // Check Client Filter (if active)
-    if (clientFilter && p.clientname !== clientFilter) {
-        matchesFilter = false;
-    }
-
-    const matchesSearch = (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          (p.clientname || '').toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesFilter && matchesSearch;
-  });
-
   const clientSuggestions = clients.filter(c => 
     (c.name || '').toLowerCase().includes(clientSearch.toLowerCase())
   );
@@ -355,39 +340,181 @@ export const Projects: React.FC = () => {
     setClientFilter(null);
   };
 
+  const filteredProjects = projects.filter(p => {
+    let matchesFilter = false;
+    
+    // Check Status Filter
+    if (filter === 'All') {
+        matchesFilter = true;
+    } else if (filter === 'Due') {
+        matchesFilter = p.dueamount > 0;
+    } else {
+        matchesFilter = p.status === filter;
+    }
+
+    // Check Client Filter (if active)
+    if (clientFilter && p.clientname !== clientFilter) {
+        matchesFilter = false;
+    }
+
+    // Check Date Range Filter
+    if (dateRange.start && p.createdat) {
+        const projectDate = p.createdat.split('T')[0];
+        if (projectDate < dateRange.start) matchesFilter = false;
+    }
+    if (dateRange.end && p.createdat) {
+        const projectDate = p.createdat.split('T')[0];
+        if (projectDate > dateRange.end) matchesFilter = false;
+    }
+
+    const matchesSearch = (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          (p.clientname || '').toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesFilter && matchesSearch;
+  });
+
+  const clientStats = clientFilter ? filteredProjects
+    .reduce((acc, p) => {
+      acc.total += p.totalamount;
+      acc.paid += p.paidamount;
+      acc.due += p.dueamount;
+      return acc;
+    }, { total: 0, paid: 0, due: 0 }) : null;
+
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  const handleDownloadPDF = async () => {
+    if (!listRef.current) return;
+    
+    setIsGeneratingPDF(true);
+    showToast('পিডিএফ তৈরি হচ্ছে...', 'info');
+    
+    // Wait a bit for the UI to update (show PDF header)
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    try {
+      const canvas = await html2canvas(listRef.current, {
+        scale: 3, 
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        onclone: (clonedDoc) => {
+          // Ensure PDF-only elements are visible in the clone
+          const pdfHeader = clonedDoc.getElementById('pdf-header');
+          if (pdfHeader) pdfHeader.style.display = 'block';
+          
+          const pdfFooter = clonedDoc.getElementById('pdf-footer');
+          if (pdfFooter) pdfFooter.style.display = 'block';
+
+          // Force the container to be fully visible and remove truncation
+          const container = clonedDoc.getElementById('pdf-container');
+          if (container) {
+            container.style.width = '800px'; // Fixed width for stable PDF layout
+            container.style.overflow = 'visible';
+            container.style.height = 'auto';
+            container.style.padding = '40px';
+            container.style.borderRadius = '0';
+            
+            // Remove truncation classes to ensure full text is visible in PDF
+            const truncatedElements = container.querySelectorAll('.truncate');
+            truncatedElements.forEach(el => {
+              el.classList.remove('truncate');
+              (el as HTMLElement).style.whiteSpace = 'normal';
+              (el as HTMLElement).style.overflow = 'visible';
+            });
+          }
+        }
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const imgProps = (new jsPDF()).getImageProperties(imgData);
+      const pdfWidth = 210; // A4 width in mm
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      
+      const pdf = new jsPDF({
+        orientation: 'p',
+        unit: 'mm',
+        format: [pdfWidth, pdfHeight]
+      });
+      
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`projects_${clientFilter ? clientFilter : 'all'}_${new Date().toISOString().split('T')[0]}.pdf`);
+      showToast('পিডিএফ ডাউনলোড সফল', 'success');
+    } catch (error) {
+      console.error('PDF Error:', error);
+      showToast('পিডিএফ তৈরি করতে সমস্যা হয়েছে');
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Header & Add Button */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-slate-800">প্রজেক্ট তালিকা</h1>
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold text-slate-800">প্রজেক্ট তালিকা</h1>
+            <button 
+              onClick={() => setShowDateFilter(!showDateFilter)}
+              className={`p-1.5 rounded-lg transition-all ${showDateFilter || dateRange.start || dateRange.end ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'}`}
+            >
+              <CalendarDays size={18} />
+            </button>
+          </div>
           <p className="text-xs text-slate-500 font-medium">{filteredProjects.length} টি প্রজেক্ট পাওয়া গেছে</p>
         </div>
-        <button 
-          onClick={handleOpenAddModal}
-          className="bg-indigo-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-indigo-200 active:scale-90 transition-transform"
-        >
-          <Plus size={24} />
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button 
+            onClick={handleOpenAddModal}
+            className="bg-indigo-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-indigo-200 active:scale-90 transition-transform"
+          >
+            <Plus size={22} />
+          </button>
+          <button 
+            onClick={handleDownloadPDF}
+            className="bg-emerald-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-emerald-200 active:scale-90 transition-transform"
+          >
+            <Download size={22} />
+          </button>
+        </div>
       </div>
 
-      {/* Active Client Filter Banner */}
-      {clientFilter && (
-        <div className="bg-indigo-50 border border-indigo-100 p-3 rounded-2xl flex items-center justify-between animate-in fade-in slide-in-from-top-2">
-            <div className="flex items-center gap-2 text-indigo-700">
-                <Users size={16} />
-                <span className="text-sm font-bold">ক্লায়েন্ট: {clientFilter}</span>
-            </div>
-            <button 
-                onClick={clearClientFilter}
-                className="p-1.5 bg-white rounded-full text-indigo-400 hover:text-rose-500 transition-colors shadow-sm"
-            >
-                <X size={14} />
-            </button>
+      {/* Date Range Filter UI */}
+      {showDateFilter && (
+        <div className="bg-white border border-slate-100 p-3 rounded-2xl shadow-sm space-y-3 animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+              <Filter size={14} className="text-indigo-500" /> তারিখ অনুযায়ী ফিল্টার
+            </h3>
+            {(dateRange.start || dateRange.end) && (
+              <button 
+                onClick={() => setDateRange({ start: '', end: '' })}
+                className="text-[10px] font-bold text-rose-500 bg-rose-50 px-2 py-1 rounded-lg"
+              >
+                রিসেট
+              </button>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <DatePicker 
+              label="শুরু"
+              value={dateRange.start}
+              onChange={(date) => setDateRange({ ...dateRange, start: date })}
+              placeholder="শুরু তারিখ"
+            />
+            <DatePicker 
+              label="শেষ"
+              value={dateRange.end}
+              onChange={(date) => setDateRange({ ...dateRange, end: date })}
+              placeholder="শেষ তারিখ"
+              align="right"
+            />
+          </div>
         </div>
       )}
 
-      {/* Search & Filter */}
+      {/* Search & Filter - Outside PDF capture */}
       <div className="flex gap-2">
         <div className="flex-1 bg-white rounded-2xl border border-slate-200 px-4 py-2.5 flex items-center gap-2 shadow-sm focus-within:ring-2 focus-within:ring-indigo-100 transition-shadow">
           <Search size={18} className="text-slate-400" />
@@ -415,82 +542,167 @@ export const Projects: React.FC = () => {
         </div>
       </div>
 
-      {/* Projects List */}
-      <div className="space-y-4 pb-12">
-        {filteredProjects.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-            <FolderOpen size={48} className="mb-4 opacity-20" />
-            <p className="text-sm font-medium">কোনো প্রজেক্ট নেই</p>
-            {clientFilter && <p className="text-xs mt-1">এই ক্লায়েন্টের জন্য কোনো প্রজেক্ট পাওয়া যায়নি</p>}
-          </div>
-        ) : (
-          filteredProjects.map((p) => (
-            <div key={p.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm relative animate-in slide-in-from-bottom-2 duration-300">
-                {/* Minimal Card Layout */}
-                <div className="p-4 flex justify-between items-center">
-                  <div className="flex items-center gap-3 flex-1 min-w-0 mr-2">
-                    <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                       <Music size={20} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h3 className="font-bold text-slate-800 text-sm truncate leading-tight">{p.name}</h3>
-                      <p className="text-[11px] text-slate-500 font-medium truncate flex items-center gap-1">
-                        <Users size={10} /> {p.clientname}
-                      </p>
-                      {p.dueamount > 0 && (
-                          <div className="mt-1 flex items-center gap-1">
-                              <span className="text-[10px] font-bold text-rose-500 bg-rose-50 px-1.5 py-0.5 rounded">
-                                বকেয়া: {currency}{p.dueamount.toLocaleString('bn-BD')}
-                              </span>
-                          </div>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* Actions: View Details (Eye) and Menu */}
-                  <div className="flex items-center gap-2">
-                      <button 
-                        onClick={() => setViewProject(p)}
-                        className="p-2 bg-blue-50 text-blue-600 rounded-full active:scale-95 transition-all shadow-sm"
-                      >
-                         <Eye size={18} />
-                      </button>
-
-                      <div className="relative action-menu-container">
-                        <button 
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveCardMenuId(activeCardMenuId === p.id ? null : p.id);
-                            }}
-                            className={`p-2 rounded-full transition-colors ${activeCardMenuId === p.id ? 'bg-indigo-50 text-indigo-600' : 'text-slate-300 hover:text-indigo-600 bg-slate-50'}`}
-                        >
-                            <MoreVertical size={18} />
-                        </button>
-
-                        {/* Dropdown Menu */}
-                        {activeCardMenuId === p.id && (
-                            <div className="absolute right-0 top-full mt-1 w-36 bg-white rounded-xl shadow-xl border border-slate-100 z-20 flex flex-col py-1.5 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
-                                <button 
-                                    onClick={(e) => { e.stopPropagation(); handleOpenEditModal(p); }}
-                                    className="w-full px-4 py-2.5 text-left text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-indigo-600 flex items-center gap-2 transition-colors"
-                                >
-                                    <Pencil size={14} /> এডিট
-                                </button>
-                                <div className="h-px bg-slate-50 w-full my-0.5"></div>
-                                <button 
-                                    onClick={(e) => { e.stopPropagation(); initiateDelete(p.id); }}
-                                    className="w-full px-4 py-2.5 text-left text-xs font-bold text-rose-500 hover:bg-rose-50 flex items-center gap-2 transition-colors"
-                                >
-                                    <Trash2 size={14} /> ডিলিট
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                  </div>
-                </div>
+      {/* Report Content Area (for PDF) */}
+      <div id="pdf-container" ref={listRef} className="space-y-4 px-2 py-4 bg-white rounded-[2.5rem]">
+        {/* PDF Only Header */}
+        <div id="pdf-header" className="hidden mb-10">
+          <div className="flex justify-between items-center border-b-2 border-slate-100 pb-8 mb-8">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-xl">
+                <Music size={36} />
+              </div>
+              <div>
+                <h1 className="text-3xl font-black text-slate-900 leading-tight mb-2">Manage-Me</h1>
+                <p className="text-xs font-bold text-indigo-600 uppercase tracking-widest">Professional Studio Manager</p>
+              </div>
             </div>
-          ))
+            <div className="text-right">
+              <p className="text-sm font-black text-slate-900 uppercase tracking-tighter mb-1">প্রজেক্ট রিপোর্ট</p>
+              <p className="text-[10px] font-bold text-slate-500">তারিখ: {new Date().toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+              <p className="text-[10px] font-bold text-slate-400">সময়: {new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' })}</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 mb-8">
+             <div className="bg-indigo-50/50 border border-indigo-100 p-5 rounded-[2rem]">
+                <p className="text-[10px] font-bold text-indigo-400 uppercase mb-1">ক্লায়েন্ট</p>
+                <p className="text-xl font-black text-indigo-700">{clientFilter || 'সকল ক্লায়েন্ট'}</p>
+             </div>
+             <div className="bg-slate-50 border border-slate-100 p-5 rounded-[2rem]">
+                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">মোট প্রজেক্ট</p>
+                <p className="text-xl font-black text-slate-700">{filteredProjects.length} টি</p>
+             </div>
+          </div>
+        </div>
+
+        {/* Active Client Filter Banner & Stats */}
+        {clientFilter && (
+          <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="bg-indigo-50 border border-indigo-100 p-3 rounded-2xl flex items-center justify-between shadow-sm">
+                <div className="flex items-center gap-2 text-indigo-700">
+                    <div className="w-7 h-7 bg-white rounded-lg flex items-center justify-center text-indigo-600 shadow-sm">
+                      <Users size={14} />
+                    </div>
+                    <span className="text-sm font-bold">ক্লায়েন্ট: {clientFilter}</span>
+                </div>
+                <button 
+                    onClick={clearClientFilter}
+                    data-html2canvas-ignore="true"
+                    className="p-1.5 bg-white rounded-full text-indigo-400 hover:text-rose-500 transition-colors shadow-sm active:scale-90"
+                >
+                    <X size={14} />
+                </button>
+            </div>
+
+            {clientStats && (
+              <div className="grid grid-cols-3 gap-2">
+                <div className="bg-white border border-slate-100 p-2.5 rounded-2xl shadow-sm">
+                  <p className="text-[9px] font-bold text-slate-400 uppercase leading-none mb-1.5">মোট বাজেট</p>
+                  <p className="text-[13px] font-black text-slate-700 leading-none">{currency}{clientStats.total.toLocaleString('bn-BD')}</p>
+                </div>
+                <div className="bg-white border border-slate-100 p-2.5 rounded-2xl shadow-sm">
+                  <p className="text-[9px] font-bold text-emerald-500 uppercase leading-none mb-1.5">মোট আদায়</p>
+                  <p className="text-[13px] font-black text-emerald-600 leading-none">{currency}{clientStats.paid.toLocaleString('bn-BD')}</p>
+                </div>
+                <div className="bg-white border border-slate-100 p-2.5 rounded-2xl shadow-sm">
+                  <p className="text-[9px] font-bold text-rose-500 uppercase leading-none mb-1.5">মোট বকেয়া</p>
+                  <p className="text-[13px] font-black text-rose-600 leading-none">{currency}{clientStats.due.toLocaleString('bn-BD')}</p>
+                </div>
+              </div>
+            )}
+          </div>
         )}
+
+        {/* Projects List */}
+        <div className="space-y-4 pb-12">
+          {filteredProjects.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+              <FolderOpen size={48} className="mb-4 opacity-20" />
+              <p className="text-sm font-medium">কোনো প্রজেক্ট নেই</p>
+              {clientFilter && <p className="text-xs mt-1">এই ক্লায়েন্টের জন্য কোনো প্রজেক্ট পাওয়া যায়নি</p>}
+            </div>
+          ) : (
+            filteredProjects.map((p) => (
+              <div key={p.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm relative animate-in slide-in-from-bottom-2 duration-300">
+                  {/* Minimal Card Layout */}
+                  <div className="px-3 py-4 flex justify-between items-center">
+                    <div className="flex items-center gap-2 flex-1 min-w-0 mr-1">
+                      <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                         <Music size={20} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-bold text-slate-800 text-sm truncate leading-snug">{p.name}</h3>
+                        <p className="text-[11px] text-slate-500 font-medium truncate flex items-center gap-1 mt-1">
+                          <Users size={10} className="shrink-0" /> {p.clientname}
+                        </p>
+                        <div className="mt-2.5 flex flex-nowrap items-center gap-1 overflow-hidden">
+                          <div className="flex items-center gap-1 bg-slate-100 px-1.5 py-1 rounded-lg shrink-0">
+                            <span className="text-[8px] font-bold text-slate-400 uppercase">বাজেট</span>
+                            <span className="text-[10px] font-black text-slate-700">{currency}{p.totalamount.toLocaleString('bn-BD')}</span>
+                          </div>
+                          <div className="flex items-center gap-1 bg-emerald-50 px-1.5 py-1 rounded-lg shrink-0">
+                            <span className="text-[8px] font-bold text-emerald-400 uppercase">আদায়</span>
+                            <span className="text-[10px] font-black text-emerald-600">{currency}{p.paidamount.toLocaleString('bn-BD')}</span>
+                          </div>
+                          <div className={`flex items-center gap-1 px-1.5 py-1 rounded-lg shrink-0 ${p.dueamount > 0 ? 'bg-rose-50' : 'bg-slate-50'}`}>
+                            <span className={`text-[8px] font-bold uppercase ${p.dueamount > 0 ? 'text-rose-400' : 'text-slate-400'}`}>বকেয়া</span>
+                            <span className={`text-[10px] font-black ${p.dueamount > 0 ? 'text-rose-600' : 'text-slate-400'}`}>{currency}{p.dueamount.toLocaleString('bn-BD')}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Actions: Menu */}
+                    <div className="flex items-center gap-2" data-html2canvas-ignore="true">
+                        <div className="relative action-menu-container">
+                          <button 
+                              onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveCardMenuId(activeCardMenuId === p.id ? null : p.id);
+                              }}
+                              className={`p-2 rounded-full transition-colors ${activeCardMenuId === p.id ? 'bg-indigo-50 text-indigo-600' : 'text-slate-300 hover:text-indigo-600 bg-slate-50'}`}
+                          >
+                              <MoreVertical size={18} />
+                          </button>
+
+                          {/* Dropdown Menu */}
+                          {activeCardMenuId === p.id && (
+                              <div className="absolute right-0 top-full mt-1 w-36 bg-white rounded-xl shadow-xl border border-slate-100 z-20 flex flex-col py-1.5 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
+                                  <button 
+                                      onClick={(e) => { e.stopPropagation(); setViewProject(p); setActiveCardMenuId(null); }}
+                                      className="w-full px-4 py-2.5 text-left text-xs font-bold text-blue-600 hover:bg-blue-50 flex items-center gap-2 transition-colors"
+                                  >
+                                      <Eye size={14} /> বিস্তারিত
+                                  </button>
+                                  <div className="h-px bg-slate-50 w-full my-0.5"></div>
+                                  <button 
+                                      onClick={(e) => { e.stopPropagation(); handleOpenEditModal(p); }}
+                                      className="w-full px-4 py-2.5 text-left text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-indigo-600 flex items-center gap-2 transition-colors"
+                                  >
+                                      <Pencil size={14} /> এডিট
+                                  </button>
+                                  <div className="h-px bg-slate-50 w-full my-0.5"></div>
+                                  <button 
+                                      onClick={(e) => { e.stopPropagation(); initiateDelete(p.id); }}
+                                      className="w-full px-4 py-2.5 text-left text-xs font-bold text-rose-500 hover:bg-rose-50 flex items-center gap-2 transition-colors"
+                                  >
+                                      <Trash2 size={14} /> ডিলিট
+                                  </button>
+                              </div>
+                          )}
+                      </div>
+                    </div>
+                  </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* PDF Only Footer */}
+        <div id="pdf-footer" className="hidden mt-12 pt-6 border-t border-slate-100 text-center">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Generated by Manage-Me Studio Manager</p>
+          <p className="text-[8px] text-slate-300 mt-1">© {new Date().getFullYear()} All Rights Reserved</p>
+        </div>
       </div>
 
       <ConfirmModal 
@@ -693,14 +905,19 @@ export const Projects: React.FC = () => {
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
-                     <div>
-                       <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">শুরু</label>
-                       <input required type="date" value={newProject.createdat} onChange={e => setNewProject({...newProject, createdat: e.target.value})} className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500" />
-                     </div>
-                     <div>
-                       <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">ডেডলাইন (অপশনাল)</label>
-                       <input type="date" value={newProject.deadline} onChange={e => setNewProject({...newProject, deadline: e.target.value})} className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500" />
-                     </div>
+                     <DatePicker 
+                       label="শুরু"
+                       value={newProject.createdat}
+                       onChange={(date) => setNewProject({...newProject, createdat: date})}
+                       placeholder="শুরু তারিখ"
+                     />
+                     <DatePicker 
+                       label="ডেডলাইন (অপশনাল)"
+                       value={newProject.deadline}
+                       onChange={(date) => setNewProject({...newProject, deadline: date})}
+                       placeholder="ডেডলাইন"
+                       align="right"
+                     />
                   </div>
 
                   <button type="submit" disabled={isSubmitting} className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold text-base shadow-lg shadow-indigo-200 active:scale-95 transition-transform flex items-center justify-center gap-2 mt-4">
