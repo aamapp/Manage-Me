@@ -116,7 +116,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 pt-20 pb-20 px-4 animate-in fade-in duration-300 w-full max-w-[100vw] overflow-x-hidden">
+      <main className="flex-1 pt-20 pb-20 px-3 animate-in fade-in duration-300 w-full max-w-[100vw] overflow-x-hidden">
         {children}
       </main>
 

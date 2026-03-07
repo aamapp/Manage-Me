@@ -543,7 +543,7 @@ export const Projects: React.FC = () => {
       </div>
 
       {/* Report Content Area (for PDF) */}
-      <div id="pdf-container" ref={listRef} className="space-y-4 px-2 py-4 bg-white rounded-[2.5rem]">
+      <div id="pdf-container" ref={listRef} className="space-y-4 px-1 py-4 bg-white rounded-[2.5rem]">
         {/* PDF Only Header */}
         <div id="pdf-header" className="hidden mb-10">
           <div className="flex justify-between items-center border-b-2 border-slate-100 pb-8 mb-8">
@@ -625,8 +625,8 @@ export const Projects: React.FC = () => {
             filteredProjects.map((p) => (
               <div key={p.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm relative animate-in slide-in-from-bottom-2 duration-300">
                   {/* Minimal Card Layout */}
-                  <div className="px-3 py-4 flex justify-between items-center">
-                    <div className="flex items-center gap-2 flex-1 min-w-0 mr-1">
+                  <div className="px-2 py-4 flex justify-between items-center">
+                    <div className="flex items-center gap-1.5 flex-1 min-w-0 mr-1">
                       <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
                          <Music size={20} />
                       </div>
@@ -635,7 +635,7 @@ export const Projects: React.FC = () => {
                         <p className="text-[11px] text-slate-500 font-medium truncate flex items-center gap-1 mt-1">
                           <Users size={10} className="shrink-0" /> {p.clientname}
                         </p>
-                        <div className="mt-2.5 flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
+                        <div className="mt-2.5 flex items-center gap-1 overflow-x-auto no-scrollbar pb-1">
                           <div className="flex items-center gap-1 bg-slate-100 px-2 py-1 rounded-lg shrink-0">
                             <span className="text-[10px] font-bold text-slate-500 uppercase">বাজেট</span>
                             <span className="text-xs font-black text-slate-800">{currency}{p.totalamount.toLocaleString('bn-BD')}</span>
