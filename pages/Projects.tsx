@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
-import { Plus, Search, MoreVertical, Calendar, DollarSign, Briefcase, X, FolderOpen, Pencil, Trash2, Users, FileText, CheckCircle2, Clock, UserPlus, CalendarDays, Loader2, AlertCircle, ChevronDown, Filter, Music, Calculator, Eye, Wallet, Download, Share2, Copy, ExternalLink } from 'lucide-react';
+import { Plus, Search, MoreVertical, Calendar, DollarSign, Briefcase, X, FolderOpen, Pencil, Trash2, Users, FileText, CheckCircle2, Clock, Play, UserPlus, CalendarDays, Loader2, AlertCircle, ChevronDown, Filter, Music, Calculator, Eye, Wallet, Download, Share2, Copy, ExternalLink } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas';
@@ -694,8 +694,19 @@ export const Projects: React.FC = () => {
                       </div>
                     </div>
                     
-                    {/* Actions: Menu */}
-                    <div className="flex items-center gap-2" data-html2canvas-ignore="true">
+                    {/* Actions: Menu & Status Icon */}
+                    <div className="flex flex-col items-center self-start pt-0.5" data-html2canvas-ignore="true">
+                        {/* Tiny Status Icon */}
+                        <div className={`p-1 rounded-md bg-slate-50 border border-slate-100 shadow-sm mb-1`}>
+                          {p.status === 'Completed' ? (
+                            <CheckCircle2 size={10} className="text-emerald-500" />
+                          ) : p.status === 'In Progress' ? (
+                            <Play size={10} className="text-blue-500 fill-blue-500" />
+                          ) : (
+                            <Clock size={10} className="text-amber-500" />
+                          )}
+                        </div>
+
                         <div className="relative action-menu-container">
                           <button 
                               onClick={(e) => {
