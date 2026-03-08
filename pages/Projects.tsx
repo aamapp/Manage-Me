@@ -6,6 +6,7 @@ import { Plus, Search, MoreVertical, Calendar, DollarSign, Briefcase, X, FolderO
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas';
+import html2pdf from 'html2pdf.js';
 import { PROJECT_STATUS_LABELS, PROJECT_TYPE_LABELS } from '../constants';
 import { Project, ProjectStatus, ProjectType, Client } from '../types';
 import { useAppContext } from '../context/AppContext';
@@ -395,60 +396,98 @@ export const Projects: React.FC = () => {
     await new Promise(resolve => setTimeout(resolve, 300));
     
     try {
-      const canvas = await html2canvas(listRef.current, {
-        scale: 2, 
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff',
-        onclone: (clonedDoc) => {
-          const pdfHeader = clonedDoc.getElementById('pdf-header');
-          if (pdfHeader) pdfHeader.style.display = 'block';
-          
-          const pdfFooter = clonedDoc.getElementById('pdf-footer');
-          if (pdfFooter) pdfFooter.style.display = 'block';
-
-          const container = clonedDoc.getElementById('pdf-container');
-          if (container) {
-            container.style.width = '800px';
-            container.style.overflow = 'visible';
-            container.style.height = 'auto';
-            container.style.padding = '40px';
-            container.style.borderRadius = '0';
-            
-            const truncatedElements = container.querySelectorAll('.truncate');
-            truncatedElements.forEach(el => {
-              el.classList.remove('truncate');
-              (el as HTMLElement).style.whiteSpace = 'normal';
-              (el as HTMLElement).style.overflow = 'visible';
-            });
-          }
-        }
-      });
-      
-      const imgData = canvas.toDataURL('image/jpeg', 1.0);
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const imgProps = pdf.getImageProperties(imgData);
-      const imgHeight = (imgProps.height * pageWidth) / imgProps.width;
-      
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      // Add first page
-      pdf.addImage(imgData, 'JPEG', 0, position, pageWidth, imgHeight);
-      heightLeft -= pageHeight;
-
-      // Add subsequent pages if needed
-      while (heightLeft >= 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'JPEG', 0, position, pageWidth, imgHeight);
-        heightLeft -= pageHeight;
-      }
-      
+      const element = listRef.current;
       const fileName = `projects_${clientFilter ? clientFilter : 'all'}_${new Date().getTime()}.pdf`;
-      const pdfBlob = pdf.output('blob');
+      
+      const opt = {
+        margin: 10,
+        filename: fileName,
+        image: { type: 'jpeg' as const, quality: 0.98 },
+        html2canvas: { 
+          scale: 2, 
+          useCORS: true,
+          logging: false,
+          backgroundColor: '#ffffff',
+          onclone: (clonedDoc: Document) => {
+            const pdfHeader = clonedDoc.getElementById('pdf-header');
+            if (pdfHeader) pdfHeader.style.display = 'block';
+            
+            const pdfFooter = clonedDoc.getElementById('pdf-footer');
+            if (pdfFooter) pdfFooter.style.display = 'block';
+
+            const container = clonedDoc.getElementById('pdf-container');
+            if (container) {
+              container.style.width = '100%';
+              container.style.maxWidth = '800px';
+              container.style.margin = '0 auto';
+              container.style.overflow = 'visible';
+              container.style.height = 'auto';
+              container.style.padding = '20px';
+              container.style.borderRadius = '0';
+              container.style.backgroundColor = '#ffffff';
+              
+              // Remove space-y classes and use direct margins for better PDF rendering
+              container.classList.remove('space-y-4');
+              const nestedSpacedElements = container.querySelectorAll('.space-y-4, .space-y-2');
+              nestedSpacedElements.forEach(el => {
+                el.classList.remove('space-y-4', 'space-y-2');
+                (el as HTMLElement).style.display = 'block';
+              });
+              
+              const truncatedElements = container.querySelectorAll('.truncate');
+              truncatedElements.forEach(el => {
+                el.classList.remove('truncate');
+                (el as HTMLElement).style.whiteSpace = 'normal';
+                (el as HTMLElement).style.overflow = 'visible';
+              });
+
+              // Remove animation classes that might interfere with PDF rendering
+              const animatedElements = container.querySelectorAll('.animate-in, .slide-in-from-bottom-2, .fade-in');
+              animatedElements.forEach(el => {
+                el.classList.remove('animate-in', 'slide-in-from-bottom-2', 'fade-in', 'slide-in-from-top-2');
+                (el as HTMLElement).style.opacity = '1';
+                (el as HTMLElement).style.transform = 'none';
+              });
+
+              // Remove overflow-x-auto and scrolling classes
+              const scrollableElements = container.querySelectorAll('.overflow-x-auto, .no-scrollbar');
+              scrollableElements.forEach(el => {
+                el.classList.remove('overflow-x-auto', 'no-scrollbar');
+                (el as HTMLElement).style.overflow = 'visible';
+                (el as HTMLElement).style.display = 'flex';
+                (el as HTMLElement).style.flexWrap = 'wrap';
+              });
+
+              // Add style to prevent page breaks inside cards
+              const style = clonedDoc.createElement('style');
+              style.innerHTML = `
+                .break-inside-avoid {
+                  break-inside: avoid !important;
+                  page-break-inside: avoid !important;
+                  display: block !important;
+                  margin-bottom: 20px !important;
+                  position: relative !important;
+                  overflow: visible !important;
+                }
+                #pdf-container {
+                  background-color: white !important;
+                  display: block !important;
+                }
+                /* Ensure nested elements don't cause breaks */
+                .break-inside-avoid * {
+                  break-inside: auto !important;
+                }
+              `;
+              clonedDoc.head.appendChild(style);
+            }
+          }
+        },
+        jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const },
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] as any, avoid: '.break-inside-avoid' }
+      };
+
+      // Generate PDF as blob for Supabase upload
+      const pdfBlob = await html2pdf().from(element).set(opt).output('blob');
       
       // Try to upload to Supabase Storage for a real URL (Best for Mobile Apps)
       let publicUrl = null;
@@ -629,7 +668,7 @@ export const Projects: React.FC = () => {
              </div>
           </div>
 
-          <div className="mb-8">
+          <div className="mb-8 break-inside-avoid">
              <h2 className="text-sm font-bold text-slate-800 mb-3 border-l-4 border-indigo-500 pl-2">হিসাব সারসংক্ষেপ</h2>
              <div className="grid grid-cols-3 gap-4">
                 <div className="bg-white border border-slate-100 p-4 rounded-2xl shadow-sm">
@@ -696,7 +735,7 @@ export const Projects: React.FC = () => {
             </div>
           ) : (
             filteredProjects.map((p) => (
-              <div key={p.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm relative animate-in slide-in-from-bottom-2 duration-300">
+              <div key={p.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm relative animate-in slide-in-from-bottom-2 duration-300 break-inside-avoid">
                   {/* Minimal Card Layout */}
                   <div className="px-2 py-4 flex justify-between items-center">
                     <div className="flex items-center gap-1.5 flex-1 min-w-0 mr-1">
