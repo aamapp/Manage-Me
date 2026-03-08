@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
-import { Plus, Search, MoreVertical, Calendar, DollarSign, Briefcase, X, FolderOpen, Pencil, Trash2, Users, FileText, CheckCircle2, Clock, UserPlus, CalendarDays, Loader2, AlertCircle, ChevronDown, Filter, Music, Calculator, Eye, Wallet, Download, Share2 } from 'lucide-react';
+import { Plus, Search, MoreVertical, Calendar, DollarSign, Briefcase, X, FolderOpen, Pencil, Trash2, Users, FileText, CheckCircle2, Clock, UserPlus, CalendarDays, Loader2, AlertCircle, ChevronDown, Filter, Music, Calculator, Eye, Wallet, Download, Share2, Copy, ExternalLink } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas';
@@ -382,6 +382,7 @@ export const Projects: React.FC = () => {
 
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
+  const [pdfPublicUrl, setPdfPublicUrl] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
   const handleDownloadPDF = async () => {
@@ -435,6 +436,27 @@ export const Projects: React.FC = () => {
       const fileName = `projects_${clientFilter ? clientFilter : 'all'}_${new Date().getTime()}.pdf`;
       const pdfBlob = pdf.output('blob');
       
+      // Try to upload to Supabase Storage for a real URL (Best for Mobile Apps)
+      let publicUrl = null;
+      try {
+        const { data, error } = await supabase.storage
+          .from('reports')
+          .upload(`pdfs/${fileName}`, pdfBlob, {
+            contentType: 'application/pdf',
+            upsert: true
+          });
+          
+        if (!error && data) {
+          const { data: { publicUrl: url } } = supabase.storage
+            .from('reports')
+            .getPublicUrl(`pdfs/${fileName}`);
+          publicUrl = url;
+          setPdfPublicUrl(url);
+        }
+      } catch (storageErr) {
+        console.warn('Supabase storage upload failed, falling back to blob', storageErr);
+      }
+
       // Try Native Share first (Best for Mobile Apps)
       if (navigator.share && navigator.canShare) {
         const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
@@ -972,6 +994,7 @@ export const Projects: React.FC = () => {
                   onClick={() => {
                     URL.revokeObjectURL(pdfPreviewUrl);
                     setPdfPreviewUrl(null);
+                    setPdfPublicUrl(null);
                   }} 
                   className="w-8 h-8 bg-slate-200 rounded-full text-slate-600 flex items-center justify-center active:scale-90 transition-transform"
                  >
@@ -985,47 +1008,73 @@ export const Projects: React.FC = () => {
                  </div>
                  <div>
                     <h4 className="font-bold text-slate-800 text-lg">রিপোর্ট তৈরি হয়েছে!</h4>
-                    <p className="text-xs text-slate-500 mt-1">নিচের বাটনে ক্লিক করে রিপোর্টটি ডাউনলোড করুন।</p>
+                    <p className="text-xs text-slate-500 mt-1">নিচের অপশনগুলো ব্যবহার করে রিপোর্টটি সেভ করুন।</p>
                  </div>
                  
                  <div className="bg-amber-50 text-amber-800 p-4 rounded-2xl text-[11px] font-bold border border-amber-100 flex items-start gap-2 text-left">
                     <AlertCircle size={16} className="shrink-0 mt-0.5" />
-                    <span>যদি সরাসরি ডাউনলোড না হয়, তবে লিংকটি কপি করে ব্রাউজারে ওপেন করুন অথবা শেয়ার বাটন ব্যবহার করুন।</span>
+                    <span>যদি অ্যাপ থেকে ডাউনলোড না হয়, তবে <span className="text-indigo-600">"ব্রাউজারে ওপেন করুন"</span> বাটনে ক্লিক করুন।</span>
                  </div>
               </div>
 
               <div className="p-6 pt-0 space-y-3">
-                 <a 
-                   href={pdfPreviewUrl} 
-                   download={`Report-${new Date().getTime()}.pdf`}
-                   className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold flex justify-center items-center gap-2 text-sm shadow-lg shadow-indigo-200 active:scale-95 transition-transform"
-                 >
-                    <Download size={18} />
-                    ডাউনলোড করুন
-                 </a>
+                 {pdfPublicUrl ? (
+                   <button 
+                     onClick={() => window.open(pdfPublicUrl, '_blank')}
+                     className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold flex justify-center items-center gap-2 text-sm shadow-lg shadow-indigo-200 active:scale-95 transition-transform"
+                   >
+                      <ExternalLink size={18} />
+                      ব্রাউজারে ওপেন করুন
+                   </button>
+                 ) : (
+                   <a 
+                     href={pdfPreviewUrl} 
+                     download={`Report-${new Date().getTime()}.pdf`}
+                     className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold flex justify-center items-center gap-2 text-sm shadow-lg shadow-indigo-200 active:scale-95 transition-transform"
+                   >
+                      <Download size={18} />
+                      ডাউনলোড করুন
+                   </a>
+                 )}
                  
-                 <button 
-                   onClick={async () => {
-                      try {
-                        const response = await fetch(pdfPreviewUrl);
-                        const blob = await response.blob();
-                        const file = new File([blob], `Report-${new Date().getTime()}.pdf`, { type: 'application/pdf' });
-                        if (navigator.share) {
-                          await navigator.share({
-                            files: [file],
-                            title: 'Project Report',
-                            text: 'Manage-Me Project Report'
-                          });
+                 <div className="grid grid-cols-2 gap-3">
+                    <button 
+                      onClick={async () => {
+                          try {
+                            const response = await fetch(pdfPreviewUrl);
+                            const blob = await response.blob();
+                            const file = new File([blob], `Report-${new Date().getTime()}.pdf`, { type: 'application/pdf' });
+                            if (navigator.share) {
+                              await navigator.share({
+                                files: [file],
+                                title: 'Project Report',
+                                text: 'Manage-Me Project Report'
+                              });
+                            }
+                          } catch (e) {
+                            showToast('শেয়ার করা সম্ভব হচ্ছে না');
+                          }
+                      }}
+                      className="bg-slate-100 text-slate-700 py-4 rounded-2xl font-bold flex justify-center items-center gap-2 text-sm active:scale-95 transition-transform border border-slate-200"
+                    >
+                        <Share2 size={18} />
+                        শেয়ার
+                    </button>
+
+                    <button 
+                      onClick={() => {
+                        const urlToCopy = pdfPublicUrl || pdfPreviewUrl;
+                        if (urlToCopy) {
+                          navigator.clipboard.writeText(urlToCopy);
+                          showToast('লিংক কপি করা হয়েছে', 'success');
                         }
-                      } catch (e) {
-                        showToast('শেয়ার করা সম্ভব হচ্ছে না');
-                      }
-                   }}
-                   className="w-full bg-slate-100 text-slate-700 py-4 rounded-2xl font-bold flex justify-center items-center gap-2 text-sm active:scale-95 transition-transform border border-slate-200"
-                 >
-                    <Share2 size={18} />
-                    অন্য অ্যাপে শেয়ার করুন
-                 </button>
+                      }}
+                      className="bg-slate-100 text-slate-700 py-4 rounded-2xl font-bold flex justify-center items-center gap-2 text-sm active:scale-95 transition-transform border border-slate-200"
+                    >
+                        <Copy size={18} />
+                        লিংক কপি
+                    </button>
+                 </div>
               </div>
            </div>
         </div>
