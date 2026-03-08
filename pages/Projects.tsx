@@ -13,6 +13,7 @@ import { supabase } from '../lib/supabase';
 import { NumericKeypad } from '@/components/NumericKeypad';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { DatePicker } from '@/components/DatePicker';
+import { StatusPicker } from '@/components/StatusPicker';
 
 export const Projects: React.FC = () => {
   const { projects, setProjects, clients, setClients, user, refreshData, showToast } = useAppContext();
@@ -913,14 +914,12 @@ export const Projects: React.FC = () => {
                     )}
                   </div>
 
-                  <div>
-                     <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">স্ট্যাটাস</label>
-                     <select value={newProject.status} onChange={e => setNewProject({...newProject, status: e.target.value})} className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-800 outline-none text-sm focus:ring-2 focus:ring-indigo-500">
-                       {Object.entries(PROJECT_STATUS_LABELS).map(([key, label]) => (
-                         <option key={key} value={key}>{label}</option>
-                       ))}
-                     </select>
-                  </div>
+                  <StatusPicker 
+                    label="স্ট্যাটাস"
+                    value={newProject.status}
+                    onChange={status => setNewProject({...newProject, status})}
+                    options={PROJECT_STATUS_LABELS}
+                  />
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
@@ -955,7 +954,14 @@ export const Projects: React.FC = () => {
                      <DatePicker 
                        label="ডেডলাইন (অপশনাল)"
                        value={newProject.deadline}
-                       onChange={(date) => setNewProject({...newProject, deadline: date})}
+                       onChange={(date) => {
+                         const update: any = { ...newProject, deadline: date };
+                         // Auto-set status to Completed when a deadline is selected
+                         if (date) {
+                           update.status = 'Completed';
+                         }
+                         setNewProject(update);
+                       }}
                        placeholder="ডেডলাইন"
                        align="right"
                      />
