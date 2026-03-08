@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
-import { Plus, Search, MoreVertical, Calendar, DollarSign, Briefcase, X, FolderOpen, Pencil, Trash2, Users, FileText, CheckCircle2, Clock, UserPlus, CalendarDays, Loader2, AlertCircle, ChevronDown, Filter, Music, Calculator, Eye, Wallet, Download } from 'lucide-react';
+import { Plus, Search, MoreVertical, Calendar, DollarSign, Briefcase, X, FolderOpen, Pencil, Trash2, Users, FileText, CheckCircle2, Clock, UserPlus, CalendarDays, Loader2, AlertCircle, ChevronDown, Filter, Music, Calculator, Eye, Wallet, Download, Share2 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas';
@@ -381,6 +381,7 @@ export const Projects: React.FC = () => {
     }, { total: 0, paid: 0, due: 0 }) : null;
 
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
   const handleDownloadPDF = async () => {
@@ -389,33 +390,30 @@ export const Projects: React.FC = () => {
     setIsGeneratingPDF(true);
     showToast('পিডিএফ তৈরি হচ্ছে...', 'info');
     
-    // Wait a bit for the UI to update (show PDF header)
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // Wait a bit for the UI to update
+    await new Promise(resolve => setTimeout(resolve, 300));
     
     try {
       const canvas = await html2canvas(listRef.current, {
-        scale: 3, 
+        scale: 2, 
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff',
         onclone: (clonedDoc) => {
-          // Ensure PDF-only elements are visible in the clone
           const pdfHeader = clonedDoc.getElementById('pdf-header');
           if (pdfHeader) pdfHeader.style.display = 'block';
           
           const pdfFooter = clonedDoc.getElementById('pdf-footer');
           if (pdfFooter) pdfFooter.style.display = 'block';
 
-          // Force the container to be fully visible and remove truncation
           const container = clonedDoc.getElementById('pdf-container');
           if (container) {
-            container.style.width = '800px'; // Fixed width for stable PDF layout
+            container.style.width = '800px';
             container.style.overflow = 'visible';
             container.style.height = 'auto';
             container.style.padding = '40px';
             container.style.borderRadius = '0';
             
-            // Remove truncation classes to ensure full text is visible in PDF
             const truncatedElements = container.querySelectorAll('.truncate');
             truncatedElements.forEach(el => {
               el.classList.remove('truncate');
@@ -426,20 +424,41 @@ export const Projects: React.FC = () => {
         }
       });
       
-      const imgData = canvas.toDataURL('image/png');
-      const imgProps = (new jsPDF()).getImageProperties(imgData);
-      const pdfWidth = 210; // A4 width in mm
+      const imgData = canvas.toDataURL('image/jpeg', 0.8);
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgProps = pdf.getImageProperties(imgData);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
       
-      const pdf = new jsPDF({
-        orientation: 'p',
-        unit: 'mm',
-        format: [pdfWidth, pdfHeight]
-      });
+      pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
       
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`projects_${clientFilter ? clientFilter : 'all'}_${new Date().toISOString().split('T')[0]}.pdf`);
-      showToast('পিডিএফ ডাউনলোড সফল', 'success');
+      const fileName = `projects_${clientFilter ? clientFilter : 'all'}_${new Date().getTime()}.pdf`;
+      const pdfBlob = pdf.output('blob');
+      
+      // Try Native Share first (Best for Mobile Apps)
+      if (navigator.share && navigator.canShare) {
+        const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
+        if (navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({
+              files: [file],
+              title: 'Project Report',
+              text: 'Manage-Me Project Report'
+            });
+            showToast('শেয়ার সফল হয়েছে', 'success');
+            setIsGeneratingPDF(false);
+            return;
+          } catch (shareError) {
+            console.log('Share cancelled or failed', shareError);
+          }
+        }
+      }
+
+      // Fallback: Show Preview Modal with Download Link
+      const blobUrl = URL.createObjectURL(pdfBlob);
+      setPdfPreviewUrl(blobUrl);
+      showToast('পিডিএফ তৈরি হয়েছে', 'success');
+      
     } catch (error) {
       console.error('PDF Error:', error);
       showToast('পিডিএফ তৈরি করতে সমস্যা হয়েছে');
@@ -937,6 +956,79 @@ export const Projects: React.FC = () => {
             />
         </div>,
         document.body
+      )}
+      {/* PDF Preview Modal (Fallback for Mobile Apps) */}
+      {pdfPreviewUrl && (
+        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+           <div className="bg-white rounded-[2.5rem] w-full max-w-sm overflow-hidden flex flex-col shadow-2xl">
+              <div className="p-6 border-b flex justify-between items-center bg-slate-50">
+                 <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center">
+                        <FileText size={18} />
+                    </div>
+                    <h3 className="font-bold text-slate-800 text-sm">পিডিএফ রিপোর্ট</h3>
+                 </div>
+                 <button 
+                  onClick={() => {
+                    URL.revokeObjectURL(pdfPreviewUrl);
+                    setPdfPreviewUrl(null);
+                  }} 
+                  className="w-8 h-8 bg-slate-200 rounded-full text-slate-600 flex items-center justify-center active:scale-90 transition-transform"
+                 >
+                    <X size={18} />
+                 </button>
+              </div>
+              
+              <div className="p-8 text-center space-y-4">
+                 <div className="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
+                    <Download size={36} />
+                 </div>
+                 <div>
+                    <h4 className="font-bold text-slate-800 text-lg">রিপোর্ট তৈরি হয়েছে!</h4>
+                    <p className="text-xs text-slate-500 mt-1">নিচের বাটনে ক্লিক করে রিপোর্টটি ডাউনলোড করুন।</p>
+                 </div>
+                 
+                 <div className="bg-amber-50 text-amber-800 p-4 rounded-2xl text-[11px] font-bold border border-amber-100 flex items-start gap-2 text-left">
+                    <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                    <span>যদি সরাসরি ডাউনলোড না হয়, তবে লিংকটি কপি করে ব্রাউজারে ওপেন করুন অথবা শেয়ার বাটন ব্যবহার করুন।</span>
+                 </div>
+              </div>
+
+              <div className="p-6 pt-0 space-y-3">
+                 <a 
+                   href={pdfPreviewUrl} 
+                   download={`Report-${new Date().getTime()}.pdf`}
+                   className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold flex justify-center items-center gap-2 text-sm shadow-lg shadow-indigo-200 active:scale-95 transition-transform"
+                 >
+                    <Download size={18} />
+                    ডাউনলোড করুন
+                 </a>
+                 
+                 <button 
+                   onClick={async () => {
+                      try {
+                        const response = await fetch(pdfPreviewUrl);
+                        const blob = await response.blob();
+                        const file = new File([blob], `Report-${new Date().getTime()}.pdf`, { type: 'application/pdf' });
+                        if (navigator.share) {
+                          await navigator.share({
+                            files: [file],
+                            title: 'Project Report',
+                            text: 'Manage-Me Project Report'
+                          });
+                        }
+                      } catch (e) {
+                        showToast('শেয়ার করা সম্ভব হচ্ছে না');
+                      }
+                   }}
+                   className="w-full bg-slate-100 text-slate-700 py-4 rounded-2xl font-bold flex justify-center items-center gap-2 text-sm active:scale-95 transition-transform border border-slate-200"
+                 >
+                    <Share2 size={18} />
+                    অন্য অ্যাপে শেয়ার করুন
+                 </button>
+              </div>
+           </div>
+        </div>
       )}
     </div>
   );
