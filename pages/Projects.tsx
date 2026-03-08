@@ -373,13 +373,12 @@ export const Projects: React.FC = () => {
     return matchesFilter && matchesSearch;
   });
 
-  const clientStats = clientFilter ? filteredProjects
-    .reduce((acc, p) => {
-      acc.total += p.totalamount;
-      acc.paid += p.paidamount;
-      acc.due += p.dueamount;
-      return acc;
-    }, { total: 0, paid: 0, due: 0 }) : null;
+  const summaryStats = filteredProjects.reduce((acc, p) => {
+    acc.total += p.totalamount;
+    acc.paid += p.paidamount;
+    acc.due += p.dueamount;
+    return acc;
+  }, { total: 0, paid: 0, due: 0 });
 
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
@@ -426,13 +425,27 @@ export const Projects: React.FC = () => {
         }
       });
       
-      const imgData = canvas.toDataURL('image/jpeg', 0.8);
+      const imgData = canvas.toDataURL('image/jpeg', 1.0);
       const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
       const imgProps = pdf.getImageProperties(imgData);
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      const imgHeight = (imgProps.height * pageWidth) / imgProps.width;
       
-      pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      // Add first page
+      pdf.addImage(imgData, 'JPEG', 0, position, pageWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      // Add subsequent pages if needed
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', 0, position, pageWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
       
       const fileName = `projects_${clientFilter ? clientFilter : 'all'}_${new Date().getTime()}.pdf`;
       const pdfBlob = pdf.output('blob');
@@ -605,7 +618,7 @@ export const Projects: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 mb-8">
+          <div className="grid grid-cols-2 gap-4 mb-4">
              <div className="bg-indigo-50/50 border border-indigo-100 p-5 rounded-[2rem]">
                 <p className="text-[10px] font-bold text-indigo-400 uppercase mb-1">ক্লায়েন্ট</p>
                 <p className="text-xl font-black text-indigo-700">{clientFilter || 'সকল ক্লায়েন্ট'}</p>
@@ -613,6 +626,24 @@ export const Projects: React.FC = () => {
              <div className="bg-slate-50 border border-slate-100 p-5 rounded-[2rem]">
                 <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">মোট প্রজেক্ট</p>
                 <p className="text-xl font-black text-slate-700">{filteredProjects.length} টি</p>
+             </div>
+          </div>
+
+          <div className="mb-8">
+             <h2 className="text-sm font-bold text-slate-800 mb-3 border-l-4 border-indigo-500 pl-2">হিসাব সারসংক্ষেপ</h2>
+             <div className="grid grid-cols-3 gap-4">
+                <div className="bg-white border border-slate-100 p-4 rounded-2xl shadow-sm">
+                   <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">মোট বাজেট</p>
+                   <p className="text-lg font-black text-slate-700">{currency}{summaryStats.total.toLocaleString('bn-BD')}</p>
+                </div>
+                <div className="bg-white border border-slate-100 p-4 rounded-2xl shadow-sm">
+                   <p className="text-[10px] font-bold text-emerald-500 uppercase mb-1">মোট আদায়</p>
+                   <p className="text-lg font-black text-emerald-600">{currency}{summaryStats.paid.toLocaleString('bn-BD')}</p>
+                </div>
+                <div className="bg-white border border-slate-100 p-4 rounded-2xl shadow-sm">
+                   <p className="text-[10px] font-bold text-rose-500 uppercase mb-1">মোট বকেয়া</p>
+                   <p className="text-lg font-black text-rose-600">{currency}{summaryStats.due.toLocaleString('bn-BD')}</p>
+                </div>
              </div>
           </div>
         </div>
@@ -636,19 +667,19 @@ export const Projects: React.FC = () => {
                 </button>
             </div>
 
-            {clientStats && (
+            {summaryStats && (
               <div className="grid grid-cols-3 gap-2">
                 <div className="bg-white border border-slate-100 p-3 rounded-2xl shadow-sm">
                   <p className="text-xs font-bold text-slate-400 uppercase leading-none mb-2">মোট বাজেট</p>
-                  <p className="text-base font-black text-slate-700 leading-none">{currency}{clientStats.total.toLocaleString('bn-BD')}</p>
+                  <p className="text-base font-black text-slate-700 leading-none">{currency}{summaryStats.total.toLocaleString('bn-BD')}</p>
                 </div>
                 <div className="bg-white border border-slate-100 p-3 rounded-2xl shadow-sm">
                   <p className="text-xs font-bold text-emerald-500 uppercase leading-none mb-2">মোট আদায়</p>
-                  <p className="text-base font-black text-emerald-600 leading-none">{currency}{clientStats.paid.toLocaleString('bn-BD')}</p>
+                  <p className="text-base font-black text-emerald-600 leading-none">{currency}{summaryStats.paid.toLocaleString('bn-BD')}</p>
                 </div>
                 <div className="bg-white border border-slate-100 p-3 rounded-2xl shadow-sm">
                   <p className="text-xs font-bold text-rose-500 uppercase leading-none mb-2">মোট বকেয়া</p>
-                  <p className="text-base font-black text-rose-600 leading-none">{currency}{clientStats.due.toLocaleString('bn-BD')}</p>
+                  <p className="text-base font-black text-rose-600 leading-none">{currency}{summaryStats.due.toLocaleString('bn-BD')}</p>
                 </div>
               </div>
             )}
