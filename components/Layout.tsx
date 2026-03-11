@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { 
   LayoutDashboard, Briefcase, TrendingUp, Receipt, Menu, 
   X, LogOut, Settings, 
-  BarChart3, Users, Tags,
+  BarChart3, Users, Tags, Trash2,
   Info, Globe, Phone, Facebook, Instagram, Send, MessageCircle, ArrowLeft, UserCog
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
@@ -41,6 +41,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
     { name: 'ক্লায়েন্ট', path: '/clients', icon: <Users size={20} />, desc: 'ক্লায়েন্ট তালিকা' },
     { name: 'খরচের খাত', path: '/categories', icon: <Tags size={20} />, desc: 'ক্যাটাগরি ম্যানেজমেন্ট' },
     { name: 'রিপোর্ট', path: '/reports', icon: <BarChart3 size={20} />, desc: 'আয়-ব্যয় রিপোর্ট' },
+    { name: 'রিসাইকেল বিন', path: '/trash', icon: <Trash2 size={20} />, desc: 'ডিলিট করা প্রজেক্ট' },
     { name: 'সেটিংস', path: '/settings', icon: <Settings size={20} />, desc: 'অ্যাপ কনফিগারেশন' },
   ];
 

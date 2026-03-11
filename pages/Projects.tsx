@@ -113,20 +113,22 @@ export const Projects: React.FC = () => {
     
     setIsDeleting(true);
     try {
+      const project = projects.find(p => p.id === projectToDelete);
+      if (!project) throw new Error('প্রজেক্ট পাওয়া যায়নি');
+
+      const newNotes = `[TRASH]${project.notes || ''}`;
+
       const { error } = await supabase
         .from('projects')
-        .delete()
+        .update({ notes: newNotes })
         .eq('id', projectToDelete)
         .eq('userid', user.id);
       
       if (error) {
-        if (error.code === '23503') {
-          throw new Error('এই প্রজেক্টের পেমেন্ট রেকর্ড আছে। আগে আয় রেকর্ড মুছুন।');
-        }
         throw error;
       }
       
-      showToast('প্রজেক্ট ডিলিট করা হয়েছে', 'success');
+      showToast('প্রজেক্ট ট্র্যাশে পাঠানো হয়েছে', 'success');
       setProjects(prev => prev.filter(p => p.id !== projectToDelete));
       await refreshData();
       setShowDeleteModal(false);
@@ -408,6 +410,7 @@ export const Projects: React.FC = () => {
           useCORS: true,
           logging: false,
           backgroundColor: '#ffffff',
+          windowWidth: 800,
           onclone: (clonedDoc: Document) => {
             const pdfHeader = clonedDoc.getElementById('pdf-header');
             if (pdfHeader) pdfHeader.style.display = 'block';
@@ -417,12 +420,13 @@ export const Projects: React.FC = () => {
 
             const container = clonedDoc.getElementById('pdf-container');
             if (container) {
-              container.style.width = '100%';
-              container.style.maxWidth = '800px';
+              container.style.width = '800px';
+              container.style.maxWidth = 'none';
               container.style.margin = '0 auto';
               container.style.overflow = 'visible';
               container.style.height = 'auto';
               container.style.padding = '20px';
+              container.style.paddingBottom = '40px';
               container.style.borderRadius = '0';
               container.style.backgroundColor = '#ffffff';
               
@@ -430,15 +434,17 @@ export const Projects: React.FC = () => {
               container.classList.remove('space-y-4');
               const nestedSpacedElements = container.querySelectorAll('.space-y-4, .space-y-2');
               nestedSpacedElements.forEach(el => {
-                el.classList.remove('space-y-4', 'space-y-2');
+                el.classList.remove('space-y-4', 'space-y-2', 'pb-12');
                 (el as HTMLElement).style.display = 'block';
+                (el as HTMLElement).style.paddingBottom = '0';
               });
               
-              const truncatedElements = container.querySelectorAll('.truncate');
+              const truncatedElements = container.querySelectorAll('.truncate, .leading-snug, .leading-none, .leading-tight, .leading-relaxed');
               truncatedElements.forEach(el => {
-                el.classList.remove('truncate');
+                el.classList.remove('truncate', 'leading-snug', 'leading-none', 'leading-tight', 'leading-relaxed');
                 (el as HTMLElement).style.whiteSpace = 'normal';
                 (el as HTMLElement).style.overflow = 'visible';
+                (el as HTMLElement).style.lineHeight = '1.6';
               });
 
               // Remove animation classes that might interfere with PDF rendering
@@ -458,32 +464,104 @@ export const Projects: React.FC = () => {
                 (el as HTMLElement).style.flexWrap = 'wrap';
               });
 
-              // Add style to prevent page breaks inside cards
+              // Group project cards into pages for equal spacing
+              const projectCards = Array.from(container.querySelectorAll('.project-card-pdf'));
+              if (projectCards.length > 0) {
+                const parent = projectCards[0].parentNode;
+                if (parent) {
+                  // Ensure parent is a block container for proper page breaking
+                  (parent as HTMLElement).style.display = 'block';
+                  
+                  projectCards.forEach((card, index) => {
+                    const el = card as HTMLElement;
+                    el.style.pageBreakInside = 'avoid';
+                    el.style.breakInside = 'avoid';
+                    el.style.display = 'block';
+                    el.style.width = '100%';
+                    el.style.boxSizing = 'border-box';
+                    
+                    // Add margin-bottom for spacing
+                    if (index < 3) {
+                      el.style.marginBottom = '60px'; // Larger spacing for first page (3 items)
+                    } else {
+                      el.style.marginBottom = '45px'; // Spacing for 6 items per page
+                    }
+                    
+                    // Reduce margin-bottom for the last item on a page to leave some breathing room
+                    if (index === 2 || (index > 2 && (index - 2) % 6 === 0)) {
+                      el.style.marginBottom = '20px';
+                    }
+                    
+                    // Add page break before the first item of a new page
+                    if (index === 3 || (index > 3 && (index - 3) % 6 === 0)) {
+                      el.classList.add('page-break-before');
+                      el.style.pageBreakBefore = 'always';
+                      el.style.breakBefore = 'page';
+                    }
+                  });
+                }
+              }
+
+              // Add style to prevent page breaks inside cards and fix text clipping
               const style = clonedDoc.createElement('style');
               style.innerHTML = `
                 .break-inside-avoid {
                   break-inside: avoid !important;
                   page-break-inside: avoid !important;
+                  -webkit-column-break-inside: avoid !important;
                   display: block !important;
-                  margin-bottom: 20px !important;
+                  width: 100% !important;
                   position: relative !important;
                   overflow: visible !important;
+                  box-sizing: border-box !important;
+                }
+                .page-break-before {
+                  padding-top: 10px !important;
+                }
+                .project-card-pdf > div {
+                  box-shadow: none !important;
+                  border-color: #e2e8f0 !important;
                 }
                 #pdf-container {
                   background-color: white !important;
                   display: block !important;
                 }
-                /* Ensure nested elements don't cause breaks */
-                .break-inside-avoid * {
-                  break-inside: auto !important;
+                #pdf-container * {
+                  overflow: visible !important;
+                }
+                #pdf-container h3 {
+                  line-height: 1.6 !important;
+                  padding-bottom: 4px !important;
+                  padding-top: 2px !important;
+                }
+                #pdf-container p {
+                  line-height: 1.6 !important;
+                  padding-bottom: 2px !important;
+                  padding-top: 2px !important;
+                }
+                #pdf-container span {
+                  line-height: 1.6 !important;
+                  padding-bottom: 2px !important;
+                  padding-top: 2px !important;
+                  display: inline-block;
+                }
+                #pdf-container .min-w-0 {
+                  overflow: visible !important;
                 }
               `;
               clonedDoc.head.appendChild(style);
+
+              // Add a spacer at the end to prevent the last item from being cut off
+              const spacer = clonedDoc.createElement('div');
+              spacer.style.height = '40px';
+              spacer.style.width = '100%';
+              spacer.style.clear = 'both';
+              container.appendChild(spacer);
             }
           }
         },
         jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const },
-        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] as any, avoid: '.break-inside-avoid' }
+        pagebreak: { mode: ['css', 'legacy'] as any, avoid: '.break-inside-avoid', before: '.page-break-before' }
       };
 
       // Generate PDF as blob for Supabase upload
@@ -657,7 +735,7 @@ export const Projects: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 mb-4">
+          <div className="grid grid-cols-3 gap-4 mb-4">
              <div className="bg-indigo-50/50 border border-indigo-100 p-5 rounded-[2rem]">
                 <p className="text-[10px] font-bold text-indigo-400 uppercase mb-1">ক্লায়েন্ট</p>
                 <p className="text-xl font-black text-indigo-700">{clientFilter || 'সকল ক্লায়েন্ট'}</p>
@@ -665,6 +743,18 @@ export const Projects: React.FC = () => {
              <div className="bg-slate-50 border border-slate-100 p-5 rounded-[2rem]">
                 <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">মোট প্রজেক্ট</p>
                 <p className="text-xl font-black text-slate-700">{filteredProjects.length} টি</p>
+             </div>
+             <div className="bg-slate-50 border border-slate-100 p-5 rounded-[2rem]">
+                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">হিসাবের সময়কাল</p>
+                <p className="text-sm font-black text-slate-700 mt-1">
+                  {dateRange.start || dateRange.end ? (
+                    <>
+                      {dateRange.start ? new Date(dateRange.start).toLocaleDateString('bn-BD') : 'শুরু'} 
+                      {' - '} 
+                      {dateRange.end ? new Date(dateRange.end).toLocaleDateString('bn-BD') : 'বর্তমান'}
+                    </>
+                  ) : 'সকল সময়'}
+                </p>
              </div>
           </div>
 
@@ -689,7 +779,7 @@ export const Projects: React.FC = () => {
 
         {/* Active Client Filter Banner & Stats */}
         {clientFilter && (
-          <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300" data-html2canvas-ignore="true">
             <div className="bg-indigo-50 border border-indigo-100 p-3 rounded-2xl flex items-center justify-between shadow-sm">
                 <div className="flex items-center gap-2 text-indigo-700">
                     <div className="w-7 h-7 bg-white rounded-lg flex items-center justify-center text-indigo-600 shadow-sm">
@@ -735,7 +825,8 @@ export const Projects: React.FC = () => {
             </div>
           ) : (
             filteredProjects.map((p) => (
-              <div key={p.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm relative animate-in slide-in-from-bottom-2 duration-300 break-inside-avoid">
+              <div key={p.id} className="break-inside-avoid project-card-pdf">
+                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm relative animate-in slide-in-from-bottom-2 duration-300">
                   {/* Minimal Card Layout */}
                   <div className="px-2 py-4 flex justify-between items-center">
                     <div className="flex items-center gap-1.5 flex-1 min-w-0 mr-1">
@@ -816,6 +907,7 @@ export const Projects: React.FC = () => {
                       </div>
                     </div>
                   </div>
+                </div>
               </div>
             ))
           )}

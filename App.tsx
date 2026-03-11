@@ -18,6 +18,7 @@ import { Reports } from '@/pages/Reports';
 import { Settings } from '@/pages/Settings';
 import { UpdatePassword } from '@/pages/UpdatePassword';
 import { AdminUserList } from '@/pages/AdminUserList'; // New Import
+import Trash from '@/pages/Trash';
 
 const Login = lazy(() => import('@/pages/Login').then(module => ({ default: module.Login })));
 const Signup = lazy(() => import('@/pages/Signup').then(module => ({ default: module.Signup })));
@@ -196,6 +197,7 @@ const AppContent: React.FC = () => {
                     <Route path="/categories" element={<Categories />} />
                     <Route path="/reports" element={<Reports />} />
                     <Route path="/settings" element={<Settings />} />
+                    <Route path="/trash" element={<Trash />} />
                     {/* Default Route Logic */}
                     <Route path="*" element={<Navigate to={user.role === 'admin' ? "/admin-users" : "/dashboard"} replace />} />
                   </Routes>

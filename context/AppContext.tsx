@@ -12,6 +12,8 @@ interface AppContextType {
   // Visible Data (Filtered by Selected User if Admin)
   projects: Project[];
   setProjects: React.Dispatch<React.SetStateAction<Project[]>>;
+  trashedProjects: Project[];
+  setTrashedProjects: React.Dispatch<React.SetStateAction<Project[]>>;
   clients: Client[];
   setClients: React.Dispatch<React.SetStateAction<Client[]>>;
   incomeRecords: IncomeRecord[];
@@ -52,6 +54,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   
   // Visible State (What components see)
   const [projects, setProjects] = useState<Project[]>([]);
+  const [trashedProjects, setTrashedProjects] = useState<Project[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [incomeRecords, setIncomeRecords] = useState<IncomeRecord[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -148,20 +151,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         // Filter Visible State based on Selection
         if (adminSelectedUserId) {
-            setProjects(pData.filter(p => p.userid === adminSelectedUserId));
+            const userProjects = pData.filter(p => p.userid === adminSelectedUserId);
+            setProjects(userProjects.filter(p => !p.notes?.startsWith('[TRASH]')));
+            setTrashedProjects(userProjects.filter(p => p.notes?.startsWith('[TRASH]')));
             setClients(cData.filter(c => c.userid === adminSelectedUserId));
             setIncomeRecords(iData.filter(i => i.userid === adminSelectedUserId));
             setExpenses(eData.filter(e => e.userid === adminSelectedUserId));
         } else {
             // If no user selected, show NOTHING in the main views (forces selection from list)
             setProjects([]);
+            setTrashedProjects([]);
             setClients([]);
             setIncomeRecords([]);
             setExpenses([]);
         }
       } else {
         // Normal User: Visible = All fetched
-        setProjects(pData);
+        setProjects(pData.filter(p => !p.notes?.startsWith('[TRASH]')));
+        setTrashedProjects(pData.filter(p => p.notes?.startsWith('[TRASH]')));
         setClients(cData);
         setIncomeRecords(iData);
         setExpenses(eData);
@@ -179,12 +186,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     if (user?.role === 'admin') {
         if (adminSelectedUserId) {
-            setProjects(allProjects.filter(p => p.userid === adminSelectedUserId));
+            const userProjects = allProjects.filter(p => p.userid === adminSelectedUserId);
+            setProjects(userProjects.filter(p => !p.notes?.startsWith('[TRASH]')));
+            setTrashedProjects(userProjects.filter(p => p.notes?.startsWith('[TRASH]')));
             setClients(allClients.filter(c => c.userid === adminSelectedUserId));
             setIncomeRecords(allIncomeRecords.filter(i => i.userid === adminSelectedUserId));
             setExpenses(allExpenses.filter(e => e.userid === adminSelectedUserId));
         } else {
             setProjects([]);
+            setTrashedProjects([]);
             setClients([]);
             setIncomeRecords([]);
             setExpenses([]);
@@ -325,7 +335,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   return (
     <AppContext.Provider value={{ 
-      projects, setProjects, clients, setClients, 
+      projects, setProjects, trashedProjects, setTrashedProjects, clients, setClients, 
       incomeRecords, setIncomeRecords, expenses, setExpenses,
       allProjects, allClients, allIncomeRecords, allExpenses,
       userProfiles,
