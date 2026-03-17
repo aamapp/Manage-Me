@@ -39,22 +39,31 @@ export const Reports: React.FC = () => {
   useEffect(() => {
     const fetchExpenses = async () => {
       if (!user) return;
-      let query = supabase.from('expenses').select('*');
-      
-      // Filter Logic:
-      // 1. If Admin has selected a user -> Show ONLY that user's data
-      // 2. If Normal User -> Show ONLY their own data
-      // 3. If Admin with NO selection -> Show ALL data (for aggregate report)
-      
-      if (user.role === 'admin' && adminSelectedUserId) {
-        query = query.eq('userid', adminSelectedUserId);
-      } else if (user.role !== 'admin') {
-         query = query.eq('userid', user.id);
+      try {
+        let query = supabase.from('expenses').select('*');
+        
+        // Filter Logic:
+        // 1. If Admin has selected a user -> Show ONLY that user's data
+        // 2. If Normal User -> Show ONLY their own data
+        // 3. If Admin with NO selection -> Show ALL data (for aggregate report)
+        
+        if (user.role === 'admin' && adminSelectedUserId) {
+          query = query.eq('userid', adminSelectedUserId);
+        } else if (user.role !== 'admin') {
+           query = query.eq('userid', user.id);
+        }
+        
+        const { data, error } = await query;
+        
+        if (error) {
+          console.error('Fetch expenses error:', error);
+          return;
+        }
+        
+        if (data) setExpenses(data);
+      } catch (err) {
+        console.error('Fetch expenses exception:', err);
       }
-      
-      const { data } = await query;
-      
-      if (data) setExpenses(data);
     };
     fetchExpenses();
   }, [user, adminSelectedUserId]); // Re-fetch when admin selects a user

@@ -176,7 +176,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     } catch (error: any) {
       console.error("Refresh Data Error:", error);
-      if (error.message?.includes('JWT') || error.message?.includes('Unauthorized') || error.message?.includes('Refresh Token')) {
+      if (error.message?.includes('JWT') || 
+          error.message?.includes('Unauthorized') || 
+          error.message?.includes('Refresh Token') ||
+          error.status === 400 ||
+          error.status === 401) {
+          
+          // Clear local storage manually as a fallback
+          for (const key in localStorage) {
+            if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+              localStorage.removeItem(key);
+            }
+          }
           supabase.auth.signOut();
           setUser(null);
       }
@@ -226,15 +237,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         const sessionPromise = supabase.auth.getSession();
         const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Session timeout')), 5000)
+            setTimeout(() => reject(new Error('Session timeout')), 8000)
         );
 
-        const { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise]) as any;
+        const result = await Promise.race([sessionPromise, timeoutPromise]) as any;
+        const session = result?.data?.session;
+        const error = result?.error;
         
         if (error) {
             console.warn("Session Init Warning:", error);
-            // If the refresh token is invalid, we should clear the session to allow the user to log in again
-            if (error.message?.includes('Refresh Token Not Found') || error.message?.includes('Invalid Refresh Token')) {
+            // If the refresh token is invalid, we MUST clear the session to allow the user to log in again
+            if (error.message?.includes('Refresh Token Not Found') || 
+                error.message?.includes('Invalid Refresh Token') ||
+                error.status === 400 || 
+                error.status === 401) {
+                
+                // Clear local storage manually as a fallback
+                for (const key in localStorage) {
+                  if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+                    localStorage.removeItem(key);
+                  }
+                }
                 await supabase.auth.signOut();
                 if (mounted) setUser(null);
             }
