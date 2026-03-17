@@ -21,9 +21,11 @@ interface LayoutProps {
 export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   const [isMoreMenuOpen, setMoreMenuOpen] = useState(false);
   const [isAboutOpen, setAboutOpen] = useState(false);
-  const { adminSelectedUserId, setAdminSelectedUserId } = useAppContext();
+  const { adminSelectedUserId, setAdminSelectedUserId, trashedProjects } = useAppContext();
   const location = useLocation();
   const navigate = useNavigate();
+
+  const trashCount = trashedProjects.length;
 
   const isAdmin = user.role === 'admin';
   const showAdminUserList = isAdmin && !adminSelectedUserId;
@@ -103,7 +105,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                     : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700 border border-transparent'}
                 `}
               >
-                <span className={isActive ? 'text-indigo-600' : 'text-slate-400'}>{item.icon}</span>
+                <span className={`relative ${isActive ? 'text-indigo-600' : 'text-slate-400'}`}>
+                  {item.icon}
+                  {item.path === '/trash' && trashCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[9px] font-black px-1 py-0.5 rounded-full min-w-[16px] h-[16px] flex items-center justify-center shadow-sm ring-2 ring-white animate-in zoom-in duration-300">
+                      {trashCount}
+                    </span>
+                  )}
+                </span>
                 {item.name}
               </button>
             );
@@ -125,7 +134,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                     : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700 border border-transparent'}
                 `}
               >
-                <span className={isActive ? 'text-indigo-600' : 'text-slate-400'}>{item.icon}</span>
+                <span className={`relative ${isActive ? 'text-indigo-600' : 'text-slate-400'}`}>
+                  {item.icon}
+                  {item.path === '/trash' && trashCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[9px] font-black px-1 py-0.5 rounded-full min-w-[16px] h-[16px] flex items-center justify-center shadow-sm ring-2 ring-white animate-in zoom-in duration-300">
+                      {trashCount}
+                    </span>
+                  )}
+                </span>
                 {item.name}
               </button>
             );
@@ -242,8 +258,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                   ${isMoreMenuOpen ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}
                 `}
               >
-                <div className={`transition-transform duration-200 ${isMoreMenuOpen ? '-translate-y-0.5' : ''}`}>
+                <div className={`transition-transform duration-200 ${isMoreMenuOpen ? '-translate-y-0.5' : ''} relative`}>
                     <Menu size={22} />
+                    {trashCount > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[8px] font-black px-1 py-0.5 rounded-full min-w-[14px] h-[14px] flex items-center justify-center shadow-sm ring-1 ring-white animate-in zoom-in duration-300">
+                        {trashCount}
+                      </span>
+                    )}
                 </div>
                 <span className={`text-[10px] font-bold ${isMoreMenuOpen ? 'text-indigo-600' : 'text-slate-500'} ${isMoreMenuOpen ? 'opacity-100' : 'opacity-80'}`}>
                     মেনু
@@ -302,8 +323,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                   onClick={() => handleNavigation(item.path)}
                   className="flex flex-col items-center justify-center p-3.5 rounded-2xl bg-white border border-slate-100 shadow-sm active:scale-95 transition-all group hover:border-indigo-200 hover:shadow-md"
                 >
-                  <div className="w-9 h-9 rounded-full bg-slate-50 text-slate-600 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300 shadow-sm mb-2">
+                  <div className="w-9 h-9 rounded-full bg-slate-50 text-slate-600 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300 shadow-sm mb-2 relative">
                     {item.icon}
+                    {item.path === '/trash' && trashCount > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[9px] font-black px-1 py-0.5 rounded-full min-w-[16px] h-[16px] flex items-center justify-center shadow-sm ring-2 bg-white group-hover:ring-indigo-600 transition-all animate-in zoom-in duration-300">
+                        {trashCount}
+                      </span>
+                    )}
                   </div>
                   <p className="font-bold text-slate-800 text-sm">{item.name}</p>
                   <p className="text-[10px] text-slate-400 font-medium">{item.desc}</p>

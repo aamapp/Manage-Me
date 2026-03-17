@@ -402,7 +402,7 @@ export const Projects: React.FC = () => {
       const fileName = `projects_${clientFilter ? clientFilter : 'all'}_${new Date().getTime()}.pdf`;
       
       const opt = {
-        margin: [10, 10, 10, 10] as [number, number, number, number],
+        margin: [15, 15, 15, 15] as [number, number, number, number],
         filename: fileName,
         image: { type: 'jpeg' as const, quality: 0.98 },
         html2canvas: { 
@@ -410,11 +410,17 @@ export const Projects: React.FC = () => {
           useCORS: true,
           logging: false,
           backgroundColor: '#ffffff',
-          windowWidth: 1200,
+          windowWidth: 1024,
+          width: 1024,
+          scrollY: 0,
+          scrollX: 0,
           onclone: (clonedDoc: Document) => {
             // Fix for html2canvas/html2pdf clipping
             clonedDoc.documentElement.style.overflow = 'visible';
             clonedDoc.body.style.overflow = 'visible';
+            clonedDoc.documentElement.style.height = 'auto';
+            clonedDoc.body.style.height = 'auto';
+            clonedDoc.body.style.width = '1024px';
 
             const pdfHeader = clonedDoc.getElementById('pdf-header');
             if (pdfHeader) {
@@ -427,8 +433,8 @@ export const Projects: React.FC = () => {
 
             const container = clonedDoc.getElementById('pdf-container');
             if (container) {
-              container.style.width = '1100px';
-              container.style.maxWidth = '1100px';
+              container.style.width = '1024px';
+              container.style.maxWidth = 'none';
               container.style.margin = '0';
               container.style.overflow = 'visible';
               container.style.height = 'auto';
@@ -439,7 +445,18 @@ export const Projects: React.FC = () => {
               container.style.boxShadow = 'none';
               
               // Remove space-y classes and use direct margins for better PDF rendering
-              container.classList.remove('space-y-4', 'space-y-6', 'space-y-8');
+              container.classList.remove('space-y-4', 'space-y-6', 'space-y-8', 'rounded-[2.5rem]', 'px-1');
+              container.style.borderRadius = '0';
+
+              const allElements = container.querySelectorAll('*');
+              allElements.forEach(el => {
+                const htmlEl = el as HTMLElement;
+                htmlEl.style.overflow = 'visible';
+                htmlEl.style.transition = 'none';
+                htmlEl.style.animation = 'none';
+                htmlEl.style.boxShadow = 'none';
+              });
+              
               const nestedSpacedElements = container.querySelectorAll('.space-y-4, .space-y-2, .space-y-6');
               nestedSpacedElements.forEach(el => {
                 el.classList.remove('space-y-4', 'space-y-2', 'space-y-6', 'pb-12');
@@ -456,12 +473,13 @@ export const Projects: React.FC = () => {
               });
 
               // Remove animation classes that might interfere with PDF rendering
-              const animatedElements = container.querySelectorAll('.animate-in, .slide-in-from-bottom-2, .fade-in');
+              const animatedElements = container.querySelectorAll('.animate-in, .slide-in-from-bottom-2, .fade-in, .slide-in-from-top-2, .transition-all, .transition');
               animatedElements.forEach(el => {
-                el.classList.remove('animate-in', 'slide-in-from-bottom-2', 'fade-in', 'slide-in-from-top-2');
+                el.classList.remove('animate-in', 'slide-in-from-bottom-2', 'fade-in', 'slide-in-from-top-2', 'transition-all', 'transition');
                 (el as HTMLElement).style.opacity = '1';
                 (el as HTMLElement).style.transform = 'none';
                 (el as HTMLElement).style.animation = 'none';
+                (el as HTMLElement).style.transition = 'none';
               });
 
               // Remove overflow-x-auto and scrolling classes
@@ -486,15 +504,17 @@ export const Projects: React.FC = () => {
                   projectCards.forEach((card) => {
                     const el = card as HTMLElement;
                     el.style.pageBreakInside = 'avoid';
-                    el.style.breakInside = 'avoid';
+                    el.style.breakInside = 'avoid-page';
                     el.style.display = 'block';
                     el.style.width = '100%';
                     el.style.boxSizing = 'border-box';
                     el.style.position = 'relative';
                     el.style.overflow = 'visible';
-                    el.style.marginBottom = '30px';
+                    el.style.marginBottom = '25px';
                     el.style.padding = '0';
                     el.style.border = 'none';
+                    el.style.float = 'none';
+                    el.style.clear = 'both';
                   });
                 }
               }
@@ -503,27 +523,41 @@ export const Projects: React.FC = () => {
               const style = clonedDoc.createElement('style');
               style.innerHTML = `
                 .project-card-pdf {
-                  break-inside: avoid !important;
+                  break-inside: avoid-page !important;
                   page-break-inside: avoid !important;
                   display: block !important;
                   width: 100% !important;
-                  margin-bottom: 30px !important;
+                  margin-bottom: 25px !important;
+                  position: relative !important;
+                  overflow: visible !important;
+                  clear: both !important;
                 }
                 .project-card-pdf > div {
+                  break-inside: avoid-page !important;
+                  page-break-inside: avoid !important;
                   box-shadow: none !important;
                   border: 1px solid #cbd5e1 !important;
                   border-radius: 12px !important;
                   overflow: visible !important;
                   background-color: white !important;
+                  display: block !important;
+                  width: 100% !important;
+                  position: relative !important;
                 }
                 #pdf-container {
                   background-color: white !important;
                   display: block !important;
                   border-radius: 0 !important;
+                  overflow: visible !important;
+                  width: 1024px !important;
+                  padding-bottom: 100px !important;
                 }
                 #pdf-container * {
                   overflow: visible !important;
                   -webkit-print-color-adjust: exact;
+                  transition: none !important;
+                  animation: none !important;
+                  box-shadow: none !important;
                 }
               `;
               clonedDoc.head.appendChild(style);
@@ -531,7 +565,7 @@ export const Projects: React.FC = () => {
           }
         },
         jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const },
-        pagebreak: { mode: ['avoid-all', 'css'], avoid: '.project-card-pdf' }
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'], avoid: '.project-card-pdf' }
       };
 
       // Generate PDF as blob for Supabase upload
