@@ -175,6 +175,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
     } catch (error: any) {
+      console.error("Refresh Data Error:", error);
+      if (error.message?.includes('JWT') || error.message?.includes('Unauthorized') || error.message?.includes('Refresh Token')) {
+          supabase.auth.signOut();
+          setUser(null);
+      }
       showToast(`কানেকশন এরর: ${error.message}`);
     } finally {
       setLoading(false);
@@ -228,6 +233,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         
         if (error) {
             console.warn("Session Init Warning:", error);
+            // If the refresh token is invalid, we should clear the session to allow the user to log in again
+            if (error.message?.includes('Refresh Token Not Found') || error.message?.includes('Invalid Refresh Token')) {
+                await supabase.auth.signOut();
+                if (mounted) setUser(null);
+            }
         }
 
         if (session?.user && mounted) {

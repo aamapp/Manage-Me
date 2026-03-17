@@ -142,23 +142,31 @@ export const Reports: React.FC = () => {
       const monthlyIncome = filteredProjects
         .filter(p => {
           if (!p.createdat) return false;
-          // Parse string directly to prevent timezone shifts
           const [yearStr, monthStr] = p.createdat.split('-');
           const projYear = parseInt(yearStr);
           const projMonthIndex = parseInt(monthStr) - 1;
-
           return projMonthIndex === targetMonthIndex && projYear === targetYear;
         })
         .reduce((sum, p) => sum + (p.paidamount || 0), 0);
 
+      const monthlyExpense = expenses
+        .filter(e => {
+          if (!e.date) return false;
+          const [yearStr, monthStr] = e.date.split('-');
+          const expYear = parseInt(yearStr);
+          const expMonthIndex = parseInt(monthStr) - 1;
+          return expMonthIndex === targetMonthIndex && expYear === targetYear;
+        })
+        .reduce((sum, e) => sum + (e.amount || 0), 0);
+
       result.push({
         name: monthNames[targetMonthIndex],
         income: monthlyIncome,
-        expense: 0 
+        expense: monthlyExpense
       });
     }
     return result;
-  }, [filteredProjects]);
+  }, [filteredProjects, expenses]);
 
   const resetFilter = () => {
     setStartDate('');
@@ -417,10 +425,10 @@ export const Reports: React.FC = () => {
                         <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
                             <div className="flex items-center gap-2 mb-4">
                                 <div className="w-1.5 h-4 bg-indigo-600 rounded-full"></div>
-                                <h3 className="font-bold text-sm text-slate-800">মাসিক আয়ের বিবরণ</h3>
+                                <h3 className="font-bold text-sm text-slate-800">মাসিক আয় ও ব্যয়ের বিবরণ</h3>
                             </div>
                             <div className="h-48 w-full">
-                                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} debounce={50}>
                                     <BarChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                     <XAxis dataKey="name" tick={{fontSize: 10, fill: '#64748b', fontWeight: 600}} axisLine={false} tickLine={false} dy={5} />
@@ -430,7 +438,8 @@ export const Reports: React.FC = () => {
                                         contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', padding: '6px 10px', fontSize: '11px' }}
                                         formatter={(value: number) => [`${currency} ${value.toLocaleString('bn-BD')}`, '']}
                                     />
-                                    <Bar dataKey="income" fill="#4f46e5" radius={[4, 4, 4, 4]} barSize={24} />
+                                    <Bar dataKey="income" name="আয়" fill="#4f46e5" stackId="a" radius={[0, 0, 0, 0]} barSize={16} />
+                                    <Bar dataKey="expense" name="খরচ" fill="#f43f5e" stackId="a" radius={[4, 4, 0, 0]} barSize={16} />
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>
@@ -446,7 +455,7 @@ export const Reports: React.FC = () => {
                             <div className="flex flex-col md:flex-row items-center gap-6">
                                 {/* Chart */}
                                 <div className="h-56 w-full md:w-1/2 relative flex items-center justify-center">
-                                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} debounce={50}>
                                         <PieChart>
                                         <Pie 
                                             data={financialData} 

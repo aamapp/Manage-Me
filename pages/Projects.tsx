@@ -402,7 +402,7 @@ export const Projects: React.FC = () => {
       const fileName = `projects_${clientFilter ? clientFilter : 'all'}_${new Date().getTime()}.pdf`;
       
       const opt = {
-        margin: 10,
+        margin: [10, 10, 10, 10] as [number, number, number, number],
         filename: fileName,
         image: { type: 'jpeg' as const, quality: 0.98 },
         html2canvas: { 
@@ -410,31 +410,39 @@ export const Projects: React.FC = () => {
           useCORS: true,
           logging: false,
           backgroundColor: '#ffffff',
-          windowWidth: 800,
+          windowWidth: 1200,
           onclone: (clonedDoc: Document) => {
+            // Fix for html2canvas/html2pdf clipping
+            clonedDoc.documentElement.style.overflow = 'visible';
+            clonedDoc.body.style.overflow = 'visible';
+
             const pdfHeader = clonedDoc.getElementById('pdf-header');
-            if (pdfHeader) pdfHeader.style.display = 'block';
+            if (pdfHeader) {
+              pdfHeader.style.display = 'block';
+              pdfHeader.style.breakAfter = 'avoid';
+            }
             
             const pdfFooter = clonedDoc.getElementById('pdf-footer');
             if (pdfFooter) pdfFooter.style.display = 'block';
 
             const container = clonedDoc.getElementById('pdf-container');
             if (container) {
-              container.style.width = '800px';
-              container.style.maxWidth = 'none';
-              container.style.margin = '0 auto';
+              container.style.width = '1100px';
+              container.style.maxWidth = '1100px';
+              container.style.margin = '0';
               container.style.overflow = 'visible';
               container.style.height = 'auto';
-              container.style.padding = '20px';
-              container.style.paddingBottom = '40px';
-              container.style.borderRadius = '0';
+              container.style.padding = '40px';
+              container.style.boxSizing = 'border-box';
               container.style.backgroundColor = '#ffffff';
+              container.style.borderRadius = '0';
+              container.style.boxShadow = 'none';
               
               // Remove space-y classes and use direct margins for better PDF rendering
-              container.classList.remove('space-y-4');
-              const nestedSpacedElements = container.querySelectorAll('.space-y-4, .space-y-2');
+              container.classList.remove('space-y-4', 'space-y-6', 'space-y-8');
+              const nestedSpacedElements = container.querySelectorAll('.space-y-4, .space-y-2, .space-y-6');
               nestedSpacedElements.forEach(el => {
-                el.classList.remove('space-y-4', 'space-y-2', 'pb-12');
+                el.classList.remove('space-y-4', 'space-y-2', 'space-y-6', 'pb-12');
                 (el as HTMLElement).style.display = 'block';
                 (el as HTMLElement).style.paddingBottom = '0';
               });
@@ -444,7 +452,7 @@ export const Projects: React.FC = () => {
                 el.classList.remove('truncate', 'leading-snug', 'leading-none', 'leading-tight', 'leading-relaxed');
                 (el as HTMLElement).style.whiteSpace = 'normal';
                 (el as HTMLElement).style.overflow = 'visible';
-                (el as HTMLElement).style.lineHeight = '1.6';
+                (el as HTMLElement).style.lineHeight = '1.5';
               });
 
               // Remove animation classes that might interfere with PDF rendering
@@ -453,6 +461,7 @@ export const Projects: React.FC = () => {
                 el.classList.remove('animate-in', 'slide-in-from-bottom-2', 'fade-in', 'slide-in-from-top-2');
                 (el as HTMLElement).style.opacity = '1';
                 (el as HTMLElement).style.transform = 'none';
+                (el as HTMLElement).style.animation = 'none';
               });
 
               // Remove overflow-x-auto and scrolling classes
@@ -471,33 +480,21 @@ export const Projects: React.FC = () => {
                 if (parent) {
                   // Ensure parent is a block container for proper page breaking
                   (parent as HTMLElement).style.display = 'block';
+                  (parent as HTMLElement).style.width = '100%';
+                  (parent as HTMLElement).classList.remove('grid', 'flex');
                   
-                  projectCards.forEach((card, index) => {
+                  projectCards.forEach((card) => {
                     const el = card as HTMLElement;
                     el.style.pageBreakInside = 'avoid';
                     el.style.breakInside = 'avoid';
                     el.style.display = 'block';
                     el.style.width = '100%';
                     el.style.boxSizing = 'border-box';
-                    
-                    // Add margin-bottom for spacing
-                    if (index < 3) {
-                      el.style.marginBottom = '60px'; // Larger spacing for first page (3 items)
-                    } else {
-                      el.style.marginBottom = '45px'; // Spacing for 6 items per page
-                    }
-                    
-                    // Reduce margin-bottom for the last item on a page to leave some breathing room
-                    if (index === 2 || (index > 2 && (index - 2) % 6 === 0)) {
-                      el.style.marginBottom = '20px';
-                    }
-                    
-                    // Add page break before the first item of a new page
-                    if (index === 3 || (index > 3 && (index - 3) % 6 === 0)) {
-                      el.classList.add('page-break-before');
-                      el.style.pageBreakBefore = 'always';
-                      el.style.breakBefore = 'page';
-                    }
+                    el.style.position = 'relative';
+                    el.style.overflow = 'visible';
+                    el.style.marginBottom = '30px';
+                    el.style.padding = '0';
+                    el.style.border = 'none';
                   });
                 }
               }
@@ -505,63 +502,36 @@ export const Projects: React.FC = () => {
               // Add style to prevent page breaks inside cards and fix text clipping
               const style = clonedDoc.createElement('style');
               style.innerHTML = `
-                .break-inside-avoid {
+                .project-card-pdf {
                   break-inside: avoid !important;
                   page-break-inside: avoid !important;
-                  -webkit-column-break-inside: avoid !important;
                   display: block !important;
                   width: 100% !important;
-                  position: relative !important;
-                  overflow: visible !important;
-                  box-sizing: border-box !important;
-                }
-                .page-break-before {
-                  padding-top: 10px !important;
+                  margin-bottom: 30px !important;
                 }
                 .project-card-pdf > div {
                   box-shadow: none !important;
-                  border-color: #e2e8f0 !important;
+                  border: 1px solid #cbd5e1 !important;
+                  border-radius: 12px !important;
+                  overflow: visible !important;
+                  background-color: white !important;
                 }
                 #pdf-container {
                   background-color: white !important;
                   display: block !important;
+                  border-radius: 0 !important;
                 }
                 #pdf-container * {
                   overflow: visible !important;
-                }
-                #pdf-container h3 {
-                  line-height: 1.6 !important;
-                  padding-bottom: 4px !important;
-                  padding-top: 2px !important;
-                }
-                #pdf-container p {
-                  line-height: 1.6 !important;
-                  padding-bottom: 2px !important;
-                  padding-top: 2px !important;
-                }
-                #pdf-container span {
-                  line-height: 1.6 !important;
-                  padding-bottom: 2px !important;
-                  padding-top: 2px !important;
-                  display: inline-block;
-                }
-                #pdf-container .min-w-0 {
-                  overflow: visible !important;
+                  -webkit-print-color-adjust: exact;
                 }
               `;
               clonedDoc.head.appendChild(style);
-
-              // Add a spacer at the end to prevent the last item from being cut off
-              const spacer = clonedDoc.createElement('div');
-              spacer.style.height = '40px';
-              spacer.style.width = '100%';
-              spacer.style.clear = 'both';
-              container.appendChild(spacer);
             }
           }
         },
         jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const },
-        pagebreak: { mode: ['css', 'legacy'] as any, avoid: '.break-inside-avoid', before: '.page-break-before' }
+        pagebreak: { mode: ['avoid-all', 'css'], avoid: '.project-card-pdf' }
       };
 
       // Generate PDF as blob for Supabase upload
@@ -715,9 +685,9 @@ export const Projects: React.FC = () => {
       </div>
 
       {/* Report Content Area (for PDF) */}
-      <div id="pdf-container" ref={listRef} className="space-y-4 px-1 py-4 bg-white rounded-[2.5rem]">
+      <div id="pdf-container" ref={listRef} className={`${isGeneratingPDF ? 'block' : 'space-y-4 rounded-[2.5rem]'} px-1 py-4 bg-white`}>
         {/* PDF Only Header */}
-        <div id="pdf-header" className="hidden mb-10">
+        <div id="pdf-header" className={isGeneratingPDF ? "block mb-10" : "hidden"}>
           <div className="flex justify-between items-center border-b-2 border-slate-100 pb-8 mb-8">
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-xl">
@@ -735,16 +705,16 @@ export const Projects: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4 mb-4">
-             <div className="bg-indigo-50/50 border border-indigo-100 p-5 rounded-[2rem]">
+          <div className="flex gap-4 mb-4">
+             <div className="flex-1 bg-indigo-50/50 border border-indigo-100 p-5 rounded-[2rem]">
                 <p className="text-[10px] font-bold text-indigo-400 uppercase mb-1">ক্লায়েন্ট</p>
                 <p className="text-xl font-black text-indigo-700">{clientFilter || 'সকল ক্লায়েন্ট'}</p>
              </div>
-             <div className="bg-slate-50 border border-slate-100 p-5 rounded-[2rem]">
+             <div className="flex-1 bg-slate-50 border border-slate-100 p-5 rounded-[2rem]">
                 <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">মোট প্রজেক্ট</p>
                 <p className="text-xl font-black text-slate-700">{filteredProjects.length} টি</p>
              </div>
-             <div className="bg-slate-50 border border-slate-100 p-5 rounded-[2rem]">
+             <div className="flex-1 bg-slate-50 border border-slate-100 p-5 rounded-[2rem]">
                 <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">হিসাবের সময়কাল</p>
                 <p className="text-sm font-black text-slate-700 mt-1">
                   {dateRange.start || dateRange.end ? (
@@ -760,16 +730,16 @@ export const Projects: React.FC = () => {
 
           <div className="mb-8 break-inside-avoid">
              <h2 className="text-sm font-bold text-slate-800 mb-3 border-l-4 border-indigo-500 pl-2">হিসাব সারসংক্ষেপ</h2>
-             <div className="grid grid-cols-3 gap-4">
-                <div className="bg-white border border-slate-100 p-4 rounded-2xl shadow-sm">
+             <div className="flex gap-4">
+                <div className="flex-1 bg-white border border-slate-100 p-4 rounded-2xl shadow-sm">
                    <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">মোট বাজেট</p>
                    <p className="text-lg font-black text-slate-700">{currency}{summaryStats.total.toLocaleString('bn-BD')}</p>
                 </div>
-                <div className="bg-white border border-slate-100 p-4 rounded-2xl shadow-sm">
+                <div className="flex-1 bg-white border border-slate-100 p-4 rounded-2xl shadow-sm">
                    <p className="text-[10px] font-bold text-emerald-500 uppercase mb-1">মোট আদায়</p>
                    <p className="text-lg font-black text-emerald-600">{currency}{summaryStats.paid.toLocaleString('bn-BD')}</p>
                 </div>
-                <div className="bg-white border border-slate-100 p-4 rounded-2xl shadow-sm">
+                <div className="flex-1 bg-white border border-slate-100 p-4 rounded-2xl shadow-sm">
                    <p className="text-[10px] font-bold text-rose-500 uppercase mb-1">মোট বকেয়া</p>
                    <p className="text-lg font-black text-rose-600">{currency}{summaryStats.due.toLocaleString('bn-BD')}</p>
                 </div>
@@ -816,17 +786,30 @@ export const Projects: React.FC = () => {
         )}
 
         {/* Projects List */}
-        <div className="space-y-4 pb-12">
+        <div 
+          id="projects-list-container" 
+          className={isGeneratingPDF ? "block w-full pb-12" : "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pb-12"}
+        >
           {filteredProjects.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+            <div className="col-span-full flex flex-col items-center justify-center py-20 text-slate-400">
               <FolderOpen size={48} className="mb-4 opacity-20" />
               <p className="text-sm font-medium">কোনো প্রজেক্ট নেই</p>
               {clientFilter && <p className="text-xs mt-1">এই ক্লায়েন্টের জন্য কোনো প্রজেক্ট পাওয়া যায়নি</p>}
             </div>
           ) : (
             filteredProjects.map((p) => (
-              <div key={p.id} className="break-inside-avoid project-card-pdf">
-                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm relative animate-in slide-in-from-bottom-2 duration-300">
+              <div 
+                key={p.id} 
+                className="project-card-pdf"
+                style={isGeneratingPDF ? { 
+                  breakInside: 'avoid', 
+                  pageBreakInside: 'avoid',
+                  width: '100%',
+                  display: 'block',
+                  marginBottom: '30px'
+                } : {}}
+              >
+                <div className={`bg-white rounded-2xl border border-slate-100 shadow-sm relative ${isGeneratingPDF ? '' : 'animate-in slide-in-from-bottom-2 duration-300'}`}>
                   {/* Minimal Card Layout */}
                   <div className="px-2 py-4 flex justify-between items-center">
                     <div className="flex items-center gap-1.5 flex-1 min-w-0 mr-1">
@@ -914,7 +897,7 @@ export const Projects: React.FC = () => {
         </div>
 
         {/* PDF Only Footer */}
-        <div id="pdf-footer" className="hidden mt-12 pt-6 border-t border-slate-100 text-center">
+        <div id="pdf-footer" className={isGeneratingPDF ? "block mt-12 pt-6 border-t border-slate-100 text-center" : "hidden"}>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Generated by Manage-Me Studio Manager</p>
           <p className="text-[8px] text-slate-300 mt-1">© {new Date().getFullYear()} All Rights Reserved</p>
         </div>

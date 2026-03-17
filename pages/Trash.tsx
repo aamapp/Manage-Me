@@ -75,7 +75,7 @@ const Trash = () => {
   };
 
   return (
-    <div className="max-w-md mx-auto px-4 pt-6 pb-24 min-h-screen bg-slate-50">
+    <div className="max-w-7xl mx-auto px-4 pt-6 pb-24 min-h-screen bg-slate-50">
       <div className="mb-6">
         <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
           <Trash2 className="text-rose-500" size={24} /> রিসাইকেল বিন
@@ -83,9 +83,9 @@ const Trash = () => {
         <p className="text-sm font-medium text-slate-500 mt-1">ডিলিট করা প্রজেক্টগুলো এখানে জমা থাকে</p>
       </div>
 
-      <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {trashedProjects.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+          <div className="col-span-full flex flex-col items-center justify-center py-20 text-slate-400">
             <Trash2 size={48} className="mb-4 opacity-20" />
             <p className="text-sm font-medium">রিসাইকেল বিন খালি</p>
           </div>

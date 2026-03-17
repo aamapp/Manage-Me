@@ -229,7 +229,7 @@ export const Settings: React.FC = () => {
         <div className="p-6 space-y-8">
           {/* General Settings */}
           <div className="space-y-4">
-             <div className="grid grid-cols-1 gap-4">
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-2">পূর্ণ নাম</label>
                   <input type="text" name="name" value={formData.name} onChange={handleChange} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 font-medium" />
@@ -238,7 +238,7 @@ export const Settings: React.FC = () => {
                   <label className="block text-sm font-semibold text-slate-700 mb-2">পেশা</label>
                   <input type="text" name="occupation" value={formData.occupation} onChange={handleChange} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 font-medium" placeholder="যেমন: সাউন্ড ইঞ্জিনিয়ার" />
                 </div>
-                <div>
+                <div className="md:col-span-2">
                     <label className="block text-sm font-semibold text-slate-700 mb-2">মুদ্রা (Currency)</label>
                     <select name="currency" value={formData.currency} onChange={handleChange} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 font-medium cursor-pointer">
                         <option value="৳">টাকা (৳)</option>

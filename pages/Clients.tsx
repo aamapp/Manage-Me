@@ -177,9 +177,9 @@ export const Clients: React.FC = () => {
         />
       </div>
 
-      <div className="space-y-3 pb-20">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pb-20">
         {filteredClients.length === 0 ? (
-          <div className="py-20 text-center text-slate-400">
+          <div className="col-span-full py-20 text-center text-slate-400">
             <Users size={48} className="mx-auto mb-4 opacity-20" />
             <p className="text-sm font-medium">কোনো ক্লায়েন্ট নেই</p>
           </div>

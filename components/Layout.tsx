@@ -71,9 +71,93 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans w-full overflow-x-hidden selection:bg-indigo-100 selection:text-indigo-700 flex flex-col">
+    <div className="min-h-screen bg-slate-50 font-sans w-full overflow-x-hidden selection:bg-indigo-100 selection:text-indigo-700 flex flex-col lg:flex-row">
+      {/* Desktop Sidebar - Visible only on LG screens */}
+      <aside className="hidden lg:flex flex-col w-72 bg-white border-r border-slate-200 h-screen sticky top-0 z-50">
+        <div className="p-6 border-b border-slate-100">
+          <div 
+            onClick={() => setAboutOpen(true)}
+            className="flex items-center gap-3 cursor-pointer group"
+          >
+            <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-indigo-200 ring-2 ring-white group-hover:scale-105 transition-transform">
+              M
+            </div>
+            <span className="font-bold text-slate-800 text-xl tracking-tight group-hover:text-indigo-600 transition-colors">{APP_NAME}</span>
+          </div>
+        </div>
+
+        <nav className="flex-1 overflow-y-auto p-4 space-y-1 custom-scrollbar">
+          <div className="px-3 mb-2">
+            <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">প্রধান মেনু</h3>
+          </div>
+          {PRIMARY_NAV.map((item) => {
+            const isActive = location.pathname === item.path;
+            return (
+              <button
+                key={item.path}
+                onClick={() => navigate(item.path, { replace: true })}
+                className={`
+                  w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm transition-all duration-200
+                  ${isActive 
+                    ? 'bg-indigo-50 text-indigo-600 shadow-sm border border-indigo-100' 
+                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700 border border-transparent'}
+                `}
+              >
+                <span className={isActive ? 'text-indigo-600' : 'text-slate-400'}>{item.icon}</span>
+                {item.name}
+              </button>
+            );
+          })}
+
+          <div className="px-3 mt-6 mb-2">
+            <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">অন্যান্য</h3>
+          </div>
+          {SECONDARY_NAV.map((item) => {
+            const isActive = location.pathname === item.path;
+            return (
+              <button
+                key={item.path}
+                onClick={() => navigate(item.path, { replace: true })}
+                className={`
+                  w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm transition-all duration-200
+                  ${isActive 
+                    ? 'bg-indigo-50 text-indigo-600 shadow-sm border border-indigo-100' 
+                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700 border border-transparent'}
+                `}
+              >
+                <span className={isActive ? 'text-indigo-600' : 'text-slate-400'}>{item.icon}</span>
+                {item.name}
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="p-4 border-t border-slate-100">
+          <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center shadow-sm overflow-hidden">
+              {user.avatar_url ? (
+                <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-indigo-600 font-bold">{user.name.charAt(0)}</span>
+              )}
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-slate-800 truncate">{user.name}</p>
+              <p className="text-[10px] text-slate-500 truncate font-medium">{user.email}</p>
+            </div>
+          </div>
+          <button 
+            onClick={onLogout}
+            className="w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-rose-50 text-rose-600 font-bold text-xs hover:bg-rose-100 transition-colors border border-rose-100"
+          >
+            <LogOut size={16} />
+            লগআউট করুন
+          </button>
+        </div>
+      </aside>
+
       {/* Mobile Header (App Bar) - Fixed to ensure it stays on top */}
-      <header className="fixed top-0 inset-x-0 h-16 bg-white/90 backdrop-blur-md border-b border-slate-200/80 flex items-center justify-between px-5 z-40 max-w-[100vw] shadow-sm transition-all duration-200">
+      <header className="fixed top-0 inset-x-0 h-16 bg-white/90 backdrop-blur-md border-b border-slate-200/80 flex lg:hidden items-center justify-between px-5 z-40 max-w-[100vw] shadow-sm transition-all duration-200">
         <div className="flex items-center gap-2">
             {/* Show Back Button for Admin if User Selected */}
             {isAdmin && adminSelectedUserId ? (
@@ -117,13 +201,15 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 pt-20 pb-20 px-3 animate-in fade-in duration-300 w-full max-w-[100vw] overflow-x-hidden">
-        {children}
+      <main className="flex-1 pt-20 lg:pt-8 pb-20 lg:pb-8 px-3 lg:px-8 animate-in fade-in duration-300 w-full max-w-[100vw] lg:max-w-none overflow-x-hidden">
+        <div className="max-w-7xl mx-auto w-full">
+          {children}
+        </div>
       </main>
 
-      {/* Fixed Bottom Navigation Bar - Hide if Admin is on User List page */}
+      {/* Fixed Bottom Navigation Bar - Hide if Admin is on User List page or on Desktop */}
       {(!isAdmin || adminSelectedUserId) && (
-          <div className="fixed bottom-0 inset-x-0 z-50 bg-white border-t border-slate-100 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] pb-safe">
+          <div className="fixed bottom-0 inset-x-0 z-50 bg-white border-t border-slate-100 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] pb-safe lg:hidden">
             <nav className="flex justify-between items-center px-6 h-[60px] w-full max-w-lg mx-auto">
               {PRIMARY_NAV.map((item) => {
                 const isActive = location.pathname === item.path;
