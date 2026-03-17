@@ -27,7 +27,7 @@ export const Signup: React.FC<SignupProps> = ({ onSignup, onGoToLogin }) => {
     <div className="min-h-screen flex flex-col bg-slate-50">
       {/* Brand Header */}
       <div className="bg-indigo-700 p-8 pt-10 pb-16 rounded-b-[3rem] shadow-xl text-center relative overflow-hidden">
-        <div className="relative z-10 flex flex-col items-center">
+        <div className="relative z-10 flex flex-col items-center max-w-md mx-auto">
              <h1 className="text-2xl font-black text-white tracking-tight mb-2">নতুন একাউন্ট</h1>
             <p className="text-indigo-200 text-sm font-medium">আমাদের কমিউনিটিতে যোগ দিন</p>
         </div>
@@ -36,8 +36,8 @@ export const Signup: React.FC<SignupProps> = ({ onSignup, onGoToLogin }) => {
         </div>
       </div>
 
-      <div className="flex-1 px-6 -mt-10 relative z-20 pb-10">
-        <div className="bg-white rounded-3xl shadow-xl p-6 border border-slate-100">
+      <div className="flex-1 px-6 -mt-12 relative z-20 pb-10 flex justify-center">
+        <div className="bg-white rounded-3xl shadow-xl p-6 md:p-8 border border-slate-100 w-full max-w-md">
           <button 
               onClick={onGoToLogin}
               className="flex items-center gap-2 text-slate-400 font-bold text-xs mb-6 hover:text-indigo-600 transition-colors"

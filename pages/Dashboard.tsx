@@ -145,7 +145,7 @@ export const Dashboard: React.FC = () => {
             </button>
           </div>
           
-          <div className="h-64 w-full -ml-2">
+          <div className="h-48 w-full -ml-2">
             {!isMounted ? null : !hasChartData ? (
               <div className="h-full w-full flex flex-col items-center justify-center text-slate-300 gap-3 border-2 border-dashed border-slate-100 rounded-2xl ml-2">
                 <Wallet size={32} className="opacity-50" />

@@ -35,8 +35,8 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onResetPassword, onGoToSi
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
       {/* Brand Header */}
-      <div className="bg-indigo-700 p-8 pt-12 rounded-b-[3rem] shadow-xl text-center relative overflow-hidden">
-        <div className="relative z-10 flex flex-col items-center">
+      <div className="bg-indigo-700 p-8 pt-12 pb-16 rounded-b-[3rem] shadow-xl text-center relative overflow-hidden">
+        <div className="relative z-10 flex flex-col items-center max-w-md mx-auto">
             <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-indigo-700 font-black text-3xl mb-4 shadow-lg">
               M
             </div>
@@ -48,8 +48,8 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onResetPassword, onGoToSi
         </div>
       </div>
 
-      <div className="flex-1 px-6 -mt-8 relative z-20 pb-10">
-        <div className="bg-white rounded-3xl shadow-xl p-6 border border-slate-100 transition-all duration-300">
+      <div className="flex-1 px-6 -mt-12 relative z-20 pb-10 flex justify-center">
+        <div className="bg-white rounded-3xl shadow-xl p-6 md:p-8 border border-slate-100 transition-all duration-300 w-full max-w-md">
           
           {view === 'login' ? (
             <>
