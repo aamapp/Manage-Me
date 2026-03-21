@@ -584,7 +584,7 @@ export const Reports: React.FC = () => {
                     ) : (
                       <a 
                         href={previewImage} 
-                        download={`Report-${new Date().getTime()}.png`}
+                        download={`ManageMe_Report_${new Date().toISOString().split('T')[0]}.png`}
                         className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold flex justify-center items-center gap-2 text-sm shadow-lg shadow-indigo-200 active:scale-95 transition-transform"
                       >
                          <Download size={18} />

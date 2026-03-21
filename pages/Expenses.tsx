@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Receipt, Plus, Search, Tag, X, ShoppingCart, Loader2, Trash2, MoreVertical, Pencil, Calculator, CalendarDays, Download, Filter, Music } from 'lucide-react';
+import { Receipt, Plus, Search, Tag, X, ShoppingCart, Loader2, Trash2, MoreVertical, Pencil, Calculator, CalendarDays, Download, Filter, Music, Share2, ExternalLink, Copy, AlertCircle } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
 import { EXPENSE_CATEGORY_LABELS } from '../constants';
 import { useAppContext } from '../context/AppContext';
@@ -235,7 +235,7 @@ export const Expenses: React.FC = () => {
     
     try {
       const element = listRef.current;
-      const fileName = `expenses_${new Date().getTime()}.pdf`;
+      const fileName = `ManageMe_Expense_Report_${new Date().toISOString().split('T')[0]}.pdf`;
       
       const opt = {
         margin: [15, 15, 15, 15] as [number, number, number, number],
@@ -474,20 +474,25 @@ export const Expenses: React.FC = () => {
       }
 
       if (navigator.share && navigator.canShare) {
-        const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
-        if (navigator.canShare({ files: [file] })) {
-          try {
-            await navigator.share({
-              files: [file],
-              title: 'Expense Report',
-              text: 'Manage-Me Expense Report'
-            });
-            showToast('শেয়ার সফল হয়েছে', 'success');
-            setIsGeneratingPDF(false);
-            return;
-          } catch (shareError) {
-            console.log('Share cancelled or failed', shareError);
+        try {
+          const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
+          if (navigator.canShare({ files: [file] })) {
+            // Delay slightly to ensure UI is ready
+            setTimeout(async () => {
+              try {
+                await navigator.share({
+                  files: [file],
+                  title: 'Expense Report',
+                  text: 'Manage-Me Expense Report'
+                });
+                showToast('শেয়ার সফল হয়েছে', 'success');
+              } catch (shareError) {
+                // Share cancelled or failed, user still has the modal
+              }
+            }, 500);
           }
+        } catch (e) {
+          console.warn('Native share preparation failed', e);
         }
       }
 
@@ -729,7 +734,10 @@ export const Expenses: React.FC = () => {
                 </div>
               </div>
               <button 
-                onClick={() => setPdfPreviewUrl(null)}
+                onClick={() => {
+                  setPdfPreviewUrl(null);
+                  setPdfPublicUrl(null);
+                }}
                 className="p-2 bg-slate-50 text-slate-400 rounded-full hover:bg-slate-100 transition-colors"
               >
                 <X size={20} />
@@ -746,27 +754,68 @@ export const Expenses: React.FC = () => {
                 <p className="text-xs text-slate-400">নিচের বাটনটি ক্লিক করে আপনার ডিভাইসে সেভ করুন।</p>
               </div>
 
+              <div className="bg-amber-50 text-amber-800 p-4 rounded-2xl text-[11px] font-bold border border-amber-100 flex items-start gap-2 text-left">
+                <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                <span>যদি অ্যাপ থেকে ডাউনলোড না হয়, তবে <span className="text-emerald-600">"ব্রাউজারে ওপেন করুন"</span> বাটনে ক্লিক করুন অথবা <span className="text-emerald-600">"শেয়ার"</span> বাটন ব্যবহার করুন।</span>
+              </div>
+
               <div className="flex flex-col w-full gap-3">
-                <a 
-                  href={pdfPreviewUrl} 
-                  download={`expenses_${new Date().getTime()}.pdf`}
-                  onClick={() => setTimeout(() => setPdfPreviewUrl(null), 500)}
-                  className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold text-base shadow-lg shadow-emerald-200 active:scale-95 transition-transform flex items-center justify-center gap-2"
-                >
-                  <Download size={20} /> ডাউনলোড করুন
-                </a>
+                {pdfPublicUrl ? (
+                  <button 
+                    onClick={() => window.open(pdfPublicUrl, '_blank')}
+                    className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold text-base shadow-lg shadow-emerald-200 active:scale-95 transition-transform flex items-center justify-center gap-2"
+                  >
+                    <ExternalLink size={20} /> ব্রাউজারে ওপেন করুন
+                  </button>
+                ) : (
+                  <a 
+                    href={pdfPreviewUrl} 
+                    download={`expenses_${new Date().getTime()}.pdf`}
+                    onClick={() => setTimeout(() => setPdfPreviewUrl(null), 500)}
+                    className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold text-base shadow-lg shadow-emerald-200 active:scale-95 transition-transform flex items-center justify-center gap-2"
+                  >
+                    <Download size={20} /> ডাউনলোড করুন
+                  </a>
+                )}
                 
-                {pdfPublicUrl && (
+                <div className="grid grid-cols-2 gap-3">
+                  <button 
+                    onClick={async () => {
+                      try {
+                        const response = await fetch(pdfPreviewUrl!);
+                        const blob = await response.blob();
+                        const file = new File([blob], `expenses_${Date.now()}.pdf`, { type: 'application/pdf' });
+                        if (navigator.share) {
+                          await navigator.share({
+                            files: [file],
+                            title: 'Expense Report',
+                            text: 'Manage-Me Expense Report'
+                          });
+                        } else {
+                          alert('আপনার ডিভাইসে শেয়ার অপশনটি সাপোর্ট করছে না');
+                        }
+                      } catch (e) {
+                        alert('শেয়ার করা সম্ভব হচ্ছে না');
+                      }
+                    }}
+                    className="bg-slate-100 text-slate-700 py-4 rounded-2xl font-bold flex justify-center items-center gap-2 text-sm active:scale-95 transition-transform border border-slate-200"
+                  >
+                    <Share2 size={18} /> শেয়ার
+                  </button>
+
                   <button 
                     onClick={() => {
-                      navigator.clipboard.writeText(pdfPublicUrl);
-                      showToast('লিঙ্ক কপি করা হয়েছে', 'success');
+                      const urlToCopy = pdfPublicUrl || pdfPreviewUrl;
+                      if (urlToCopy) {
+                        navigator.clipboard.writeText(urlToCopy);
+                        showToast('লিঙ্ক কপি করা হয়েছে', 'success');
+                      }
                     }}
-                    className="w-full bg-slate-100 text-slate-600 py-4 rounded-2xl font-bold text-sm active:scale-95 transition-transform flex items-center justify-center gap-2"
+                    className="bg-slate-100 text-slate-700 py-4 rounded-2xl font-bold flex justify-center items-center gap-2 text-sm active:scale-95 transition-transform border border-slate-200"
                   >
-                    লিঙ্ক কপি করুন
+                    <Copy size={18} /> লিংক কপি
                   </button>
-                )}
+                </div>
               </div>
             </div>
           </div>
