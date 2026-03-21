@@ -227,6 +227,7 @@ export const Expenses: React.FC = () => {
   const handleDownloadPDF = async () => {
     if (!listRef.current) return;
     
+    window.scrollTo(0, 0); // Ensure we are at the top for reliable capture
     setIsGeneratingPDF(true);
     showToast('পিডিএফ তৈরি হচ্ছে...', 'info');
     
@@ -238,7 +239,7 @@ export const Expenses: React.FC = () => {
       const fileName = `ManageMe_Expense_Report_${new Date().toISOString().split('T')[0]}.pdf`;
       
       const opt = {
-        margin: [15, 15, 15, 15] as [number, number, number, number],
+        margin: [10, 10, 10, 10] as [number, number, number, number],
         filename: fileName,
         image: { type: 'jpeg' as const, quality: 0.98 },
         html2canvas: { 
@@ -246,209 +247,108 @@ export const Expenses: React.FC = () => {
           useCORS: true,
           logging: false,
           backgroundColor: '#ffffff',
-          windowWidth: 1024,
-          width: 1024,
           scrollY: 0,
           scrollX: 0,
+          windowWidth: 794,
           onclone: (clonedDoc: Document) => {
             clonedDoc.documentElement.style.overflow = 'visible';
             clonedDoc.body.style.overflow = 'visible';
-            clonedDoc.documentElement.style.height = 'auto';
-            clonedDoc.body.style.height = 'auto';
-            clonedDoc.body.style.width = '1024px';
-
+            
             const pdfHeader = clonedDoc.getElementById('pdf-header');
-            if (pdfHeader) {
-              pdfHeader.style.display = 'block';
-              pdfHeader.style.breakAfter = 'avoid';
-            }
+            if (pdfHeader) pdfHeader.style.display = 'block';
             
             const pdfFooter = clonedDoc.getElementById('pdf-footer');
             if (pdfFooter) pdfFooter.style.display = 'block';
 
             const container = clonedDoc.getElementById('pdf-container');
             if (container) {
-              container.style.width = '1024px';
+              container.style.width = '794px'; // Standard A4 width at 96dpi
               container.style.maxWidth = 'none';
               container.style.margin = '0';
-              container.style.overflow = 'visible';
-              container.style.height = 'auto';
-              container.style.padding = '40px';
-              container.style.boxSizing = 'border-box';
+              container.style.padding = '30px';
               container.style.backgroundColor = '#ffffff';
-              container.style.borderRadius = '0';
-              container.style.boxShadow = 'none';
+              container.style.display = 'block';
+              container.style.overflow = 'visible';
               
               container.classList.remove('space-y-4', 'space-y-6', 'space-y-8', 'rounded-[2.5rem]', 'px-1');
-              container.style.borderRadius = '0';
-              container.style.paddingLeft = '40px';
-              container.style.paddingRight = '40px';
 
-              const allElements = container.querySelectorAll('*');
-              allElements.forEach(el => {
-                const htmlEl = el as HTMLElement;
-                htmlEl.style.overflow = 'visible';
-                htmlEl.style.transition = 'none';
-                htmlEl.style.animation = 'none';
-                htmlEl.style.boxShadow = 'none';
-              });
-              
-              const nestedSpacedElements = container.querySelectorAll('.space-y-4, .space-y-2, .space-y-6');
-              nestedSpacedElements.forEach(el => {
-                el.classList.remove('space-y-4', 'space-y-2', 'space-y-6', 'pb-12');
-                (el as HTMLElement).style.display = 'block';
-                (el as HTMLElement).style.paddingBottom = '0';
-              });
-              
-              const truncatedElements = container.querySelectorAll('.truncate, .leading-snug, .leading-none, .leading-tight, .leading-relaxed');
-              truncatedElements.forEach(el => {
-                el.classList.remove('truncate', 'leading-snug', 'leading-none', 'leading-tight', 'leading-relaxed');
-                (el as HTMLElement).style.whiteSpace = 'normal';
-                (el as HTMLElement).style.overflow = 'visible';
-                (el as HTMLElement).style.lineHeight = '1.5';
-              });
-
-              const scrollableElements = container.querySelectorAll('.overflow-x-auto, .no-scrollbar');
-              scrollableElements.forEach(el => {
-                el.classList.remove('overflow-x-auto', 'no-scrollbar');
-                (el as HTMLElement).style.overflow = 'visible';
-                (el as HTMLElement).style.display = 'flex';
-                (el as HTMLElement).style.flexWrap = 'wrap';
-              });
-
-              const summaryCards = container.querySelectorAll('.summary-cards-container > div');
-              summaryCards.forEach(card => {
-                const el = card as HTMLElement;
-                el.style.flex = '1';
-                el.style.minWidth = '0';
-                el.style.backgroundColor = el.classList.contains('bg-rose-50/50') ? '#fff1f2' : '#f8fafc';
-                el.style.borderColor = el.classList.contains('border-rose-100') ? '#ffe4e6' : '#f1f5f9';
-                el.style.display = 'block';
-                el.style.padding = '20px';
-                el.style.borderRadius = '16px';
-                
-                const texts = el.querySelectorAll('p');
-                texts.forEach(text => {
-                  const p = text as HTMLElement;
-                  p.style.opacity = '1';
-                  p.style.visibility = 'visible';
-                  if (p.classList.contains('text-slate-400') || p.classList.contains('text-rose-400')) {
-                    p.style.color = '#64748b';
-                  } else if (p.classList.contains('text-slate-700') || p.classList.contains('text-rose-700')) {
-                    p.style.color = '#1e293b';
-                  }
+                const allElements = container.querySelectorAll('*');
+                allElements.forEach(el => {
+                  const htmlEl = el as HTMLElement;
+                  htmlEl.style.transition = 'none';
+                  htmlEl.style.animation = 'none';
+                  htmlEl.style.boxShadow = 'none';
+                  htmlEl.style.transform = 'none';
+                  htmlEl.style.opacity = '1';
                 });
-              });
 
-              const expenseCards = Array.from(container.querySelectorAll('.expense-card-pdf'));
-              if (expenseCards.length > 0) {
-                const parent = expenseCards[0].parentNode;
-                if (parent) {
-                  (parent as HTMLElement).style.display = 'block';
-                  (parent as HTMLElement).style.width = '100%';
-                  (parent as HTMLElement).classList.remove('grid', 'flex');
-                  
-                  expenseCards.forEach((card) => {
-                    const el = card as HTMLElement;
-                    el.style.pageBreakInside = 'avoid';
-                    el.style.breakInside = 'avoid-page';
-                    el.style.display = 'block';
-                    el.style.width = '100%';
-                    el.style.boxSizing = 'border-box';
-                    el.style.position = 'relative';
-                    el.style.overflow = 'visible';
-                    el.style.marginBottom = '25px';
-                    el.style.padding = '0';
-                    el.style.border = 'none';
-                    el.style.float = 'none';
-                    el.style.clear = 'both';
-                  });
-                }
-              }
+                // Target specific text elements for Bengali font fix
+                const textElements = container.querySelectorAll('h1, h2, h3, h4, h5, h6, p, span, div.text-xs, div.text-sm');
+                textElements.forEach(el => {
+                  const htmlEl = el as HTMLElement;
+                  htmlEl.style.lineHeight = '1.8';
+                  htmlEl.style.paddingTop = '2px';
+                  htmlEl.style.paddingBottom = '2px';
+                  htmlEl.style.overflow = 'visible';
+                });
 
-              const style = clonedDoc.createElement('style');
-              style.innerHTML = `
-                .expense-card-pdf {
-                  break-inside: avoid-page !important;
-                  page-break-inside: avoid !important;
-                  display: block !important;
-                  width: 100% !important;
-                  margin-bottom: 25px !important;
-                  position: relative !important;
-                  overflow: visible !important;
-                  clear: both !important;
+                const truncatedElements = container.querySelectorAll('.truncate, .line-clamp-1, .line-clamp-2, .leading-snug, .leading-tight, .leading-none');
+                truncatedElements.forEach(el => {
+                  el.classList.remove('truncate', 'line-clamp-1', 'line-clamp-2', 'leading-snug', 'leading-tight', 'leading-none');
+                  (el as HTMLElement).style.whiteSpace = 'normal';
+                  (el as HTMLElement).style.overflow = 'visible';
+                });
+                
+                const listContainer = clonedDoc.getElementById('expenses-list-container');
+                if (listContainer) {
+                  listContainer.style.display = 'block';
+                  listContainer.style.width = '100%';
+                  listContainer.style.overflow = 'visible';
+                  listContainer.classList.remove('grid', 'md:grid-cols-2', 'xl:grid-cols-3', 'gap-4');
                 }
-                .expense-card-pdf > div {
-                  break-inside: avoid-page !important;
-                  page-break-inside: avoid !important;
-                  box-shadow: none !important;
-                  border: 1px solid #cbd5e1 !important;
-                  border-radius: 12px !important;
-                  overflow: visible !important;
-                  background-color: white !important;
-                  display: block !important;
-                  width: 100% !important;
-                  position: relative !important;
-                }
-                .summary-cards-container {
-                  break-inside: avoid-page !important;
-                  page-break-inside: avoid !important;
-                  display: block !important;
-                  margin-bottom: 32px !important;
-                  overflow: visible !important;
-                  width: 100% !important;
-                  clear: both !important;
-                }
-                .summary-cards-container > div {
-                  display: inline-block !important;
-                  width: 30% !important;
-                  margin-right: 3% !important;
-                  background-color: #f8fafc !important;
-                  border: 1px solid #f1f5f9 !important;
-                  padding: 20px !important;
-                  border-radius: 16px !important;
-                  vertical-align: top !important;
-                  box-sizing: border-box !important;
-                }
-                .summary-cards-container > div:last-child {
-                  margin-right: 0 !important;
-                }
-                .summary-cards-container > div:first-child {
-                  background-color: #fff1f2 !important;
-                  border-color: #ffe4e6 !important;
-                }
-                .summary-cards-container p {
-                  margin: 0 !important;
-                  display: block !important;
-                }
-                #expenses-list-container {
-                  display: block !important;
-                  width: 100% !important;
-                  overflow: visible !important;
-                  padding-bottom: 50px !important;
-                }
-                #pdf-container {
-                  background-color: white !important;
-                  display: block !important;
-                  border-radius: 0 !important;
-                  overflow: visible !important;
-                  width: 1024px !important;
-                  padding-bottom: 100px !important;
-                }
-                #pdf-container * {
-                  overflow: visible !important;
-                  -webkit-print-color-adjust: exact;
-                  transition: none !important;
-                  animation: none !important;
-                  box-shadow: none !important;
-                }
-              `;
-              clonedDoc.head.appendChild(style);
+
+                const expenseCards = Array.from(container.querySelectorAll('.expense-card-pdf'));
+                expenseCards.forEach((card) => {
+                  const el = card as HTMLElement;
+                  el.style.display = 'table'; // Force table layout to prevent splitting
+                  el.style.width = '100%';
+                  el.style.marginBottom = '20px';
+                  el.style.pageBreakInside = 'avoid';
+                  el.style.breakInside = 'avoid';
+                  el.style.borderCollapse = 'separate';
+                });
             }
+
+            const style = clonedDoc.createElement('style');
+            style.innerHTML = `
+              .expense-card-pdf {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+                display: table !important;
+                width: 100% !important;
+                margin-bottom: 20px !important;
+                border-collapse: separate !important;
+              }
+              .expense-card-pdf > div {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+                border: 1px solid #cbd5e1 !important;
+                border-radius: 12px !important;
+                background-color: white !important;
+                box-shadow: none !important;
+                overflow: visible !important;
+                display: block !important;
+              }
+              h1, h2, h3, h4, h5, h6, p, span, div {
+                line-height: 1.8 !important;
+                overflow: visible !important;
+              }
+            `;
+            clonedDoc.head.appendChild(style);
           }
         },
         jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const },
-        pagebreak: { mode: ['avoid-all', 'css', 'legacy'], avoid: '.expense-card-pdf' }
+        pagebreak: { mode: ['css', 'legacy'], avoid: '.expense-card-pdf' }
       };
 
       const pdfBlob = await html2pdf().from(element).set(opt).output('blob');
@@ -588,29 +488,43 @@ export const Expenses: React.FC = () => {
 
       {/* Report Content Area (for PDF) */}
       <div id="pdf-container" ref={listRef} className={`${isGeneratingPDF ? 'block' : 'space-y-4 rounded-[2.5rem]'} px-1 py-4 bg-white`}>
-        {/* PDF Only Header */}
-        <div id="pdf-header" className={isGeneratingPDF ? "block mb-10" : "hidden"}>
-          <div className="flex justify-between items-center border-b-2 border-slate-100 pb-8 mb-8">
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 bg-rose-600 rounded-2xl flex items-center justify-center text-white shadow-xl">
-                <Music size={36} />
-              </div>
-              <div>
-                <h1 className="text-3xl font-black text-slate-900 leading-tight mb-2">Manage-Me</h1>
-                <p className="text-xs font-bold text-rose-600 uppercase tracking-widest">Professional Studio Manager</p>
-              </div>
+        
+        {isGeneratingPDF && (
+          <div className="mb-8 border-b-2 border-slate-100 pb-6">
+            <h1 className="text-2xl font-black text-slate-800 mb-1">খরচ রিপোর্ট</h1>
+            <p className="text-sm font-bold text-slate-500">তৈরি হয়েছে: {new Date().toLocaleDateString('bn-BD')}</p>
+          </div>
+        )}
+
+        {/* PDF Only Summary Section */}
+        {isGeneratingPDF && (
+          <div className="mb-8" style={{ display: 'flex', gap: '15px', width: '100%', marginBottom: '30px' }}>
+            <div style={{ flex: 1, backgroundColor: '#fff1f2', border: '1px solid #ffe4e6', padding: '20px', borderRadius: '16px' }}>
+              <p style={{ color: '#e11d48', fontSize: '12px', fontWeight: 'bold', marginBottom: '5px', textTransform: 'uppercase' }}>মোট খরচ</p>
+              <p style={{ color: '#9f1239', fontSize: '22px', fontWeight: '900', margin: 0 }}>{user?.currency || '৳'} {totalExpenseFiltered.toLocaleString('bn-BD')}</p>
             </div>
-            <div className="text-right">
-              <p className="text-sm font-black text-slate-900 uppercase tracking-tighter mb-1">খরচ রিপোর্ট</p>
-              <p className="text-[10px] font-bold text-slate-500">তারিখ: {new Date().toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-              <p className="text-[10px] font-bold text-slate-400">সময়: {new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' })}</p>
+            <div style={{ flex: 1, backgroundColor: '#f8fafc', border: '1px solid #f1f5f9', padding: '20px', borderRadius: '16px' }}>
+              <p style={{ color: '#64748b', fontSize: '12px', fontWeight: 'bold', marginBottom: '5px', textTransform: 'uppercase' }}>মোট রেকর্ড</p>
+              <p style={{ color: '#1e293b', fontSize: '22px', fontWeight: '900', margin: 0 }}>{filteredExpenses.length} টি</p>
+            </div>
+            <div style={{ flex: 1, backgroundColor: '#f8fafc', border: '1px solid #f1f5f9', padding: '20px', borderRadius: '16px' }}>
+              <p style={{ color: '#64748b', fontSize: '12px', fontWeight: 'bold', marginBottom: '5px', textTransform: 'uppercase' }}>সময়কাল</p>
+              <p style={{ color: '#1e293b', fontSize: '14px', fontWeight: 'bold', margin: 0, marginTop: '5px' }}>
+                {dateRange.start || dateRange.end ? (
+                  <>
+                    {dateRange.start ? new Date(dateRange.start).toLocaleDateString('bn-BD') : 'শুরু'} 
+                    {' - '} 
+                    {dateRange.end ? new Date(dateRange.end).toLocaleDateString('bn-BD') : 'বর্তমান'}
+                  </>
+                ) : 'সকল সময়'}
+              </p>
             </div>
           </div>
+        )}
 
-          <div 
-            className={`flex gap-4 mb-8 ${isGeneratingPDF ? 'summary-cards-container' : ''}`}
-            style={isGeneratingPDF ? { breakInside: 'avoid', pageBreakInside: 'avoid' } : {}}
-          >
+        {/* Original Summary Cards (Hidden in PDF) */}
+        {!isGeneratingPDF && (
+          <div className="flex gap-4 mb-8">
              <div className="flex-1 bg-rose-50/50 border border-rose-100 p-5 rounded-[2rem]">
                 <p className="text-[10px] font-bold text-rose-400 uppercase mb-1">মোট খরচ</p>
                 <p className="text-xl font-black text-rose-700">{user?.currency || '৳'} {totalExpenseFiltered.toLocaleString('bn-BD')}</p>
@@ -632,7 +546,7 @@ export const Expenses: React.FC = () => {
                 </p>
              </div>
           </div>
-        </div>
+        )}
 
         <div 
           id="expenses-list-container"
@@ -749,16 +663,6 @@ export const Expenses: React.FC = () => {
                 <Receipt size={48} />
               </div>
               
-              <div className="space-y-2">
-                <p className="text-sm font-bold text-slate-600">আপনার খরচের রিপোর্টটি সফলভাবে তৈরি করা হয়েছে।</p>
-                <p className="text-xs text-slate-400">নিচের বাটনটি ক্লিক করে আপনার ডিভাইসে সেভ করুন।</p>
-              </div>
-
-              <div className="bg-amber-50 text-amber-800 p-4 rounded-2xl text-[11px] font-bold border border-amber-100 flex items-start gap-2 text-left">
-                <AlertCircle size={16} className="shrink-0 mt-0.5" />
-                <span>যদি অ্যাপ থেকে ডাউনলোড না হয়, তবে <span className="text-emerald-600">"ব্রাউজারে ওপেন করুন"</span> বাটনে ক্লিক করুন অথবা <span className="text-emerald-600">"শেয়ার"</span> বাটন ব্যবহার করুন।</span>
-              </div>
-
               <div className="flex flex-col w-full gap-3">
                 {pdfPublicUrl ? (
                   <button 

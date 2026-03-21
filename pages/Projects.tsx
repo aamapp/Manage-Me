@@ -391,18 +391,19 @@ export const Projects: React.FC = () => {
   const handleDownloadPDF = async () => {
     if (!listRef.current) return;
     
+    window.scrollTo(0, 0);
     setIsGeneratingPDF(true);
     showToast('পিডিএফ তৈরি হচ্ছে...', 'info');
     
-    // Wait a bit for the UI to update
-    await new Promise(resolve => setTimeout(resolve, 300));
+    // Wait a bit for the UI to update and fonts to settle
+    await new Promise(resolve => setTimeout(resolve, 500));
     
     try {
       const element = listRef.current;
       const fileName = `projects_${clientFilter ? clientFilter : 'all'}_${new Date().getTime()}.pdf`;
       
       const opt = {
-        margin: [15, 15, 15, 15] as [number, number, number, number],
+        margin: [10, 10, 10, 10] as [number, number, number, number],
         filename: fileName,
         image: { type: 'jpeg' as const, quality: 0.98 },
         html2canvas: { 
@@ -410,162 +411,108 @@ export const Projects: React.FC = () => {
           useCORS: true,
           logging: false,
           backgroundColor: '#ffffff',
-          windowWidth: 1024,
-          width: 1024,
           scrollY: 0,
           scrollX: 0,
+          windowWidth: 794,
           onclone: (clonedDoc: Document) => {
-            // Fix for html2canvas/html2pdf clipping
             clonedDoc.documentElement.style.overflow = 'visible';
             clonedDoc.body.style.overflow = 'visible';
-            clonedDoc.documentElement.style.height = 'auto';
-            clonedDoc.body.style.height = 'auto';
-            clonedDoc.body.style.width = '1024px';
-
+            
             const pdfHeader = clonedDoc.getElementById('pdf-header');
-            if (pdfHeader) {
-              pdfHeader.style.display = 'block';
-              pdfHeader.style.breakAfter = 'avoid';
-            }
+            if (pdfHeader) pdfHeader.style.display = 'block';
             
             const pdfFooter = clonedDoc.getElementById('pdf-footer');
             if (pdfFooter) pdfFooter.style.display = 'block';
 
             const container = clonedDoc.getElementById('pdf-container');
             if (container) {
-              container.style.width = '1024px';
+              container.style.width = '794px'; // Standard A4 width at 96dpi
               container.style.maxWidth = 'none';
               container.style.margin = '0';
-              container.style.overflow = 'visible';
-              container.style.height = 'auto';
-              container.style.padding = '40px';
-              container.style.boxSizing = 'border-box';
+              container.style.padding = '30px';
               container.style.backgroundColor = '#ffffff';
-              container.style.borderRadius = '0';
-              container.style.boxShadow = 'none';
+              container.style.display = 'block';
+              container.style.overflow = 'visible';
               
-              // Remove space-y classes and use direct margins for better PDF rendering
               container.classList.remove('space-y-4', 'space-y-6', 'space-y-8', 'rounded-[2.5rem]', 'px-1');
-              container.style.borderRadius = '0';
 
-              const allElements = container.querySelectorAll('*');
-              allElements.forEach(el => {
-                const htmlEl = el as HTMLElement;
-                htmlEl.style.overflow = 'visible';
-                htmlEl.style.transition = 'none';
-                htmlEl.style.animation = 'none';
-                htmlEl.style.boxShadow = 'none';
-              });
-              
-              const nestedSpacedElements = container.querySelectorAll('.space-y-4, .space-y-2, .space-y-6');
-              nestedSpacedElements.forEach(el => {
-                el.classList.remove('space-y-4', 'space-y-2', 'space-y-6', 'pb-12');
-                (el as HTMLElement).style.display = 'block';
-                (el as HTMLElement).style.paddingBottom = '0';
-              });
-              
-              const truncatedElements = container.querySelectorAll('.truncate, .leading-snug, .leading-none, .leading-tight, .leading-relaxed');
-              truncatedElements.forEach(el => {
-                el.classList.remove('truncate', 'leading-snug', 'leading-none', 'leading-tight', 'leading-relaxed');
-                (el as HTMLElement).style.whiteSpace = 'normal';
-                (el as HTMLElement).style.overflow = 'visible';
-                (el as HTMLElement).style.lineHeight = '1.5';
-              });
+                const allElements = container.querySelectorAll('*');
+                allElements.forEach(el => {
+                  const htmlEl = el as HTMLElement;
+                  htmlEl.style.transition = 'none';
+                  htmlEl.style.animation = 'none';
+                  htmlEl.style.boxShadow = 'none';
+                  htmlEl.style.transform = 'none';
+                  htmlEl.style.opacity = '1';
+                });
 
-              // Remove animation classes that might interfere with PDF rendering
-              const animatedElements = container.querySelectorAll('.animate-in, .slide-in-from-bottom-2, .fade-in, .slide-in-from-top-2, .transition-all, .transition');
-              animatedElements.forEach(el => {
-                el.classList.remove('animate-in', 'slide-in-from-bottom-2', 'fade-in', 'slide-in-from-top-2', 'transition-all', 'transition');
-                (el as HTMLElement).style.opacity = '1';
-                (el as HTMLElement).style.transform = 'none';
-                (el as HTMLElement).style.animation = 'none';
-                (el as HTMLElement).style.transition = 'none';
-              });
+                // Target specific text elements for Bengali font fix
+                const textElements = container.querySelectorAll('h1, h2, h3, h4, h5, h6, p, span, div.text-xs, div.text-sm');
+                textElements.forEach(el => {
+                  const htmlEl = el as HTMLElement;
+                  htmlEl.style.lineHeight = '1.8';
+                  htmlEl.style.paddingTop = '2px';
+                  htmlEl.style.paddingBottom = '2px';
+                  htmlEl.style.overflow = 'visible';
+                });
 
-              // Remove overflow-x-auto and scrolling classes
-              const scrollableElements = container.querySelectorAll('.overflow-x-auto, .no-scrollbar');
-              scrollableElements.forEach(el => {
-                el.classList.remove('overflow-x-auto', 'no-scrollbar');
-                (el as HTMLElement).style.overflow = 'visible';
-                (el as HTMLElement).style.display = 'flex';
-                (el as HTMLElement).style.flexWrap = 'wrap';
-              });
+                const truncatedElements = container.querySelectorAll('.truncate, .line-clamp-1, .line-clamp-2, .leading-snug, .leading-tight, .leading-none');
+                truncatedElements.forEach(el => {
+                  el.classList.remove('truncate', 'line-clamp-1', 'line-clamp-2', 'leading-snug', 'leading-tight', 'leading-none');
+                  (el as HTMLElement).style.whiteSpace = 'normal';
+                  (el as HTMLElement).style.overflow = 'visible';
+                });
+                
+                const listContainer = clonedDoc.getElementById('projects-list-container');
+                if (listContainer) {
+                  listContainer.style.display = 'block';
+                  listContainer.style.width = '100%';
+                  listContainer.style.overflow = 'visible';
+                  listContainer.classList.remove('grid', 'md:grid-cols-2', 'xl:grid-cols-3', 'gap-4');
+                }
 
-              // Group project cards into pages for equal spacing
-              const projectCards = Array.from(container.querySelectorAll('.project-card-pdf'));
-              if (projectCards.length > 0) {
-                const parent = projectCards[0].parentNode;
-                if (parent) {
-                  // Ensure parent is a block container for proper page breaking
-                  (parent as HTMLElement).style.display = 'block';
-                  (parent as HTMLElement).style.width = '100%';
-                  (parent as HTMLElement).classList.remove('grid', 'flex');
-                  
-                  projectCards.forEach((card) => {
-                    const el = card as HTMLElement;
-                    el.style.pageBreakInside = 'avoid';
-                    el.style.breakInside = 'avoid-page';
-                    el.style.display = 'block';
-                    el.style.width = '100%';
-                    el.style.boxSizing = 'border-box';
-                    el.style.position = 'relative';
-                    el.style.overflow = 'visible';
-                    el.style.marginBottom = '25px';
-                    el.style.padding = '0';
-                    el.style.border = 'none';
-                    el.style.float = 'none';
-                    el.style.clear = 'both';
-                  });
-                }
-              }
-
-              // Add style to prevent page breaks inside cards and fix text clipping
-              const style = clonedDoc.createElement('style');
-              style.innerHTML = `
-                .project-card-pdf {
-                  break-inside: avoid-page !important;
-                  page-break-inside: avoid !important;
-                  display: block !important;
-                  width: 100% !important;
-                  margin-bottom: 25px !important;
-                  position: relative !important;
-                  overflow: visible !important;
-                  clear: both !important;
-                }
-                .project-card-pdf > div {
-                  break-inside: avoid-page !important;
-                  page-break-inside: avoid !important;
-                  box-shadow: none !important;
-                  border: 1px solid #cbd5e1 !important;
-                  border-radius: 12px !important;
-                  overflow: visible !important;
-                  background-color: white !important;
-                  display: block !important;
-                  width: 100% !important;
-                  position: relative !important;
-                }
-                #pdf-container {
-                  background-color: white !important;
-                  display: block !important;
-                  border-radius: 0 !important;
-                  overflow: visible !important;
-                  width: 1024px !important;
-                  padding-bottom: 100px !important;
-                }
-                #pdf-container * {
-                  overflow: visible !important;
-                  -webkit-print-color-adjust: exact;
-                  transition: none !important;
-                  animation: none !important;
-                  box-shadow: none !important;
-                }
-              `;
-              clonedDoc.head.appendChild(style);
+                const projectCards = Array.from(container.querySelectorAll('.project-card-pdf'));
+                projectCards.forEach((card) => {
+                  const el = card as HTMLElement;
+                  el.style.display = 'table'; // Force table layout to prevent splitting
+                  el.style.width = '100%';
+                  el.style.marginBottom = '20px';
+                  el.style.pageBreakInside = 'avoid';
+                  el.style.breakInside = 'avoid';
+                  el.style.borderCollapse = 'separate';
+                });
             }
+
+            const style = clonedDoc.createElement('style');
+            style.innerHTML = `
+              .project-card-pdf {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+                display: table !important;
+                width: 100% !important;
+                margin-bottom: 20px !important;
+                border-collapse: separate !important;
+              }
+              .project-card-pdf > div {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+                border: 1px solid #cbd5e1 !important;
+                border-radius: 12px !important;
+                background-color: white !important;
+                box-shadow: none !important;
+                overflow: visible !important;
+                display: block !important;
+              }
+              h1, h2, h3, h4, h5, h6, p, span, div {
+                line-height: 1.8 !important;
+                overflow: visible !important;
+              }
+            `;
+            clonedDoc.head.appendChild(style);
           }
         },
         jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const },
-        pagebreak: { mode: ['avoid-all', 'css', 'legacy'], avoid: '.project-card-pdf' }
+        pagebreak: { mode: ['css', 'legacy'], avoid: '.project-card-pdf' }
       };
 
       // Generate PDF as blob for Supabase upload
@@ -720,70 +667,35 @@ export const Projects: React.FC = () => {
 
       {/* Report Content Area (for PDF) */}
       <div id="pdf-container" ref={listRef} className={`${isGeneratingPDF ? 'block' : 'space-y-4 rounded-[2.5rem]'} px-1 py-4 bg-white`}>
-        {/* PDF Only Header */}
-        <div id="pdf-header" className={isGeneratingPDF ? "block mb-10" : "hidden"}>
-          <div className="flex justify-between items-center border-b-2 border-slate-100 pb-8 mb-8">
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-xl">
-                <Music size={36} />
-              </div>
-              <div>
-                <h1 className="text-3xl font-black text-slate-900 leading-tight mb-2">Manage-Me</h1>
-                <p className="text-xs font-bold text-indigo-600 uppercase tracking-widest">Professional Studio Manager</p>
-              </div>
+        
+        {isGeneratingPDF && (
+          <div className="mb-8 border-b-2 border-slate-100 pb-6">
+            <h1 className="text-2xl font-black text-slate-800 mb-1">প্রজেক্ট রিপোর্ট</h1>
+            <p className="text-sm font-bold text-slate-500">তৈরি হয়েছে: {new Date().toLocaleDateString('bn-BD')}</p>
+          </div>
+        )}
+
+        {/* PDF Only Summary Section */}
+        {isGeneratingPDF && summaryStats && (
+          <div className="mb-8" style={{ display: 'flex', gap: '15px', width: '100%', marginBottom: '30px' }}>
+            <div style={{ flex: 1, backgroundColor: '#f8fafc', border: '1px solid #f1f5f9', padding: '20px', borderRadius: '16px' }}>
+              <p style={{ color: '#64748b', fontSize: '12px', fontWeight: 'bold', marginBottom: '5px', textTransform: 'uppercase' }}>মোট বাজেট</p>
+              <p style={{ color: '#1e293b', fontSize: '22px', fontWeight: '900', margin: 0 }}>{currency}{summaryStats.total.toLocaleString('bn-BD')}</p>
             </div>
-            <div className="text-right">
-              <p className="text-sm font-black text-slate-900 uppercase tracking-tighter mb-1">প্রজেক্ট রিপোর্ট</p>
-              <p className="text-[10px] font-bold text-slate-500">তারিখ: {new Date().toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-              <p className="text-[10px] font-bold text-slate-400">সময়: {new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' })}</p>
+            <div style={{ flex: 1, backgroundColor: '#f0fdf4', border: '1px solid #dcfce7', padding: '20px', borderRadius: '16px' }}>
+              <p style={{ color: '#10b981', fontSize: '12px', fontWeight: 'bold', marginBottom: '5px', textTransform: 'uppercase' }}>মোট আদায়</p>
+              <p style={{ color: '#065f46', fontSize: '22px', fontWeight: '900', margin: 0 }}>{currency}{summaryStats.paid.toLocaleString('bn-BD')}</p>
+            </div>
+            <div style={{ flex: 1, backgroundColor: '#fef2f2', border: '1px solid #fee2e2', padding: '20px', borderRadius: '16px' }}>
+              <p style={{ color: '#ef4444', fontSize: '12px', fontWeight: 'bold', marginBottom: '5px', textTransform: 'uppercase' }}>মোট বকেয়া</p>
+              <p style={{ color: '#991b1b', fontSize: '22px', fontWeight: '900', margin: 0 }}>{currency}{summaryStats.due.toLocaleString('bn-BD')}</p>
             </div>
           </div>
+        )}
 
-          <div className="flex gap-4 mb-4">
-             <div className="flex-1 bg-indigo-50/50 border border-indigo-100 p-5 rounded-[2rem]">
-                <p className="text-[10px] font-bold text-indigo-400 uppercase mb-1">ক্লায়েন্ট</p>
-                <p className="text-xl font-black text-indigo-700">{clientFilter || 'সকল ক্লায়েন্ট'}</p>
-             </div>
-             <div className="flex-1 bg-slate-50 border border-slate-100 p-5 rounded-[2rem]">
-                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">মোট প্রজেক্ট</p>
-                <p className="text-xl font-black text-slate-700">{filteredProjects.length} টি</p>
-             </div>
-             <div className="flex-1 bg-slate-50 border border-slate-100 p-5 rounded-[2rem]">
-                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">হিসাবের সময়কাল</p>
-                <p className="text-sm font-black text-slate-700 mt-1">
-                  {dateRange.start || dateRange.end ? (
-                    <>
-                      {dateRange.start ? new Date(dateRange.start).toLocaleDateString('bn-BD') : 'শুরু'} 
-                      {' - '} 
-                      {dateRange.end ? new Date(dateRange.end).toLocaleDateString('bn-BD') : 'বর্তমান'}
-                    </>
-                  ) : 'সকল সময়'}
-                </p>
-             </div>
-          </div>
-
-          <div className="mb-8 break-inside-avoid">
-             <h2 className="text-sm font-bold text-slate-800 mb-3 border-l-4 border-indigo-500 pl-2">হিসাব সারসংক্ষেপ</h2>
-             <div className="flex gap-4">
-                <div className="flex-1 bg-white border border-slate-100 p-4 rounded-2xl shadow-sm">
-                   <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">মোট বাজেট</p>
-                   <p className="text-lg font-black text-slate-700">{currency}{summaryStats.total.toLocaleString('bn-BD')}</p>
-                </div>
-                <div className="flex-1 bg-white border border-slate-100 p-4 rounded-2xl shadow-sm">
-                   <p className="text-[10px] font-bold text-emerald-500 uppercase mb-1">মোট আদায়</p>
-                   <p className="text-lg font-black text-emerald-600">{currency}{summaryStats.paid.toLocaleString('bn-BD')}</p>
-                </div>
-                <div className="flex-1 bg-white border border-slate-100 p-4 rounded-2xl shadow-sm">
-                   <p className="text-[10px] font-bold text-rose-500 uppercase mb-1">মোট বকেয়া</p>
-                   <p className="text-lg font-black text-rose-600">{currency}{summaryStats.due.toLocaleString('bn-BD')}</p>
-                </div>
-             </div>
-          </div>
-        </div>
-
-        {/* Active Client Filter Banner & Stats */}
-        {clientFilter && (
-          <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300" data-html2canvas-ignore="true">
+        {/* Active Client Filter Banner & Stats (Hidden in PDF) */}
+        {!isGeneratingPDF && clientFilter && (
+          <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
             <div className="bg-indigo-50 border border-indigo-100 p-3 rounded-2xl flex items-center justify-between shadow-sm">
                 <div className="flex items-center gap-2 text-indigo-700">
                     <div className="w-7 h-7 bg-white rounded-lg flex items-center justify-center text-indigo-600 shadow-sm">
@@ -793,7 +705,6 @@ export const Projects: React.FC = () => {
                 </div>
                 <button 
                     onClick={clearClientFilter}
-                    data-html2canvas-ignore="true"
                     className="p-1.5 bg-white rounded-full text-indigo-400 hover:text-rose-500 transition-colors shadow-sm active:scale-90"
                 >
                     <X size={14} />
@@ -929,15 +840,9 @@ export const Projects: React.FC = () => {
             ))
           )}
         </div>
-
-        {/* PDF Only Footer */}
-        <div id="pdf-footer" className={isGeneratingPDF ? "block mt-12 pt-6 border-t border-slate-100 text-center" : "hidden"}>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Generated by Manage-Me Studio Manager</p>
-          <p className="text-[8px] text-slate-300 mt-1">© {new Date().getFullYear()} All Rights Reserved</p>
-        </div>
       </div>
 
-      <ConfirmModal 
+        <ConfirmModal 
         isOpen={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}
         onConfirm={handleConfirmDelete}
@@ -1201,15 +1106,6 @@ export const Projects: React.FC = () => {
               <div className="p-8 text-center space-y-4">
                  <div className="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
                     <Download size={36} />
-                 </div>
-                 <div>
-                    <h4 className="font-bold text-slate-800 text-lg">রিপোর্ট তৈরি হয়েছে!</h4>
-                    <p className="text-xs text-slate-500 mt-1">নিচের অপশনগুলো ব্যবহার করে রিপোর্টটি সেভ করুন।</p>
-                 </div>
-                 
-                 <div className="bg-amber-50 text-amber-800 p-4 rounded-2xl text-[11px] font-bold border border-amber-100 flex items-start gap-2 text-left">
-                    <AlertCircle size={16} className="shrink-0 mt-0.5" />
-                    <span>যদি অ্যাপ থেকে ডাউনলোড না হয়, তবে <span className="text-indigo-600">"ব্রাউজারে ওপেন করুন"</span> বাটনে ক্লিক করুন।</span>
                  </div>
               </div>
 

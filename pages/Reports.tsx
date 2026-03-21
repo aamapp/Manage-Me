@@ -318,70 +318,12 @@ export const Reports: React.FC = () => {
             <button onClick={resetFilter} className="w-full py-2 bg-slate-100 text-slate-600 rounded-xl font-bold text-sm hover:bg-slate-200 transition-colors">ফিল্টার রিসেট করুন</button>
             )}
         </div>
-
-        {/* Action Button */}
-        <div className="w-full">
-          <button 
-            onClick={handleDownloadImage}
-            disabled={!hasData || isCapturing}
-            className="w-full bg-indigo-600 text-white px-5 py-3.5 rounded-xl font-bold flex justify-center items-center gap-2 text-sm disabled:opacity-50 shadow-lg shadow-indigo-200 active:scale-[0.98] transition-all hover:bg-indigo-700"
-          >
-            {isCapturing ? <RefreshCcw size={18} className="animate-spin" /> : <Share2 size={18} />}
-            <span>{isCapturing ? 'তৈরি হচ্ছে...' : 'রিপোর্ট শেয়ার / ডাউনলোড'}</span>
-          </button>
-        </div>
       </div>
 
       {/* Report Content (Capture Area) */}
       <div className="overflow-hidden rounded-none shadow-xl">
-        <div id="report-container" ref={reportRef} className="bg-white min-h-[750px] relative w-full mx-auto">
+        <div id="report-container" ref={reportRef} className="bg-white relative w-full mx-auto">
             
-            {/* Watermark Pattern */}
-            <div className="absolute inset-0 opacity-[0.02] pointer-events-none z-0 flex items-center justify-center overflow-hidden">
-                <Hexagon size={500} strokeWidth={0.5} />
-            </div>
-
-            {/* Compact Premium Header */}
-            <div className="bg-slate-900 px-6 py-8 text-white flex justify-between items-center relative overflow-hidden z-10">
-                {/* Abstract Shapes */}
-                <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
-                
-                <div className="relative z-10">
-                    <div className="flex items-center gap-2.5 mb-1">
-                        <div className="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/30">
-                            <span className="font-black text-lg">M</span>
-                        </div>
-                        <h1 className="text-2xl font-black tracking-tight">{APP_NAME}</h1>
-                    </div>
-                    <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em] pl-1">ফাইন্যান্সিয়াল রিপোর্ট</p>
-                </div>
-
-                <div className="flex items-center gap-3 relative z-10">
-                    <div className="text-right">
-                        <p className="font-bold text-sm text-white">{user?.name}</p>
-                        <p className="text-[10px] text-slate-400 font-medium">{user?.email}</p>
-                    </div>
-                    {user?.avatar_url ? (
-                        <img 
-                            src={user.avatar_url} 
-                            alt="Profile" 
-                            className="w-10 h-10 rounded-full border border-slate-600 object-cover" 
-                            crossOrigin="anonymous" 
-                        />
-                    ) : (
-                        <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center font-bold text-sm border border-slate-600">
-                            {user?.name?.charAt(0)}
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* Date Ribbon */}
-            <div className="bg-indigo-50 border-b border-indigo-100 py-2 text-center text-xs font-bold text-indigo-900 tracking-wide flex justify-center items-center gap-2">
-                <Clock size={12} className="text-indigo-600" />
-                <span>সময়কাল: {getReportPeriodText()}</span>
-            </div>
-
             {/* Main Content Body */}
             <div className="p-6 space-y-6 relative z-10">
                 
@@ -527,16 +469,6 @@ export const Reports: React.FC = () => {
                 )}
             </div>
 
-            {/* Simple Footer */}
-            <div className="bg-slate-50 px-6 py-4 border-t border-slate-200 mt-4 flex justify-between items-center">
-                <div className="flex items-center gap-1.5 opacity-60">
-                    <span className="font-bold text-xs text-slate-600">{APP_NAME}</span>
-                </div>
-                <p className="text-[10px] text-slate-400">{new Date().toLocaleDateString('bn-BD', { dateStyle: 'full' })}</p>
-            </div>
-            
-            {/* Bottom Color Bar */}
-            <div className="h-1.5 w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-rose-500"></div>
         </div>
       </div>
 
@@ -567,11 +499,6 @@ export const Reports: React.FC = () => {
               </div>
 
               <div className="p-6 border-t bg-white space-y-4">
-                 <div className="bg-amber-50 text-amber-800 p-4 rounded-2xl text-[11px] font-bold border border-amber-100 flex items-start gap-2">
-                    <AlertCircle size={16} className="shrink-0 mt-0.5" />
-                    <span>যদি অ্যাপ থেকে ডাউনলোড না হয়, তবে <span className="text-indigo-600">"ব্রাউজারে ওপেন করুন"</span> বাটনে ক্লিক করুন অথবা ছবিটি <span className="text-indigo-600">লং-প্রেস</span> করে সেভ করুন।</span>
-                 </div>
-
                  <div className="flex flex-col gap-3">
                     {publicUrl ? (
                       <button 
