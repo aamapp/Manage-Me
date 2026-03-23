@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { User as UserIcon, Bell, Shield, Palette, Globe, Save, CheckCircle2, Loader2, Camera, UploadCloud, AlertCircle, Lock, Key } from 'lucide-react';
+import { User as UserIcon, Bell, Shield, Palette, Globe, Save, CheckCircle2, Loader2, Camera, UploadCloud, AlertCircle, Lock, Key, Trash2 } from 'lucide-react';
 import { APP_NAME } from '../constants';
 import { useAppContext } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
@@ -22,6 +22,8 @@ export const Settings: React.FC = () => {
   // Security State
   const [newPassword, setNewPassword] = useState('');
   const [isChangingPass, setIsChangingPass] = useState(false);
+  const [isClearingStorage, setIsClearingStorage] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   
   // 'setup' means setting a new pin, 'disable' means verifying pin to turn it off
   const [pinAction, setPinAction] = useState<'setup' | 'disable' | null>(null);
@@ -186,6 +188,59 @@ export const Settings: React.FC = () => {
       setPinAction(null);
   };
 
+  const handleClearStorage = () => {
+    setShowClearConfirm(true);
+  };
+
+  const executeClearStorage = async () => {
+    setShowClearConfirm(false);
+    setIsClearingStorage(true);
+    try {
+      const folders = ['pdfs', 'expenses', 'projects'];
+      let totalDeleted = 0;
+
+      for (const folder of folders) {
+        const { data: files, error: listError } = await supabase.storage
+          .from('reports')
+          .list(folder);
+
+        if (listError) continue;
+
+        if (files && files.length > 0) {
+          const filesToRemove = files.map(f => `${folder}/${f.name}`);
+          const { error: deleteError } = await supabase.storage
+            .from('reports')
+            .remove(filesToRemove);
+
+          if (!deleteError) {
+            totalDeleted += files.length;
+          }
+        }
+      }
+
+      // Also check root
+      const { data: rootFiles } = await supabase.storage.from('reports').list();
+      if (rootFiles && rootFiles.length > 0) {
+        const rootFilesToRemove = rootFiles.filter(f => !f.id).map(f => f.name);
+        if (rootFilesToRemove.length > 0) {
+          await supabase.storage.from('reports').remove(rootFilesToRemove);
+          totalDeleted += rootFilesToRemove.length;
+        }
+      }
+
+      if (totalDeleted > 0) {
+        showToast(`${totalDeleted} টি পুরনো ফাইল সফলভাবে ডিলিট করা হয়েছে!`, 'success');
+      } else {
+        showToast('কোনো পুরনো ফাইল পাওয়া যায়নি। আপনার স্টোরেজ ইতিমধ্যে পরিষ্কার আছে।', 'success');
+      }
+    } catch (err: any) {
+      console.error('Clear Storage Error:', err);
+      showToast('ফাইল ডিলিট করতে সমস্যা হয়েছে', 'error');
+    } finally {
+      setIsClearingStorage(false);
+    }
+  };
+
   if (!user) return null;
 
   return (
@@ -307,6 +362,27 @@ export const Settings: React.FC = () => {
                     </button>
                 </div>
              </div>
+
+             {/* Data Management */}
+             <div className="pt-6 mt-6 border-t border-slate-100">
+               <h4 className="font-bold text-slate-800 mb-4 flex items-center gap-2 text-sm">
+                 <Trash2 size={16} className="text-red-500" />
+                 ডেটা ম্যানেজমেন্ট
+               </h4>
+               <div className="bg-red-50 p-4 rounded-xl border border-red-100">
+                 <p className="text-xs text-red-600 font-medium mb-3">
+                   সুপাবেজ স্টোরেজে জমা থাকা সব পুরনো পিডিএফ রিপোর্ট ডিলিট করুন। এটি আপনার স্টোরেজ খালি করতে সাহায্য করবে।
+                 </p>
+                 <button 
+                   onClick={handleClearStorage}
+                   disabled={isClearingStorage}
+                   className="w-full flex justify-center items-center gap-2 px-4 py-3 rounded-xl font-bold bg-white text-red-600 border border-red-200 hover:bg-red-600 hover:text-white active:scale-95 transition-all text-sm"
+                 >
+                   {isClearingStorage ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                   {isClearingStorage ? 'ডিলিট হচ্ছে...' : 'সব রিপোর্ট ডিলিট করুন'}
+                 </button>
+               </div>
+             </div>
           </div>
         </div>
       </div>
@@ -321,6 +397,37 @@ export const Settings: React.FC = () => {
             onSuccess={handlePinSuccess}
             onCancel={() => setPinAction(null)}
           />
+      )}
+
+      {/* Clear Storage Confirmation Modal */}
+      {showClearConfirm && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="p-6 text-center">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <AlertCircle size={32} className="text-red-600" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-800 mb-2">সতর্কতা!</h3>
+              <p className="text-slate-600 text-sm mb-6">
+                আপনি কি নিশ্চিত যে আপনি সব পুরনো পিডিএফ রিপোর্ট ডিলিট করতে চান? এটি আর ফিরে পাওয়া যাবে না।
+              </p>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setShowClearConfirm(false)}
+                  className="flex-1 py-3 rounded-xl font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
+                >
+                  বাতিল
+                </button>
+                <button 
+                  onClick={executeClearStorage}
+                  className="flex-1 py-3 rounded-xl font-bold bg-red-600 text-white hover:bg-red-700 transition-colors shadow-lg shadow-red-200"
+                >
+                  হ্যাঁ, ডিলিট করুন
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

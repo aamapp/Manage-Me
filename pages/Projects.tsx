@@ -7,7 +7,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas';
 import html2pdf from 'html2pdf.js';
-import { PROJECT_STATUS_LABELS, PROJECT_TYPE_LABELS } from '../constants';
+import { PROJECT_STATUS_LABELS, PROJECT_TYPE_LABELS, APP_NAME } from '../constants';
 import { Project, ProjectStatus, ProjectType, Client } from '../types';
 import { useAppContext } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
@@ -396,14 +396,14 @@ export const Projects: React.FC = () => {
     showToast('পিডিএফ তৈরি হচ্ছে...', 'info');
     
     // Wait a bit for the UI to update and fonts to settle
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 800));
     
     try {
       const element = listRef.current;
       const fileName = `projects_${clientFilter ? clientFilter : 'all'}_${new Date().getTime()}.pdf`;
       
       const opt = {
-        margin: [10, 10, 10, 10] as [number, number, number, number],
+        margin: [15, 15, 15, 15],
         filename: fileName,
         image: { type: 'jpeg' as const, quality: 0.98 },
         html2canvas: { 
@@ -411,28 +411,29 @@ export const Projects: React.FC = () => {
           useCORS: true,
           logging: false,
           backgroundColor: '#ffffff',
+          letterRendering: true,
           scrollY: 0,
           scrollX: 0,
           windowWidth: 794,
           onclone: (clonedDoc: Document) => {
             clonedDoc.documentElement.style.overflow = 'visible';
+            clonedDoc.documentElement.style.height = 'auto';
             clonedDoc.body.style.overflow = 'visible';
+            clonedDoc.body.style.height = 'auto';
             
             const pdfHeader = clonedDoc.getElementById('pdf-header');
-            if (pdfHeader) pdfHeader.style.display = 'block';
-            
             const pdfFooter = clonedDoc.getElementById('pdf-footer');
-            if (pdfFooter) pdfFooter.style.display = 'block';
-
             const container = clonedDoc.getElementById('pdf-container');
+
             if (container) {
               container.style.width = '794px'; // Standard A4 width at 96dpi
               container.style.maxWidth = 'none';
               container.style.margin = '0';
-              container.style.padding = '30px';
+              container.style.padding = '0'; 
               container.style.backgroundColor = '#ffffff';
               container.style.display = 'block';
               container.style.overflow = 'visible';
+              container.style.height = 'auto';
               
               container.classList.remove('space-y-4', 'space-y-6', 'space-y-8', 'rounded-[2.5rem]', 'px-1');
 
@@ -469,18 +470,16 @@ export const Projects: React.FC = () => {
                   listContainer.style.width = '100%';
                   listContainer.style.overflow = 'visible';
                   listContainer.classList.remove('grid', 'md:grid-cols-2', 'xl:grid-cols-3', 'gap-4');
-                }
 
-                const projectCards = Array.from(container.querySelectorAll('.project-card-pdf'));
-                projectCards.forEach((card) => {
-                  const el = card as HTMLElement;
-                  el.style.display = 'table'; // Force table layout to prevent splitting
-                  el.style.width = '100%';
-                  el.style.marginBottom = '20px';
-                  el.style.pageBreakInside = 'avoid';
-                  el.style.breakInside = 'avoid';
-                  el.style.borderCollapse = 'separate';
-                });
+                  const cards = Array.from(listContainer.querySelectorAll('.project-card-pdf'));
+                  cards.forEach((card) => {
+                    const cardEl = card as HTMLElement;
+                    cardEl.style.display = 'block';
+                    cardEl.style.width = '100%';
+                    cardEl.style.paddingBottom = '20px';
+                    cardEl.style.marginBottom = '0';
+                  });
+                }
             }
 
             const style = clonedDoc.createElement('style');
@@ -488,57 +487,34 @@ export const Projects: React.FC = () => {
               .project-card-pdf {
                 page-break-inside: avoid !important;
                 break-inside: avoid !important;
-                display: table !important;
+                display: block !important;
                 width: 100% !important;
-                margin-bottom: 20px !important;
-                border-collapse: separate !important;
+                position: relative !important;
+                padding-bottom: 20px !important;
+                margin-bottom: 0 !important;
               }
               .project-card-pdf > div {
-                page-break-inside: avoid !important;
-                break-inside: avoid !important;
                 border: 1px solid #cbd5e1 !important;
                 border-radius: 12px !important;
                 background-color: white !important;
                 box-shadow: none !important;
-                overflow: visible !important;
+                padding: 20px !important;
                 display: block !important;
               }
               h1, h2, h3, h4, h5, h6, p, span, div {
-                line-height: 1.8 !important;
-                overflow: visible !important;
+                line-height: 1.6 !important;
               }
             `;
             clonedDoc.head.appendChild(style);
           }
         },
         jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const },
-        pagebreak: { mode: ['css', 'legacy'], avoid: '.project-card-pdf' }
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'], avoid: '.project-card-pdf' }
       };
 
-      // Generate PDF as blob for Supabase upload
+      // Generate PDF as blob
       const pdfBlob = await html2pdf().from(element).set(opt).output('blob');
       
-      // Try to upload to Supabase Storage for a real URL (Best for Mobile Apps)
-      let publicUrl = null;
-      try {
-        const { data, error } = await supabase.storage
-          .from('reports')
-          .upload(`pdfs/${fileName}`, pdfBlob, {
-            contentType: 'application/pdf',
-            upsert: true
-          });
-          
-        if (!error && data) {
-          const { data: { publicUrl: url } } = supabase.storage
-            .from('reports')
-            .getPublicUrl(`pdfs/${fileName}`);
-          publicUrl = url;
-          setPdfPublicUrl(url);
-        }
-      } catch (storageErr) {
-        console.warn('Supabase storage upload failed, falling back to blob', storageErr);
-      }
-
       // Try Native Share first (Best for Mobile Apps)
       if (navigator.share && navigator.canShare) {
         const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
@@ -669,9 +645,18 @@ export const Projects: React.FC = () => {
       <div id="pdf-container" ref={listRef} className={`${isGeneratingPDF ? 'block' : 'space-y-4 rounded-[2.5rem]'} px-1 py-4 bg-white`}>
         
         {isGeneratingPDF && (
-          <div className="mb-8 border-b-2 border-slate-100 pb-6">
-            <h1 className="text-2xl font-black text-slate-800 mb-1">প্রজেক্ট রিপোর্ট</h1>
-            <p className="text-sm font-bold text-slate-500">তৈরি হয়েছে: {new Date().toLocaleDateString('bn-BD')}</p>
+          <div className="mb-8 border-b-2 border-slate-100 pb-6 flex justify-between items-end">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">M</div>
+                <h1 className="text-2xl font-black text-slate-800">{APP_NAME}</h1>
+              </div>
+              <h2 className="text-xl font-bold text-slate-700">প্রজেক্ট রিপোর্ট</h2>
+            </div>
+            <div className="text-right">
+              <p className="text-sm font-bold text-slate-500">তৈরি হয়েছে:</p>
+              <p className="text-base font-bold text-slate-800">{new Date().toLocaleString('bn-BD')}</p>
+            </div>
           </div>
         )}
 
@@ -751,7 +736,8 @@ export const Projects: React.FC = () => {
                   pageBreakInside: 'avoid',
                   width: '100%',
                   display: 'block',
-                  marginBottom: '30px'
+                  paddingBottom: '20px',
+                  marginBottom: '0'
                 } : {}}
               >
                 <div className={`bg-white rounded-2xl border border-slate-100 shadow-sm relative ${isGeneratingPDF ? '' : 'animate-in slide-in-from-bottom-2 duration-300'}`}>
