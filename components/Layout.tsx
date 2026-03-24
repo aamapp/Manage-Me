@@ -412,11 +412,23 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                     </div>
 
                     <div className="grid grid-cols-3 gap-3">
-                        <a href={DEVELOPER_INFO.facebook} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-1 p-2 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors">
+                        <a 
+                          href={DEVELOPER_INFO.facebook} 
+                          onClick={(e) => { e.preventDefault(); window.open(DEVELOPER_INFO.facebook, '_blank'); }}
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="flex flex-col items-center gap-1 p-2 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                        >
                             <Facebook size={20} />
                             <span className="text-[10px] font-bold">ফেইসবুক</span>
                         </a>
-                        <a href={DEVELOPER_INFO.whatsapp} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-1 p-2 rounded-xl bg-green-50 text-green-600 hover:bg-green-100 transition-colors">
+                        <a 
+                          href={DEVELOPER_INFO.whatsapp} 
+                          onClick={(e) => { e.preventDefault(); window.open(DEVELOPER_INFO.whatsapp, '_blank'); }}
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="flex flex-col items-center gap-1 p-2 rounded-xl bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
+                        >
                             <MessageCircle size={20} />
                             <span className="text-[10px] font-bold">হোয়াটসঅ্যাপ</span>
                         </a>
@@ -424,15 +436,33 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                             <Phone size={20} />
                             <span className="text-[10px] font-bold">কল করুন</span>
                         </a>
-                        <a href={DEVELOPER_INFO.instagram} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-1 p-2 rounded-xl bg-pink-50 text-pink-600 hover:bg-pink-100 transition-colors">
+                        <a 
+                          href={DEVELOPER_INFO.instagram} 
+                          onClick={(e) => { e.preventDefault(); window.open(DEVELOPER_INFO.instagram, '_blank'); }}
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="flex flex-col items-center gap-1 p-2 rounded-xl bg-pink-50 text-pink-600 hover:bg-pink-100 transition-colors"
+                        >
                             <Instagram size={20} />
                             <span className="text-[10px] font-bold">ইন্সটাগ্রাম</span>
                         </a>
-                        <a href={DEVELOPER_INFO.telegram} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-1 p-2 rounded-xl bg-sky-50 text-sky-600 hover:bg-sky-100 transition-colors">
+                        <a 
+                          href={DEVELOPER_INFO.telegram} 
+                          onClick={(e) => { e.preventDefault(); window.open(DEVELOPER_INFO.telegram, '_blank'); }}
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="flex flex-col items-center gap-1 p-2 rounded-xl bg-sky-50 text-sky-600 hover:bg-sky-100 transition-colors"
+                        >
                             <Send size={20} />
                             <span className="text-[10px] font-bold">টেলিগ্রাম</span>
                         </a>
-                        <a href={DEVELOPER_INFO.website} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-1 p-2 rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors">
+                        <a 
+                          href={DEVELOPER_INFO.website} 
+                          onClick={(e) => { e.preventDefault(); window.open(DEVELOPER_INFO.website, '_blank'); }}
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="flex flex-col items-center gap-1 p-2 rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors"
+                        >
                             <Globe size={20} />
                             <span className="text-[10px] font-bold">ওয়েবসাইট</span>
                         </a>

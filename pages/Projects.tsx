@@ -404,7 +404,7 @@ export const Projects: React.FC = () => {
       if (!element) return;
       
       const canvas = await html2canvas(element, {
-        scale: 4, // Increased scale for HD quality
+        scale: 2, // Reduced scale for better performance and smaller file size
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff',
@@ -562,8 +562,8 @@ export const Projects: React.FC = () => {
         format: [imgWidth, imgHeight]
       });
 
-      const imgData = canvas.toDataURL('image/png');
-      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+      const imgData = canvas.toDataURL('image/jpeg', 0.8);
+      pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
       
       const pdfBlob = pdf.output('blob');
       
