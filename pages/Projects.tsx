@@ -6,7 +6,6 @@ import { Plus, Search, MoreVertical, Calendar, DollarSign, Briefcase, X, FolderO
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas';
-import html2pdf from 'html2pdf.js';
 import { PROJECT_STATUS_LABELS, PROJECT_TYPE_LABELS, APP_NAME } from '../constants';
 import { Project, ProjectStatus, ProjectType, Client } from '../types';
 import { useAppContext } from '../context/AppContext';
@@ -402,142 +401,187 @@ export const Projects: React.FC = () => {
       const element = listRef.current;
       const fileName = `projects_${clientFilter ? clientFilter : 'all'}_${new Date().getTime()}.pdf`;
       
-      const opt = {
-        margin: [15, 15, 15, 15],
-        filename: fileName,
-        image: { type: 'jpeg' as const, quality: 0.98 },
-        html2canvas: { 
-          scale: 2, 
-          useCORS: true,
-          logging: false,
-          backgroundColor: '#ffffff',
-          letterRendering: true,
-          scrollY: 0,
-          scrollX: 0,
-          windowWidth: 794,
-          onclone: (clonedDoc: Document) => {
-            clonedDoc.documentElement.style.overflow = 'visible';
-            clonedDoc.documentElement.style.height = 'auto';
-            clonedDoc.body.style.overflow = 'visible';
-            clonedDoc.body.style.height = 'auto';
-            
-            const pdfHeader = clonedDoc.getElementById('pdf-header');
-            const pdfFooter = clonedDoc.getElementById('pdf-footer');
-            const container = clonedDoc.getElementById('pdf-container');
-
-            if (container) {
-              container.style.width = '794px'; // Standard A4 width at 96dpi
-              container.style.maxWidth = 'none';
-              container.style.margin = '0';
-              container.style.padding = '0'; 
-              container.style.backgroundColor = '#ffffff';
-              container.style.display = 'block';
-              container.style.overflow = 'visible';
-              container.style.height = 'auto';
-              
-              container.classList.remove('space-y-4', 'space-y-6', 'space-y-8', 'rounded-[2.5rem]', 'px-1');
-
-                const allElements = container.querySelectorAll('*');
-                allElements.forEach(el => {
-                  const htmlEl = el as HTMLElement;
-                  htmlEl.style.transition = 'none';
-                  htmlEl.style.animation = 'none';
-                  htmlEl.style.boxShadow = 'none';
-                  htmlEl.style.transform = 'none';
-                  htmlEl.style.opacity = '1';
-                });
-
-                // Target specific text elements for Bengali font fix
-                const textElements = container.querySelectorAll('h1, h2, h3, h4, h5, h6, p, span, div.text-xs, div.text-sm');
-                textElements.forEach(el => {
-                  const htmlEl = el as HTMLElement;
-                  htmlEl.style.lineHeight = '1.8';
-                  htmlEl.style.paddingTop = '2px';
-                  htmlEl.style.paddingBottom = '2px';
-                  htmlEl.style.overflow = 'visible';
-                });
-
-                const truncatedElements = container.querySelectorAll('.truncate, .line-clamp-1, .line-clamp-2, .leading-snug, .leading-tight, .leading-none');
-                truncatedElements.forEach(el => {
-                  el.classList.remove('truncate', 'line-clamp-1', 'line-clamp-2', 'leading-snug', 'leading-tight', 'leading-none');
-                  (el as HTMLElement).style.whiteSpace = 'normal';
-                  (el as HTMLElement).style.overflow = 'visible';
-                });
-                
-                const listContainer = clonedDoc.getElementById('projects-list-container');
-                if (listContainer) {
-                  listContainer.style.display = 'block';
-                  listContainer.style.width = '100%';
-                  listContainer.style.overflow = 'visible';
-                  listContainer.classList.remove('grid', 'md:grid-cols-2', 'xl:grid-cols-3', 'gap-4');
-
-                  const cards = Array.from(listContainer.querySelectorAll('.project-card-pdf'));
-                  cards.forEach((card) => {
-                    const cardEl = card as HTMLElement;
-                    cardEl.style.display = 'block';
-                    cardEl.style.width = '100%';
-                    cardEl.style.paddingBottom = '20px';
-                    cardEl.style.marginBottom = '0';
-                  });
-                }
-            }
-
-            const style = clonedDoc.createElement('style');
-            style.innerHTML = `
-              .project-card-pdf {
-                page-break-inside: avoid !important;
-                break-inside: avoid !important;
-                display: block !important;
-                width: 100% !important;
-                position: relative !important;
-                padding-bottom: 20px !important;
-                margin-bottom: 0 !important;
-              }
-              .project-card-pdf > div {
-                border: 1px solid #cbd5e1 !important;
-                border-radius: 12px !important;
-                background-color: white !important;
-                box-shadow: none !important;
-                padding: 20px !important;
-                display: block !important;
-              }
-              h1, h2, h3, h4, h5, h6, p, span, div {
-                line-height: 1.6 !important;
-              }
-            `;
-            clonedDoc.head.appendChild(style);
-          }
-        },
-        jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const },
-        pagebreak: { mode: ['avoid-all', 'css', 'legacy'], avoid: '.project-card-pdf' }
-      };
-
-      // Generate PDF as blob
-      const pdfBlob = await html2pdf().from(element).set(opt).output('blob');
+      if (!element) return;
       
-      // Try Native Share first (Best for Mobile Apps)
-      if (navigator.share && navigator.canShare) {
-        const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
-        if (navigator.canShare({ files: [file] })) {
-          try {
-            await navigator.share({
-              files: [file],
-              title: 'Project Report',
-              text: 'Manage-Me Project Report'
-            });
-            showToast('শেয়ার সফল হয়েছে', 'success');
-            setIsGeneratingPDF(false);
-            return;
-          } catch (shareError) {
-            console.log('Share cancelled or failed', shareError);
-          }
-        }
-      }
+      const canvas = await html2canvas(element, {
+        scale: 4, // Increased scale for HD quality
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        windowWidth: 794,
+        onclone: (clonedDoc: Document) => {
+          clonedDoc.documentElement.style.overflow = 'visible';
+          clonedDoc.documentElement.style.height = 'auto';
+          clonedDoc.body.style.overflow = 'visible';
+          clonedDoc.body.style.height = 'auto';
+          
+          const pdfHeader = clonedDoc.getElementById('pdf-header');
+          const pdfStats = clonedDoc.getElementById('pdf-stats');
+          const pdfFooter = clonedDoc.getElementById('pdf-footer');
+          const container = clonedDoc.getElementById('pdf-container');
 
-      // Fallback: Show Preview Modal with Download Link
-      const blobUrl = URL.createObjectURL(pdfBlob);
-      setPdfPreviewUrl(blobUrl);
-      showToast('পিডিএফ তৈরি হয়েছে', 'success');
+          if (container) {
+            container.style.width = '794px'; // Standard A4 width at 96dpi
+            container.style.maxWidth = 'none';
+            container.style.margin = '0';
+            container.style.padding = '40px'; 
+            container.style.backgroundColor = '#ffffff';
+            container.style.display = 'block';
+            container.style.overflow = 'visible';
+            container.style.height = 'auto';
+            
+            container.classList.remove('space-y-4', 'space-y-6', 'space-y-8', 'rounded-[2.5rem]', 'px-1');
+
+            const allElements = container.querySelectorAll('*');
+            allElements.forEach(el => {
+              const htmlEl = el as HTMLElement;
+              htmlEl.style.transition = 'none';
+              htmlEl.style.animation = 'none';
+              htmlEl.style.boxShadow = 'none';
+              htmlEl.style.transform = 'none';
+              htmlEl.style.opacity = '1';
+            });
+
+            // Target specific text elements for Bengali font fix
+            const textElements = container.querySelectorAll('h1:not(.pdf-exact-text), h2:not(.pdf-exact-text), h3:not(.pdf-exact-text), h4, h5, h6, p:not(.pdf-exact-text), span:not(.pdf-exact-text), div.text-xs:not(.pdf-exact-text), div.text-sm:not(.pdf-exact-text)');
+            textElements.forEach(el => {
+              const htmlEl = el as HTMLElement;
+              htmlEl.style.lineHeight = '1.8';
+              htmlEl.style.paddingTop = '2px';
+              htmlEl.style.paddingBottom = '2px';
+              htmlEl.style.overflow = 'visible';
+            });
+
+            // Fix M logo text position
+            const logoTexts = container.querySelectorAll('.pdf-logo-text');
+            logoTexts.forEach(el => {
+              const htmlEl = el as HTMLElement;
+              htmlEl.style.lineHeight = '1';
+              htmlEl.style.padding = '0';
+              htmlEl.style.position = 'relative';
+              htmlEl.style.top = '-3px';
+            });
+
+            // Fix specific badges that get messed up by the global text fix
+            const badges = container.querySelectorAll('.pdf-badge');
+            badges.forEach(el => {
+              const htmlEl = el as HTMLElement;
+              htmlEl.style.lineHeight = '1';
+              htmlEl.style.paddingTop = '0px';
+              htmlEl.style.paddingBottom = '0px';
+              htmlEl.style.display = 'inline-flex';
+              htmlEl.style.alignItems = 'center';
+              htmlEl.style.justifyContent = 'center';
+            });
+            
+            const badgeTexts = container.querySelectorAll('.pdf-badge-text');
+            badgeTexts.forEach(el => {
+              const htmlEl = el as HTMLElement;
+              htmlEl.style.position = 'relative';
+              htmlEl.style.top = '-2px';
+            });
+
+            const truncatedElements = container.querySelectorAll('.truncate, .line-clamp-1, .line-clamp-2, .leading-snug, .leading-tight, .leading-none');
+            truncatedElements.forEach(el => {
+              el.classList.remove('truncate', 'line-clamp-1', 'line-clamp-2', 'leading-snug', 'leading-tight', 'leading-none');
+              (el as HTMLElement).style.whiteSpace = 'normal';
+              (el as HTMLElement).style.overflow = 'visible';
+            });
+            
+            const listContainer = clonedDoc.getElementById('projects-list-container');
+            if (listContainer) {
+              listContainer.style.display = 'block';
+              listContainer.style.width = '100%';
+              listContainer.style.overflow = 'visible';
+              listContainer.classList.remove('grid', 'md:grid-cols-2', 'xl:grid-cols-3', 'gap-4');
+
+              const cards = Array.from(listContainer.querySelectorAll('.project-card-pdf'));
+              
+              // Clear the container to rebuild as a single list
+              container.innerHTML = '';
+              
+              if (pdfHeader) {
+                pdfHeader.style.marginBottom = '24px';
+                container.appendChild(pdfHeader);
+              }
+              
+              if (pdfStats) {
+                pdfStats.style.marginBottom = '30px';
+                container.appendChild(pdfStats);
+              }
+              
+              // Add all cards sequentially
+              cards.forEach((card) => {
+                const cardEl = card as HTMLElement;
+                cardEl.style.display = 'block';
+                cardEl.style.width = '100%';
+                cardEl.style.paddingBottom = '20px';
+                cardEl.style.marginBottom = '0';
+                container.appendChild(cardEl);
+              });
+              
+              if (pdfFooter) {
+                pdfFooter.style.marginTop = '24px';
+                container.appendChild(pdfFooter);
+              }
+            }
+          }
+
+          const style = clonedDoc.createElement('style');
+          style.innerHTML = `
+            .project-card-pdf {
+              display: block !important;
+              width: 100% !important;
+              position: relative !important;
+              padding-bottom: 20px !important;
+              margin-bottom: 0 !important;
+            }
+            .project-card-pdf > div {
+              border: 1px solid #cbd5e1 !important;
+              border-radius: 12px !important;
+              background-color: white !important;
+              box-shadow: none !important;
+              padding: 20px !important;
+              display: block !important;
+            }
+            h1, h2, h3, h4, h5, h6, p, span, div {
+              line-height: 1.6 !important;
+            }
+          `;
+          clonedDoc.head.appendChild(style);
+        }
+      });
+
+      // Calculate dimensions in mm (1px = 0.264583mm)
+      const imgWidth = canvas.width / 2; // scale is 2
+      const imgHeight = canvas.height / 2;
+      
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'px',
+        format: [imgWidth, imgHeight]
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+      
+      const pdfBlob = pdf.output('blob');
+      
+      // Create a download link and trigger it
+      const downloadUrl = URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up the object URL after a short delay
+      setTimeout(() => {
+        URL.revokeObjectURL(downloadUrl);
+      }, 100);
+      
+      showToast('পিডিএফ ডাউনলোড হয়েছে', 'success');
       
     } catch (error) {
       console.error('PDF Error:', error);
@@ -645,52 +689,112 @@ export const Projects: React.FC = () => {
       <div id="pdf-container" ref={listRef} className={`${isGeneratingPDF ? 'block' : 'space-y-4 rounded-[2.5rem]'} px-1 py-4 bg-white`}>
         
         {isGeneratingPDF && (
-          <div className="mb-8 border-b-2 border-slate-100 pb-6 flex justify-between items-end">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">M</div>
-                <h1 className="text-2xl font-black text-slate-800">{APP_NAME}</h1>
+          <div id="pdf-header" className="mb-8 border-b border-slate-200 pb-6 flex justify-between items-start">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-sm">
+                <Music size={28} strokeWidth={2.5} />
               </div>
-              <h2 className="text-xl font-bold text-slate-700">প্রজেক্ট রিপোর্ট</h2>
+              <div className="flex flex-col justify-center">
+                <h1 className="text-3xl font-black text-slate-900 leading-none mb-1.5 tracking-tight pdf-exact-text" style={{ lineHeight: '1' }}>Manage-Me</h1>
+                <h2 className="text-[10px] font-bold text-indigo-600 tracking-[0.2em] uppercase leading-none pdf-exact-text" style={{ lineHeight: '1' }}>Professional Studio Manager</h2>
+              </div>
             </div>
-            <div className="text-right">
-              <p className="text-sm font-bold text-slate-500">তৈরি হয়েছে:</p>
-              <p className="text-base font-bold text-slate-800">{new Date().toLocaleString('bn-BD')}</p>
+
+            <div className="text-right flex flex-col justify-center">
+              <h2 className="text-xl font-black text-slate-800 mb-2 pdf-exact-text" style={{ lineHeight: '1.2' }}>প্রজেক্ট রিপোর্ট</h2>
+              <p className="text-xs font-bold text-slate-500 mb-1 pdf-exact-text" style={{ lineHeight: '1.2' }}>তারিখ: {new Date().toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+              <p className="text-xs font-bold text-slate-500 pdf-exact-text" style={{ lineHeight: '1.2' }}>সময়: {new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' })}</p>
             </div>
           </div>
         )}
 
         {/* PDF Only Summary Section */}
         {isGeneratingPDF && summaryStats && (
-          <div className="mb-8" style={{ display: 'flex', gap: '15px', width: '100%', marginBottom: '30px' }}>
-            <div style={{ flex: 1, backgroundColor: '#f8fafc', border: '1px solid #f1f5f9', padding: '20px', borderRadius: '16px' }}>
-              <p style={{ color: '#64748b', fontSize: '12px', fontWeight: 'bold', marginBottom: '5px', textTransform: 'uppercase' }}>মোট বাজেট</p>
-              <p style={{ color: '#1e293b', fontSize: '22px', fontWeight: '900', margin: 0 }}>{currency}{summaryStats.total.toLocaleString('bn-BD')}</p>
+          <div id="pdf-stats" className="mb-8 flex flex-col gap-6">
+            {/* Top Cards */}
+            <div className="flex gap-6">
+              <div className="flex-1 bg-white border border-indigo-100 rounded-[2rem] p-6 shadow-sm">
+                <p className="text-sm font-bold text-indigo-500 mb-2">ক্লায়েন্ট</p>
+                <p className="text-3xl font-black text-indigo-700">{clientFilter || 'সকল ক্লায়েন্ট'}</p>
+              </div>
+              <div className="flex-1 bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm">
+                <p className="text-sm font-bold text-slate-400 mb-2">মোট প্রজেক্ট</p>
+                <p className="text-3xl font-black text-slate-700">{filteredProjects.length} টি</p>
+              </div>
+              <div className="flex-1 bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm">
+                <p className="text-sm font-bold text-slate-400 mb-2">সময়কাল</p>
+                <p className="text-xl font-black text-slate-700 mt-1">
+                  {dateRange.start || dateRange.end ? (
+                    <>
+                      {dateRange.start ? new Date(dateRange.start).toLocaleDateString('bn-BD') : 'শুরু'}
+                      {' - '}
+                      {dateRange.end ? new Date(dateRange.end).toLocaleDateString('bn-BD') : 'বর্তমান'}
+                    </>
+                  ) : 'সকল সময়'}
+                </p>
+              </div>
             </div>
-            <div style={{ flex: 1, backgroundColor: '#f0fdf4', border: '1px solid #dcfce7', padding: '20px', borderRadius: '16px' }}>
-              <p style={{ color: '#10b981', fontSize: '12px', fontWeight: 'bold', marginBottom: '5px', textTransform: 'uppercase' }}>মোট আদায়</p>
-              <p style={{ color: '#065f46', fontSize: '22px', fontWeight: '900', margin: 0 }}>{currency}{summaryStats.paid.toLocaleString('bn-BD')}</p>
-            </div>
-            <div style={{ flex: 1, backgroundColor: '#fef2f2', border: '1px solid #fee2e2', padding: '20px', borderRadius: '16px' }}>
-              <p style={{ color: '#ef4444', fontSize: '12px', fontWeight: 'bold', marginBottom: '5px', textTransform: 'uppercase' }}>মোট বকেয়া</p>
-              <p style={{ color: '#991b1b', fontSize: '22px', fontWeight: '900', margin: 0 }}>{currency}{summaryStats.due.toLocaleString('bn-BD')}</p>
+
+            {/* Financial Stats */}
+            <div className="flex gap-4">
+              <div className="flex-1 bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-slate-300 font-bold text-sm">$</span>
+                  <p className="text-xs font-bold text-slate-400">মোট বাজেট</p>
+                </div>
+                <p className="text-xl font-black text-slate-800">{currency}{summaryStats.total.toLocaleString('bn-BD')}</p>
+              </div>
+              <div className="flex-1 bg-white border border-emerald-50 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center gap-2 mb-3">
+                  <Wallet size={16} className="text-emerald-500" />
+                  <p className="text-xs font-bold text-emerald-500">মোট আদায়</p>
+                </div>
+                <p className="text-xl font-black text-emerald-600">{currency}{summaryStats.paid.toLocaleString('bn-BD')}</p>
+              </div>
+              <div className="flex-1 bg-white border border-rose-50 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center gap-2 mb-3">
+                  <AlertCircle size={16} className="text-rose-400" />
+                  <p className="text-xs font-bold text-rose-500">মোট বকেয়া</p>
+                </div>
+                <p className="text-xl font-black text-rose-600">{currency}{summaryStats.due.toLocaleString('bn-BD')}</p>
+              </div>
             </div>
           </div>
         )}
 
-        {/* Active Client Filter Banner & Stats (Hidden in PDF) */}
-        {!isGeneratingPDF && clientFilter && (
+        {/* Active Filters Banner & Stats (Hidden in PDF) */}
+        {!isGeneratingPDF && (clientFilter || dateRange.start || dateRange.end) && (
           <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
-            <div className="bg-indigo-50 border border-indigo-100 p-3 rounded-2xl flex items-center justify-between shadow-sm">
-                <div className="flex items-center gap-2 text-indigo-700">
-                    <div className="w-7 h-7 bg-white rounded-lg flex items-center justify-center text-indigo-600 shadow-sm">
-                      <Users size={14} />
-                    </div>
-                    <span className="text-sm font-bold">ক্লায়েন্ট: {clientFilter}</span>
+            <div className="bg-indigo-50 border border-indigo-100 p-3 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between shadow-sm gap-2">
+                <div className="flex flex-wrap items-center gap-3 text-indigo-700">
+                    {clientFilter && (
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 bg-white rounded-lg flex items-center justify-center text-indigo-600 shadow-sm">
+                          <Users size={14} />
+                        </div>
+                        <span className="text-sm font-bold">ক্লায়েন্ট: {clientFilter}</span>
+                      </div>
+                    )}
+                    
+                    {(dateRange.start || dateRange.end) && (
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 bg-white rounded-lg flex items-center justify-center text-indigo-600 shadow-sm">
+                          <CalendarDays size={14} />
+                        </div>
+                        <span className="text-sm font-bold">
+                          {dateRange.start ? new Date(dateRange.start).toLocaleDateString('bn-BD') : 'শুরু'} 
+                          {' - '} 
+                          {dateRange.end ? new Date(dateRange.end).toLocaleDateString('bn-BD') : 'বর্তমান'}
+                        </span>
+                      </div>
+                    )}
                 </div>
                 <button 
-                    onClick={clearClientFilter}
-                    className="p-1.5 bg-white rounded-full text-indigo-400 hover:text-rose-500 transition-colors shadow-sm active:scale-90"
+                    onClick={() => {
+                      clearClientFilter();
+                      setDateRange({ start: '', end: '' });
+                    }}
+                    className="p-1.5 bg-white rounded-full text-indigo-400 hover:text-rose-500 transition-colors shadow-sm active:scale-90 self-end sm:self-auto"
                 >
                     <X size={14} />
                 </button>
@@ -700,15 +804,15 @@ export const Projects: React.FC = () => {
               <div className="grid grid-cols-3 gap-2">
                 <div className="bg-white border border-slate-100 p-3 rounded-2xl shadow-sm">
                   <p className="text-xs font-bold text-slate-400 uppercase leading-none mb-2">মোট বাজেট</p>
-                  <p className="text-base font-black text-slate-700 leading-none">{currency}{summaryStats.total.toLocaleString('bn-BD')}</p>
+                  <p className="text-base font-black text-slate-700 leading-none truncate">{currency}{summaryStats.total.toLocaleString('bn-BD')}</p>
                 </div>
                 <div className="bg-white border border-slate-100 p-3 rounded-2xl shadow-sm">
                   <p className="text-xs font-bold text-emerald-500 uppercase leading-none mb-2">মোট আদায়</p>
-                  <p className="text-base font-black text-emerald-600 leading-none">{currency}{summaryStats.paid.toLocaleString('bn-BD')}</p>
+                  <p className="text-base font-black text-emerald-600 leading-none truncate">{currency}{summaryStats.paid.toLocaleString('bn-BD')}</p>
                 </div>
                 <div className="bg-white border border-slate-100 p-3 rounded-2xl shadow-sm">
                   <p className="text-xs font-bold text-rose-500 uppercase leading-none mb-2">মোট বকেয়া</p>
-                  <p className="text-base font-black text-rose-600 leading-none">{currency}{summaryStats.due.toLocaleString('bn-BD')}</p>
+                  <p className="text-base font-black text-rose-600 leading-none truncate">{currency}{summaryStats.due.toLocaleString('bn-BD')}</p>
                 </div>
               </div>
             )}
@@ -742,28 +846,28 @@ export const Projects: React.FC = () => {
               >
                 <div className={`bg-white rounded-2xl border border-slate-100 shadow-sm relative ${isGeneratingPDF ? '' : 'animate-in slide-in-from-bottom-2 duration-300'}`}>
                   {/* Minimal Card Layout */}
-                  <div className="px-2 py-4 flex justify-between items-center">
-                    <div className="flex items-center gap-1.5 flex-1 min-w-0 mr-1">
-                      <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                         <Music size={20} />
+                  <div className={`${isGeneratingPDF ? 'px-6 py-6' : 'px-2 py-4'} flex justify-between items-center`}>
+                    <div className={`flex items-center ${isGeneratingPDF ? 'gap-4' : 'gap-1.5'} flex-1 min-w-0 mr-1`}>
+                      <div className={`${isGeneratingPDF ? 'w-14 h-14 rounded-2xl' : 'w-10 h-10 rounded-xl'} bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0`}>
+                         <Music size={isGeneratingPDF ? 28 : 20} />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <h3 className="font-bold text-slate-800 text-sm truncate leading-snug">{p.name}</h3>
-                        <p className="text-[11px] text-slate-500 font-medium truncate flex items-center gap-1 mt-1">
-                          <Users size={10} className="shrink-0" /> {p.clientname}
+                        <h3 className={`font-bold text-slate-800 ${isGeneratingPDF ? 'text-lg mb-1.5' : 'text-sm'} truncate leading-snug`}>{p.name}</h3>
+                        <p className={`${isGeneratingPDF ? 'text-sm' : 'text-[11px]'} text-slate-500 font-medium truncate flex items-center gap-1.5 ${isGeneratingPDF ? 'mb-3' : 'mt-1'}`}>
+                          <Users size={isGeneratingPDF ? 14 : 10} className="shrink-0" /> {p.clientname}
                         </p>
-                        <div className="mt-2.5 flex items-center gap-1 overflow-x-auto no-scrollbar pb-1">
-                          <div className="flex items-center gap-1 bg-slate-100 px-2 py-1 rounded-lg shrink-0">
-                            <span className="text-[10px] font-bold text-slate-500 uppercase">বাজেট</span>
-                            <span className="text-xs font-black text-slate-800">{currency}{p.totalamount.toLocaleString('bn-BD')}</span>
+                        <div className={`flex items-center ${isGeneratingPDF ? 'gap-2' : 'gap-1 mt-2.5'} overflow-x-auto no-scrollbar pb-1`}>
+                          <div className={`flex items-center ${isGeneratingPDF ? 'gap-1.5 px-3 py-1.5 rounded-xl' : 'gap-1 px-2 py-1 rounded-lg'} bg-slate-50 shrink-0`}>
+                            <span className={`${isGeneratingPDF ? 'text-xs' : 'text-[10px]'} font-bold text-slate-400`}>বাজেট</span>
+                            <span className={`${isGeneratingPDF ? 'text-sm' : 'text-xs'} font-black text-slate-700`}>{currency}{p.totalamount.toLocaleString('bn-BD')}</span>
                           </div>
-                          <div className="flex items-center gap-1 bg-emerald-50 px-2 py-1 rounded-lg shrink-0">
-                            <span className="text-[10px] font-bold text-emerald-500 uppercase">আদায়</span>
-                            <span className="text-xs font-black text-emerald-700">{currency}{p.paidamount.toLocaleString('bn-BD')}</span>
+                          <div className={`flex items-center ${isGeneratingPDF ? 'gap-1.5 px-3 py-1.5 rounded-xl' : 'gap-1 px-2 py-1 rounded-lg'} bg-emerald-50 shrink-0`}>
+                            <span className={`${isGeneratingPDF ? 'text-xs' : 'text-[10px]'} font-bold text-emerald-500`}>আদায়</span>
+                            <span className={`${isGeneratingPDF ? 'text-sm' : 'text-xs'} font-black text-emerald-600`}>{currency}{p.paidamount.toLocaleString('bn-BD')}</span>
                           </div>
-                          <div className={`flex items-center gap-1 px-2 py-1 rounded-lg shrink-0 ${p.dueamount > 0 ? 'bg-rose-50' : 'bg-slate-50'}`}>
-                            <span className={`text-[10px] font-bold uppercase ${p.dueamount > 0 ? 'text-rose-500' : 'text-slate-500'}`}>বকেয়া</span>
-                            <span className={`text-xs font-black ${p.dueamount > 0 ? 'text-rose-700' : 'text-slate-500'}`}>{currency}{p.dueamount.toLocaleString('bn-BD')}</span>
+                          <div className={`flex items-center ${isGeneratingPDF ? 'gap-1.5 px-3 py-1.5 rounded-xl' : 'gap-1 px-2 py-1 rounded-lg'} shrink-0 ${p.dueamount > 0 ? 'bg-rose-50' : 'bg-slate-50'}`}>
+                            <span className={`${isGeneratingPDF ? 'text-xs' : 'text-[10px]'} font-bold ${p.dueamount > 0 ? 'text-rose-400' : 'text-slate-400'}`}>বকেয়া</span>
+                            <span className={`${isGeneratingPDF ? 'text-sm' : 'text-xs'} font-black ${p.dueamount > 0 ? 'text-rose-600' : 'text-slate-500'}`}>{currency}{p.dueamount.toLocaleString('bn-BD')}</span>
                           </div>
                         </div>
                       </div>

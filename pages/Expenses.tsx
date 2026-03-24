@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Receipt, Plus, Search, Tag, X, ShoppingCart, Loader2, Trash2, MoreVertical, Pencil, Calculator, CalendarDays, Download, Filter, Music, Share2, ExternalLink, Copy, AlertCircle } from 'lucide-react';
-import html2pdf from 'html2pdf.js';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 import { EXPENSE_CATEGORY_LABELS, APP_NAME } from '../constants';
 import { useAppContext } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
@@ -238,149 +239,144 @@ export const Expenses: React.FC = () => {
       const element = listRef.current;
       const fileName = `ManageMe_Expense_Report_${new Date().toISOString().split('T')[0]}.pdf`;
       
-      const opt = {
-        margin: [15, 15, 15, 15],
-        filename: fileName,
-        image: { type: 'jpeg' as const, quality: 0.98 },
-        html2canvas: { 
-          scale: 2, 
-          useCORS: true,
-          logging: false,
-          backgroundColor: '#ffffff',
-          letterRendering: true,
-          scrollY: 0,
-          scrollX: 0,
-          windowWidth: 794,
-          onclone: (clonedDoc: Document) => {
-            const container = clonedDoc.getElementById('pdf-container');
-            if (container) {
-              container.style.width = '794px';
-              container.style.maxWidth = 'none';
-              container.style.margin = '0';
-              container.style.padding = '0'; 
-              container.style.backgroundColor = '#ffffff';
-              container.classList.remove('space-y-4', 'space-y-6', 'space-y-8', 'rounded-[2.5rem]', 'px-1');
+      if (!element) return;
 
-              const allElements = container.querySelectorAll('*');
-              allElements.forEach(el => {
-                const htmlEl = el as HTMLElement;
-                htmlEl.style.transition = 'none';
-                htmlEl.style.animation = 'none';
-                htmlEl.style.boxShadow = 'none';
-                htmlEl.style.transform = 'none';
-                htmlEl.style.opacity = '1';
-              });
+      const canvas = await html2canvas(element, {
+        scale: 4, // Increased scale for HD quality
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        windowWidth: 794,
+        onclone: (clonedDoc: Document) => {
+          const container = clonedDoc.getElementById('pdf-container');
+          if (container) {
+            container.style.width = '794px';
+            container.style.maxWidth = 'none';
+            container.style.margin = '0';
+            container.style.padding = '40px'; 
+            container.style.backgroundColor = '#ffffff';
+            container.classList.remove('space-y-4', 'space-y-6', 'space-y-8', 'rounded-[2.5rem]', 'px-1');
 
-              const textElements = container.querySelectorAll('h1, h2, h3, h4, h5, h6, p, span, div.text-xs, div.text-sm');
-              textElements.forEach(el => {
-                const htmlEl = el as HTMLElement;
-                htmlEl.style.lineHeight = '1.8';
-                htmlEl.style.paddingTop = '2px';
-                htmlEl.style.paddingBottom = '2px';
-              });
+            const allElements = container.querySelectorAll('*');
+            allElements.forEach(el => {
+              const htmlEl = el as HTMLElement;
+              htmlEl.style.transition = 'none';
+              htmlEl.style.animation = 'none';
+              htmlEl.style.boxShadow = 'none';
+              htmlEl.style.transform = 'none';
+              htmlEl.style.opacity = '1';
+            });
 
-              const truncatedElements = container.querySelectorAll('.truncate, .line-clamp-1, .line-clamp-2, .leading-snug, .leading-tight, .leading-none');
-              truncatedElements.forEach(el => {
-                el.classList.remove('truncate', 'line-clamp-1', 'line-clamp-2', 'leading-snug', 'leading-tight', 'leading-none');
-                (el as HTMLElement).style.whiteSpace = 'normal';
-                (el as HTMLElement).style.overflow = 'visible';
-              });
+            const textElements = container.querySelectorAll('h1:not(.pdf-exact-text), h2:not(.pdf-exact-text), h3:not(.pdf-exact-text), h4, h5, h6, p:not(.pdf-exact-text), span:not(.pdf-exact-text), div.text-xs:not(.pdf-exact-text), div.text-sm:not(.pdf-exact-text)');
+            textElements.forEach(el => {
+              const htmlEl = el as HTMLElement;
+              htmlEl.style.lineHeight = '1.8';
+              htmlEl.style.paddingTop = '2px';
+              htmlEl.style.paddingBottom = '2px';
+            });
+
+            // Fix M logo text position
+            const logoTexts = container.querySelectorAll('.pdf-logo-text');
+            logoTexts.forEach(el => {
+              const htmlEl = el as HTMLElement;
+              htmlEl.style.lineHeight = '1';
+              htmlEl.style.padding = '0';
+              htmlEl.style.position = 'relative';
+              htmlEl.style.top = '-3px';
+            });
+
+            // Fix specific badges that get messed up by the global text fix
+            const badges = container.querySelectorAll('.pdf-badge');
+            badges.forEach(el => {
+              const htmlEl = el as HTMLElement;
+              htmlEl.style.lineHeight = '1';
+              htmlEl.style.paddingTop = '0px';
+              htmlEl.style.paddingBottom = '0px';
+              htmlEl.style.display = 'inline-flex';
+              htmlEl.style.alignItems = 'center';
+              htmlEl.style.justifyContent = 'center';
+            });
+            
+            const badgeTexts = container.querySelectorAll('.pdf-badge-text');
+            badgeTexts.forEach(el => {
+              const htmlEl = el as HTMLElement;
+              htmlEl.style.position = 'relative';
+              htmlEl.style.top = '-2px';
+            });
+
+            const truncatedElements = container.querySelectorAll('.truncate, .line-clamp-1, .line-clamp-2, .leading-snug, .leading-tight, .leading-none');
+            truncatedElements.forEach(el => {
+              el.classList.remove('truncate', 'line-clamp-1', 'line-clamp-2', 'leading-snug', 'leading-tight', 'leading-none');
+              (el as HTMLElement).style.whiteSpace = 'normal';
+              (el as HTMLElement).style.overflow = 'visible';
+            });
+            
+            const listContainer = clonedDoc.getElementById('expenses-list-container');
+            if (listContainer && container) {
+              const cards = Array.from(listContainer.querySelectorAll('.expense-card-pdf'));
+              const header = clonedDoc.getElementById('pdf-header');
+              const stats = clonedDoc.getElementById('pdf-stats');
               
-              const listContainer = clonedDoc.getElementById('expenses-list-container');
-              if (listContainer && container) {
-                const cards = Array.from(listContainer.querySelectorAll('.expense-card-pdf'));
-                const header = clonedDoc.getElementById('pdf-header');
-                const stats = clonedDoc.getElementById('pdf-stats');
-                
-                // Clear the container to rebuild with explicit page wrappers
-                container.innerHTML = '';
-                container.style.padding = '0';
-                container.style.margin = '0';
-                container.style.display = 'block';
-                container.style.width = '794px'; // A4 width at 96dpi
-                container.style.backgroundColor = '#f1f5f9'; // Match app background
-
-                const createPage = () => {
-                  const page = clonedDoc.createElement('div');
-                  page.className = 'pdf-page-wrapper';
-                  page.style.width = '794px';
-                  page.style.height = '1122px'; // Exact A4 height at 96dpi
-                  page.style.padding = '40px';
-                  page.style.boxSizing = 'border-box';
-                  page.style.backgroundColor = 'white';
-                  page.style.position = 'relative';
-                  page.style.overflow = 'hidden'; // Ensure nothing spills out
-                  container.appendChild(page);
-                  return page;
-                };
-
-                // --- PAGE 1 ---
-                let currentPage = createPage();
-                
-                if (header) {
-                  header.style.marginBottom = '24px';
-                  currentPage.appendChild(header);
-                }
-                if (stats) {
-                  stats.style.marginBottom = '32px';
-                  currentPage.appendChild(stats);
-                }
-                
-                // Add first 5 cards to Page 1
-                for (let i = 0; i < Math.min(5, cards.length); i++) {
-                  const cardEl = cards[i] as HTMLElement;
-                  cardEl.style.display = 'block';
-                  cardEl.style.width = '100%';
-                  cardEl.style.marginBottom = '20px';
-                  currentPage.appendChild(cardEl);
-                }
-                
-                // --- SUBSEQUENT PAGES (7 cards each) ---
-                for (let i = 5; i < cards.length; i++) {
-                  // Create a new page every 7 cards
-                  if ((i - 5) % 7 === 0) {
-                    currentPage = createPage();
-                  }
-                  const cardEl = cards[i] as HTMLElement;
-                  cardEl.style.display = 'block';
-                  cardEl.style.width = '100%';
-                  cardEl.style.marginBottom = '20px';
-                  currentPage.appendChild(cardEl);
-                }
+              // Clear the container to rebuild as a single list
+              container.innerHTML = '';
+              
+              if (header) {
+                header.style.marginBottom = '24px';
+                container.appendChild(header);
               }
+              if (stats) {
+                stats.style.marginBottom = '32px';
+                container.appendChild(stats);
+              }
+              
+              // Add all cards sequentially
+              cards.forEach(card => {
+                const cardEl = card as HTMLElement;
+                cardEl.style.display = 'block';
+                cardEl.style.width = '100%';
+                cardEl.style.marginBottom = '20px';
+                container.appendChild(cardEl);
+              });
             }
-
-            const style = clonedDoc.createElement('style');
-            style.innerHTML = `
-              .pdf-page-wrapper {
-                page-break-after: always !important;
-                break-after: page !important;
-              }
-              .expense-card-pdf {
-                display: block !important;
-                width: 100% !important;
-                position: relative !important;
-              }
-              .expense-card-pdf > div {
-                border: 1px solid #cbd5e1 !important;
-                border-radius: 12px !important;
-                background-color: white !important;
-                box-shadow: none !important;
-                padding: 16px !important;
-                display: block !important;
-              }
-              h1, h2, h3, h4, h5, h6, p, span, div {
-                line-height: 1.6 !important;
-              }
-            `;
-            clonedDoc.head.appendChild(style);
           }
-        },
-        jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const },
-        pagebreak: { mode: 'css' }
-      };
 
-      const pdfBlob = await html2pdf().from(element).set(opt).output('blob');
+          const style = clonedDoc.createElement('style');
+          style.innerHTML = `
+            .expense-card-pdf {
+              display: block !important;
+              width: 100% !important;
+              position: relative !important;
+            }
+            .expense-card-pdf > div {
+              border: 1px solid #cbd5e1 !important;
+              border-radius: 12px !important;
+              background-color: white !important;
+              box-shadow: none !important;
+              padding: 16px !important;
+              display: block !important;
+            }
+            h1, h2, h3, h4, h5, h6, p, span, div {
+              line-height: 1.6 !important;
+            }
+          `;
+          clonedDoc.head.appendChild(style);
+        }
+      });
+
+      // Calculate dimensions in mm (1px = 0.264583mm)
+      const imgWidth = canvas.width / 2; // scale is 2
+      const imgHeight = canvas.height / 2;
+      
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'px',
+        format: [imgWidth, imgHeight]
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+      
+      const pdfBlob = pdf.output('blob');
       
       // Create a download link and trigger it
       const downloadUrl = URL.createObjectURL(pdfBlob);
@@ -488,43 +484,49 @@ export const Expenses: React.FC = () => {
       <div id="pdf-container" ref={listRef} className={`${isGeneratingPDF ? 'block' : 'space-y-4 rounded-[2.5rem]'} px-1 py-4 bg-white`}>
         
         {isGeneratingPDF && (
-          <div id="pdf-header" className="mb-8 border-b-2 border-slate-100 pb-6 flex justify-between items-end">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">M</div>
-                <h1 className="text-2xl font-black text-slate-800">{APP_NAME}</h1>
+          <div id="pdf-header" className="mb-8 border-b border-slate-200 pb-6 flex justify-between items-start">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-sm">
+                <Music size={28} strokeWidth={2.5} />
               </div>
-              <h2 className="text-xl font-bold text-slate-700">খরচ রিপোর্ট</h2>
+              <div className="flex flex-col justify-center">
+                <h1 className="text-3xl font-black text-slate-900 leading-none mb-1.5 tracking-tight pdf-exact-text" style={{ lineHeight: '1' }}>Manage-Me</h1>
+                <h2 className="text-[10px] font-bold text-indigo-600 tracking-[0.2em] uppercase leading-none pdf-exact-text" style={{ lineHeight: '1' }}>Professional Studio Manager</h2>
+              </div>
             </div>
-            <div className="text-right">
-              <p className="text-sm font-bold text-slate-500">তৈরি হয়েছে:</p>
-              <p className="text-base font-bold text-slate-800">{new Date().toLocaleString('bn-BD')}</p>
+
+            <div className="text-right flex flex-col justify-center">
+              <h2 className="text-xl font-black text-slate-800 mb-2 pdf-exact-text" style={{ lineHeight: '1.2' }}>খরচ রিপোর্ট</h2>
+              <p className="text-xs font-bold text-slate-500 mb-1 pdf-exact-text" style={{ lineHeight: '1.2' }}>তারিখ: {new Date().toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+              <p className="text-xs font-bold text-slate-500 pdf-exact-text" style={{ lineHeight: '1.2' }}>সময়: {new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' })}</p>
             </div>
           </div>
         )}
 
         {/* PDF Only Summary Section */}
         {isGeneratingPDF && (
-          <div id="pdf-stats" className="mb-8" style={{ display: 'flex', gap: '15px', width: '100%', marginBottom: '30px' }}>
-            <div style={{ flex: 1, backgroundColor: '#fff1f2', border: '1px solid #ffe4e6', padding: '20px', borderRadius: '16px' }}>
-              <p style={{ color: '#e11d48', fontSize: '12px', fontWeight: 'bold', marginBottom: '5px', textTransform: 'uppercase' }}>মোট খরচ</p>
-              <p style={{ color: '#9f1239', fontSize: '22px', fontWeight: '900', margin: 0 }}>{user?.currency || '৳'} {totalExpenseFiltered.toLocaleString('bn-BD')}</p>
-            </div>
-            <div style={{ flex: 1, backgroundColor: '#f8fafc', border: '1px solid #f1f5f9', padding: '20px', borderRadius: '16px' }}>
-              <p style={{ color: '#64748b', fontSize: '12px', fontWeight: 'bold', marginBottom: '5px', textTransform: 'uppercase' }}>মোট রেকর্ড</p>
-              <p style={{ color: '#1e293b', fontSize: '22px', fontWeight: '900', margin: 0 }}>{filteredExpenses.length} টি</p>
-            </div>
-            <div style={{ flex: 1, backgroundColor: '#f8fafc', border: '1px solid #f1f5f9', padding: '20px', borderRadius: '16px' }}>
-              <p style={{ color: '#64748b', fontSize: '12px', fontWeight: 'bold', marginBottom: '5px', textTransform: 'uppercase' }}>সময়কাল</p>
-              <p style={{ color: '#1e293b', fontSize: '14px', fontWeight: 'bold', margin: 0, marginTop: '5px' }}>
-                {dateRange.start || dateRange.end ? (
-                  <>
-                    {dateRange.start ? new Date(dateRange.start).toLocaleDateString('bn-BD') : 'শুরু'} 
-                    {' - '} 
-                    {dateRange.end ? new Date(dateRange.end).toLocaleDateString('bn-BD') : 'বর্তমান'}
-                  </>
-                ) : 'সকল সময়'}
-              </p>
+          <div id="pdf-stats" className="mb-8 flex flex-col gap-6">
+            <div className="flex gap-6">
+              <div className="flex-1 bg-white border border-rose-100 rounded-[2rem] p-6 shadow-sm">
+                <p className="text-sm font-bold text-rose-500 mb-2">মোট খরচ</p>
+                <p className="text-3xl font-black text-rose-700">{user?.currency || '৳'} {totalExpenseFiltered.toLocaleString('bn-BD')}</p>
+              </div>
+              <div className="flex-1 bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm">
+                <p className="text-sm font-bold text-slate-400 mb-2">মোট রেকর্ড</p>
+                <p className="text-3xl font-black text-slate-700">{filteredExpenses.length} টি</p>
+              </div>
+              <div className="flex-1 bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm">
+                <p className="text-sm font-bold text-slate-400 mb-2">সময়কাল</p>
+                <p className="text-xl font-black text-slate-700 mt-1">
+                  {dateRange.start || dateRange.end ? (
+                    <>
+                      {dateRange.start ? new Date(dateRange.start).toLocaleDateString('bn-BD') : 'শুরু'}
+                      {' - '}
+                      {dateRange.end ? new Date(dateRange.end).toLocaleDateString('bn-BD') : 'বর্তমান'}
+                    </>
+                  ) : 'সকল সময়'}
+                </p>
+              </div>
             </div>
           </div>
         )}
@@ -579,18 +581,18 @@ export const Expenses: React.FC = () => {
                 } : {}}
               >
                 <div className={`bg-white rounded-2xl border border-slate-100 shadow-sm relative ${isGeneratingPDF ? '' : 'animate-in slide-in-from-bottom-2 duration-300'}`}>
-                  <div className="p-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3 overflow-hidden">
-                      <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
-                        <Tag size={18} />
+                  <div className={`${isGeneratingPDF ? 'px-6 py-6' : 'p-4'} flex items-center justify-between`}>
+                    <div className={`flex items-center ${isGeneratingPDF ? 'gap-4' : 'gap-3'} overflow-hidden`}>
+                      <div className={`${isGeneratingPDF ? 'w-14 h-14 rounded-2xl' : 'w-10 h-10 rounded-xl'} bg-rose-50 text-rose-600 flex items-center justify-center shrink-0`}>
+                        <Tag size={isGeneratingPDF ? 28 : 18} />
                       </div>
                       <div className="min-w-0">
-                        <h3 className="font-bold text-slate-800 text-sm truncate">{expense.notes}</h3>
-                        <p className="text-xs text-slate-500 font-medium">{EXPENSE_CATEGORY_LABELS[expense.category] || expense.category} • {expense.date}</p>
+                        <h3 className={`font-bold text-slate-800 ${isGeneratingPDF ? 'text-lg mb-1.5' : 'text-sm'} truncate`}>{expense.notes}</h3>
+                        <p className={`${isGeneratingPDF ? 'text-sm' : 'text-xs'} text-slate-500 font-medium`}>{EXPENSE_CATEGORY_LABELS[expense.category] || expense.category} • {expense.date}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 pl-2">
-                      <span className="font-black text-rose-600 text-base mr-1 whitespace-nowrap">{user?.currency || '৳'} {expense.amount.toLocaleString('bn-BD')}</span>
+                      <span className={`font-black text-rose-600 ${isGeneratingPDF ? 'text-xl' : 'text-base'} mr-1 whitespace-nowrap`}>{user?.currency || '৳'} {expense.amount.toLocaleString('bn-BD')}</span>
                       
                       {!isGeneratingPDF && (
                         <div className="relative action-menu-container">
