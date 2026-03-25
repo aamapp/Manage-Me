@@ -4,6 +4,7 @@ import { HashRouter, Routes, Route, Navigate, useNavigate } from "react-router-d
 import { Layout } from '@/components/Layout';
 import { Toast } from '@/components/Toast';
 import { AppLock } from '@/components/AppLock'; 
+import { ScrollToTop } from '@/components/ScrollToTop';
 import { AppProvider, useAppContext } from '@/context/AppContext';
 import { supabase, isConfigured } from '@/lib/supabase';
 
@@ -152,6 +153,7 @@ const AppContent: React.FC = () => {
 
   return (
     <HashRouter>
+      <ScrollToTop />
       <AuthListener />
       {toast && (
         <Toast 
