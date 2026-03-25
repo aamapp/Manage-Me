@@ -182,23 +182,20 @@ export const Expenses: React.FC = () => {
     if (!expenseToDelete) return;
     setIsDeleting(true);
     try {
-      let query = supabase.from('expenses').delete().eq('id', expenseToDelete.id);
+      const expense = expenses.find(e => e.id === expenseToDelete.id);
+      if (!expense) throw new Error('Expense not found');
+
+      const { error } = await supabase
+        .from('expenses')
+        .update({ notes: `[TRASH] ${expense.notes || ''}`.trim() })
+        .eq('id', expenseToDelete.id);
       
-      // If not admin, restrict to own records
-      if (user?.role !== 'admin') {
-          query = query.eq('userid', user?.id);
-      }
-      
-      const { error } = await query;
-      if (error) showToast(error.message);
-      else {
-        showToast('খরচ মুছে ফেলা হয়েছে', 'success');
-        await refreshData(); // Refresh global context
-      }
+      if (error) throw error;
+      showToast('খরচটি রিসাইকেল বিনে পাঠানো হয়েছে', 'success');
+      await refreshData();
       setShowDeleteModal(false);
     } catch(err: any) {
       showToast(err.message);
-      setShowDeleteModal(false);
     } finally {
       setIsDeleting(false);
       setExpenseToDelete(null);

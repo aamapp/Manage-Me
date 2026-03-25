@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Briefcase, TrendingUp, Receipt, Menu, 
   X, LogOut, Settings, 
   BarChart3, Users, Tags, Trash2,
-  Info, Globe, Phone, Facebook, Instagram, Send, MessageCircle, ArrowLeft, UserCog
+  Info, Globe, Phone, Facebook, Instagram, Send, MessageCircle, ArrowLeft, UserCog, BookOpen
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { APP_NAME } from '@/constants';
@@ -21,11 +21,17 @@ interface LayoutProps {
 export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   const [isMoreMenuOpen, setMoreMenuOpen] = useState(false);
   const [isAboutOpen, setAboutOpen] = useState(false);
-  const { adminSelectedUserId, setAdminSelectedUserId, trashedProjects } = useAppContext();
+  const { 
+    adminSelectedUserId, 
+    setAdminSelectedUserId, 
+    trashedProjects, 
+    trashedExpenses, 
+    trashedGhazalNotes 
+  } = useAppContext();
   const location = useLocation();
   const navigate = useNavigate();
 
-  const trashCount = trashedProjects.length;
+  const trashCount = trashedProjects.length + trashedExpenses.length + trashedGhazalNotes.length;
 
   const isAdmin = user.role === 'admin';
   const showAdminUserList = isAdmin && !adminSelectedUserId;
@@ -40,6 +46,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
 
   // Secondary items for "More" Menu Drawer
   const SECONDARY_NAV = [
+    { name: 'গজল নোট', path: '/ghazal-notes', icon: <BookOpen size={20} />, desc: 'গজলের লিরিক সংগ্রহ' },
     { name: 'ক্লায়েন্ট', path: '/clients', icon: <Users size={20} />, desc: 'ক্লায়েন্ট তালিকা' },
     { name: 'খরচের খাত', path: '/categories', icon: <Tags size={20} />, desc: 'ক্যাটাগরি ম্যানেজমেন্ট' },
     { name: 'রিপোর্ট', path: '/reports', icon: <BarChart3 size={20} />, desc: 'আয়-ব্যয় রিপোর্ট' },

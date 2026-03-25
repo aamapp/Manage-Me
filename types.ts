@@ -64,3 +64,11 @@ export interface UserProfile {
   email: string | null;
   avatar_url: string | null;
 }
+
+export interface GhazalNote {
+  id: string;
+  title: string;
+  lyrics: string;
+  userid: string;
+  createdat: string;
+}

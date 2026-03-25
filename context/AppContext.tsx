@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { Project, Client, User, IncomeRecord, UserProfile, Expense } from '@/types';
+import { Project, Client, User, IncomeRecord, UserProfile, Expense, GhazalNote } from '@/types';
 import { supabase, isConfigured } from '@/lib/supabase';
 
 interface ToastState {
@@ -20,6 +20,12 @@ interface AppContextType {
   setIncomeRecords: React.Dispatch<React.SetStateAction<IncomeRecord[]>>;
   expenses: Expense[];
   setExpenses: React.Dispatch<React.SetStateAction<Expense[]>>;
+  trashedExpenses: Expense[];
+  setTrashedExpenses: React.Dispatch<React.SetStateAction<Expense[]>>;
+  ghazalNotes: GhazalNote[];
+  setGhazalNotes: React.Dispatch<React.SetStateAction<GhazalNote[]>>;
+  trashedGhazalNotes: GhazalNote[];
+  setTrashedGhazalNotes: React.Dispatch<React.SetStateAction<GhazalNote[]>>;
   
   // Master Data (Contains ALL data for Admin)
   allProjects: Project[];
@@ -58,6 +64,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [clients, setClients] = useState<Client[]>([]);
   const [incomeRecords, setIncomeRecords] = useState<IncomeRecord[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [trashedExpenses, setTrashedExpenses] = useState<Expense[]>([]);
+  const [ghazalNotes, setGhazalNotes] = useState<GhazalNote[]>([]);
+  const [trashedGhazalNotes, setTrashedGhazalNotes] = useState<GhazalNote[]>([]);
 
   // Master State (All data cache for Admin)
   const [allProjects, setAllProjects] = useState<Project[]>([]);
@@ -113,6 +122,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       let clientQuery = supabase.from('clients').select('*');
       let incomeQuery = supabase.from('income_records').select('*');
       let expenseQuery = supabase.from('expenses').select('*');
+      let ghazalQuery = supabase.from('ghazal_notes').select('*');
 
       // If NOT admin, filter at DB level for efficiency/security
       if (!isAdmin) {
@@ -120,13 +130,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         clientQuery = clientQuery.eq('userid', user.id);
         incomeQuery = incomeQuery.eq('userid', user.id);
         expenseQuery = expenseQuery.eq('userid', user.id);
+        ghazalQuery = ghazalQuery.eq('userid', user.id);
       }
 
-      const [projRes, clientRes, incomeRes, expenseRes] = await Promise.all([
+      const [projRes, clientRes, incomeRes, expenseRes, ghazalRes] = await Promise.all([
         projQuery.order('createdat', { ascending: false }),
         clientQuery.order('name', { ascending: true }),
         incomeQuery.order('date', { ascending: false }),
-        expenseQuery.order('date', { ascending: false })
+        expenseQuery.order('date', { ascending: false }),
+        ghazalQuery.order('createdat', { ascending: false })
       ]);
 
       if (projRes.error) console.warn(`Project load error: ${projRes.error.message}`);
@@ -135,6 +147,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const cData = clientRes.data as Client[] || [];
       const iData = incomeRes.data as IncomeRecord[] || [];
       const eData = expenseRes.data as Expense[] || [];
+      const gData = ghazalRes.data as GhazalNote[] || [];
 
       if (isAdmin) {
         // Store everything in Master State
@@ -152,11 +165,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // Filter Visible State based on Selection
         if (adminSelectedUserId) {
             const userProjects = pData.filter(p => p.userid === adminSelectedUserId);
+            const userExpenses = eData.filter(e => e.userid === adminSelectedUserId);
+            const userGhazals = gData.filter(g => g.userid === adminSelectedUserId);
+
             setProjects(userProjects.filter(p => !p.notes?.startsWith('[TRASH]')));
             setTrashedProjects(userProjects.filter(p => p.notes?.startsWith('[TRASH]')));
             setClients(cData.filter(c => c.userid === adminSelectedUserId));
             setIncomeRecords(iData.filter(i => i.userid === adminSelectedUserId));
-            setExpenses(eData.filter(e => e.userid === adminSelectedUserId));
+            setExpenses(userExpenses.filter(e => !e.notes?.startsWith('[TRASH]')));
+            setTrashedExpenses(userExpenses.filter(e => e.notes?.startsWith('[TRASH]')));
+            setGhazalNotes(userGhazals.filter(g => !g.lyrics?.startsWith('[TRASH]')));
+            setTrashedGhazalNotes(userGhazals.filter(g => g.lyrics?.startsWith('[TRASH]')));
         } else {
             // If no user selected, show NOTHING in the main views (forces selection from list)
             setProjects([]);
@@ -164,6 +183,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setClients([]);
             setIncomeRecords([]);
             setExpenses([]);
+            setTrashedExpenses([]);
+            setGhazalNotes([]);
+            setTrashedGhazalNotes([]);
         }
       } else {
         // Normal User: Visible = All fetched
@@ -171,7 +193,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setTrashedProjects(pData.filter(p => p.notes?.startsWith('[TRASH]')));
         setClients(cData);
         setIncomeRecords(iData);
-        setExpenses(eData);
+        setExpenses(eData.filter(e => !e.notes?.startsWith('[TRASH]')));
+        setTrashedExpenses(eData.filter(e => e.notes?.startsWith('[TRASH]')));
+        setGhazalNotes(gData.filter(g => !g.lyrics?.startsWith('[TRASH]')));
+        setTrashedGhazalNotes(gData.filter(g => g.lyrics?.startsWith('[TRASH]')));
       }
 
     } catch (error: any) {
@@ -369,7 +394,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   return (
     <AppContext.Provider value={{ 
       projects, setProjects, trashedProjects, setTrashedProjects, clients, setClients, 
-      incomeRecords, setIncomeRecords, expenses, setExpenses,
+      incomeRecords, setIncomeRecords, expenses, setExpenses, trashedExpenses, setTrashedExpenses,
+      ghazalNotes, setGhazalNotes, trashedGhazalNotes, setTrashedGhazalNotes,
       allProjects, allClients, allIncomeRecords, allExpenses,
       userProfiles,
       user, setUser, loading, refreshData,
