@@ -19,6 +19,7 @@ import { Settings } from '@/pages/Settings';
 import { UpdatePassword } from '@/pages/UpdatePassword';
 import { AdminUserList } from '@/pages/AdminUserList'; // New Import
 import { GhazalNotes } from '@/pages/GhazalNotes';
+import { IconGenerator } from '@/pages/IconGenerator';
 import Trash from '@/pages/Trash';
 
 const Login = lazy(() => import('@/pages/Login').then(module => ({ default: module.Login })));
@@ -182,6 +183,7 @@ const AppContent: React.FC = () => {
           />
           
           <Route path="/update-password" element={<UpdatePassword />} />
+          <Route path="/generate-icon" element={<IconGenerator />} />
 
           <Route 
             path="/*" 
