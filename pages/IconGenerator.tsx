@@ -74,22 +74,25 @@ export const IconGenerator: React.FC = () => {
                   alignItems: 'center', 
                   justifyContent: 'center',
                   position: 'absolute',
-                  left: '-9999px', // Hide it far away
-                  top: '0'
+                  left: '-9999px',
+                  top: '0',
+                  overflow: 'hidden'
                 }}
               >
                 <span style={{ 
                   color: 'white', 
-                  fontSize: '550px', 
+                  fontSize: '650px', 
                   fontWeight: '900', 
-                  fontFamily: 'sans-serif',
-                  lineHeight: '1'
+                  fontFamily: 'system-ui, -apple-system, sans-serif',
+                  display: 'block',
+                  transform: 'translateY(-20px)', // Nudge up to compensate for font baseline
+                  textAlign: 'center'
                 }}>M</span>
               </div>
 
               {/* Preview Version */}
-              <div className="w-64 h-64 bg-[#6366f1] rounded-[22%] shadow-2xl flex items-center justify-center border-4 border-white">
-                <span className="text-white text-[140px] font-black leading-none select-none">M</span>
+              <div className="w-64 h-64 bg-[#6366f1] rounded-[22%] shadow-2xl flex items-center justify-center border-4 border-white overflow-hidden">
+                <span className="text-white text-[160px] font-black select-none transform -translate-y-1">M</span>
               </div>
             </div>
 
