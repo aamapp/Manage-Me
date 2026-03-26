@@ -59,15 +59,31 @@ export const Clients: React.FC = () => {
     if (!user || !clientToDelete) return;
     setIsDeleting(true);
     try {
-      const { error } = await supabase
+      const client = clients.find(c => c.id === clientToDelete);
+      if (!client) throw new Error('Client not found');
+
+      // Move client to trash
+      const newContact = `[TRASH] ${client.contact || ''}`.trim();
+      const { error: clientError } = await supabase
         .from('clients')
-        .delete()
+        .update({ contact: newContact })
         .eq('id', clientToDelete)
         .eq('userid', user.id);
       
-      if (error) throw error;
+      if (clientError) throw clientError;
+
+      // Move all projects of this client to trash
+      const clientProjects = projects.filter(p => p.clientname === client.name);
+      for (const project of clientProjects) {
+        const newNotes = `[TRASH] ${project.notes || ''}`.trim();
+        await supabase
+          .from('projects')
+          .update({ notes: newNotes })
+          .eq('id', project.id)
+          .eq('userid', user.id);
+      }
       
-      showToast('ক্লায়েন্ট ডিলিট করা হয়েছে', 'success');
+      showToast('ক্লায়েন্ট রিসাইকেল বিনে পাঠানো হয়েছে', 'success');
       await refreshData();
       setShowDeleteModal(false);
     } catch (err: any) {

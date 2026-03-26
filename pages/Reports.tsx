@@ -17,7 +17,7 @@ import { Expense } from '@/types';
 import { DatePicker } from '@/components/DatePicker';
 
 export const Reports: React.FC = () => {
-  const { projects, user, adminSelectedUserId } = useAppContext();
+  const { projects, user, adminSelectedUserId, expenses, incomeRecords } = useAppContext();
   const currency = user?.currency || '৳';
   const reportRef = useRef<HTMLDivElement>(null);
 
@@ -29,44 +29,10 @@ export const Reports: React.FC = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [isCapturing, setIsCapturing] = useState(false);
-  const [expenses, setExpenses] = useState<Expense[]>([]);
   
   // State for Image Preview Modal (Fallback for Android)
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [publicUrl, setPublicUrl] = useState<string | null>(null);
-
-  // Fetch expenses specifically for the report
-  useEffect(() => {
-    const fetchExpenses = async () => {
-      if (!user) return;
-      try {
-        let query = supabase.from('expenses').select('*');
-        
-        // Filter Logic:
-        // 1. If Admin has selected a user -> Show ONLY that user's data
-        // 2. If Normal User -> Show ONLY their own data
-        // 3. If Admin with NO selection -> Show ALL data (for aggregate report)
-        
-        if (user.role === 'admin' && adminSelectedUserId) {
-          query = query.eq('userid', adminSelectedUserId);
-        } else if (user.role !== 'admin') {
-           query = query.eq('userid', user.id);
-        }
-        
-        const { data, error } = await query;
-        
-        if (error) {
-          console.error('Fetch expenses error:', error);
-          return;
-        }
-        
-        if (data) setExpenses(data);
-      } catch (err) {
-        console.error('Fetch expenses exception:', err);
-      }
-    };
-    fetchExpenses();
-  }, [user, adminSelectedUserId]); // Re-fetch when admin selects a user
 
   const filteredProjects = useMemo(() => {
     return projects.filter(p => {
@@ -110,8 +76,30 @@ export const Reports: React.FC = () => {
     });
   }, [expenses, startDate, endDate]);
 
+  const filteredIncomeRecords = useMemo(() => {
+    return incomeRecords.filter(r => {
+      if (!startDate && !endDate) return true;
+      if (!r.date) return false;
+      const recordDate = new Date(r.date);
+      
+      if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        if (recordDate < start) return false;
+      }
+      
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        if (recordDate > end) return false;
+      }
+      
+      return true;
+    });
+  }, [incomeRecords, startDate, endDate]);
+
   const stats = useMemo(() => {
-    const totalIncome = filteredProjects.reduce((acc, p) => acc + (p.paidamount || 0), 0);
+    const totalIncome = filteredIncomeRecords.reduce((acc, r) => acc + (r.amount || 0), 0);
     const totalDue = filteredProjects.reduce((acc, p) => acc + (p.dueamount || 0), 0);
     const totalExpenses = filteredExpenses.reduce((acc, e) => acc + (e.amount || 0), 0);
 
@@ -121,7 +109,7 @@ export const Reports: React.FC = () => {
       totalExpenses,
       profit: totalIncome - totalExpenses
     };
-  }, [filteredProjects, filteredExpenses]);
+  }, [filteredIncomeRecords, filteredProjects, filteredExpenses]);
 
   // Income vs Expense Pie Chart Data
   const financialData = useMemo(() => {
@@ -148,17 +136,17 @@ export const Reports: React.FC = () => {
         targetYear -= 1;
       }
 
-      const monthlyIncome = filteredProjects
-        .filter(p => {
-          if (!p.createdat) return false;
-          const [yearStr, monthStr] = p.createdat.split('-');
-          const projYear = parseInt(yearStr);
-          const projMonthIndex = parseInt(monthStr) - 1;
-          return projMonthIndex === targetMonthIndex && projYear === targetYear;
+      const monthlyIncome = filteredIncomeRecords
+        .filter(r => {
+          if (!r.date) return false;
+          const [yearStr, monthStr] = r.date.split('-');
+          const recYear = parseInt(yearStr);
+          const recMonthIndex = parseInt(monthStr) - 1;
+          return recMonthIndex === targetMonthIndex && recYear === targetYear;
         })
-        .reduce((sum, p) => sum + (p.paidamount || 0), 0);
+        .reduce((sum, r) => sum + (r.amount || 0), 0);
 
-      const monthlyExpense = expenses
+      const monthlyExpense = filteredExpenses
         .filter(e => {
           if (!e.date) return false;
           const [yearStr, monthStr] = e.date.split('-');
@@ -175,7 +163,7 @@ export const Reports: React.FC = () => {
       });
     }
     return result;
-  }, [filteredProjects, expenses]);
+  }, [filteredIncomeRecords, filteredExpenses]);
 
   const resetFilter = () => {
     setStartDate('');
@@ -268,7 +256,7 @@ export const Reports: React.FC = () => {
     }
   };
 
-  const hasData = filteredProjects.length > 0 || filteredExpenses.length > 0;
+  const hasData = filteredIncomeRecords.length > 0 || filteredExpenses.length > 0 || filteredProjects.length > 0;
 
   const getReportPeriodText = () => {
     const formatDate = (dateStr: string) => {

@@ -26,6 +26,8 @@ interface AppContextType {
   setGhazalNotes: React.Dispatch<React.SetStateAction<GhazalNote[]>>;
   trashedGhazalNotes: GhazalNote[];
   setTrashedGhazalNotes: React.Dispatch<React.SetStateAction<GhazalNote[]>>;
+  trashedClients: Client[];
+  setTrashedClients: React.Dispatch<React.SetStateAction<Client[]>>;
   
   // Master Data (Contains ALL data for Admin)
   allProjects: Project[];
@@ -67,6 +69,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [trashedExpenses, setTrashedExpenses] = useState<Expense[]>([]);
   const [ghazalNotes, setGhazalNotes] = useState<GhazalNote[]>([]);
   const [trashedGhazalNotes, setTrashedGhazalNotes] = useState<GhazalNote[]>([]);
+  const [trashedClients, setTrashedClients] = useState<Client[]>([]);
 
   // Master State (All data cache for Admin)
   const [allProjects, setAllProjects] = useState<Project[]>([]);
@@ -176,11 +179,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setTrashedExpenses(userExpenses.filter(e => e.notes?.startsWith('[TRASH]')));
             setGhazalNotes(userGhazals.filter(g => !g.lyrics?.startsWith('[TRASH]')));
             setTrashedGhazalNotes(userGhazals.filter(g => g.lyrics?.startsWith('[TRASH]')));
+            setClients(cData.filter(c => c.userid === adminSelectedUserId && !c.contact?.startsWith('[TRASH]')));
+            setTrashedClients(cData.filter(c => c.userid === adminSelectedUserId && c.contact?.startsWith('[TRASH]')));
+            setIncomeRecords(iData.filter(i => {
+              if (i.userid !== adminSelectedUserId) return false;
+              const isProjectTrashed = pData.find(p => p.id === i.projectid)?.notes?.startsWith('[TRASH]');
+              const isClientTrashed = cData.find(c => c.name === i.clientname)?.contact?.startsWith('[TRASH]');
+              return !isProjectTrashed && !isClientTrashed;
+            }));
+            setExpenses(userExpenses.filter(e => !e.notes?.startsWith('[TRASH]')));
+            setTrashedExpenses(userExpenses.filter(e => e.notes?.startsWith('[TRASH]')));
         } else {
             // If no user selected, show NOTHING in the main views (forces selection from list)
             setProjects([]);
             setTrashedProjects([]);
             setClients([]);
+            setTrashedClients([]);
             setIncomeRecords([]);
             setExpenses([]);
             setTrashedExpenses([]);
@@ -191,8 +205,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // Normal User: Visible = All fetched
         setProjects(pData.filter(p => !p.notes?.startsWith('[TRASH]')));
         setTrashedProjects(pData.filter(p => p.notes?.startsWith('[TRASH]')));
-        setClients(cData);
-        setIncomeRecords(iData);
+        setClients(cData.filter(c => !c.contact?.startsWith('[TRASH]')));
+        setTrashedClients(cData.filter(c => c.contact?.startsWith('[TRASH]')));
+        setIncomeRecords(iData.filter(i => {
+          const isProjectTrashed = pData.find(p => p.id === i.projectid)?.notes?.startsWith('[TRASH]');
+          const isClientTrashed = cData.find(c => c.name === i.clientname)?.contact?.startsWith('[TRASH]');
+          return !isProjectTrashed && !isClientTrashed;
+        }));
         setExpenses(eData.filter(e => !e.notes?.startsWith('[TRASH]')));
         setTrashedExpenses(eData.filter(e => e.notes?.startsWith('[TRASH]')));
         setGhazalNotes(gData.filter(g => !g.lyrics?.startsWith('[TRASH]')));
@@ -204,6 +223,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (error.message?.includes('JWT') || 
           error.message?.includes('Unauthorized') || 
           error.message?.includes('Refresh Token') ||
+          error.message?.includes('refresh_token_not_found') ||
           error.status === 400 ||
           error.status === 401) {
           
@@ -213,10 +233,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               localStorage.removeItem(key);
             }
           }
-          supabase.auth.signOut();
+          supabase.auth.signOut().catch(() => {});
           setUser(null);
+          showToast('আপনার সেশনের মেয়াদ শেষ হয়েছে, দয়া করে পুনরায় লগইন করুন।', 'info');
+      } else {
+          showToast(`কানেকশন এরর: ${error.message}`);
       }
-      showToast(`কানেকশন এরর: ${error.message}`);
     } finally {
       setLoading(false);
       isFetchingRef.current = false;
@@ -274,6 +296,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             // If the refresh token is invalid, we MUST clear the session to allow the user to log in again
             if (error.message?.includes('Refresh Token Not Found') || 
                 error.message?.includes('Invalid Refresh Token') ||
+                error.message?.includes('refresh_token_not_found') ||
                 error.status === 400 || 
                 error.status === 401) {
                 
@@ -315,8 +338,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                  }
              });
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error("Session Init Error:", err);
+        if (err.message?.includes('Refresh Token Not Found') || 
+            err.message?.includes('Invalid Refresh Token') ||
+            err.message?.includes('refresh_token_not_found') ||
+            err.status === 400 || 
+            err.status === 401) {
+            
+            for (const key in localStorage) {
+              if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+                localStorage.removeItem(key);
+              }
+            }
+            supabase.auth.signOut().catch(() => {});
+            if (mounted) setUser(null);
+        }
       } finally {
         if (mounted) setLoading(false);
       }
@@ -324,7 +361,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     initSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if ((event as string) === 'TOKEN_REFRESH_FAILED') {
+          for (const key in localStorage) {
+            if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+              localStorage.removeItem(key);
+            }
+          }
+          supabase.auth.signOut().catch(() => {});
+          if (mounted) setUser(null);
+          showToast('আপনার সেশনের মেয়াদ শেষ হয়েছে, দয়া করে পুনরায় লগইন করুন।', 'info');
+          return;
+      }
+
       if (session?.user) {
         if (mounted) {
             // OPTIMIZATION: Set User Immediately from Session Metadata to prevent UI blocking
@@ -396,6 +445,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       projects, setProjects, trashedProjects, setTrashedProjects, clients, setClients, 
       incomeRecords, setIncomeRecords, expenses, setExpenses, trashedExpenses, setTrashedExpenses,
       ghazalNotes, setGhazalNotes, trashedGhazalNotes, setTrashedGhazalNotes,
+      trashedClients, setTrashedClients,
       allProjects, allClients, allIncomeRecords, allExpenses,
       userProfiles,
       user, setUser, loading, refreshData,

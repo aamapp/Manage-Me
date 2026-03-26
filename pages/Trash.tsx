@@ -5,13 +5,14 @@ import { supabase } from '@/lib/supabase';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { motion, AnimatePresence } from 'motion/react';
 
-type TrashTab = 'projects' | 'expenses' | 'ghazal_notes';
+type TrashTab = 'projects' | 'expenses' | 'ghazal_notes' | 'clients';
 
 const Trash: React.FC = () => {
   const { 
     trashedProjects, 
     trashedExpenses, 
     trashedGhazalNotes, 
+    trashedClients,
     showToast, refreshData 
   } = useAppContext();
   
@@ -41,6 +42,10 @@ const Trash: React.FC = () => {
         table = 'ghazal_notes';
         const note = trashedGhazalNotes.find(n => n.id === selectedItem.id);
         updateData = { lyrics: note?.lyrics?.replace('[TRASH]', '').trim() || '' };
+      } else if (selectedItem.type === 'clients') {
+        table = 'clients';
+        const client = trashedClients.find(c => c.id === selectedItem.id);
+        updateData = { contact: client?.contact?.replace('[TRASH]', '').trim() || '' };
       }
 
       const { error } = await supabase
@@ -65,7 +70,8 @@ const Trash: React.FC = () => {
     setIsDeleting(true);
     try {
       const table = selectedItem.type === 'projects' ? 'projects' : 
-                    selectedItem.type === 'expenses' ? 'expenses' : 'ghazal_notes';
+                    selectedItem.type === 'expenses' ? 'expenses' : 
+                    selectedItem.type === 'clients' ? 'clients' : 'ghazal_notes';
 
       const { error } = await supabase
         .from(table)
@@ -73,6 +79,16 @@ const Trash: React.FC = () => {
         .eq('id', selectedItem.id);
 
       if (error) throw error;
+
+      // If it's a client, also delete its projects and income records
+      if (selectedItem.type === 'clients') {
+        const client = trashedClients.find(c => c.id === selectedItem.id);
+        if (client) {
+          await supabase.from('projects').delete().eq('clientname', client.name);
+          await supabase.from('income_records').delete().eq('clientname', client.name);
+        }
+      }
+
       showToast('স্থায়ীভাবে মুছে ফেলা হয়েছে', 'success');
       await refreshData();
     } catch (error: any) {
@@ -231,18 +247,58 @@ const Trash: React.FC = () => {
     </div>
   );
 
+  const renderClients = () => (
+    <div className="space-y-4">
+      {trashedClients.length === 0 ? (
+        <div className="text-center py-12 bg-white rounded-xl border border-dashed border-gray-300">
+          <User className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+          <p className="text-gray-500">কোন ডিলিট করা ক্লায়েন্ট নেই</p>
+        </div>
+      ) : (
+        trashedClients.map((client) => (
+          <div key={client.id} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex justify-between items-start">
+              <div className="flex-1">
+                <h3 className="font-bold text-gray-900 text-lg mb-1">{client.name}</h3>
+                <p className="text-sm text-gray-600">
+                  {client.contact.replace('[TRASH]', '').trim()}
+                </p>
+              </div>
+              <div className="flex gap-2 ml-4">
+                <button
+                  onClick={() => openConfirm(client.id, 'clients', 'restore')}
+                  className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                  title="Restore"
+                >
+                  <RotateCcw className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => openConfirm(client.id, 'clients', 'delete')}
+                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  title="Permanent Delete"
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  );
+
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">রিসাইকেল বিন</h1>
-        <p className="text-gray-600">মুছে ফেলা আইটেমগুলো এখান থেকে রিস্টোর বা স্থায়ীভাবে ডিলিট করতে পারেন।</p>
+    <div className="max-w-4xl mx-auto px-4 pb-6">
+      <div className="mb-4">
+        <h1 className="text-xl font-bold text-gray-900 mb-1">রিসাইকেল বিন</h1>
+        <p className="text-sm text-gray-500">মুছে ফেলা আইটেমগুলো এখান থেকে রিস্টোর বা স্থায়ীভাবে ডিলিট করতে পারেন।</p>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-6 bg-gray-100 p-1 rounded-xl">
+      <div className="flex flex-wrap gap-2 mb-6 bg-gray-100 p-1 rounded-xl">
         <button
           onClick={() => setActiveTab('projects')}
-          className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+          className={`flex-1 min-w-[120px] py-2.5 px-4 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${
             activeTab === 'projects' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
           }`}
         >
@@ -250,8 +306,17 @@ const Trash: React.FC = () => {
           প্রজেক্ট ({trashedProjects.length})
         </button>
         <button
+          onClick={() => setActiveTab('clients')}
+          className={`flex-1 min-w-[120px] py-2.5 px-4 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+            activeTab === 'clients' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <User className="w-4 h-4" />
+          ক্লায়েন্ট ({trashedClients.length})
+        </button>
+        <button
           onClick={() => setActiveTab('expenses')}
-          className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+          className={`flex-1 min-w-[120px] py-2.5 px-4 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${
             activeTab === 'expenses' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
           }`}
         >
@@ -260,7 +325,7 @@ const Trash: React.FC = () => {
         </button>
         <button
           onClick={() => setActiveTab('ghazal_notes')}
-          className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+          className={`flex-1 min-w-[120px] py-2.5 px-4 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${
             activeTab === 'ghazal_notes' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
           }`}
         >
@@ -279,6 +344,7 @@ const Trash: React.FC = () => {
           transition={{ duration: 0.2 }}
         >
           {activeTab === 'projects' && renderProjects()}
+          {activeTab === 'clients' && renderClients()}
           {activeTab === 'expenses' && renderExpenses()}
           {activeTab === 'ghazal_notes' && renderGhazalNotes()}
         </motion.div>
