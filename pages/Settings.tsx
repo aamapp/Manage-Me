@@ -139,8 +139,8 @@ export const Settings: React.FC = () => {
                     phone: formData.phone,
                     occupation: formData.occupation,
                     language: formData.language,
-                    currency: formData.currency,
-                    avatar_url: user.avatar_url // Preserve the current avatar URL
+                    currency: formData.currency
+                    // Removed avatar_url to prevent overwriting with stale state
                 }
             });
 
@@ -152,8 +152,8 @@ export const Settings: React.FC = () => {
                 phone: formData.phone,
                 occupation: formData.occupation,
                 currency: formData.currency,
-                language: formData.language,
-                avatar_url: user.avatar_url
+                language: formData.language
+                // Removed avatar_url to prevent overwriting with stale state
             }).eq('id', user.id);
 
         } catch (err) {

@@ -247,17 +247,48 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  // Handle Online/Offline Status
+  // Handle Online/Offline Status with Active Ping Check
   useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
+    const checkActualConnectivity = async () => {
+      if (!navigator.onLine) {
+        setIsOnline(false);
+        return;
+      }
+
+      try {
+        // Try to fetch a tiny resource with a cache-buster to verify actual internet access
+        // Using a 3-second timeout for faster detection
+        const response = await fetch('https://www.google.com/favicon.ico', { 
+          mode: 'no-cors', 
+          cache: 'no-store',
+          signal: AbortSignal.timeout(3000) 
+        });
+        setIsOnline(true);
+      } catch (error) {
+        // If fetch fails, it's likely no actual internet (e.g. no MB)
+        setIsOnline(false);
+      }
+    };
+
+    const handleOnline = () => checkActualConnectivity();
     const handleOffline = () => setIsOnline(false);
+    const handleFocus = () => checkActualConnectivity();
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+    window.addEventListener('focus', handleFocus);
+
+    // Periodic check every 5 seconds for high responsiveness
+    const interval = setInterval(checkActualConnectivity, 5000);
+
+    // Initial check
+    checkActualConnectivity();
 
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('focus', handleFocus);
+      clearInterval(interval);
     };
   }, []);
 
