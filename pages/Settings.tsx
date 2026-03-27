@@ -231,7 +231,12 @@ export const Settings: React.FC = () => {
           <div className="relative group">
             <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-white shadow-lg bg-indigo-100 flex items-center justify-center relative">
                {user.avatar_url ? (
-                 <img src={user.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+                 <img 
+                   key={user.avatar_url}
+                   src={user.avatar_url} 
+                   alt="Profile" 
+                   className="w-full h-full object-cover" 
+                 />
                ) : (
                  <span className="text-indigo-600 text-3xl font-bold">{formData.name ? formData.name.charAt(0) : 'U'}</span>
                )}

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'manageme-v2';
+const CACHE_NAME = 'manageme-v3';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -40,17 +40,32 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(event.request.url);
 
-  // Skip Supabase API and Storage requests - we want real-time data
+  // Special handling for Supabase API and Storage - we want real-time data but fallback to cache
   if (url.hostname.includes('supabase.co')) {
-    event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          // If successful, cache the response for offline use
+          if (response.status === 200) {
+            const responseClone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseClone);
+            });
+          }
+          return response;
+        })
+        .catch(() => caches.match(event.request))
+    );
     return;
   }
 
+  // General Fetch Strategy: Network First, then Cache
   event.respondWith(
     fetch(event.request)
       .then((response) => {
         // If successful, clone and cache the response
-        if (response.status === 200) {
+        // We cache everything including external scripts from esm.sh
+        if (response.status === 200 || response.status === 0) { // status 0 for opaque responses (CORS)
           const responseClone = response.clone();
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(event.request, responseClone);

@@ -171,7 +171,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
           <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center shadow-sm overflow-hidden">
               {user.avatar_url ? (
-                <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
+                <img 
+                  key={user.avatar_url}
+                  src={user.avatar_url} 
+                  alt={user.name} 
+                  className="w-full h-full object-cover" 
+                />
               ) : (
                 <span className="text-indigo-600 font-bold">{user.name.charAt(0)}</span>
               )}
@@ -223,6 +228,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
           )}
           {user.avatar_url ? (
             <img 
+              key={user.avatar_url}
               src={user.avatar_url} 
               alt={user.name} 
               className="w-9 h-9 rounded-full border-2 border-white shadow-md object-cover ring-1 ring-slate-100"
@@ -314,7 +320,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                <div className="flex items-center gap-2 relative z-10 min-w-0">
                  <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-white border-2 border-white flex items-center justify-center shadow-md">
                    {user.avatar_url ? (
-                     <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
+                     <img key={user.avatar_url} src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
                    ) : (
                      <span className="text-indigo-600 text-base font-bold">{user.name.charAt(0)}</span>
                    )}

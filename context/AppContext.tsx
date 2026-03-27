@@ -330,18 +330,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const initSession = async () => {
       try {
         // Force a session refresh to get the latest metadata on mobile
-        const { data: { session: refreshedSession } } = await supabase.auth.refreshSession();
-        const session = refreshedSession || (await supabase.auth.getSession()).data.session;
+        // Wrap in try-catch to handle offline gracefully
+        let session = null;
+        try {
+          const { data: { session: refreshedSession } } = await supabase.auth.refreshSession();
+          session = refreshedSession;
+        } catch (e) {
+          console.log("Offline or refresh failed, trying to get cached session");
+        }
+        
+        if (!session) {
+          const { data: { session: cachedSession } } = await supabase.auth.getSession();
+          session = cachedSession;
+        }
         
         if (session?.user && mounted) {
            // 1. Fetch from profiles table (Source of Truth) FIRST
            // Add a cache-buster to the query to bypass mobile WebView cache
-           const { data: profile, error: profError } = await supabase
-             .from('profiles')
-             .select('*')
-             .eq('id', session.user.id)
-             .abortSignal(AbortSignal.timeout(5000)) // Add timeout for reliability
-             .maybeSingle();
+           let profile = null;
+           try {
+             const { data: profData } = await supabase
+               .from('profiles')
+               .select('*')
+               .eq('id', session.user.id)
+               .neq('id', `cb-${Date.now()}`)
+               .abortSignal(AbortSignal.timeout(5000)) // Add timeout for reliability
+               .maybeSingle();
+             profile = profData;
+           } catch (e) {
+             console.log("Offline or profile fetch failed, using metadata");
+           }
 
            const metadata = session.user.user_metadata;
            
@@ -403,9 +421,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             const metadata = session.user.user_metadata;
             
             // Background Sync with Profile Table (Source of Truth)
-            supabase.from('profiles').select('*').eq('id', session.user.id)
-             .abortSignal(AbortSignal.timeout(5000))
-             .maybeSingle()
+            supabase.from('profiles')
+              .select('*')
+              .eq('id', session.user.id)
+              .neq('id', `cb-${Date.now()}`)
+              .abortSignal(AbortSignal.timeout(5000))
+              .maybeSingle()
              .then(({ data: profile }) => {
                  if (mounted) {
                      const avatarUrl = profile?.avatar_url || metadata?.avatar_url || '';
