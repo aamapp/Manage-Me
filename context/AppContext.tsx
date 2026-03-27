@@ -331,46 +331,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         // Force a session refresh to get the latest metadata on mobile
         const { data: { session: refreshedSession } } = await supabase.auth.refreshSession();
-        
         const session = refreshedSession || (await supabase.auth.getSession()).data.session;
         
         if (session?.user && mounted) {
-           // 1. Set initial user from session metadata
-           const metadata = session.user.user_metadata;
-           setUser({
-              id: session.user.id,
-              email: session.user.email || '',
-              name: metadata?.name || 'User',
-              phone: metadata?.phone || '',
-              occupation: metadata?.occupation || '',
-              avatar_url: metadata?.avatar_url || '',
-              language: metadata?.language || 'bn',
-              currency: metadata?.currency || '৳',
-              role: metadata?.role || 'user'
-           });
-
-           // 2. IMMEDIATELY fetch from profiles table (Source of Truth)
-           // Adding a small delay to ensure DB has finished writing if this is right after an update
+           // 1. Fetch from profiles table (Source of Truth) FIRST
            const { data: profile, error: profError } = await supabase
              .from('profiles')
              .select('*')
              .eq('id', session.user.id)
              .maybeSingle();
 
-           if (profile && mounted && !profError) {
-               setUser(prev => {
-                   if (!prev) return null;
-                   return {
-                       ...prev,
-                       name: profile.name || prev.name,
-                       avatar_url: profile.avatar_url || prev.avatar_url,
-                       phone: profile.phone || prev.phone,
-                       occupation: profile.occupation || prev.occupation,
-                       currency: profile.currency || prev.currency,
-                       language: profile.language || prev.language
-                   };
-               });
-           }
+           const metadata = session.user.user_metadata;
+           
+           // 2. Set user state, prioritizing profile table data
+           // Add a cache-buster to avatar_url to force mobile browsers to reload
+           const avatarUrl = profile?.avatar_url || metadata?.avatar_url || '';
+           const cacheBuster = avatarUrl ? `${avatarUrl}${avatarUrl.includes('?') ? '&' : '?'}t=${Date.now()}` : '';
+
+           setUser({
+              id: session.user.id,
+              email: session.user.email || '',
+              name: profile?.name || metadata?.name || 'User',
+              phone: profile?.phone || metadata?.phone || '',
+              occupation: profile?.occupation || metadata?.occupation || '',
+              avatar_url: cacheBuster || avatarUrl,
+              language: profile?.language || metadata?.language || 'bn',
+              currency: profile?.currency || metadata?.currency || '৳',
+              role: metadata?.role || 'user'
+           });
         }
       } catch (err: any) {
         console.error("Session Init Error:", err);
@@ -410,48 +398,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       if (session?.user) {
         if (mounted) {
-            // OPTIMIZATION: Set User Immediately from Session Metadata to prevent UI blocking
             const metadata = session.user.user_metadata;
             
-            // 1. Immediate UI update
-            setUser({
-                id: session.user.id,
-                email: session.user.email || '',
-                name: metadata?.name || 'User',
-                phone: metadata?.phone || '',
-                occupation: metadata?.occupation || '',
-                avatar_url: metadata?.avatar_url || '',
-                language: metadata?.language || 'bn',
-                currency: metadata?.currency || '৳',
-                role: metadata?.role || 'user'
-            });
-            
-            // 2. Background Sync with Profile Table (Non-blocking)
+            // Background Sync with Profile Table (Source of Truth)
             supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle()
              .then(({ data: profile }) => {
-                 if (profile && mounted) {
-                     setUser(prev => {
-                         if (!prev) return null;
-                         // Only update if actually different to prevent unnecessary renders
-                         if (
-                             prev.name !== profile.name || 
-                             prev.avatar_url !== profile.avatar_url ||
-                             prev.phone !== profile.phone ||
-                             prev.occupation !== profile.occupation ||
-                             prev.currency !== profile.currency ||
-                             prev.language !== profile.language
-                         ) {
-                             return {
-                                 ...prev,
-                                 name: profile.name || prev.name,
-                                 avatar_url: profile.avatar_url || prev.avatar_url,
-                                 phone: profile.phone || prev.phone,
-                                 occupation: profile.occupation || prev.occupation,
-                                 currency: profile.currency || prev.currency,
-                                 language: profile.language || prev.language
-                             };
-                         }
-                         return prev;
+                 if (mounted) {
+                     const avatarUrl = profile?.avatar_url || metadata?.avatar_url || '';
+                     const cacheBuster = avatarUrl ? `${avatarUrl}${avatarUrl.includes('?') ? '&' : '?'}t=${Date.now()}` : '';
+
+                     setUser({
+                         id: session.user.id,
+                         email: session.user.email || '',
+                         name: profile?.name || metadata?.name || 'User',
+                         phone: profile?.phone || metadata?.phone || '',
+                         occupation: profile?.occupation || metadata?.occupation || '',
+                         avatar_url: cacheBuster || avatarUrl,
+                         language: profile?.language || metadata?.language || 'bn',
+                         currency: profile?.currency || metadata?.currency || '৳',
+                         role: metadata?.role || 'user'
                      });
                  }
              });
