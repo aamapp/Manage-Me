@@ -38,10 +38,11 @@ self.addEventListener('fetch', (event) => {
   // Skip non-GET requests
   if (event.request.method !== 'GET') return;
 
-  // Skip Supabase API and Storage requests - we want real-time data
   const url = new URL(event.request.url);
+
+  // Skip Supabase API and Storage requests - we want real-time data
   if (url.hostname.includes('supabase.co')) {
-    event.respondWith(fetch(event.request));
+    event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
     return;
   }
 
@@ -63,8 +64,8 @@ self.addEventListener('fetch', (event) => {
           if (cachedResponse) {
             return cachedResponse;
           }
-          // If it's a navigation request, return index.html from cache
-          if (event.request.mode === 'navigate') {
+          // If it's a navigation request (like refreshing the page), return index.html
+          if (event.request.mode === 'navigate' || (event.request.headers.get('accept') && event.request.headers.get('accept').includes('text/html'))) {
             return caches.match('/');
           }
         });
