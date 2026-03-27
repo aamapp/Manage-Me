@@ -342,6 +342,23 @@ export const Settings: React.FC = () => {
                     </button>
                 </div>
              </div>
+
+             {/* Clear Cache Utility */}
+             <div className="pt-6 mt-6 border-t border-slate-100">
+                <button 
+                  onClick={() => {
+                    if (window.confirm('আপনি কি অ্যাপের ক্যাশ ক্লিয়ার করতে চান? এটি আপনাকে লগআউট করে দিবে এবং সব তথ্য নতুন করে লোড হবে।')) {
+                      localStorage.clear();
+                      sessionStorage.clear();
+                      window.location.reload(true);
+                    }
+                  }}
+                  className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-red-50 text-red-600 rounded-xl font-bold text-sm hover:bg-red-100 transition-colors"
+                >
+                  <Trash2 size={16} />
+                  অ্যাপ ক্যাশ ক্লিয়ার করুন
+                </button>
+             </div>
           </div>
         </div>
       </div>
