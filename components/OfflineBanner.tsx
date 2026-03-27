@@ -34,20 +34,20 @@ export const OfflineBanner: React.FC = () => {
 
   return (
     <div 
-      className={`w-full z-[100] transition-all duration-500 ease-in-out overflow-hidden
-        ${!isOnline ? 'bg-rose-500 text-white' : 'bg-emerald-500 text-white'}
+      className={`w-full rounded-2xl transition-all duration-500 ease-in-out overflow-hidden shadow-sm border
+        ${!isOnline ? 'bg-rose-500 text-white border-rose-400' : 'bg-emerald-500 text-white border-emerald-400'}
       `}
     >
-      <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-2 text-xs font-medium">
+      <div className="px-4 py-3 flex items-center justify-center gap-2 text-xs font-bold">
         {!isOnline ? (
           <>
-            <WifiOff size={14} className="animate-pulse" />
-            <span>⚠️ আপনি এখন অফলাইনে আছেন {lastUpdated && `(সর্বশেষ আপডেট: ${lastUpdated})`}</span>
+            <WifiOff size={16} className="animate-pulse" />
+            <span className="leading-tight">⚠️ আপনি এখন অফলাইনে আছেন {lastUpdated && `(সর্বশেষ আপডেট: ${lastUpdated})`}</span>
           </>
         ) : (
           <>
-            <Wifi size={14} />
-            <span>ইন্টারনেট কানেকশন ফিরে এসেছে!</span>
+            <Wifi size={16} />
+            <span className="leading-tight">ইন্টারনেট কানেকশন ফিরে এসেছে!</span>
           </>
         )}
       </div>

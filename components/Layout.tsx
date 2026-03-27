@@ -93,9 +93,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans w-full overflow-x-hidden selection:bg-indigo-100 selection:text-indigo-700 flex flex-col lg:flex-row">
-      <div className="fixed top-0 left-0 w-full z-[100]">
-        <OfflineBanner />
-      </div>
       {/* Desktop Sidebar - Visible only on LG screens */}
       <aside className="hidden lg:flex flex-col w-72 bg-white border-r border-slate-200 h-screen lg:fixed lg:top-0 lg:left-0 z-50">
         <div className="p-6 border-b border-slate-100">
@@ -241,6 +238,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
       {/* Main Content Area */}
       <main className="flex-1 pt-20 lg:pt-8 pb-20 lg:pb-8 px-3 lg:px-8 animate-in fade-in duration-300 w-full max-w-[100vw] lg:max-w-none overflow-x-hidden lg:ml-72">
         <div className="max-w-7xl mx-auto w-full">
+          <div className="mb-4">
+            <OfflineBanner />
+          </div>
           {children}
         </div>
       </main>
