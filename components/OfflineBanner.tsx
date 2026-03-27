@@ -34,7 +34,7 @@ export const OfflineBanner: React.FC = () => {
 
   return (
     <div 
-      className={`w-full rounded-2xl transition-all duration-500 ease-in-out overflow-hidden shadow-sm border
+      className={`w-full rounded-2xl transition-all duration-500 ease-in-out overflow-hidden shadow-sm border mb-4
         ${!isOnline ? 'bg-rose-500 text-white border-rose-400' : 'bg-emerald-500 text-white border-emerald-400'}
       `}
     >
