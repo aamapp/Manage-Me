@@ -166,11 +166,11 @@ export const Settings: React.FC = () => {
 
             if (profileError) throw profileError;
 
-        } catch (err) {
+        } catch (err: any) {
             console.error("Background Sync Error:", err);
             // Revert UI on critical failure only
             setUser(previousUser);
-            showToast('নেটওয়ার্ক সমস্যার কারণে সেভ হয়নি', 'error');
+            showToast(`সেভ করতে সমস্যা হয়েছে: ${err.message || 'নেটওয়ার্ক এরর'}`, 'error');
         }
     })();
   };
