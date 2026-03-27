@@ -139,14 +139,22 @@ export const Settings: React.FC = () => {
                     phone: formData.phone,
                     occupation: formData.occupation,
                     language: formData.language,
-                    currency: formData.currency
+                    currency: formData.currency,
+                    avatar_url: user.avatar_url // Preserve the current avatar URL
                 }
             });
 
             if (error) throw error;
 
-            // Update profiles table silently
-            await supabase.from('profiles').update({ name: formData.name }).eq('id', user.id);
+            // Update profiles table silently with all fields
+            await supabase.from('profiles').update({ 
+                name: formData.name,
+                phone: formData.phone,
+                occupation: formData.occupation,
+                currency: formData.currency,
+                language: formData.language,
+                avatar_url: user.avatar_url
+            }).eq('id', user.id);
 
         } catch (err) {
             console.error("Background Sync Error:", err);
@@ -269,7 +277,7 @@ export const Settings: React.FC = () => {
                     </select>
                 </div>
              </div>
-             <button onClick={handleSave} disabled={isSaving || !isOnline} className={`w-full flex justify-center items-center gap-2 px-6 py-3.5 rounded-xl font-bold text-white transition-all shadow-lg mt-2 ${isSaving || !isOnline ? 'bg-indigo-400 cursor-not-allowed shadow-none' : 'bg-indigo-600 hover:bg-indigo-700 active:scale-95 shadow-indigo-100'}`}>
+             <button onClick={handleSave} disabled={isSaving || isUploading || !isOnline} className={`w-full flex justify-center items-center gap-2 px-6 py-3.5 rounded-xl font-bold text-white transition-all shadow-lg mt-2 ${isSaving || isUploading || !isOnline ? 'bg-indigo-400 cursor-not-allowed shadow-none' : 'bg-indigo-600 hover:bg-indigo-700 active:scale-95 shadow-indigo-100'}`}>
                 {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
                 {isSaving ? 'সেভ হচ্ছে...' : 'পরিবর্তন সেভ করুন'}
              </button>
