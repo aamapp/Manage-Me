@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { WifiOff, Wifi } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 
@@ -6,6 +6,7 @@ export const OfflineBanner: React.FC = () => {
   const { isOnline } = useAppContext();
   const [showOnlineMessage, setShowOnlineMessage] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string>('');
+  const isFirstRender = useRef(true);
 
   useEffect(() => {
     if (!isOnline) {
@@ -14,13 +15,18 @@ export const OfflineBanner: React.FC = () => {
       const formattedTime = now.toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' });
       const formattedDate = now.toLocaleDateString('bn-BD', { day: 'numeric', month: 'long' });
       setLastUpdated(`${formattedDate}, ${formattedTime}`);
+      isFirstRender.current = false;
     } else {
       // Show "Online" message briefly when connection is restored
-      setShowOnlineMessage(true);
-      const timer = setTimeout(() => {
-        setShowOnlineMessage(false);
-      }, 3000); // Hide after 3 seconds
-      return () => clearTimeout(timer);
+      // BUT only if it's not the first render (meaning it was offline before)
+      if (!isFirstRender.current) {
+        setShowOnlineMessage(true);
+        const timer = setTimeout(() => {
+          setShowOnlineMessage(false);
+        }, 3000); // Hide after 3 seconds
+        return () => clearTimeout(timer);
+      }
+      isFirstRender.current = false;
     }
   }, [isOnline]);
 
