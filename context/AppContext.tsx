@@ -377,11 +377,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
            supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle()
              .then(({ data: profile }) => {
                  if (profile && mounted) {
-                     setUser(prev => ({
-                         ...prev!,
-                         name: profile.name || prev!.name,
-                         avatar_url: profile.avatar_url || prev!.avatar_url,
-                     }));
+                     setUser(prev => {
+                         if (!prev) return null;
+                         return {
+                             ...prev,
+                             name: profile.name || prev.name,
+                             avatar_url: profile.avatar_url || prev.avatar_url,
+                             phone: profile.phone || prev.phone,
+                             occupation: profile.occupation || prev.occupation,
+                             currency: profile.currency || prev.currency,
+                             language: profile.language || prev.language
+                         };
+                     });
                  }
              });
         }
@@ -444,12 +451,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
              .then(({ data: profile }) => {
                  if (profile && mounted) {
                      setUser(prev => {
+                         if (!prev) return null;
                          // Only update if actually different to prevent unnecessary renders
-                         if (prev && (prev.name !== profile.name || prev.avatar_url !== profile.avatar_url)) {
+                         if (
+                             prev.name !== profile.name || 
+                             prev.avatar_url !== profile.avatar_url ||
+                             prev.phone !== profile.phone ||
+                             prev.occupation !== profile.occupation ||
+                             prev.currency !== profile.currency ||
+                             prev.language !== profile.language
+                         ) {
                              return {
                                  ...prev,
                                  name: profile.name || prev.name,
                                  avatar_url: profile.avatar_url || prev.avatar_url,
+                                 phone: profile.phone || prev.phone,
+                                 occupation: profile.occupation || prev.occupation,
+                                 currency: profile.currency || prev.currency,
+                                 language: profile.language || prev.language
                              };
                          }
                          return prev;

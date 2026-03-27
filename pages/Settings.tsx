@@ -61,37 +61,43 @@ export const Settings: React.FC = () => {
     setIsUploading(true);
 
     try {
+      // 1. Upload to Storage
       const { error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(filePath, file, { upsert: true });
 
       if (uploadError) throw uploadError;
 
+      // 2. Get Public URL
       const { data: { publicUrl } } = supabase.storage
         .from('avatars')
         .getPublicUrl(filePath);
 
-      // Update Auth Metadata
+      // 3. Update Auth Metadata (for session persistence)
       const { error: authError } = await supabase.auth.updateUser({
         data: { avatar_url: publicUrl }
       });
 
       if (authError) throw authError;
 
-      // Update Profiles Table (Source of Truth)
+      // 4. Update Profiles Table (Source of Truth) - Use UPSERT to ensure record exists
       const { error: profileError } = await supabase
         .from('profiles')
-        .update({ avatar_url: publicUrl })
-        .eq('id', user.id);
+        .upsert({ 
+          id: user.id,
+          avatar_url: publicUrl,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'id' });
 
-      if (profileError) console.error("Profile update failed", profileError);
+      if (profileError) throw profileError;
 
+      // 5. Update Local State
       setUser(prev => prev ? ({ ...prev, avatar_url: publicUrl }) : null);
       showToast('প্রোফাইল ছবি আপডেট হয়েছে!', 'success');
 
     } catch (error: any) {
-      console.error(error);
-      showToast('ছবি আপলোড করতে সমস্যা হয়েছে', 'error');
+      console.error("Upload Error Details:", error);
+      showToast(`ছবি আপলোড করতে সমস্যা হয়েছে: ${error.message || 'Unknown error'}`, 'error');
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -105,35 +111,36 @@ export const Settings: React.FC = () => {
       return;
     }
     
-    // 1. UI Loading State (Visual Feedback)
+    // 1. UI Loading State
     setIsSaving(true);
     
     // Snapshot for rollback
     const previousUser = { ...user };
     
-    // 2. Optimistic Update (Immediate Context Update)
-    const updatedUser = {
-        ...user,
+    // 2. Optimistic Update - Use functional update to avoid stale closures
+    setUser(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
         name: formData.name,
         phone: formData.phone,
         occupation: formData.occupation,
         language: formData.language as 'bn' | 'en',
         currency: formData.currency
-    };
-    setUser(updatedUser);
+      };
+    });
 
-    // 3. Fake delay to show spinner briefly (UX)
+    // 3. Fake delay for UX
     await new Promise(resolve => setTimeout(resolve, 600));
     
-    // 4. Stop Loading & Show Success IMMEDIATELY
+    // 4. Stop Loading
     setIsSaving(false);
     showToast('সেটিংস সেভ হয়েছে', 'success');
 
-    // 5. Background Network Sync (Fire & Forget)
-    // We do NOT await this in the UI thread
+    // 5. Background Network Sync
     (async () => {
         try {
-            const { error } = await supabase.auth.updateUser({
+            const { error: authError } = await supabase.auth.updateUser({
                 data: {
                     name: formData.name,
                     phone: formData.phone,
@@ -144,17 +151,20 @@ export const Settings: React.FC = () => {
                 }
             });
 
-            if (error) throw error;
+            if (authError) throw authError;
 
             // Update profiles table silently with all fields
-            await supabase.from('profiles').update({ 
+            const { error: profileError } = await supabase.from('profiles').upsert({ 
+                id: user.id,
                 name: formData.name,
                 phone: formData.phone,
                 occupation: formData.occupation,
                 currency: formData.currency,
                 language: formData.language
                 // Removed avatar_url to prevent overwriting with stale state
-            }).eq('id', user.id);
+            }, { onConflict: 'id' });
+
+            if (profileError) throw profileError;
 
         } catch (err) {
             console.error("Background Sync Error:", err);
