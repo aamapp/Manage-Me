@@ -335,10 +335,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         
         if (session?.user && mounted) {
            // 1. Fetch from profiles table (Source of Truth) FIRST
+           // Add a cache-buster to the query to bypass mobile WebView cache
            const { data: profile, error: profError } = await supabase
              .from('profiles')
              .select('*')
              .eq('id', session.user.id)
+             .abortSignal(AbortSignal.timeout(5000)) // Add timeout for reliability
              .maybeSingle();
 
            const metadata = session.user.user_metadata;
@@ -401,7 +403,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             const metadata = session.user.user_metadata;
             
             // Background Sync with Profile Table (Source of Truth)
-            supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle()
+            supabase.from('profiles').select('*').eq('id', session.user.id)
+             .abortSignal(AbortSignal.timeout(5000))
+             .maybeSingle()
              .then(({ data: profile }) => {
                  if (mounted) {
                      const avatarUrl = profile?.avatar_url || metadata?.avatar_url || '';

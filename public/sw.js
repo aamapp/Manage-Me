@@ -1,4 +1,4 @@
-const CACHE_NAME = 'manageme-v1';
+const CACHE_NAME = 'manageme-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -37,6 +37,13 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   // Skip non-GET requests
   if (event.request.method !== 'GET') return;
+
+  // Skip Supabase API and Storage requests - we want real-time data
+  const url = new URL(event.request.url);
+  if (url.hostname.includes('supabase.co')) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
 
   event.respondWith(
     fetch(event.request)
