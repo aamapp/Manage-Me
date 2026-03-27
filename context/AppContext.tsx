@@ -456,6 +456,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [user]);
 
+  // Real-time Data Sync
+  useEffect(() => {
+    if (!user || !isConfigured) return;
+
+    const channel = supabase
+      .channel('db-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => refreshData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, () => refreshData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'income_records' }, () => refreshData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses' }, () => refreshData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ghazal_notes' }, () => refreshData())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
   return (
     <AppContext.Provider value={{ 
       projects, setProjects, trashedProjects, setTrashedProjects, clients, setClients, 
