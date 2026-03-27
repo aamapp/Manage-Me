@@ -7,9 +7,10 @@ import {
 import { 
   TrendingUp,
   Wallet,
-  RefreshCcw, Clock, Receipt, Download, Share2, Hexagon, X, AlertCircle, ExternalLink, Copy
+  RefreshCcw, Clock, Receipt, Download, Share2, Hexagon, X, AlertCircle, ExternalLink, Copy, Music, Filter
 } from 'lucide-react';
 import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 import { useAppContext } from '@/context/AppContext';
 import { APP_NAME } from '@/constants';
 import { supabase } from '@/lib/supabase';
@@ -17,7 +18,7 @@ import { Expense } from '@/types';
 import { DatePicker } from '@/components/DatePicker';
 
 export const Reports: React.FC = () => {
-  const { projects, user, adminSelectedUserId, expenses, incomeRecords } = useAppContext();
+  const { projects, user, adminSelectedUserId, expenses, incomeRecords, isOnline } = useAppContext();
   const currency = user?.currency || '৳';
   const reportRef = useRef<HTMLDivElement>(null);
 
@@ -29,6 +30,7 @@ export const Reports: React.FC = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [isCapturing, setIsCapturing] = useState(false);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   
   // State for Image Preview Modal (Fallback for Android)
   const [previewImage, setPreviewImage] = useState<string | null>(null);
@@ -171,6 +173,10 @@ export const Reports: React.FC = () => {
   };
 
   const handleDownloadImage = async () => {
+    if (!isOnline) {
+      alert('অফলাইনে রিপোর্ট তৈরি করা যাবে না। দয়া করে ইন্টারনেট সংযোগ চেক করুন।');
+      return;
+    }
     if (!reportRef.current) return;
     setIsCapturing(true);
     
@@ -255,6 +261,102 @@ export const Reports: React.FC = () => {
       setIsCapturing(false);
     }
   };
+  
+  const handleDownloadPDF = async () => {
+    if (!reportRef.current) return;
+    
+    window.scrollTo(0, 0);
+    setIsGeneratingPDF(true);
+    
+    // Wait a bit for the UI to update and fonts to settle
+    await new Promise(resolve => setTimeout(resolve, 800));
+    
+    try {
+      const element = reportRef.current;
+      const fileName = `financial_report_${new Date().getTime()}.pdf`;
+      
+      if (!element) return;
+      
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        windowWidth: 794,
+        onclone: (clonedDoc: Document) => {
+          clonedDoc.documentElement.style.overflow = 'visible';
+          clonedDoc.documentElement.style.height = 'auto';
+          clonedDoc.body.style.overflow = 'visible';
+          clonedDoc.body.style.height = 'auto';
+          
+          const pdfHeader = clonedDoc.getElementById('pdf-header');
+          const pdfFooter = clonedDoc.getElementById('pdf-footer');
+          const container = clonedDoc.getElementById('report-container');
+
+          if (container) {
+            container.style.width = '794px';
+            container.style.maxWidth = 'none';
+            container.style.margin = '0';
+            container.style.padding = '40px'; 
+            container.style.backgroundColor = '#ffffff';
+            container.style.display = 'block';
+            container.style.overflow = 'visible';
+            container.style.height = 'auto';
+            
+            const allElements = container.querySelectorAll('*');
+            allElements.forEach(el => {
+              const htmlEl = el as HTMLElement;
+              htmlEl.style.transition = 'none';
+              htmlEl.style.animation = 'none';
+              htmlEl.style.boxShadow = 'none';
+              htmlEl.style.transform = 'none';
+              htmlEl.style.opacity = '1';
+            });
+
+            // Target specific text elements for Bengali font fix
+            const textElements = container.querySelectorAll('h1:not(.pdf-exact-text), h2:not(.pdf-exact-text), h3:not(.pdf-exact-text), h4, h5, h6, p:not(.pdf-exact-text), span:not(.pdf-exact-text), div.text-xs:not(.pdf-exact-text), div.text-sm:not(.pdf-exact-text)');
+            textElements.forEach(el => {
+              const htmlEl = el as HTMLElement;
+              htmlEl.style.lineHeight = '1.8';
+              htmlEl.style.paddingTop = '2px';
+              htmlEl.style.paddingBottom = '2px';
+              htmlEl.style.overflow = 'visible';
+            });
+          }
+        }
+      });
+
+      const imgWidth = canvas.width / 2;
+      const imgHeight = canvas.height / 2;
+      
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'px',
+        format: [imgWidth, imgHeight]
+      });
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.8);
+      pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
+      
+      const pdfBlob = pdf.output('blob');
+      const downloadUrl = URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      setTimeout(() => {
+        URL.revokeObjectURL(downloadUrl);
+      }, 100);
+      
+    } catch (error) {
+      console.error('PDF Error:', error);
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
 
   const hasData = filteredIncomeRecords.length > 0 || filteredExpenses.length > 0 || filteredProjects.length > 0;
 
@@ -277,14 +379,24 @@ export const Reports: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-20">
-      <div className="flex flex-col gap-4">
+      <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">
              {user?.role === 'admin' ? (adminSelectedUserId ? 'ইউজার রিপোর্ট' : 'রিপোর্ট (অ্যাডমিন ভিউ)') : 'রিপোর্ট'}
           </h1>
           <p className="text-slate-500">আর্থিক প্রবৃদ্ধি পর্যবেক্ষণ করুন।</p>
         </div>
-        
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={handleDownloadPDF}
+            className="bg-emerald-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-emerald-200 active:scale-90 transition-transform"
+          >
+            <Download size={22} />
+          </button>
+        </div>
+      </div>
+      
+      <div className="flex flex-col gap-4">
         {/* Filter Section */}
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col gap-4">
             <div className="grid grid-cols-2 gap-4">
@@ -312,6 +424,26 @@ export const Reports: React.FC = () => {
       <div className="overflow-hidden rounded-none shadow-xl">
         <div id="report-container" ref={reportRef} className="bg-white relative w-full mx-auto">
             
+            {isGeneratingPDF && (
+              <div id="pdf-header" className="p-6 border-b border-slate-200 flex justify-between items-start">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-sm">
+                    <Music size={28} strokeWidth={2.5} />
+                  </div>
+                  <div className="flex flex-col justify-center">
+                    <h1 className="text-3xl font-black text-slate-900 leading-none mb-1.5 tracking-tight pdf-exact-text" style={{ lineHeight: '1' }}>Manage-Me</h1>
+                    <h2 className="text-[10px] font-bold text-indigo-600 tracking-[0.2em] uppercase leading-none pdf-exact-text" style={{ lineHeight: '1' }}>Professional Studio Manager</h2>
+                  </div>
+                </div>
+
+                <div className="text-right flex flex-col justify-center">
+                  <h2 className="text-xl font-black text-slate-800 mb-2 pdf-exact-text" style={{ lineHeight: '1.2' }}>আর্থিক রিপোর্ট</h2>
+                  <p className="text-xs font-bold text-slate-500 mb-1 pdf-exact-text" style={{ lineHeight: '1.2' }}>সময়কাল: {getReportPeriodText()}</p>
+                  <p className="text-xs font-bold text-slate-500 pdf-exact-text" style={{ lineHeight: '1.2' }}>তারিখ: {new Date().toLocaleDateString('bn-BD')}</p>
+                </div>
+              </div>
+            )}
+
             {/* Main Content Body */}
             <div className="p-6 space-y-6 relative z-10">
                 

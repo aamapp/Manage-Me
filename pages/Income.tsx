@@ -1,7 +1,9 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { TrendingUp, Plus, Search, Calendar, DollarSign, X, ReceiptText, Briefcase, CreditCard, AlertCircle, MoreVertical, Pencil, Trash2, Users, Loader2, CalendarDays, Wallet, Clock, Zap, Rocket, Landmark, Banknote, Calculator } from 'lucide-react';
+import { TrendingUp, Plus, Search, Calendar, DollarSign, X, ReceiptText, Briefcase, CreditCard, AlertCircle, MoreVertical, Pencil, Trash2, Users, Loader2, CalendarDays, Wallet, Clock, Zap, Rocket, Landmark, Banknote, Calculator, Download, Music, Filter } from 'lucide-react';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import { useAppContext } from '../context/AppContext';
 import { Project, IncomeRecord } from '../types';
 import { supabase } from '../lib/supabase';
@@ -26,7 +28,7 @@ const BkashIcon = ({ size = 16, className = "" }: { size?: number, className?: s
 
 export const Income: React.FC = () => {
   // Use incomeRecords directly from context (cached data)
-  const { projects, incomeRecords, user, showToast, refreshData, adminSelectedUserId } = useAppContext();
+  const { projects, incomeRecords, user, showToast, refreshData, adminSelectedUserId, isOnline } = useAppContext();
   const currency = user?.currency || '৳';
   
   const [isModalOpen, setModalOpen] = useState(false);
@@ -125,12 +127,20 @@ export const Income: React.FC = () => {
   };
 
   const handleOpenAddModal = () => {
+    if (!isOnline) {
+      showToast('অফলাইনে নতুন আয় যোগ করা যাবে না', 'error');
+      return;
+    }
     resetForm();
     setIsEditing(false);
     setModalOpen(true);
   };
 
   const handleOpenEditModal = (payment: any) => {
+    if (!isOnline) {
+      showToast('অফলাইনে আয় এডিট করা যাবে না', 'error');
+      return;
+    }
     setIsEditing(true);
     setActivePaymentId(payment.id);
     setNewPayment({ 
@@ -263,6 +273,152 @@ export const Income: React.FC = () => {
 
   const totalIncome = incomeRecords.reduce((acc, curr) => acc + curr.amount, 0);
 
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  const handleDownloadPDF = async () => {
+    if (!listRef.current) return;
+    
+    window.scrollTo(0, 0);
+    setIsGeneratingPDF(true);
+    showToast('পিডিএফ তৈরি হচ্ছে...', 'info');
+    
+    await new Promise(resolve => setTimeout(resolve, 800));
+    
+    try {
+      const element = listRef.current;
+      const fileName = `income_report_${new Date().getTime()}.pdf`;
+      
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        windowWidth: 794,
+        onclone: (clonedDoc: Document) => {
+          clonedDoc.documentElement.style.overflow = 'visible';
+          clonedDoc.documentElement.style.height = 'auto';
+          clonedDoc.body.style.overflow = 'visible';
+          clonedDoc.body.style.height = 'auto';
+          
+          const pdfHeader = clonedDoc.getElementById('pdf-header');
+          const pdfStats = clonedDoc.getElementById('pdf-stats');
+          const pdfFooter = clonedDoc.getElementById('pdf-footer');
+          const container = clonedDoc.getElementById('pdf-container');
+
+          if (container) {
+            container.style.width = '794px';
+            container.style.maxWidth = 'none';
+            container.style.margin = '0';
+            container.style.padding = '40px'; 
+            container.style.backgroundColor = '#ffffff';
+            container.style.display = 'block';
+            container.style.overflow = 'visible';
+            container.style.height = 'auto';
+            
+            container.classList.remove('space-y-4', 'rounded-[2.5rem]', 'px-1');
+
+            const allElements = container.querySelectorAll('*');
+            allElements.forEach(el => {
+              const htmlEl = el as HTMLElement;
+              htmlEl.style.transition = 'none';
+              htmlEl.style.animation = 'none';
+              htmlEl.style.boxShadow = 'none';
+              htmlEl.style.transform = 'none';
+              htmlEl.style.opacity = '1';
+            });
+
+            const textElements = container.querySelectorAll('h1, h2, h3, h4, h5, h6, p, span, div');
+            textElements.forEach(el => {
+              const htmlEl = el as HTMLElement;
+              htmlEl.style.lineHeight = '1.8';
+              htmlEl.style.paddingTop = '2px';
+              htmlEl.style.paddingBottom = '2px';
+              htmlEl.style.overflow = 'visible';
+            });
+
+            const listContainer = clonedDoc.getElementById('income-list-container');
+            if (listContainer) {
+              listContainer.style.display = 'block';
+              listContainer.style.width = '100%';
+              listContainer.style.overflow = 'visible';
+              listContainer.classList.remove('grid', 'md:grid-cols-2', 'xl:grid-cols-3', 'gap-4');
+
+              const cards = Array.from(listContainer.querySelectorAll('.income-card-pdf'));
+              
+              container.innerHTML = '';
+              
+              if (pdfHeader) {
+                pdfHeader.style.marginBottom = '24px';
+                container.appendChild(pdfHeader);
+              }
+              
+              if (pdfStats) {
+                pdfStats.style.marginBottom = '30px';
+                container.appendChild(pdfStats);
+              }
+              
+              cards.forEach((card) => {
+                const cardEl = card as HTMLElement;
+                cardEl.style.display = 'block';
+                cardEl.style.width = '100%';
+                cardEl.style.paddingBottom = '20px';
+                cardEl.style.marginBottom = '0';
+                container.appendChild(cardEl);
+              });
+              
+              if (pdfFooter) {
+                pdfFooter.style.marginTop = '24px';
+                container.appendChild(pdfFooter);
+              }
+            }
+          }
+
+          const style = clonedDoc.createElement('style');
+          style.innerHTML = `
+            .income-card-pdf {
+              display: block !important;
+              width: 100% !important;
+              position: relative !important;
+              padding-bottom: 20px !important;
+              margin-bottom: 0 !important;
+            }
+            .income-card-pdf > div {
+              border: 1px solid #cbd5e1 !important;
+              border-radius: 12px !important;
+              background-color: white !important;
+              box-shadow: none !important;
+              padding: 20px !important;
+              display: block !important;
+            }
+          `;
+          clonedDoc.head.appendChild(style);
+        }
+      });
+
+      const imgWidth = canvas.width / 2;
+      const imgHeight = canvas.height / 2;
+      
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'px',
+        format: [imgWidth, imgHeight]
+      });
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.8);
+      pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
+      
+      pdf.save(fileName);
+      showToast('পিডিএফ ডাউনলোড হয়েছে', 'success');
+      
+    } catch (error) {
+      console.error('PDF Error:', error);
+      showToast('পিডিএফ তৈরি করতে সমস্যা হয়েছে');
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
+
   const getPaymentMethodStyle = (method: string) => {
     switch(method) {
       case 'বিকাশ': 
@@ -302,12 +458,20 @@ export const Income: React.FC = () => {
           </h1>
           <p className="text-xs text-slate-500 font-medium">মোট আয়: <span className="text-emerald-600 font-bold">{currency} {totalIncome.toLocaleString('bn-BD')}</span></p>
         </div>
-        <button 
-          onClick={handleOpenAddModal}
-          className="bg-emerald-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-emerald-200 active:scale-90 transition-transform"
-        >
-          <Plus size={24} />
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button 
+            onClick={handleOpenAddModal}
+            className="bg-emerald-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-emerald-200 active:scale-90 transition-transform"
+          >
+            <Plus size={24} />
+          </button>
+          <button 
+            onClick={handleDownloadPDF}
+            className="bg-indigo-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-indigo-200 active:scale-90 transition-transform"
+          >
+            <Download size={22} />
+          </button>
+        </div>
       </div>
 
       <div className="bg-white px-4 py-2.5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-2">
@@ -321,78 +485,137 @@ export const Income: React.FC = () => {
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pb-20">
-        {filteredPayments.length === 0 ? (
-          <div className="col-span-full py-20 text-center text-slate-400">
-            <ReceiptText size={48} className="mx-auto mb-4 opacity-20" />
-            <p className="text-sm font-medium">কোনো পেমেন্ট নেই</p>
+      <div id="pdf-container" ref={listRef} className={`${isGeneratingPDF ? 'block' : 'space-y-4 rounded-[2.5rem]'} px-1 py-4 bg-white`}>
+        {isGeneratingPDF && (
+          <div id="pdf-header" className="mb-8 border-b border-slate-200 pb-6 flex justify-between items-start">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-sm">
+                <Music size={28} strokeWidth={2.5} />
+              </div>
+              <div className="flex flex-col justify-center">
+                <h1 className="text-3xl font-black text-slate-900 leading-none mb-1.5 tracking-tight" style={{ lineHeight: '1' }}>Manage-Me</h1>
+                <h2 className="text-[10px] font-bold text-indigo-600 tracking-[0.2em] uppercase leading-none" style={{ lineHeight: '1' }}>Professional Studio Manager</h2>
+              </div>
+            </div>
+
+            <div className="text-right flex flex-col justify-center">
+              <h2 className="text-xl font-black text-slate-800 mb-2" style={{ lineHeight: '1.2' }}>আয় রিপোর্ট</h2>
+              <p className="text-xs font-bold text-slate-500 mb-1" style={{ lineHeight: '1.2' }}>তারিখ: {new Date().toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+              <p className="text-xs font-bold text-slate-500" style={{ lineHeight: '1.2' }}>সময়: {new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' })}</p>
+            </div>
           </div>
-        ) : (
-          filteredPayments.map((payment) => {
-            const { style, icon } = getPaymentMethodStyle(payment.method);
-            return (
-              <div key={payment.id} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm relative animate-in slide-in-from-bottom-2 duration-300">
-                <div className="flex justify-between items-start mb-2">
-                  <div className="flex items-center gap-3">
-                     <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-                       <DollarSign size={20} />
-                     </div>
-                     <div>
-                       <h3 className="font-bold text-slate-800 text-sm">{payment.projectname}</h3>
-                       <p className="text-xs text-slate-500 font-medium">{payment.clientname}</p>
-                     </div>
+        )}
+
+        {isGeneratingPDF && (
+          <div id="pdf-stats" className="mb-8 flex flex-col gap-6">
+            <div className="flex gap-6">
+              <div className="flex-1 bg-white border border-emerald-100 rounded-[2rem] p-6 shadow-sm">
+                <p className="text-sm font-bold text-emerald-500 mb-2">মোট আয়</p>
+                <p className="text-3xl font-black text-emerald-700">{currency} {totalIncome.toLocaleString('bn-BD')}</p>
+              </div>
+              <div className="flex-1 bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm">
+                <p className="text-sm font-bold text-slate-400 mb-2">রেকর্ড সংখ্যা</p>
+                <p className="text-3xl font-black text-slate-700">{filteredPayments.length} টি</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div id="income-list-container" className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pb-20">
+          {filteredPayments.length === 0 ? (
+            <div className="col-span-full py-20 text-center text-slate-400">
+              <ReceiptText size={48} className="mx-auto mb-4 opacity-20" />
+              <p className="text-sm font-medium">কোনো পেমেন্ট নেই</p>
+            </div>
+          ) : (
+            filteredPayments.map((payment) => {
+              const { style, icon } = getPaymentMethodStyle(payment.method);
+              return (
+                <div key={payment.id} className="income-card-pdf bg-white p-4 rounded-2xl border border-slate-100 shadow-sm relative animate-in slide-in-from-bottom-2 duration-300">
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex items-center gap-3">
+                       <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                         <DollarSign size={20} />
+                       </div>
+                       <div>
+                         <h3 className="font-bold text-slate-800 text-sm">{payment.projectname}</h3>
+                         <p className="text-xs text-slate-500 font-medium">{payment.clientname}</p>
+                       </div>
+                    </div>
+                    
+                    {!isGeneratingPDF && (
+                      <div className="relative action-menu-container">
+                          <button 
+                            onClick={(e) => {
+                               e.stopPropagation();
+                               setActiveMenuId(activeMenuId === payment.id ? null : payment.id);
+                            }}
+                            className={`p-2 -mr-2 rounded-full transition-colors ${activeMenuId === payment.id ? 'bg-emerald-50 text-emerald-600' : 'text-slate-300 hover:text-emerald-600 active:bg-slate-50'}`}
+                          >
+                            <MoreVertical size={20} />
+                          </button>
+                          
+                          {activeMenuId === payment.id && (
+                             <div className="absolute right-0 top-full mt-1 w-36 bg-white rounded-xl shadow-xl border border-slate-100 z-20 flex flex-col py-1.5 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
+                                  <button 
+                                      onClick={(e) => { 
+                                        e.stopPropagation(); 
+                                        if (!isOnline) {
+                                          showToast('অফলাইনে আয় এডিট করা যাবে না', 'error');
+                                          return;
+                                        }
+                                        handleOpenEditModal(payment); 
+                                      }}
+                                      disabled={!isOnline}
+                                      className={`w-full px-4 py-2.5 text-left text-xs font-bold flex items-center gap-2 transition-colors
+                                        ${!isOnline ? 'text-slate-300 cursor-not-allowed' : 'text-slate-600 hover:bg-slate-50 hover:text-emerald-600'}
+                                      `}
+                                  >
+                                      <Pencil size={14} /> এডিট
+                                  </button>
+                                  <div className="h-px bg-slate-50 w-full my-0.5"></div>
+                                  <button 
+                                      onClick={(e) => { 
+                                        e.stopPropagation(); 
+                                        if (!isOnline) {
+                                          showToast('অফলাইনে আয় ডিলিট করা যাবে না', 'error');
+                                          return;
+                                        }
+                                        initiateDelete(payment.id, payment); 
+                                      }}
+                                      disabled={!isOnline}
+                                      className={`w-full px-4 py-2.5 text-left text-xs font-bold flex items-center gap-2 transition-colors
+                                        ${!isOnline ? 'text-slate-300 cursor-not-allowed' : 'text-rose-500 hover:bg-rose-50'}
+                                      `}
+                                  >
+                                       <Trash2 size={14} /> ডিলিট
+                                  </button>
+                              </div>
+                          )}
+                      </div>
+                    )}
                   </div>
                   
-                  <div className="relative action-menu-container">
-                      <button 
-                        onClick={(e) => {
-                           e.stopPropagation();
-                           setActiveMenuId(activeMenuId === payment.id ? null : payment.id);
-                        }}
-                        className={`p-2 -mr-2 rounded-full transition-colors ${activeMenuId === payment.id ? 'bg-emerald-50 text-emerald-600' : 'text-slate-300 hover:text-emerald-600 active:bg-slate-50'}`}
-                      >
-                        <MoreVertical size={20} />
-                      </button>
-                      
-                      {activeMenuId === payment.id && (
-                         <div className="absolute right-0 top-full mt-1 w-36 bg-white rounded-xl shadow-xl border border-slate-100 z-20 flex flex-col py-1.5 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
-                              <button 
-                                  onClick={(e) => { e.stopPropagation(); handleOpenEditModal(payment); }}
-                                  className="w-full px-4 py-2.5 text-left text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-emerald-600 flex items-center gap-2 transition-colors"
-                              >
-                                  <Pencil size={14} /> এডিট
-                              </button>
-                              <div className="h-px bg-slate-50 w-full my-0.5"></div>
-                              <button 
-                                  onClick={(e) => { e.stopPropagation(); initiateDelete(payment.id, payment); }}
-                                  className="w-full px-4 py-2.5 text-left text-xs font-bold text-rose-500 hover:bg-rose-50 flex items-center gap-2 transition-colors"
-                              >
-                                   <Trash2 size={14} /> ডিলিট
-                              </button>
-                          </div>
-                      )}
+                  <div className="flex justify-between items-end border-t border-slate-50 pt-3 mt-1">
+                    <div>
+                       <p className="text-[10px] text-slate-400 font-bold uppercase mb-0.5">তারিখ</p>
+                       <p className="text-xs font-bold text-slate-600 flex items-center gap-1">
+                         <Calendar size={12} /> {payment.date}
+                       </p>
+                    </div>
+                    <div className="text-right">
+                       <span className={`text-[10px] px-2 py-0.5 rounded font-bold mb-1 inline-flex items-center gap-1 ${style}`}>
+                         {icon}
+                         {payment.method}
+                       </span>
+                       <p className="text-lg font-black text-emerald-600">{currency} {payment.amount.toLocaleString('bn-BD')}</p>
+                    </div>
                   </div>
                 </div>
-                
-                <div className="flex justify-between items-end border-t border-slate-50 pt-3 mt-1">
-                  <div>
-                     <p className="text-[10px] text-slate-400 font-bold uppercase mb-0.5">তারিখ</p>
-                     <p className="text-xs font-bold text-slate-600 flex items-center gap-1">
-                       <Calendar size={12} /> {payment.date}
-                     </p>
-                  </div>
-                  <div className="text-right">
-                     <span className={`text-[10px] px-2 py-0.5 rounded font-bold mb-1 inline-flex items-center gap-1 ${style}`}>
-                       {icon}
-                       {payment.method}
-                     </span>
-                     <p className="text-lg font-black text-emerald-600">{currency} {payment.amount.toLocaleString('bn-BD')}</p>
-                  </div>
-                </div>
-              </div>
-            );
-          })
-        )}
+              );
+            })
+          )}
+        </div>
       </div>
 
       <ConfirmModal 

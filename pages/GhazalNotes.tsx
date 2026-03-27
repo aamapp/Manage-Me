@@ -11,7 +11,7 @@ import { useAppContext } from '@/context/AppContext';
 import { GhazalNote } from '@/types';
 
 export const GhazalNotes: React.FC = () => {
-  const { user, showToast, ghazalNotes: notes, refreshData } = useAppContext();
+  const { user, showToast, ghazalNotes: notes, refreshData, isOnline } = useAppContext();
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -102,11 +102,19 @@ export const GhazalNotes: React.FC = () => {
   };
 
   const openAddModal = () => {
+    if (!isOnline) {
+      showToast('অফলাইনে নতুন গজল যোগ করা যাবে না', 'error');
+      return;
+    }
     setCurrentNote({ title: '', lyrics: '' });
     setIsEditModalOpen(true);
   };
 
   const openEditModal = (note: GhazalNote) => {
+    if (!isOnline) {
+      showToast('অফলাইনে গজল এডিট করা যাবে না', 'error');
+      return;
+    }
     setCurrentNote(note);
     setIsEditModalOpen(true);
   };
@@ -137,7 +145,8 @@ export const GhazalNotes: React.FC = () => {
         <div className="flex items-center gap-2 shrink-0">
           <button 
             onClick={openAddModal}
-            className="bg-indigo-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-indigo-200 active:scale-90 transition-transform"
+            disabled={!isOnline}
+            className={`bg-indigo-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-indigo-200 active:scale-90 transition-transform ${!isOnline ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             <Plus size={22} />
           </button>
@@ -215,15 +224,37 @@ export const GhazalNotes: React.FC = () => {
                               </button>
                               <div className="h-px bg-slate-50 w-full my-0.5"></div>
                               <button 
-                                  onClick={(e) => { e.stopPropagation(); setActiveMenuId(null); openEditModal(note); }}
-                                  className="w-full px-4 py-2.5 text-left text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-indigo-600 flex items-center gap-2 transition-colors"
+                                  onClick={(e) => { 
+                                    e.stopPropagation(); 
+                                    setActiveMenuId(null); 
+                                    if (!isOnline) {
+                                      showToast('অফলাইনে গজল এডিট করা যাবে না', 'error');
+                                      return;
+                                    }
+                                    openEditModal(note); 
+                                  }}
+                                  disabled={!isOnline}
+                                  className={`w-full px-4 py-2.5 text-left text-xs font-bold flex items-center gap-2 transition-colors
+                                    ${!isOnline ? 'text-slate-300 cursor-not-allowed' : 'text-slate-600 hover:bg-slate-50 hover:text-indigo-600'}
+                                  `}
                               >
                                   <Pencil size={14} /> এডিট
                               </button>
                               <div className="h-px bg-slate-50 w-full my-0.5"></div>
                               <button 
-                                  onClick={(e) => { e.stopPropagation(); setActiveMenuId(null); openDeleteModal(note); }}
-                                  className="w-full px-4 py-2.5 text-left text-xs font-bold text-rose-500 hover:bg-rose-50 flex items-center gap-2 transition-colors"
+                                  onClick={(e) => { 
+                                    e.stopPropagation(); 
+                                    setActiveMenuId(null); 
+                                    if (!isOnline) {
+                                      showToast('অফলাইনে গজল ডিলিট করা যাবে না', 'error');
+                                      return;
+                                    }
+                                    openDeleteModal(note); 
+                                  }}
+                                  disabled={!isOnline}
+                                  className={`w-full px-4 py-2.5 text-left text-xs font-bold flex items-center gap-2 transition-colors
+                                    ${!isOnline ? 'text-slate-300 cursor-not-allowed' : 'text-rose-500 hover:bg-rose-50'}
+                                  `}
                               >
                                   <Trash2 size={14} /> ডিলিট
                               </button>

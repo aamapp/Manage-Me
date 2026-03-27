@@ -6,7 +6,7 @@ import { useAppContext } from '../context/AppContext';
 import { Lock, CheckCircle2, Loader2, Eye, EyeOff } from 'lucide-react';
 
 export const UpdatePassword: React.FC = () => {
-  const { showToast, setUser } = useAppContext();
+  const { showToast, setUser, isOnline } = useAppContext();
   const navigate = useNavigate();
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -14,6 +14,10 @@ export const UpdatePassword: React.FC = () => {
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isOnline) {
+      showToast('অফলাইনে পাসওয়ার্ড পরিবর্তন করা যাবে না', 'error');
+      return;
+    }
     if (password.length < 6) {
       showToast('পাসওয়ার্ড অন্তত ৬ অক্ষরের হতে হবে', 'error');
       return;
@@ -74,8 +78,8 @@ export const UpdatePassword: React.FC = () => {
 
           <button 
             type="submit" 
-            disabled={loading}
-            className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-indigo-700 active:scale-95 transition-all shadow-lg shadow-indigo-200 flex items-center justify-center gap-2"
+            disabled={loading || !isOnline}
+            className={`w-full py-4 rounded-2xl font-bold text-lg transition-all shadow-lg shadow-indigo-200 flex items-center justify-center gap-2 ${loading || !isOnline ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95'}`}
           >
             {loading ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}
             পাসওয়ার্ড সেভ করুন

@@ -11,6 +11,7 @@ import { createPortal } from 'react-dom';
 import { APP_NAME } from '@/constants';
 import { User as UserType } from '@/types';
 import { useAppContext } from '@/context/AppContext';
+import { OfflineBanner } from './OfflineBanner';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -92,6 +93,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans w-full overflow-x-hidden selection:bg-indigo-100 selection:text-indigo-700 flex flex-col lg:flex-row">
+      <div className="fixed top-0 left-0 w-full z-[100]">
+        <OfflineBanner />
+      </div>
       {/* Desktop Sidebar - Visible only on LG screens */}
       <aside className="hidden lg:flex flex-col w-72 bg-white border-r border-slate-200 h-screen lg:fixed lg:top-0 lg:left-0 z-50">
         <div className="p-6 border-b border-slate-100">
@@ -301,30 +305,33 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
           />
           
           <div className="relative bg-white rounded-t-[2rem] p-4 pb-6 shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[75vh] overflow-y-auto w-full max-w-lg mx-auto border-t border-slate-100">
-            <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-4" />
+            <div 
+              className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-4 cursor-pointer" 
+              onClick={() => setMoreMenuOpen(false)}
+            />
             
-            <div className="flex items-center justify-between gap-3 mb-5 bg-slate-50 p-3 rounded-3xl border border-slate-100 relative overflow-hidden">
+            <div className="flex items-center justify-between gap-1 mb-5 bg-slate-50 p-2.5 rounded-3xl border border-slate-100 relative overflow-hidden">
                <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-100 rounded-full -mr-10 -mt-10 opacity-50 blur-xl"></div>
                
-               <div className="flex items-center gap-3 relative z-10 min-w-0">
-                 <div className="w-12 h-12 rounded-full overflow-hidden flex-shrink-0 bg-white border-2 border-white flex items-center justify-center shadow-md">
+               <div className="flex items-center gap-2 relative z-10 min-w-0">
+                 <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-white border-2 border-white flex items-center justify-center shadow-md">
                    {user.avatar_url ? (
                      <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
                    ) : (
-                     <span className="text-indigo-600 text-lg font-bold">{user.name.charAt(0)}</span>
+                     <span className="text-indigo-600 text-base font-bold">{user.name.charAt(0)}</span>
                    )}
                  </div>
                  <div className="min-w-0">
-                   <h3 className="font-bold text-base text-slate-800 truncate leading-tight">{user.name}</h3>
+                   <h3 className="font-bold text-sm text-slate-800 truncate leading-tight">{user.name}</h3>
                    <p className="text-[10px] text-slate-500 font-medium truncate mt-0.5">{isAdmin ? 'Admin' : user.email}</p>
                  </div>
                </div>
 
                <button 
                  onClick={onLogout}
-                 className="relative z-10 flex items-center gap-1.5 px-3 py-2 rounded-2xl bg-rose-50 text-rose-600 font-bold text-[10px] active:scale-95 transition-all border border-rose-100 shadow-sm flex-shrink-0"
+                 className="relative z-10 flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl bg-rose-50 text-rose-600 font-bold text-[10px] active:scale-95 transition-all border border-rose-100 shadow-sm flex-shrink-0"
                >
-                 <LogOut size={14} />
+                 <LogOut size={12} />
                  লগআউট
                </button>
             </div>
@@ -351,15 +358,15 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                   onClick={() => handleNavigation(item.path)}
                   className="flex flex-col items-center justify-center p-2 rounded-xl bg-white border border-slate-100 shadow-sm active:scale-95 transition-all group hover:border-indigo-200 hover:shadow-md"
                 >
-                  <div className="w-8 h-8 rounded-full bg-slate-50 text-slate-600 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300 shadow-sm mb-1.5 relative">
-                    {React.cloneElement(item.icon as React.ReactElement, { size: 16 })}
+                  <div className="w-7 h-7 rounded-full bg-slate-50 text-slate-600 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300 shadow-sm mb-1.5 relative">
+                    {React.cloneElement(item.icon as React.ReactElement, { size: 14 })}
                     {item.path === '/trash' && trashCount > 0 && (
                       <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[8px] font-black px-1 py-0.5 rounded-full min-w-[14px] h-[14px] flex items-center justify-center shadow-sm ring-2 bg-white group-hover:ring-indigo-600 transition-all animate-in zoom-in duration-300">
                         {trashCount}
                       </span>
                     )}
                   </div>
-                  <p className="font-bold text-slate-800 text-[11px] leading-tight text-center">{item.name}</p>
+                  <p className="font-bold text-slate-800 text-[10px] leading-tight text-center">{item.name}</p>
                 </button>
               ))}
             </div>

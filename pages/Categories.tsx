@@ -7,7 +7,7 @@ import { EXPENSE_CATEGORY_LABELS } from '../constants';
 import { ConfirmModal } from '@/components/ConfirmModal';
 
 export const Categories: React.FC = () => {
-  const { user, showToast, adminSelectedUserId } = useAppContext();
+  const { user, showToast, adminSelectedUserId, isOnline } = useAppContext();
   const [categories, setCategories] = useState<{name: string, count: number, total: number}[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRenameModalOpen, setRenameModalOpen] = useState(false);
@@ -68,6 +68,10 @@ export const Categories: React.FC = () => {
   }, [user, adminSelectedUserId]); // Re-fetch when admin selects a user
 
   const handleOpenRename = (currentName: string) => {
+    if (!isOnline) {
+      showToast('অফলাইনে ক্যাটাগরি রিনেম করা যাবে না', 'error');
+      return;
+    }
     setTargetCategory(currentName);
     setNewName(currentName);
     setRenameModalOpen(true);
@@ -109,6 +113,10 @@ export const Categories: React.FC = () => {
   };
 
   const initiateDelete = (categoryName: string) => {
+    if (!isOnline) {
+      showToast('অফলাইনে ক্যাটাগরি ডিলিট করা যাবে না', 'error');
+      return;
+    }
     setCategoryToDelete(categoryName);
     setShowDeleteModal(true);
   };
@@ -179,13 +187,15 @@ export const Categories: React.FC = () => {
               <div className="flex gap-2">
                 <button 
                   onClick={() => handleOpenRename(cat.name)}
-                  className="p-2 bg-slate-50 text-indigo-600 rounded-xl hover:bg-indigo-50 transition-colors"
+                  disabled={!isOnline}
+                  className={`p-2 rounded-xl transition-colors ${!isOnline ? 'bg-slate-50 text-slate-300 cursor-not-allowed' : 'bg-slate-50 text-indigo-600 hover:bg-indigo-50'}`}
                 >
                   <Edit2 size={16} />
                 </button>
                 <button 
                   onClick={() => initiateDelete(cat.name)}
-                  className="p-2 bg-rose-50 text-rose-500 rounded-xl hover:bg-rose-100 transition-colors"
+                  disabled={!isOnline}
+                  className={`p-2 rounded-xl transition-colors ${!isOnline ? 'bg-slate-50 text-slate-300 cursor-not-allowed' : 'bg-rose-50 text-rose-500 hover:bg-rose-100'}`}
                 >
                   <Trash2 size={16} />
                 </button>

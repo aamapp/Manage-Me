@@ -13,7 +13,7 @@ const Trash: React.FC = () => {
     trashedExpenses, 
     trashedGhazalNotes, 
     trashedClients,
-    showToast, refreshData 
+    showToast, refreshData, isOnline
   } = useAppContext();
   
   const [activeTab, setActiveTab] = useState<TrashTab>('projects');
@@ -101,6 +101,10 @@ const Trash: React.FC = () => {
   };
 
   const openConfirm = (id: string, type: TrashTab, action: 'restore' | 'delete') => {
+    if (!isOnline) {
+      showToast(`অফলাইনে ${action === 'restore' ? 'রিস্টোর' : 'ডিলিট'} করা যাবে না`, 'error');
+      return;
+    }
     setSelectedItem({ id, type });
     setConfirmAction(action);
     setShowConfirm(true);
@@ -137,14 +141,16 @@ const Trash: React.FC = () => {
               <div className="flex gap-2 ml-4">
                 <button
                   onClick={() => openConfirm(project.id, 'projects', 'restore')}
-                  className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                  disabled={!isOnline}
+                  className={`p-2 rounded-lg transition-colors ${!isOnline ? 'text-slate-300 cursor-not-allowed' : 'text-blue-600 hover:bg-blue-50'}`}
                   title="Restore"
                 >
                   <RotateCcw className="w-5 h-5" />
                 </button>
                 <button
                   onClick={() => openConfirm(project.id, 'projects', 'delete')}
-                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  disabled={!isOnline}
+                  className={`p-2 rounded-lg transition-colors ${!isOnline ? 'text-slate-300 cursor-not-allowed' : 'text-red-600 hover:bg-red-50'}`}
                   title="Permanent Delete"
                 >
                   <Trash2 className="w-5 h-5" />
@@ -187,14 +193,16 @@ const Trash: React.FC = () => {
               <div className="flex gap-2 ml-4">
                 <button
                   onClick={() => openConfirm(expense.id, 'expenses', 'restore')}
-                  className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                  disabled={!isOnline}
+                  className={`p-2 rounded-lg transition-colors ${!isOnline ? 'text-slate-300 cursor-not-allowed' : 'text-blue-600 hover:bg-blue-50'}`}
                   title="Restore"
                 >
                   <RotateCcw className="w-5 h-5" />
                 </button>
                 <button
                   onClick={() => openConfirm(expense.id, 'expenses', 'delete')}
-                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  disabled={!isOnline}
+                  className={`p-2 rounded-lg transition-colors ${!isOnline ? 'text-slate-300 cursor-not-allowed' : 'text-red-600 hover:bg-red-50'}`}
                   title="Permanent Delete"
                 >
                   <Trash2 className="w-5 h-5" />
@@ -227,14 +235,16 @@ const Trash: React.FC = () => {
               <div className="flex gap-2 ml-4">
                 <button
                   onClick={() => openConfirm(note.id, 'ghazal_notes', 'restore')}
-                  className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                  disabled={!isOnline}
+                  className={`p-2 rounded-lg transition-colors ${!isOnline ? 'text-slate-300 cursor-not-allowed' : 'text-blue-600 hover:bg-blue-50'}`}
                   title="Restore"
                 >
                   <RotateCcw className="w-5 h-5" />
                 </button>
                 <button
                   onClick={() => openConfirm(note.id, 'ghazal_notes', 'delete')}
-                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  disabled={!isOnline}
+                  className={`p-2 rounded-lg transition-colors ${!isOnline ? 'text-slate-300 cursor-not-allowed' : 'text-red-600 hover:bg-red-50'}`}
                   title="Permanent Delete"
                 >
                   <Trash2 className="w-5 h-5" />
@@ -267,14 +277,16 @@ const Trash: React.FC = () => {
               <div className="flex gap-2 ml-4">
                 <button
                   onClick={() => openConfirm(client.id, 'clients', 'restore')}
-                  className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                  disabled={!isOnline}
+                  className={`p-2 rounded-lg transition-colors ${!isOnline ? 'text-slate-300 cursor-not-allowed' : 'text-blue-600 hover:bg-blue-50'}`}
                   title="Restore"
                 >
                   <RotateCcw className="w-5 h-5" />
                 </button>
                 <button
                   onClick={() => openConfirm(client.id, 'clients', 'delete')}
-                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  disabled={!isOnline}
+                  className={`p-2 rounded-lg transition-colors ${!isOnline ? 'text-slate-300 cursor-not-allowed' : 'text-red-600 hover:bg-red-50'}`}
                   title="Permanent Delete"
                 >
                   <Trash2 className="w-5 h-5" />

@@ -13,7 +13,7 @@ import { DatePicker } from '@/components/DatePicker';
 
 export const Expenses: React.FC = () => {
   // Use cached expenses from AppContext
-  const { user, showToast, adminSelectedUserId, expenses, setExpenses, refreshData } = useAppContext();
+  const { user, showToast, adminSelectedUserId, expenses, setExpenses, refreshData, isOnline } = useAppContext();
   const [isModalOpen, setModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -606,15 +606,35 @@ export const Expenses: React.FC = () => {
                             {activeMenuId === expense.id && (
                                 <div className="absolute right-0 top-full mt-1 w-36 bg-white rounded-xl shadow-xl border border-slate-100 z-20 flex flex-col py-1.5 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
                                     <button 
-                                        onClick={(e) => { e.stopPropagation(); handleOpenEditModal(expense); }}
-                                        className="w-full px-4 py-2.5 text-left text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-indigo-600 flex items-center gap-2 transition-colors"
+                                        onClick={(e) => { 
+                                          e.stopPropagation(); 
+                                          if (!isOnline) {
+                                            showToast('অফলাইনে খরচ এডিট করা যাবে না', 'error');
+                                            return;
+                                          }
+                                          handleOpenEditModal(expense); 
+                                        }}
+                                        disabled={!isOnline}
+                                        className={`w-full px-4 py-2.5 text-left text-xs font-bold flex items-center gap-2 transition-colors
+                                          ${!isOnline ? 'text-slate-300 cursor-not-allowed' : 'text-slate-600 hover:bg-slate-50 hover:text-indigo-600'}
+                                        `}
                                     >
                                         <Pencil size={14} /> এডিট
                                     </button>
                                     <div className="h-px bg-slate-50 w-full my-0.5"></div>
                                     <button 
-                                        onClick={(e) => { e.stopPropagation(); initiateDelete(expense.id, expense.userid); }}
-                                        className="w-full px-4 py-2.5 text-left text-xs font-bold text-rose-500 hover:bg-rose-50 flex items-center gap-2 transition-colors"
+                                        onClick={(e) => { 
+                                          e.stopPropagation(); 
+                                          if (!isOnline) {
+                                            showToast('অফলাইনে খরচ ডিলিট করা যাবে না', 'error');
+                                            return;
+                                          }
+                                          initiateDelete(expense.id, expense.userid); 
+                                        }}
+                                        disabled={!isOnline}
+                                        className={`w-full px-4 py-2.5 text-left text-xs font-bold flex items-center gap-2 transition-colors
+                                          ${!isOnline ? 'text-slate-300 cursor-not-allowed' : 'text-rose-500 hover:bg-rose-50'}
+                                        `}
                                     >
                                         <Trash2 size={14} /> ডিলিট
                                     </button>

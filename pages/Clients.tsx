@@ -10,7 +10,7 @@ import { supabase } from '../lib/supabase';
 import { ConfirmModal } from '@/components/ConfirmModal';
 
 export const Clients: React.FC = () => {
-  const { clients, projects, setClients, user, refreshData, showToast } = useAppContext();
+  const { clients, projects, setClients, user, refreshData, showToast, isOnline } = useAppContext();
   const navigate = useNavigate();
   const [isModalOpen, setModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -96,12 +96,20 @@ export const Clients: React.FC = () => {
   };
 
   const handleOpenAddModal = () => {
+    if (!isOnline) {
+      showToast('অফলাইনে নতুন ক্লায়েন্ট যোগ করা যাবে না', 'error');
+      return;
+    }
     setIsEditing(false);
     setNewClient({ name: '', contact: '' });
     setModalOpen(true);
   };
 
   const handleOpenEditModal = (client: Client) => {
+    if (!isOnline) {
+      showToast('অফলাইনে ক্লায়েন্ট এডিট করা যাবে না', 'error');
+      return;
+    }
     setIsEditing(true);
     setActiveClientId(client.id);
     setNewClient({ name: client.name, contact: client.contact });
@@ -176,7 +184,8 @@ export const Clients: React.FC = () => {
         </div>
         <button 
           onClick={handleOpenAddModal}
-          className="bg-indigo-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-indigo-200 active:scale-90 transition-transform"
+          disabled={!isOnline}
+          className={`bg-indigo-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-indigo-200 active:scale-90 transition-transform ${!isOnline ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
           <Plus size={24} />
         </button>
@@ -238,8 +247,18 @@ export const Clients: React.FC = () => {
                               </button>
                               <div className="h-px bg-slate-50 w-full my-0.5"></div>
                               <button 
-                                  onClick={(e) => { e.stopPropagation(); initiateDelete(client.id); }}
-                                  className="w-full px-4 py-2.5 text-left text-xs font-bold text-rose-500 hover:bg-rose-50 flex items-center gap-2 transition-colors"
+                                  onClick={(e) => { 
+                                    e.stopPropagation(); 
+                                    if (!isOnline) {
+                                      showToast('অফলাইনে ক্লায়েন্ট ডিলিট করা যাবে না', 'error');
+                                      return;
+                                    }
+                                    initiateDelete(client.id); 
+                                  }}
+                                  disabled={!isOnline}
+                                  className={`w-full px-4 py-2.5 text-left text-xs font-bold flex items-center gap-2 transition-colors
+                                    ${!isOnline ? 'text-slate-300 cursor-not-allowed' : 'text-rose-500 hover:bg-rose-50'}
+                                  `}
                               >
                                   <Trash2 size={14} /> ডিলিট
                               </button>

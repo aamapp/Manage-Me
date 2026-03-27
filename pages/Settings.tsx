@@ -7,7 +7,7 @@ import { supabase } from '../lib/supabase';
 import { AppLock } from '@/components/AppLock';
 
 export const Settings: React.FC = () => {
-  const { user, setUser, showToast, appPin, setAppPin } = useAppContext();
+  const { user, setUser, showToast, appPin, setAppPin, isOnline } = useAppContext();
   const [formData, setFormData] = useState({
     name: user?.name || '',
     email: user?.email || '',
@@ -48,6 +48,10 @@ export const Settings: React.FC = () => {
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0 || !user) return;
+    if (!isOnline) {
+      showToast('অফলাইনে ছবি আপলোড করা যাবে না', 'error');
+      return;
+    }
     
     const file = e.target.files[0];
     const fileExt = file.name.split('.').pop();
@@ -96,6 +100,10 @@ export const Settings: React.FC = () => {
 
   const handleSave = async () => {
     if (!user) return;
+    if (!isOnline) {
+      showToast('অফলাইনে সেটিংস সেভ করা যাবে না', 'error');
+      return;
+    }
     
     // 1. UI Loading State (Visual Feedback)
     setIsSaving(true);
@@ -150,6 +158,10 @@ export const Settings: React.FC = () => {
   };
 
   const handleChangePassword = async () => {
+    if (!isOnline) {
+      showToast('অফলাইনে পাসওয়ার্ড পরিবর্তন করা যাবে না', 'error');
+      return;
+    }
     if (!newPassword || newPassword.length < 6) {
         showToast('পাসওয়ার্ড অন্তত ৬ অক্ষরের হতে হবে', 'error');
         return;
@@ -212,7 +224,7 @@ export const Settings: React.FC = () => {
                )}
             </div>
             <label 
-              className={`absolute bottom-0 right-0 bg-indigo-600 text-white p-2 rounded-full shadow-md hover:bg-indigo-700 active:scale-90 transition-transform cursor-pointer z-20 ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}
+              className={`absolute bottom-0 right-0 bg-indigo-600 text-white p-2 rounded-full shadow-md transition-transform z-20 ${isUploading || !isOnline ? 'opacity-50 pointer-events-none cursor-not-allowed' : 'hover:bg-indigo-700 active:scale-90 cursor-pointer'}`}
             >
               <Camera size={14} />
               <input 
@@ -221,7 +233,7 @@ export const Settings: React.FC = () => {
                 className="hidden" 
                 accept="image/*" 
                 onChange={handleImageUpload} 
-                disabled={isUploading} 
+                disabled={isUploading || !isOnline} 
               />
             </label>
           </div>
@@ -257,7 +269,7 @@ export const Settings: React.FC = () => {
                     </select>
                 </div>
              </div>
-             <button onClick={handleSave} disabled={isSaving} className="w-full flex justify-center items-center gap-2 px-6 py-3.5 rounded-xl font-bold bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95 transition-all shadow-lg shadow-indigo-100 mt-2">
+             <button onClick={handleSave} disabled={isSaving || !isOnline} className={`w-full flex justify-center items-center gap-2 px-6 py-3.5 rounded-xl font-bold text-white transition-all shadow-lg mt-2 ${isSaving || !isOnline ? 'bg-indigo-400 cursor-not-allowed shadow-none' : 'bg-indigo-600 hover:bg-indigo-700 active:scale-95 shadow-indigo-100'}`}>
                 {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
                 {isSaving ? 'সেভ হচ্ছে...' : 'পরিবর্তন সেভ করুন'}
              </button>
@@ -305,8 +317,8 @@ export const Settings: React.FC = () => {
                     </div>
                     <button 
                         onClick={handleChangePassword}
-                        disabled={!newPassword || isChangingPass}
-                        className="bg-slate-800 text-white px-4 rounded-xl font-bold text-sm hover:bg-slate-900 active:scale-95 transition-all whitespace-nowrap"
+                        disabled={!newPassword || isChangingPass || !isOnline}
+                        className={`text-white px-4 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${!newPassword || isChangingPass || !isOnline ? 'bg-slate-400 cursor-not-allowed' : 'bg-slate-800 hover:bg-slate-900 active:scale-95'}`}
                     >
                         {isChangingPass ? <Loader2 size={16} className="animate-spin" /> : 'আপডেট'}
                     </button>

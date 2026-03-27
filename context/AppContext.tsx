@@ -49,6 +49,7 @@ interface AppContextType {
   setIsAppLocked: React.Dispatch<React.SetStateAction<boolean>>;
   appPin: string | null;
   setAppPin: (pin: string | null) => void;
+  isOnline: boolean;
   
   // Admin Specific
   adminSelectedUserId: string | null;
@@ -86,6 +87,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // App Lock State
   const [isAppLocked, setIsAppLocked] = useState(false);
   const [appPin, setAppPinState] = useState<string | null>(null);
+  const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
 
   // Admin Selection State
   const [adminSelectedUserId, setAdminSelectedUserId] = useState<string | null>(null);
@@ -244,6 +246,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       isFetchingRef.current = false;
     }
   };
+
+  // Handle Online/Offline Status
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // Effect to re-filter data when Admin selection changes without re-fetching
   useEffect(() => {
@@ -452,7 +468,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       toast, showToast, hideToast,
       isAppLocked, setIsAppLocked,
       appPin, setAppPin,
-      adminSelectedUserId, setAdminSelectedUserId
+      adminSelectedUserId, setAdminSelectedUserId,
+      isOnline
     }}>
       {children}
     </AppContext.Provider>

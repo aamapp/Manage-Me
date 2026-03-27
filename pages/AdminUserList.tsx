@@ -7,7 +7,7 @@ import { useAppContext } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
 
 export const AdminUserList: React.FC = () => {
-  const { allProjects, allIncomeRecords, userProfiles, setAdminSelectedUserId, user, refreshData, showToast } = useAppContext();
+  const { allProjects, allIncomeRecords, userProfiles, setAdminSelectedUserId, user, refreshData, showToast, isOnline } = useAppContext();
   const navigate = useNavigate();
   const [isRefreshing, setIsRefreshing] = useState(false);
   
@@ -23,6 +23,10 @@ export const AdminUserList: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleRefresh = async () => {
+    if (!isOnline) {
+      showToast('অফলাইনে রিফ্রেশ করা যাবে না', 'error');
+      return;
+    }
     setIsRefreshing(true);
     await refreshData();
     setIsRefreshing(false);
@@ -69,12 +73,20 @@ export const AdminUserList: React.FC = () => {
   }, [allProjects, allIncomeRecords, userProfiles]);
 
   const handleSelectUser = (userId: string) => {
+    if (!isOnline) {
+      showToast('অফলাইনে ইউজার সিলেক্ট করা যাবে না', 'error');
+      return;
+    }
     setAdminSelectedUserId(userId);
     navigate('/dashboard');
   };
 
   const handleEditClick = (e: React.MouseEvent, userId: string, currentName: string, currentAvatar: string) => {
       e.stopPropagation(); // Prevent navigating to dashboard
+      if (!isOnline) {
+        showToast('অফলাইনে ইউজার এডিট করা যাবে না', 'error');
+        return;
+      }
       setEditingUser({ id: userId, name: currentName, avatar_url: currentAvatar });
       setNewName(currentName);
       setNewAvatarUrl(currentAvatar || '');
@@ -83,6 +95,10 @@ export const AdminUserList: React.FC = () => {
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0 || !editingUser) return;
+    if (!isOnline) {
+      showToast('অফলাইনে ছবি আপলোড করা যাবে না', 'error');
+      return;
+    }
     
     const file = e.target.files[0];
     const fileExt = file.name.split('.').pop();
@@ -118,6 +134,10 @@ export const AdminUserList: React.FC = () => {
   const handleSaveProfile = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!editingUser || !newName.trim()) return;
+      if (!isOnline) {
+        showToast('অফলাইনে প্রোফাইল সেভ করা যাবে না', 'error');
+        return;
+      }
 
       setIsSaving(true);
       try {
@@ -165,8 +185,8 @@ export const AdminUserList: React.FC = () => {
             </h2>
             <button 
                 onClick={handleRefresh}
-                disabled={isRefreshing}
-                className="p-2 bg-white border border-slate-200 rounded-full text-slate-600 hover:text-indigo-600 transition-colors active:scale-95 shadow-sm"
+                disabled={isRefreshing || !isOnline}
+                className={`p-2 bg-white border border-slate-200 rounded-full transition-colors shadow-sm ${isRefreshing || !isOnline ? 'text-slate-300 cursor-not-allowed' : 'text-slate-600 hover:text-indigo-600 active:scale-95'}`}
             >
                 <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
             </button>
@@ -223,7 +243,8 @@ export const AdminUserList: React.FC = () => {
                                     {/* Edit Button */}
                                     <button 
                                         onClick={(e) => handleEditClick(e, u.id, displayName, avatarUrl || '')}
-                                        className="p-2 bg-slate-50 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors"
+                                        disabled={!isOnline}
+                                        className={`p-2 rounded-full transition-colors ${!isOnline ? 'bg-slate-50 text-slate-300 cursor-not-allowed' : 'bg-slate-50 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'}`}
                                     >
                                         <Pencil size={16} />
                                     </button>
@@ -329,8 +350,8 @@ export const AdminUserList: React.FC = () => {
 
                     <button 
                         type="submit" 
-                        disabled={isSaving || isUploading}
-                        className="w-full bg-indigo-600 text-white py-3.5 rounded-xl font-bold shadow-lg shadow-indigo-200 active:scale-95 transition-transform flex justify-center items-center gap-2 mt-4"
+                        disabled={isSaving || isUploading || !isOnline}
+                        className={`w-full py-3.5 rounded-xl font-bold shadow-lg shadow-indigo-200 transition-transform flex justify-center items-center gap-2 mt-4 ${isSaving || isUploading || !isOnline ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-indigo-600 text-white active:scale-95'}`}
                     >
                         {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
                         সেভ করুন

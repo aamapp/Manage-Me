@@ -16,7 +16,7 @@ import { DatePicker } from '@/components/DatePicker';
 import { StatusPicker } from '@/components/StatusPicker';
 
 export const Projects: React.FC = () => {
-  const { projects, setProjects, clients, setClients, user, refreshData, showToast } = useAppContext();
+  const { projects, setProjects, clients, setClients, user, refreshData, showToast, isOnline } = useAppContext();
   const location = useLocation();
   const currency = user?.currency || '৳';
   
@@ -141,6 +141,10 @@ export const Projects: React.FC = () => {
   };
 
   const handleOpenAddModal = () => {
+    if (!isOnline) {
+      showToast('অফলাইনে নতুন প্রজেক্ট যোগ করা যাবে না', 'error');
+      return;
+    }
     setIsEditing(false);
     setFormError(null);
     setClientSearch('');
@@ -159,6 +163,10 @@ export const Projects: React.FC = () => {
   };
 
   const handleOpenEditModal = (project: Project) => {
+    if (!isOnline) {
+      showToast('অফলাইনে প্রজেক্ট এডিট করা যাবে না', 'error');
+      return;
+    }
     setIsEditing(true);
     setFormError(null);
     setActiveProjectId(project.id);
@@ -610,7 +618,8 @@ export const Projects: React.FC = () => {
         <div className="flex items-center gap-2 shrink-0">
           <button 
             onClick={handleOpenAddModal}
-            className="bg-indigo-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-indigo-200 active:scale-90 transition-transform"
+            disabled={!isOnline}
+            className={`bg-indigo-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-indigo-200 active:scale-90 transition-transform ${!isOnline ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             <Plus size={22} />
           </button>
@@ -908,15 +917,35 @@ export const Projects: React.FC = () => {
                                   </button>
                                   <div className="h-px bg-slate-50 w-full my-0.5"></div>
                                   <button 
-                                      onClick={(e) => { e.stopPropagation(); handleOpenEditModal(p); }}
-                                      className="w-full px-4 py-2.5 text-left text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-indigo-600 flex items-center gap-2 transition-colors"
+                                      onClick={(e) => { 
+                                        e.stopPropagation(); 
+                                        if (!isOnline) {
+                                          showToast('অফলাইনে প্রজেক্ট এডিট করা যাবে না', 'error');
+                                          return;
+                                        }
+                                        handleOpenEditModal(p); 
+                                      }}
+                                      disabled={!isOnline}
+                                      className={`w-full px-4 py-2.5 text-left text-xs font-bold flex items-center gap-2 transition-colors
+                                        ${!isOnline ? 'text-slate-300 cursor-not-allowed' : 'text-slate-600 hover:bg-slate-50 hover:text-indigo-600'}
+                                      `}
                                   >
                                       <Pencil size={14} /> এডিট
                                   </button>
                                   <div className="h-px bg-slate-50 w-full my-0.5"></div>
                                   <button 
-                                      onClick={(e) => { e.stopPropagation(); initiateDelete(p.id); }}
-                                      className="w-full px-4 py-2.5 text-left text-xs font-bold text-rose-500 hover:bg-rose-50 flex items-center gap-2 transition-colors"
+                                      onClick={(e) => { 
+                                        e.stopPropagation(); 
+                                        if (!isOnline) {
+                                          showToast('অফলাইনে প্রজেক্ট ডিলিট করা যাবে না', 'error');
+                                          return;
+                                        }
+                                        initiateDelete(p.id); 
+                                      }}
+                                      disabled={!isOnline}
+                                      className={`w-full px-4 py-2.5 text-left text-xs font-bold flex items-center gap-2 transition-colors
+                                        ${!isOnline ? 'text-slate-300 cursor-not-allowed' : 'text-rose-500 hover:bg-rose-50'}
+                                      `}
                                   >
                                       <Trash2 size={14} /> ডিলিট
                                   </button>
