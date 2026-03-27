@@ -329,37 +329,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const initSession = async () => {
       try {
-        const sessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Session timeout')), 8000)
-        );
-
-        const result = await Promise.race([sessionPromise, timeoutPromise]) as any;
-        const session = result?.data?.session;
-        const error = result?.error;
+        // Force a session refresh to get the latest metadata on mobile
+        const { data: { session: refreshedSession } } = await supabase.auth.refreshSession();
         
-        if (error) {
-            console.warn("Session Init Warning:", error);
-            // If the refresh token is invalid, we MUST clear the session to allow the user to log in again
-            if (error.message?.includes('Refresh Token Not Found') || 
-                error.message?.includes('Invalid Refresh Token') ||
-                error.message?.includes('refresh_token_not_found') ||
-                error.status === 400 || 
-                error.status === 401) {
-                
-                // Clear local storage manually as a fallback
-                for (const key in localStorage) {
-                  if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
-                    localStorage.removeItem(key);
-                  }
-                }
-                await supabase.auth.signOut();
-                if (mounted) setUser(null);
-            }
-        }
-
+        const session = refreshedSession || (await supabase.auth.getSession()).data.session;
+        
         if (session?.user && mounted) {
-           // Basic sync from metadata first (Fastest)
+           // 1. Set initial user from session metadata
            const metadata = session.user.user_metadata;
            setUser({
               id: session.user.id,
@@ -373,24 +349,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               role: metadata?.role || 'user'
            });
 
-           // Background fetch for profile updates (Source of truth)
-           supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle()
-             .then(({ data: profile }) => {
-                 if (profile && mounted) {
-                     setUser(prev => {
-                         if (!prev) return null;
-                         return {
-                             ...prev,
-                             name: profile.name || prev.name,
-                             avatar_url: profile.avatar_url || prev.avatar_url,
-                             phone: profile.phone || prev.phone,
-                             occupation: profile.occupation || prev.occupation,
-                             currency: profile.currency || prev.currency,
-                             language: profile.language || prev.language
-                         };
-                     });
-                 }
-             });
+           // 2. IMMEDIATELY fetch from profiles table (Source of Truth)
+           // Adding a small delay to ensure DB has finished writing if this is right after an update
+           const { data: profile, error: profError } = await supabase
+             .from('profiles')
+             .select('*')
+             .eq('id', session.user.id)
+             .maybeSingle();
+
+           if (profile && mounted && !profError) {
+               setUser(prev => {
+                   if (!prev) return null;
+                   return {
+                       ...prev,
+                       name: profile.name || prev.name,
+                       avatar_url: profile.avatar_url || prev.avatar_url,
+                       phone: profile.phone || prev.phone,
+                       occupation: profile.occupation || prev.occupation,
+                       currency: profile.currency || prev.currency,
+                       language: profile.language || prev.language
+                   };
+               });
+           }
         }
       } catch (err: any) {
         console.error("Session Init Error:", err);
