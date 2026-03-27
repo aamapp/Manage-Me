@@ -1,0 +1,15 @@
+{
+  "name": "Manage-Me",
+  "short_name": "ManageMe",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#6366f1",
+  "icons": [
+    {
+      "src": "https://ais-dev-gmab4qct4xsy4johumbyb2-160015492035.asia-southeast1.run.app/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ]
+}
