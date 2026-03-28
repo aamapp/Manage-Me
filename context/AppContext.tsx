@@ -112,6 +112,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Admin Selection State
   const [adminSelectedUserId, setAdminSelectedUserId] = useState<string | null>(null);
   
+  // Load cache immediately on mount
+  useEffect(() => {
+    const savedUser = localStorage.getItem('last_known_user');
+    if (savedUser) {
+      try {
+        const user = JSON.parse(savedUser);
+        const cacheKey = `manage_me_cache_${user.id}`;
+        const cachedData = localStorage.getItem(cacheKey);
+        if (cachedData) {
+          const parsed = JSON.parse(cachedData);
+          if (parsed.projects) setProjects(parsed.projects);
+          if (parsed.trashedProjects) setTrashedProjects(parsed.trashedProjects);
+          if (parsed.clients) setClients(parsed.clients);
+          if (parsed.trashedClients) setTrashedClients(parsed.trashedClients);
+          if (parsed.incomeRecords) setIncomeRecords(parsed.incomeRecords);
+          if (parsed.expenses) setExpenses(parsed.expenses);
+          if (parsed.trashedExpenses) setTrashedExpenses(parsed.trashedExpenses);
+          if (parsed.ghazalNotes) setGhazalNotes(parsed.ghazalNotes);
+          if (parsed.trashedGhazalNotes) setTrashedGhazalNotes(parsed.trashedGhazalNotes);
+          if (parsed.allProjects) setAllProjects(parsed.allProjects);
+          if (parsed.allClients) setAllClients(parsed.allClients);
+          if (parsed.allIncomeRecords) setAllIncomeRecords(parsed.allIncomeRecords);
+          if (parsed.allExpenses) setAllExpenses(parsed.allExpenses);
+          if (parsed.userProfiles) setUserProfiles(parsed.userProfiles);
+        }
+      } catch (e) {
+        console.warn("Initial cache hydration failed", e);
+      }
+    }
+  }, []);
+
   // Performance optimization: Prevent multiple simultaneous refreshes
   const isFetchingRef = useRef(false);
 
