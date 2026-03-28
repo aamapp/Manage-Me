@@ -43,6 +43,24 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
     };
   }, [isMoreMenuOpen, isAboutOpen]);
 
+  const [avatarCacheBuster, setAvatarCacheBuster] = useState(Date.now());
+
+  // Handle online/offline events to refresh avatar
+  useEffect(() => {
+    const handleOnline = () => {
+      setAvatarCacheBuster(Date.now());
+    };
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, []);
+
+  const getAvatarUrl = (url: string | null | undefined) => {
+    if (!url) return null;
+    // Add cache buster to URL
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}t=${avatarCacheBuster}`;
+  };
+
   const trashCount = trashedProjects.length + trashedExpenses.length + trashedGhazalNotes.length;
 
   const isAdmin = user.role === 'admin';
@@ -172,10 +190,15 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
             <div className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center shadow-sm overflow-hidden">
               {user.avatar_url ? (
                 <img 
-                  key={user.avatar_url}
-                  src={user.avatar_url} 
+                  key={`${user.avatar_url}-${avatarCacheBuster}`}
+                  src={getAvatarUrl(user.avatar_url) || ''} 
                   alt={user.name} 
                   className="w-full h-full object-cover" 
+                  referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=random`;
+                  }}
                 />
               ) : (
                 <span className="text-indigo-600 font-bold">{user.name.charAt(0)}</span>
@@ -228,10 +251,15 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
           )}
           {user.avatar_url ? (
             <img 
-              key={user.avatar_url}
-              src={user.avatar_url} 
+              key={`${user.avatar_url}-${avatarCacheBuster}`}
+              src={getAvatarUrl(user.avatar_url) || ''} 
               alt={user.name} 
               className="w-9 h-9 rounded-full border-2 border-white shadow-md object-cover ring-1 ring-slate-100"
+              referrerPolicy="no-referrer"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=random`;
+              }}
             />
           ) : (
             <div className="w-9 h-9 bg-indigo-50 border border-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold text-sm shadow-sm">

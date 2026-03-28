@@ -88,6 +88,10 @@ export const Expenses: React.FC = () => {
   };
 
   const handleOpenAddModal = () => {
+    if (!isOnline) {
+      showToast('অফলাইনে নতুন খরচ যোগ করা যাবে না', 'error');
+      return;
+    }
     setIsEditing(false);
     setActiveExpenseId(null);
     setNewExpense({ category: '', date: new Date().toISOString().split('T')[0], amount: 0, notes: '' });

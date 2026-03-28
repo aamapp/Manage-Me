@@ -618,8 +618,7 @@ export const Projects: React.FC = () => {
         <div className="flex items-center gap-2 shrink-0">
           <button 
             onClick={handleOpenAddModal}
-            disabled={!isOnline}
-            className={`bg-indigo-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-indigo-200 active:scale-90 transition-transform ${!isOnline ? 'opacity-50 cursor-not-allowed' : ''}`}
+            className="bg-indigo-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-indigo-200 active:scale-90 transition-transform"
           >
             <Plus size={22} />
           </button>

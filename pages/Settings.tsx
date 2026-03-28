@@ -355,7 +355,7 @@ export const Settings: React.FC = () => {
                     if (window.confirm('আপনি কি অ্যাপের ক্যাশ ক্লিয়ার করতে চান? এটি আপনাকে লগআউট করে দিবে এবং সব তথ্য নতুন করে লোড হবে।')) {
                       localStorage.clear();
                       sessionStorage.clear();
-                      window.location.reload(true);
+                      window.location.reload();
                     }
                   }}
                   className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-red-50 text-red-600 rounded-xl font-bold text-sm hover:bg-red-100 transition-colors"
