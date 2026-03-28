@@ -174,11 +174,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const isAdmin = user.role === 'admin';
 
       // Base queries - fetch everything initially
-      let projQuery = supabase.from('projects').select('*').neq('id', `cb-${Date.now()}`);
-      let clientQuery = supabase.from('clients').select('*').neq('id', `cb-${Date.now()}`);
-      let incomeQuery = supabase.from('income_records').select('*').neq('id', `cb-${Date.now()}`);
-      let expenseQuery = supabase.from('expenses').select('*').neq('id', `cb-${Date.now()}`);
-      let ghazalQuery = supabase.from('ghazal_notes').select('*').neq('id', `cb-${Date.now()}`);
+      let projQuery = supabase.from('projects').select('*');
+      let clientQuery = supabase.from('clients').select('*');
+      let incomeQuery = supabase.from('income_records').select('*');
+      let expenseQuery = supabase.from('expenses').select('*');
+      let ghazalQuery = supabase.from('ghazal_notes').select('*');
 
       // If NOT admin, filter at DB level for efficiency/security
       if (!isAdmin) {
