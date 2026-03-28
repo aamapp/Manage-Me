@@ -328,13 +328,20 @@ export const Income: React.FC = () => {
               htmlEl.style.opacity = '1';
             });
 
-            const textElements = container.querySelectorAll('h1, h2, h3, h4, h5, h6, p, span, div');
+            const textElements = container.querySelectorAll('h1:not(.pdf-exact-text), h2:not(.pdf-exact-text), h3:not(.pdf-exact-text), h4, h5, h6, p:not(.pdf-exact-text), span:not(.pdf-exact-text), div.text-xs:not(.pdf-exact-text), div.text-sm:not(.pdf-exact-text)');
             textElements.forEach(el => {
               const htmlEl = el as HTMLElement;
               htmlEl.style.lineHeight = '1.8';
               htmlEl.style.paddingTop = '2px';
               htmlEl.style.paddingBottom = '2px';
               htmlEl.style.overflow = 'visible';
+            });
+
+            const truncatedElements = container.querySelectorAll('.truncate, .line-clamp-1, .line-clamp-2, .leading-snug, .leading-tight, .leading-none');
+            truncatedElements.forEach(el => {
+              el.classList.remove('truncate', 'line-clamp-1', 'line-clamp-2', 'leading-snug', 'leading-tight', 'leading-none');
+              (el as HTMLElement).style.whiteSpace = 'normal';
+              (el as HTMLElement).style.overflow = 'visible';
             });
 
             const listContainer = clonedDoc.getElementById('income-list-container');
@@ -362,8 +369,7 @@ export const Income: React.FC = () => {
                 const cardEl = card as HTMLElement;
                 cardEl.style.display = 'block';
                 cardEl.style.width = '100%';
-                cardEl.style.paddingBottom = '20px';
-                cardEl.style.marginBottom = '0';
+                cardEl.style.marginBottom = '20px';
                 container.appendChild(cardEl);
               });
               
@@ -380,16 +386,9 @@ export const Income: React.FC = () => {
               display: block !important;
               width: 100% !important;
               position: relative !important;
-              padding-bottom: 20px !important;
-              margin-bottom: 0 !important;
-            }
-            .income-card-pdf > div {
-              border: 1px solid #cbd5e1 !important;
-              border-radius: 12px !important;
-              background-color: white !important;
-              box-shadow: none !important;
-              padding: 20px !important;
-              display: block !important;
+              margin-bottom: 20px !important;
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
             }
           `;
           clonedDoc.head.appendChild(style);
@@ -408,7 +407,22 @@ export const Income: React.FC = () => {
       const imgData = canvas.toDataURL('image/jpeg', 0.8);
       pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
       
-      pdf.save(fileName);
+      const pdfBlob = pdf.output('blob');
+      
+      // Create a download link and trigger it
+      const downloadUrl = URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up the object URL after a short delay
+      setTimeout(() => {
+        URL.revokeObjectURL(downloadUrl);
+      }, 100);
+
       showToast('পিডিএফ ডাউনলোড হয়েছে', 'success');
       
     } catch (error) {
@@ -493,15 +507,15 @@ export const Income: React.FC = () => {
                 <Music size={28} strokeWidth={2.5} />
               </div>
               <div className="flex flex-col justify-center">
-                <h1 className="text-3xl font-black text-slate-900 leading-none mb-1.5 tracking-tight" style={{ lineHeight: '1' }}>Manage-Me</h1>
-                <h2 className="text-[10px] font-bold text-indigo-600 tracking-[0.2em] uppercase leading-none" style={{ lineHeight: '1' }}>Professional Studio Manager</h2>
+                <h1 className="text-3xl font-black text-slate-900 leading-none mb-1.5 tracking-tight pdf-exact-text" style={{ lineHeight: '1' }}>Manage-Me</h1>
+                <h2 className="text-[10px] font-bold text-indigo-600 tracking-[0.2em] uppercase leading-none pdf-exact-text" style={{ lineHeight: '1' }}>Professional Studio Manager</h2>
               </div>
             </div>
 
             <div className="text-right flex flex-col justify-center">
-              <h2 className="text-xl font-black text-slate-800 mb-2" style={{ lineHeight: '1.2' }}>আয় রিপোর্ট</h2>
-              <p className="text-xs font-bold text-slate-500 mb-1" style={{ lineHeight: '1.2' }}>তারিখ: {new Date().toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-              <p className="text-xs font-bold text-slate-500" style={{ lineHeight: '1.2' }}>সময়: {new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' })}</p>
+              <h2 className="text-xl font-black text-slate-800 mb-2 pdf-exact-text" style={{ lineHeight: '1.2' }}>আয় রিপোর্ট</h2>
+              <p className="text-xs font-bold text-slate-500 mb-1 pdf-exact-text" style={{ lineHeight: '1.2' }}>তারিখ: {new Date().toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+              <p className="text-xs font-bold text-slate-500 pdf-exact-text" style={{ lineHeight: '1.2' }}>সময়: {new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' })}</p>
             </div>
           </div>
         )}
@@ -521,7 +535,10 @@ export const Income: React.FC = () => {
           </div>
         )}
 
-        <div id="income-list-container" className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pb-20">
+        <div 
+          id="income-list-container" 
+          className={isGeneratingPDF ? "block w-full pb-12" : "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pb-20"}
+        >
           {filteredPayments.length === 0 ? (
             <div className="col-span-full py-20 text-center text-slate-400">
               <ReceiptText size={48} className="mx-auto mb-4 opacity-20" />
@@ -531,15 +548,26 @@ export const Income: React.FC = () => {
             filteredPayments.map((payment) => {
               const { style, icon } = getPaymentMethodStyle(payment.method);
               return (
-                <div key={payment.id} className="income-card-pdf bg-white p-4 rounded-2xl border border-slate-100 shadow-sm relative animate-in slide-in-from-bottom-2 duration-300">
+                <div 
+                  key={payment.id} 
+                  className={`income-card-pdf bg-white p-4 rounded-2xl border border-slate-100 shadow-sm relative ${isGeneratingPDF ? '' : 'animate-in slide-in-from-bottom-2 duration-300'}`}
+                  style={isGeneratingPDF ? { 
+                    breakInside: 'avoid', 
+                    pageBreakInside: 'avoid',
+                    width: '100%',
+                    display: 'block',
+                    paddingBottom: '20px',
+                    marginBottom: '0'
+                  } : {}}
+                >
                   <div className="flex justify-between items-start mb-2">
                     <div className="flex items-center gap-3">
-                       <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-                         <DollarSign size={20} />
+                       <div className={`${isGeneratingPDF ? 'w-14 h-14 rounded-2xl' : 'w-10 h-10 rounded-xl'} bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold shrink-0`}>
+                         <DollarSign size={isGeneratingPDF ? 28 : 20} />
                        </div>
-                       <div>
-                         <h3 className="font-bold text-slate-800 text-sm">{payment.projectname}</h3>
-                         <p className="text-xs text-slate-500 font-medium">{payment.clientname}</p>
+                       <div className="min-w-0">
+                         <h3 className={`font-bold text-slate-800 ${isGeneratingPDF ? 'text-lg mb-1.5' : 'text-sm'} truncate`}>{payment.projectname}</h3>
+                         <p className={`${isGeneratingPDF ? 'text-sm' : 'text-xs'} text-slate-500 font-medium`}>{payment.clientname}</p>
                        </div>
                     </div>
                     
@@ -596,19 +624,19 @@ export const Income: React.FC = () => {
                     )}
                   </div>
                   
-                  <div className="flex justify-between items-end border-t border-slate-50 pt-3 mt-1">
+                  <div className={`flex justify-between items-end border-t border-slate-50 ${isGeneratingPDF ? 'pt-4 mt-2' : 'pt-3 mt-1'}`}>
                     <div>
-                       <p className="text-[10px] text-slate-400 font-bold uppercase mb-0.5">তারিখ</p>
-                       <p className="text-xs font-bold text-slate-600 flex items-center gap-1">
-                         <Calendar size={12} /> {payment.date}
+                       <p className={`${isGeneratingPDF ? 'text-xs' : 'text-[10px]'} text-slate-400 font-bold uppercase mb-0.5`}>তারিখ</p>
+                       <p className={`${isGeneratingPDF ? 'text-sm' : 'text-xs'} font-bold text-slate-600 flex items-center gap-1`}>
+                         <Calendar size={isGeneratingPDF ? 14 : 12} /> {payment.date}
                        </p>
                     </div>
                     <div className="text-right">
-                       <span className={`text-[10px] px-2 py-0.5 rounded font-bold mb-1 inline-flex items-center gap-1 ${style}`}>
+                       <span className={`${isGeneratingPDF ? 'text-xs px-3 py-1' : 'text-[10px] px-2 py-0.5'} rounded font-bold mb-1 inline-flex items-center gap-1 ${style}`}>
                          {icon}
                          {payment.method}
                        </span>
-                       <p className="text-lg font-black text-emerald-600">{currency} {payment.amount.toLocaleString('bn-BD')}</p>
+                       <p className={`${isGeneratingPDF ? 'text-2xl' : 'text-lg'} font-black text-emerald-600`}>{currency} {payment.amount.toLocaleString('bn-BD')}</p>
                     </div>
                   </div>
                 </div>

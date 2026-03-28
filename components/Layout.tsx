@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Briefcase, TrendingUp, Receipt, Menu, 
   X, LogOut, Settings, 
   BarChart3, Users, Tags, Trash2,
-  Info, Globe, Phone, Facebook, Instagram, Send, MessageCircle, ArrowLeft, UserCog, BookOpen
+  Info, Globe, Phone, Facebook, Instagram, Send, MessageCircle, ArrowLeft, UserCog, BookOpen, User
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { APP_NAME } from '@/constants';
@@ -27,7 +27,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
     setAdminSelectedUserId, 
     trashedProjects, 
     trashedExpenses, 
-    trashedGhazalNotes 
+    trashedGhazalNotes,
+    isOnline
   } = useAppContext();
   const location = useLocation();
   const navigate = useNavigate();
@@ -186,9 +187,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
         </nav>
 
         <div className="p-4 border-t border-slate-100">
-          <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 flex items-center gap-3 mb-3">
+          <div 
+            onClick={() => navigate('/profile')}
+            className="bg-slate-50 p-3 rounded-2xl border border-slate-100 flex items-center gap-3 mb-3 cursor-pointer hover:bg-slate-100 transition-colors"
+          >
             <div className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center shadow-sm overflow-hidden">
-              {user.avatar_url ? (
+              {user.avatar_url && isOnline ? (
                 <img 
                   key={`${user.avatar_url}-${avatarCacheBuster}`}
                   src={getAvatarUrl(user.avatar_url) || ''} 
@@ -201,7 +205,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                   }}
                 />
               ) : (
-                <span className="text-indigo-600 font-bold">{user.name.charAt(0)}</span>
+                <div className="w-full h-full bg-indigo-50 flex items-center justify-center text-indigo-600">
+                  <User size={20} />
+                </div>
               )}
             </div>
             <div className="min-w-0">
@@ -243,13 +249,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
             )}
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3" onClick={() => navigate('/profile')}>
           {isAdmin && adminSelectedUserId && (
                <span className="text-[10px] font-bold bg-indigo-50 text-indigo-600 px-2 py-1 rounded-md border border-indigo-100">
                  User View
                </span>
           )}
-          {user.avatar_url ? (
+          {user.avatar_url && isOnline ? (
             <img 
               key={`${user.avatar_url}-${avatarCacheBuster}`}
               src={getAvatarUrl(user.avatar_url) || ''} 
@@ -263,7 +269,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
             />
           ) : (
             <div className="w-9 h-9 bg-indigo-50 border border-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold text-sm shadow-sm">
-              {user.name.charAt(0)}
+              <User size={18} />
             </div>
           )}
         </div>
@@ -342,15 +348,20 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
               onClick={() => setMoreMenuOpen(false)}
             />
             
-            <div className="flex items-center justify-between gap-1 mb-5 bg-slate-50 p-2.5 rounded-3xl border border-slate-100 relative overflow-hidden">
+            <div 
+              onClick={() => handleNavigation('/profile')}
+              className="flex items-center justify-between gap-1 mb-5 bg-slate-50 p-2.5 rounded-3xl border border-slate-100 relative overflow-hidden cursor-pointer active:bg-slate-100 transition-colors"
+            >
                <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-100 rounded-full -mr-10 -mt-10 opacity-50 blur-xl"></div>
                
                <div className="flex items-center gap-2 relative z-10 min-w-0">
                  <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-white border-2 border-white flex items-center justify-center shadow-md">
-                   {user.avatar_url ? (
-                     <img key={user.avatar_url} src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
+                   {user.avatar_url && isOnline ? (
+                     <img key={user.avatar_url} src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                    ) : (
-                     <span className="text-indigo-600 text-base font-bold">{user.name.charAt(0)}</span>
+                     <div className="w-full h-full bg-indigo-50 flex items-center justify-center text-indigo-600">
+                       <User size={18} />
+                     </div>
                    )}
                  </div>
                  <div className="min-w-0">
@@ -383,7 +394,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
 
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 px-2">অন্যান্য মেনু</h3>
 
-            <div className="grid grid-cols-3 gap-2 mb-4">
+            <div className="grid grid-cols-2 gap-2 mb-4">
               {SECONDARY_NAV.map((item) => (
                 <button
                   key={item.path}

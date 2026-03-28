@@ -482,7 +482,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               avatar_url: cacheBuster || avatarUrl,
               language: profile?.language || metadata?.language || 'bn',
               currency: profile?.currency || metadata?.currency || '৳',
-              role: metadata?.role || 'user'
+              role: metadata?.role || 'user',
+              createdat: profile?.createdat || session.user.created_at
            };
            
            setUser(updatedUser);
@@ -557,7 +558,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                          avatar_url: cacheBuster || avatarUrl,
                          language: profile?.language || metadata?.language || 'bn',
                          currency: profile?.currency || metadata?.currency || '৳',
-                         role: metadata?.role || 'user'
+                         role: metadata?.role || 'user',
+                         createdat: profile?.createdat || session.user.created_at
                      });
                  }
              });

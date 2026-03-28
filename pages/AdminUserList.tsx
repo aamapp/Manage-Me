@@ -234,6 +234,9 @@ export const AdminUserList: React.FC = () => {
                                             {displayName}
                                         </h3>
                                         <p className="text-[11px] text-slate-500 font-medium">{displayEmail}</p>
+                                        {profile?.createdat && (
+                                            <p className="text-[9px] text-slate-400 mt-0.5">জয়েন: {new Date(profile.createdat).toLocaleDateString('bn-BD')}</p>
+                                        )}
                                         {u.lastActive && (
                                             <p className="text-[9px] text-slate-400 mt-0.5">শেষ অ্যাক্টিভ: {u.lastActive.split('T')[0]}</p>
                                         )}

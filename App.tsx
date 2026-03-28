@@ -21,6 +21,7 @@ import { UpdatePassword } from '@/pages/UpdatePassword';
 import { AdminUserList } from '@/pages/AdminUserList'; // New Import
 import { GhazalNotes } from '@/pages/GhazalNotes';
 import { IconGenerator } from '@/pages/IconGenerator';
+import { Profile } from '@/pages/Profile';
 import Trash from '@/pages/Trash';
 
 const Login = lazy(() => import('@/pages/Login').then(module => ({ default: module.Login })));
@@ -202,6 +203,7 @@ const AppContent: React.FC = () => {
                     <Route path="/categories" element={<Categories />} />
                     <Route path="/reports" element={<Reports />} />
                     <Route path="/settings" element={<Settings />} />
+                    <Route path="/profile" element={<Profile />} />
                     <Route path="/ghazal-notes" element={<GhazalNotes />} />
                     <Route path="/trash" element={<Trash />} />
                     {/* Default Route Logic */}

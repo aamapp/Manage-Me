@@ -56,6 +56,7 @@ export interface User {
   language: 'bn' | 'en';
   currency: string;
   role: 'user' | 'admin';
+  createdat?: string;
 }
 
 export interface UserProfile {
@@ -63,6 +64,7 @@ export interface UserProfile {
   name: string | null;
   email: string | null;
   avatar_url: string | null;
+  createdat?: string;
 }
 
 export interface GhazalNote {
