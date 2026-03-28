@@ -135,6 +135,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const refreshData = async () => {
     if (!user || !isConfigured) return;
     
+    // 1. Load from cache first for immediate UI (Offline Support)
+    const cacheKey = `manage_me_cache_${user.id}`;
+    const cachedData = localStorage.getItem(cacheKey);
+    if (cachedData) {
+      try {
+        const parsed = JSON.parse(cachedData);
+        if (parsed.projects) setProjects(parsed.projects);
+        if (parsed.trashedProjects) setTrashedProjects(parsed.trashedProjects);
+        if (parsed.clients) setClients(parsed.clients);
+        if (parsed.trashedClients) setTrashedClients(parsed.trashedClients);
+        if (parsed.incomeRecords) setIncomeRecords(parsed.incomeRecords);
+        if (parsed.expenses) setExpenses(parsed.expenses);
+        if (parsed.trashedExpenses) setTrashedExpenses(parsed.trashedExpenses);
+        if (parsed.ghazalNotes) setGhazalNotes(parsed.ghazalNotes);
+        if (parsed.trashedGhazalNotes) setTrashedGhazalNotes(parsed.trashedGhazalNotes);
+        if (parsed.allProjects) setAllProjects(parsed.allProjects);
+        if (parsed.allClients) setAllClients(parsed.allClients);
+        if (parsed.allIncomeRecords) setAllIncomeRecords(parsed.allIncomeRecords);
+        if (parsed.allExpenses) setAllExpenses(parsed.allExpenses);
+        if (parsed.userProfiles) setUserProfiles(parsed.userProfiles);
+      } catch (e) {
+        console.warn("Cache hydration failed", e);
+      }
+    }
+
+    // If offline, don't attempt network fetch
+    if (!navigator.onLine) {
+      setLoading(false);
+      return;
+    }
+
     // If already fetching, ignore this request to save bandwidth
     if (isFetchingRef.current) return;
     isFetchingRef.current = true;
@@ -183,9 +214,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         
         // Fetch User Profiles for Admin List
         const { data: profiles, error: profError } = await supabase.from('profiles').select('*');
+        let profilesData: UserProfile[] = [];
         if (!profError && profiles) {
-            setUserProfiles(profiles as UserProfile[]);
+            profilesData = profiles as UserProfile[];
+            setUserProfiles(profilesData);
         }
+
+        // Update Cache for Admin
+        const cacheKey = `manage_me_cache_${user.id}`;
+        localStorage.setItem(cacheKey, JSON.stringify({
+          allProjects: pData,
+          allClients: cData,
+          allIncomeRecords: iData,
+          allExpenses: eData,
+          userProfiles: profilesData,
+          lastUpdated: Date.now()
+        }));
 
         // Filter Visible State based on Selection
         if (adminSelectedUserId) {
@@ -225,19 +269,44 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       } else {
         // Normal User: Visible = All fetched
-        setProjects(pData.filter(p => !p.notes?.startsWith('[TRASH]')));
-        setTrashedProjects(pData.filter(p => p.notes?.startsWith('[TRASH]')));
-        setClients(cData.filter(c => !c.contact?.startsWith('[TRASH]')));
-        setTrashedClients(cData.filter(c => c.contact?.startsWith('[TRASH]')));
-        setIncomeRecords(iData.filter(i => {
+        const userProjects = pData.filter(p => !p.notes?.startsWith('[TRASH]'));
+        const userTrashedProjects = pData.filter(p => p.notes?.startsWith('[TRASH]'));
+        const userClients = cData.filter(c => !c.contact?.startsWith('[TRASH]'));
+        const userTrashedClients = cData.filter(c => c.contact?.startsWith('[TRASH]'));
+        const userIncome = iData.filter(i => {
           const isProjectTrashed = pData.find(p => p.id === i.projectid)?.notes?.startsWith('[TRASH]');
           const isClientTrashed = cData.find(c => c.name === i.clientname)?.contact?.startsWith('[TRASH]');
           return !isProjectTrashed && !isClientTrashed;
+        });
+        const userExpenses = eData.filter(e => !e.notes?.startsWith('[TRASH]'));
+        const userTrashedExpenses = eData.filter(e => e.notes?.startsWith('[TRASH]'));
+        const userGhazals = gData.filter(g => !g.lyrics?.startsWith('[TRASH]'));
+        const userTrashedGhazals = gData.filter(g => g.lyrics?.startsWith('[TRASH]'));
+
+        setProjects(userProjects);
+        setTrashedProjects(userTrashedProjects);
+        setClients(userClients);
+        setTrashedClients(userTrashedClients);
+        setIncomeRecords(userIncome);
+        setExpenses(userExpenses);
+        setTrashedExpenses(userTrashedExpenses);
+        setGhazalNotes(userGhazals);
+        setTrashedGhazalNotes(userTrashedGhazals);
+
+        // Update Cache for Offline Support
+        const cacheKey = `manage_me_cache_${user.id}`;
+        localStorage.setItem(cacheKey, JSON.stringify({
+          projects: userProjects,
+          trashedProjects: userTrashedProjects,
+          clients: userClients,
+          trashedClients: userTrashedClients,
+          incomeRecords: userIncome,
+          expenses: userExpenses,
+          trashedExpenses: userTrashedExpenses,
+          ghazalNotes: userGhazals,
+          trashedGhazalNotes: userTrashedGhazals,
+          lastUpdated: Date.now()
         }));
-        setExpenses(eData.filter(e => !e.notes?.startsWith('[TRASH]')));
-        setTrashedExpenses(eData.filter(e => e.notes?.startsWith('[TRASH]')));
-        setGhazalNotes(gData.filter(g => !g.lyrics?.startsWith('[TRASH]')));
-        setTrashedGhazalNotes(gData.filter(g => g.lyrics?.startsWith('[TRASH]')));
       }
 
     } catch (error: any) {
