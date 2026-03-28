@@ -59,7 +59,27 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUserState] = useState<User | null>(() => {
+    // Hydrate user from localStorage on mount (Last Known User)
+    const savedUser = localStorage.getItem('last_known_user');
+    if (savedUser) {
+      try {
+        return JSON.parse(savedUser);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  });
+
+  const setUser = (newUser: User | null) => {
+    setUserState(newUser);
+    if (newUser) {
+      localStorage.setItem('last_known_user', JSON.stringify(newUser));
+    } else {
+      localStorage.removeItem('last_known_user');
+    }
+  };
   
   // Visible State (What components see)
   const [projects, setProjects] = useState<Project[]>([]);
@@ -374,7 +394,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                .maybeSingle();
              profile = profData;
            } catch (e) {
-             console.log("Offline or profile fetch failed, using metadata");
+             console.log("Offline or profile fetch failed, using metadata or cached user");
            }
 
            const metadata = session.user.user_metadata;
@@ -384,7 +404,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
            const avatarUrl = profile?.avatar_url || metadata?.avatar_url || '';
            const cacheBuster = avatarUrl ? `${avatarUrl}${avatarUrl.includes('?') ? '&' : '?'}t=${Date.now()}` : '';
 
-           setUser({
+           const updatedUser = {
               id: session.user.id,
               email: session.user.email || '',
               name: profile?.name || metadata?.name || 'User',
@@ -394,7 +414,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               language: profile?.language || metadata?.language || 'bn',
               currency: profile?.currency || metadata?.currency || '৳',
               role: metadata?.role || 'user'
-           });
+           };
+           
+           setUser(updatedUser);
+        } else if (!session && navigator.onLine) {
+           // Only clear if online and definitely no session
+           setUser(null);
         }
       } catch (err: any) {
         console.error("Session Init Error:", err);
