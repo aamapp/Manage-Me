@@ -344,6 +344,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           session = cachedSession;
         }
         
+        // If still no session and we are offline, check if we have a token in localStorage
+        // If we do, don't give up yet - wait for network to return
+        if (!session && !navigator.onLine && mounted) {
+          const hasToken = Object.keys(localStorage).some(key => key.startsWith('sb-') && key.endsWith('-auth-token'));
+          if (hasToken) {
+            console.log("Offline with existing token, waiting for network to re-authenticate...");
+            const handleOnline = () => {
+              window.removeEventListener('online', handleOnline);
+              initSession();
+            };
+            window.addEventListener('online', handleOnline);
+            // We don't set loading to false here, we wait for the online event
+            return;
+          }
+        }
+        
         if (session?.user && mounted) {
            // 1. Fetch from profiles table (Source of Truth) FIRST
            // Add a cache-buster to the query to bypass mobile WebView cache
@@ -405,6 +421,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if ((event as string) === 'TOKEN_REFRESH_FAILED') {
+          // If offline, don't treat this as a fatal logout yet
+          if (!navigator.onLine) {
+            console.log("Token refresh failed while offline, ignoring...");
+            return;
+          }
+
           for (const key in localStorage) {
             if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
               localStorage.removeItem(key);
@@ -446,7 +468,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                  }
              });
         }
-      } else {
+      } else if (event === 'SIGNED_OUT') {
         if (mounted) {
             setUser(null);
             setProjects([]);
