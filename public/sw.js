@@ -44,21 +44,10 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(event.request.url);
 
-  // Supabase API handling - Network First, then Cache
+  // CRITICAL FIX: NEVER cache Supabase API calls. Always go to network.
+  // This prevents the "stale data" issue when adding/deleting records.
   if (url.hostname.includes('supabase.co')) {
-    event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          if (response.status === 200) {
-            const responseClone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, responseClone);
-            });
-          }
-          return response;
-        })
-        .catch(() => caches.match(event.request))
-    );
+    event.respondWith(fetch(event.request));
     return;
   }
 
