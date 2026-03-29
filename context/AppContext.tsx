@@ -393,7 +393,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     };
 
-    const handleOnline = () => checkActualConnectivity();
+    const handleOnline = () => {
+      checkActualConnectivity();
+      if (user) {
+        console.log("App came back online. Refreshing data...");
+        refreshData();
+      }
+    };
     const handleOffline = () => setIsOnline(false);
     const handleFocus = () => checkActualConnectivity();
 
