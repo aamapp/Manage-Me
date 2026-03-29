@@ -397,6 +397,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       checkActualConnectivity();
       if (user) {
         console.log("App came back online. Refreshing data...");
+        // Force refresh by resetting the ref
+        isFetchingRef.current = false;
         refreshData();
       }
     };
