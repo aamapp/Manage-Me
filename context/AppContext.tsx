@@ -424,7 +424,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setTrashedProjects(userProjects.filter(p => p.notes?.startsWith('[TRASH]')));
             setClients(allClients.filter(c => c.userid === adminSelectedUserId));
             setIncomeRecords(allIncomeRecords.filter(i => i.userid === adminSelectedUserId));
-            setExpenses(allExpenses.filter(e => e.userid === adminSelectedUserId));
+            setExpenses(allExpenses.filter(e => e.userid === adminSelectedUserId && !e.notes?.startsWith('[TRASH]')));
+            setTrashedExpenses(allExpenses.filter(e => e.userid === adminSelectedUserId && e.notes?.startsWith('[TRASH]')));
         } else {
             setProjects([]);
             setTrashedProjects([]);

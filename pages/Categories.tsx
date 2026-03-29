@@ -7,7 +7,7 @@ import { EXPENSE_CATEGORY_LABELS } from '../constants';
 import { ConfirmModal } from '@/components/ConfirmModal';
 
 export const Categories: React.FC = () => {
-  const { user, showToast, adminSelectedUserId, isOnline } = useAppContext();
+  const { user, showToast, adminSelectedUserId, isOnline, expenses, allExpenses } = useAppContext();
   const [categories, setCategories] = useState<{name: string, count: number, total: number}[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRenameModalOpen, setRenameModalOpen] = useState(false);
@@ -20,52 +20,45 @@ export const Categories: React.FC = () => {
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const fetchCategories = async () => {
+  const fetchCategories = () => {
     if (!user) return;
     setLoading(true);
-    let query = supabase.from('expenses').select('category, amount');
     
-    // Filter Logic:
-    // 1. If Admin has selected a user -> Show ONLY that user's data
-    // 2. If Normal User -> Show ONLY their own data
-    // 3. If Admin with NO selection -> Show ALL data
+    let dataToProcess = [];
     
-    if (user.role === 'admin' && adminSelectedUserId) {
-        query = query.eq('userid', adminSelectedUserId);
-    } else if (user.role !== 'admin') {
-        query = query.eq('userid', user.id);
+    if (user.role === 'admin' && !adminSelectedUserId) {
+        // Admin viewing all
+        dataToProcess = (allExpenses || []).filter(e => !e.notes?.startsWith('[TRASH]'));
+    } else {
+        // Normal user OR Admin viewing specific user
+        // The 'expenses' array in AppContext is already filtered for this!
+        dataToProcess = expenses || [];
     }
 
-    const { data, error } = await query;
+    // Aggregate data
+    const catMap = new Map<string, {count: number, total: number}>();
     
-    if (error) {
-      showToast('ডাটা লোড করতে সমস্যা হয়েছে');
-    } else if (data) {
-      // Aggregate data
-      const catMap = new Map<string, {count: number, total: number}>();
-      
-      data.forEach((item: any) => {
-        const cat = item.category || 'Uncategorized';
-        const current = catMap.get(cat) || { count: 0, total: 0 };
-        catMap.set(cat, {
-          count: current.count + 1,
-          total: current.total + item.amount
-        });
+    dataToProcess.forEach((item: any) => {
+      const cat = item.category || 'Uncategorized';
+      const current = catMap.get(cat) || { count: 0, total: 0 };
+      catMap.set(cat, {
+        count: current.count + 1,
+        total: current.total + (Number(item.amount) || 0)
       });
-      
-      const sortedCats = Array.from(catMap.entries()).map(([name, stats]) => ({
-        name,
-        ...stats
-      })).sort((a, b) => b.total - a.total);
+    });
+    
+    const sortedCats = Array.from(catMap.entries()).map(([name, stats]) => ({
+      name,
+      ...stats
+    })).sort((a, b) => b.total - a.total);
 
-      setCategories(sortedCats);
-    }
+    setCategories(sortedCats);
     setLoading(false);
   };
 
   useEffect(() => {
     fetchCategories();
-  }, [user, adminSelectedUserId]); // Re-fetch when admin selects a user
+  }, [user, adminSelectedUserId, expenses, allExpenses]);
 
   const handleOpenRename = (currentName: string) => {
     if (!isOnline) {
