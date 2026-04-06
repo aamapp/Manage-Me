@@ -5,7 +5,8 @@ import {
   LayoutDashboard, Briefcase, TrendingUp, Receipt, Menu, 
   X, LogOut, Settings, 
   BarChart3, Users, Tags, Trash2,
-  Info, Globe, Phone, Facebook, Instagram, Send, MessageCircle, ArrowLeft, UserCog, BookOpen, User
+  Info, Globe, Phone, Facebook, Instagram, Send, MessageCircle, ArrowLeft, UserCog, BookOpen, User,
+  ShoppingBag
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { APP_NAME } from '@/constants';
@@ -77,6 +78,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
 
   // Secondary items for "More" Menu Drawer
   const SECONDARY_NAV = [
+    { name: 'ফর্দি', path: '/shopping-lists', icon: <ShoppingBag size={20} />, desc: 'বাজারের তালিকা' },
     { name: 'গজল নোট', path: '/ghazal-notes', icon: <BookOpen size={20} />, desc: 'গজলের লিরিক সংগ্রহ' },
     { name: 'ক্লায়েন্ট', path: '/clients', icon: <Users size={20} />, desc: 'ক্লায়েন্ট তালিকা' },
     { name: 'খরচের খাত', path: '/categories', icon: <Tags size={20} />, desc: 'ক্যাটাগরি ম্যানেজমেন্ট' },

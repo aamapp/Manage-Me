@@ -22,6 +22,7 @@ import { AdminUserList } from '@/pages/AdminUserList'; // New Import
 import { GhazalNotes } from '@/pages/GhazalNotes';
 import { IconGenerator } from '@/pages/IconGenerator';
 import { Profile } from '@/pages/Profile';
+import ShoppingLists from '@/pages/ShoppingLists';
 import Trash from '@/pages/Trash';
 
 const Login = lazy(() => import('@/pages/Login').then(module => ({ default: module.Login })));
@@ -205,6 +206,7 @@ const AppContent: React.FC = () => {
                     <Route path="/settings" element={<Settings />} />
                     <Route path="/profile" element={<Profile />} />
                     <Route path="/ghazal-notes" element={<GhazalNotes />} />
+                    <Route path="/shopping-lists" element={<ShoppingLists />} />
                     <Route path="/trash" element={<Trash />} />
                     {/* Default Route Logic */}
                     <Route path="*" element={<Navigate to={user.role === 'admin' ? "/admin-users" : "/dashboard"} replace />} />

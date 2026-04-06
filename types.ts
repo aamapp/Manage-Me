@@ -74,3 +74,22 @@ export interface GhazalNote {
   userid: string;
   createdat: string;
 }
+
+export interface ShoppingItem {
+  id: string;
+  name: string;
+  quantity: string;
+  price: number;
+  isBought: boolean;
+}
+
+export interface ShoppingList {
+  id: string;
+  title: string;
+  date: string;
+  items: ShoppingItem[];
+  totalamount: number;
+  userid: string;
+  createdat: string;
+  notes?: string;
+}
