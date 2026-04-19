@@ -3,4 +3,6 @@
 body {
   font-family: 'Hind Siliguri', sans-serif;
   background-color: #f8fafc;
+  /* Prevent pull-to-refresh on mobile browsers / WebView */
+  overscroll-behavior-y: none;
 }

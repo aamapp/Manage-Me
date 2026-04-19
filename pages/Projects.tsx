@@ -1041,7 +1041,7 @@ export const Projects: React.FC = () => {
       {viewProject && createPortal(
           <div className="fixed inset-0 z-[1000] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
              <div className="bg-white w-full max-w-sm flex flex-col max-h-[90vh] rounded-[2rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-100">
-                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                <div className="flex-1 overflow-y-auto overscroll-contain custom-scrollbar">
                     <div ref={detailsRef} className="bg-white pb-4 relative rounded-[2rem] overflow-hidden">
                       {/* Decorative Background */}
                       <div className={`absolute top-0 left-0 w-full h-32 opacity-20 pointer-events-none ${viewProject.status === 'Completed' ? 'bg-emerald-500' : viewProject.status === 'In Progress' ? 'bg-blue-500' : 'bg-amber-500'}`} style={{ maskImage: 'linear-gradient(to bottom, black, transparent)', WebkitMaskImage: 'linear-gradient(to bottom, black, transparent)'}}></div>
