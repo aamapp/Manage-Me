@@ -251,10 +251,25 @@ export const Income: React.FC = () => {
     setActivePaymentId(null);
   };
 
-  const filteredPayments = incomeRecords.filter(p => 
-    (p.projectname || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (p.clientname || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const [methodFilter, setMethodFilter] = useState<string>('All');
+  const [dateRange, setDateRange] = useState({ start: '', end: '' });
+  const [showFilters, setShowFilters] = useState(false);
+
+  const filteredPayments = incomeRecords.filter(p => {
+    const matchesSearch = (p.projectname || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          (p.clientname || '').toLowerCase().includes(searchTerm.toLowerCase());
+                          
+    const matchesMethod = methodFilter === 'All' || p.method === methodFilter;
+    
+    let matchesDate = true;
+    if (dateRange.start || dateRange.end) {
+      const pDateStr = p.date.split('T')[0];
+      if (dateRange.start && pDateStr < dateRange.start) matchesDate = false;
+      if (dateRange.end && pDateStr > dateRange.end) matchesDate = false;
+    }
+    
+    return matchesSearch && matchesMethod && matchesDate;
+  }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   // Filter: Match name AND ensure Due Amount > 0
   const projectSuggestions = projects.filter(p => 
@@ -271,7 +286,7 @@ export const Income: React.FC = () => {
     setError(null);
   };
 
-  const totalIncome = incomeRecords.reduce((acc, curr) => acc + curr.amount, 0);
+  const totalIncome = filteredPayments.reduce((acc, curr) => acc + curr.amount, 0);
 
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
@@ -466,27 +481,110 @@ export const Income: React.FC = () => {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-slate-800">
-            {user?.role === 'admin' ? (adminSelectedUserId ? 'ইউজার আয়' : 'আয় (অ্যাডমিন ভিউ)') : 'আয় (পেমেন্ট)'}
-          </h1>
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold text-slate-800">
+              {user?.role === 'admin' ? (adminSelectedUserId ? 'ইউজার আয়' : 'আয় (অ্যাডমিন ভিউ)') : 'আয় (পেমেন্ট)'}
+            </h1>
+            <button 
+              onClick={() => setShowFilters(!showFilters)}
+              className={`p-1.5 rounded-lg transition-all ${showFilters || methodFilter !== 'All' || dateRange.start || dateRange.end ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'}`}
+            >
+              <Filter size={18} />
+            </button>
+          </div>
           <p className="text-xs text-slate-500 font-medium">মোট আয়: <span className="text-emerald-600 font-bold">{currency} {totalIncome.toLocaleString('bn-BD')}</span></p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <button 
-            onClick={handleOpenAddModal}
-            className="bg-emerald-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-emerald-200 active:scale-90 transition-transform"
-          >
-            <Plus size={24} />
-          </button>
           <button 
             onClick={handleDownloadPDF}
             className="bg-indigo-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-indigo-200 active:scale-90 transition-transform"
           >
             <Download size={22} />
           </button>
+          <button 
+            onClick={handleOpenAddModal}
+            className="bg-emerald-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-emerald-200 active:scale-90 transition-transform"
+          >
+            <Plus size={24} />
+          </button>
         </div>
       </div>
+
+      {/* Filter UI */}
+      {showFilters && (
+        <div className="bg-white border border-slate-100 p-4 rounded-2xl shadow-sm space-y-4 animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-slate-700 flex items-center gap-1.5">
+              <Filter size={16} className="text-indigo-500" /> ফিল্টার করুন
+            </h3>
+            {(methodFilter !== 'All' || dateRange.start || dateRange.end) && (
+              <button 
+                onClick={() => {
+                  setMethodFilter('All');
+                  setDateRange({ start: '', end: '' });
+                }}
+                className="text-xs font-bold text-rose-500 bg-rose-50 px-2 py-1 rounded-lg"
+              >
+                রিসেট
+              </button>
+            )}
+          </div>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs font-bold text-slate-500 mb-2 pl-1 block">পেমেন্ট মেথড</label>
+              <div className="flex flex-wrap gap-2">
+                 {['All', 'বিকাশ', 'নগদ', 'রকেট', 'ব্যাংক'].map(m => (
+                    <button
+                       key={m}
+                       onClick={() => setMethodFilter(m)}
+                       className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+                          methodFilter === m 
+                          ? 'bg-emerald-600 text-white shadow-md shadow-emerald-200' 
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                       }`}
+                    >
+                       {m === 'All' ? 'সকল' : m}
+                    </button>
+                 ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <DatePicker 
+                label="শুরু তারিখ"
+                value={dateRange.start}
+                onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
+                placeholder="শুরু তারিখ"
+              />
+              <DatePicker 
+                label="শেষ তারিখ"
+                value={dateRange.end}
+                onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
+                placeholder="শেষ তারিখ"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Active Filters Banner */}
+      {(methodFilter !== 'All' || dateRange.start || dateRange.end) && (
+          <div className="flex flex-wrap gap-2 items-center bg-indigo-50/50 p-2 rounded-xl border border-indigo-100/50">
+             <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider pl-1">সক্রিয়:</span>
+             {methodFilter !== 'All' && (
+                <span className="bg-white text-indigo-700 text-[10px] font-bold px-2 py-1 rounded-md shadow-sm border border-indigo-100">
+                   মেথড: {methodFilter}
+                </span>
+             )}
+             {(dateRange.start || dateRange.end) && (
+                <span className="bg-white text-indigo-700 text-[10px] font-bold px-2 py-1 rounded-md shadow-sm border border-indigo-100">
+                   তারিখ: {dateRange.start || 'শুরু'} - {dateRange.end || 'শেষ'}
+                </span>
+             )}
+          </div>
+      )}
 
       <div className="bg-white px-4 py-2.5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-2">
         <Search size={18} className="text-slate-400" />

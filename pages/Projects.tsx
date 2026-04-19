@@ -2,10 +2,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
-import { Plus, Search, MoreVertical, Calendar, DollarSign, Briefcase, X, FolderOpen, Pencil, Trash2, Users, FileText, CheckCircle2, Clock, Play, UserPlus, CalendarDays, Loader2, AlertCircle, ChevronDown, Filter, Music, Calculator, Eye, Wallet, Download, Share2, Copy, ExternalLink } from 'lucide-react';
+import { Plus, Search, MoreVertical, Calendar, DollarSign, Briefcase, X, FolderOpen, Pencil, Trash2, Users, FileText, CheckCircle2, Clock, Play, UserPlus, CalendarDays, Loader2, AlertCircle, ChevronDown, Filter, Music, Calculator, Eye, Wallet, Download, Share2, Copy, ExternalLink, Camera, Activity } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas';
+
 import { PROJECT_STATUS_LABELS, PROJECT_TYPE_LABELS, APP_NAME } from '../constants';
 import { Project, ProjectStatus, ProjectType, Client } from '../types';
 import { useAppContext } from '../context/AppContext';
@@ -16,7 +17,7 @@ import { DatePicker } from '@/components/DatePicker';
 import { StatusPicker } from '@/components/StatusPicker';
 
 export const Projects: React.FC = () => {
-  const { projects, setProjects, clients, setClients, user, refreshData, showToast, isOnline } = useAppContext();
+  const { projects, setProjects, clients, setClients, user, refreshData, showToast, isOnline, incomeRecords } = useAppContext();
   const location = useLocation();
   const currency = user?.currency || '৳';
   
@@ -155,7 +156,7 @@ export const Projects: React.FC = () => {
       totalamount: 0, 
       paidamount: 0, 
       deadline: '',
-      createdat: new Date().toISOString().split('T')[0],
+      createdat: new Date().toISOString(), // Keep full ISO string for new projects so time is tracked
       clientname: '',
       notes: ''
     });
@@ -173,8 +174,8 @@ export const Projects: React.FC = () => {
     setClientSearch(project.clientname);
     setNewProject({
       ...project,
-      createdat: project.createdat ? project.createdat.split('T')[0] : '',
-      deadline: project.deadline ? project.deadline.split('T')[0] : ''
+      createdat: project.createdat || '', // Preserve original full ISO if it exists
+      deadline: project.deadline || ''
     });
     setModalOpen(true);
     setActiveCardMenuId(null);
@@ -215,7 +216,7 @@ export const Projects: React.FC = () => {
     const clientName = clientSearch.trim();
     const projectName = newProject.name.trim();
     const deadlineToSave = newProject.deadline ? newProject.deadline : null;
-    const createdAtToSave = newProject.createdat || new Date().toISOString().split('T')[0];
+    const createdAtToSave = newProject.createdat || new Date().toISOString();
 
     try {
       // 1. Handle Client Creation
@@ -389,6 +390,73 @@ export const Projects: React.FC = () => {
     acc.due += p.dueamount;
     return acc;
   }, { total: 0, paid: 0, due: 0 });
+
+  // Details Modal refs and logic
+  const detailsRef = useRef<HTMLDivElement>(null);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+
+  // Derive tracking history for viewProject
+  let trackingHistory: any[] = [];
+  if (viewProject) {
+      const createdDate = viewProject.createdat || new Date().toISOString();
+      // Base step: Pending/Created
+      trackingHistory = [
+        { type: 'created', date: createdDate, text: 'প্রজেক্ট যুক্ত হয়েছে (পেন্ডিং)', id: 'create' }
+      ];
+
+      if (viewProject.status === 'In Progress' || viewProject.status === 'Completed') {
+          // Add a slight delay to time just for visual ordering if they have the exact same date string
+          const progressDate = new Date(new Date(createdDate).getTime() + 1000).toISOString();
+          trackingHistory.push({ type: 'progress', date: progressDate, text: 'কাজ শুরু হয়েছে (চলমান)', id: 'progress' });
+      }
+
+      const payments = incomeRecords.filter(r => r.projectid === viewProject.id).map(r => ({
+          type: 'payment',
+          // Append midday time for old payments without time so they sort correctly
+          date: r.date.includes('T') ? r.date : `${r.date}T12:00:00.000Z`,
+          amount: r.amount,
+          method: r.method,
+          text: `পেমেন্ট রিসিভড (${r.method})`,
+          id: r.id
+      }));
+      trackingHistory.push(...payments);
+
+      if (viewProject.status === 'Completed') {
+          let completedDate = viewProject.deadline || new Date(new Date(createdDate).getTime() + 2000).toISOString();
+          if (!completedDate.includes('T')) {
+             completedDate = `${completedDate}T23:59:59.000Z`; // Ensures it sorts at the end of the day
+          }
+          trackingHistory.push({ type: 'completed', date: completedDate, text: 'প্রজেক্ট সম্পন্ন ও ডেলিভারি হয়েছে', id: 'complete' });
+      }
+
+      // Final step: Sort chronologically
+      trackingHistory.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }
+
+  const handleDownloadImage = async () => {
+      if (!detailsRef.current || !viewProject) return;
+      setIsGeneratingImage(true);
+      showToast('ছবি তৈরি হচ্ছে...', 'info');
+      try {
+          const canvas = await html2canvas(detailsRef.current, {
+              scale: 4, // Increased scale for Ultra HD resolution
+              useCORS: true,
+              backgroundColor: null // Set to null for transparent background (allows rounded corners to show)
+          });
+          // Use PNG for lossless quality (crisper text) instead of JPEG
+          const dataUrl = canvas.toDataURL('image/png');
+          const link = document.createElement('a');
+          link.href = dataUrl;
+          link.download = `Project_${viewProject.name.replace(/\s+/g, '_')}_Tracking.png`;
+          link.click();
+          showToast('ছবি সেভ হয়েছে', 'success');
+      } catch (err: any) {
+          console.error(err);
+          showToast('ছবি জেনারেট করতে সমস্যা হয়েছে', 'error');
+      } finally {
+          setIsGeneratingImage(false);
+      }
+  };
 
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
@@ -617,16 +685,16 @@ export const Projects: React.FC = () => {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button 
-            onClick={handleOpenAddModal}
-            className="bg-indigo-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-indigo-200 active:scale-90 transition-transform"
-          >
-            <Plus size={22} />
-          </button>
-          <button 
             onClick={handleDownloadPDF}
             className="bg-emerald-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-emerald-200 active:scale-90 transition-transform"
           >
             <Download size={22} />
+          </button>
+          <button 
+            onClick={handleOpenAddModal}
+            className="bg-indigo-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-indigo-200 active:scale-90 transition-transform"
+          >
+            <Plus size={22} />
           </button>
         </div>
       </div>
@@ -972,92 +1040,127 @@ export const Projects: React.FC = () => {
       {/* View Project Details Modal (Popup) */}
       {viewProject && createPortal(
           <div className="fixed inset-0 z-[1000] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-             <div className="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-100">
-                {/* Header with Color Coding based on Status */}
-                <div className={`p-6 relative ${viewProject.status === 'Completed' ? 'bg-emerald-600' : viewProject.status === 'In Progress' ? 'bg-blue-600' : 'bg-amber-500'}`}>
-                    <button 
-                        onClick={() => setViewProject(null)} 
-                        className="absolute top-4 right-4 p-2 bg-white/20 hover:bg-white/30 rounded-full text-white transition-colors backdrop-blur-md"
-                    >
-                        <X size={20} />
-                    </button>
-                    
-                    <div className="flex flex-col items-center text-center">
-                        <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-white mb-3 shadow-inner ring-1 ring-white/30">
-                            <Music size={32} />
-                        </div>
-                        <h2 className="text-xl font-bold text-white mb-1 leading-tight">{viewProject.name}</h2>
-                        <span className="inline-block px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-white text-[10px] font-bold border border-white/20">
-                            {PROJECT_STATUS_LABELS[viewProject.status]}
-                        </span>
-                    </div>
-                </div>
+             <div className="bg-white w-full max-w-sm flex flex-col max-h-[90vh] rounded-[2rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-100">
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                    <div ref={detailsRef} className="bg-white pb-4 relative rounded-[2rem] overflow-hidden">
+                      {/* Decorative Background */}
+                      <div className={`absolute top-0 left-0 w-full h-32 opacity-20 pointer-events-none ${viewProject.status === 'Completed' ? 'bg-emerald-500' : viewProject.status === 'In Progress' ? 'bg-blue-500' : 'bg-amber-500'}`} style={{ maskImage: 'linear-gradient(to bottom, black, transparent)', WebkitMaskImage: 'linear-gradient(to bottom, black, transparent)'}}></div>
 
-                <div className="p-6 space-y-5">
-                    {/* Basic Info - Full Width Client */}
-                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                            <p className="text-xs text-slate-400 font-bold uppercase mb-1">ক্লায়েন্ট</p>
-                            <p className="font-bold text-slate-700 text-base flex items-center gap-1.5">
-                                <Users size={16} className="text-indigo-500"/> {viewProject.clientname}
-                            </p>
-                        </div>
+                      {/* Header - Compact */}
+                      <div className="pt-6 px-6 pb-2 relative z-10">
+                          <div className="flex items-center gap-3">
+                              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-sm shrink-0 ${viewProject.status === 'Completed' ? 'bg-emerald-500' : viewProject.status === 'In Progress' ? 'bg-blue-600' : 'bg-amber-500'}`}>
+                                  <Music size={24} />
+                              </div>
+                              <div className="flex-1">
+                                  <h2 className="text-xl font-black text-slate-800 mb-1 leading-tight">{viewProject.name}</h2>
+                                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${viewProject.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' : viewProject.status === 'In Progress' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
+                                      {PROJECT_STATUS_LABELS[viewProject.status]}
+                                  </span>
+                              </div>
+                          </div>
+                      </div>
 
-                    {/* Dates */}
-                    <div className="flex justify-between items-center bg-slate-50 p-4 rounded-xl border border-slate-100">
-                         <div>
-                            <p className="text-xs text-slate-400 font-bold uppercase mb-1">শুরু</p>
-                            <p className="font-bold text-slate-700 text-sm flex items-center gap-1">
-                                <Calendar size={14} /> {viewProject.createdat ? viewProject.createdat.split('T')[0] : 'N/A'}
-                            </p>
-                         </div>
-                         <div className="h-8 w-px bg-slate-200"></div>
-                         <div className="text-right">
-                            <p className="text-xs text-slate-400 font-bold uppercase mb-1">ডেডলাইন</p>
-                            <p className={`font-bold text-sm flex items-center gap-1 justify-end ${viewProject.deadline ? 'text-slate-700' : 'text-slate-400 italic'}`}>
-                                <Clock size={14} /> {viewProject.deadline ? viewProject.deadline.split('T')[0] : 'নির্ধারিত নেই'}
-                            </p>
-                         </div>
-                    </div>
+                  <div className="px-6 pb-6 pt-2 space-y-4 relative z-10">
+                      {/* Compact Info Card (Client & Dates stacked) */}
+                      <div className="bg-white rounded-xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-slate-100 divide-y divide-slate-100">
+                          {/* Client */}
+                          <div className="px-4 py-3 flex items-center justify-between bg-slate-50/50 rounded-t-xl">
+                              <div className="flex items-center gap-2 text-slate-500">
+                                  <Users size={14} className="text-indigo-500" />
+                                  <span className="text-[10px] font-bold uppercase tracking-wider">ক্লায়েন্ট</span>
+                              </div>
+                              <span className="text-sm font-bold text-slate-800">{viewProject.clientname}</span>
+                          </div>
+                          
+                          {/* Dates */}
+                          <div className="px-4 py-3 flex items-center justify-between">
+                              <div>
+                                  <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">শুরু</p>
+                                  <p className="text-xs font-bold text-slate-700 flex items-center gap-1 font-sans">
+                                      <Calendar size={12} className="text-slate-400"/> 
+                                      {viewProject.createdat ? new Date(viewProject.createdat).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit'}) : 'N/A'}
+                                  </p>
+                              </div>
+                              <div className="w-px h-6 bg-slate-100"></div>
+                              <div className="text-right">
+                                  <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">ডেডলাইন</p>
+                                  <p className={`text-xs font-bold flex items-center justify-end gap-1 font-sans ${viewProject.deadline ? 'text-slate-700' : 'text-slate-400 italic'}`}>
+                                      {viewProject.deadline ? <Clock size={12} className="text-slate-400"/> : ''} 
+                                      {viewProject.deadline ? new Date(viewProject.deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit'}) : 'নির্ধারিত নেই'}
+                                  </p>
+                              </div>
+                          </div>
+                      </div>
 
-                    {/* Financials */}
+                      {/* Financials - Compact */}
+                      <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                           <div className="flex justify-between items-end mb-3">
+                               <div>
+                                   <p className="text-[10px] font-bold text-slate-500 flex items-center gap-1 uppercase mb-1">
+                                       <Wallet size={12} className="text-emerald-500" /> বাজেট
+                                   </p>
+                                   <span className="text-lg font-black text-slate-800 leading-none flex items-baseline gap-0.5">
+                                        <span className="text-sm">{currency}</span>
+                                        <span className="font-sans tracking-tight">{viewProject.totalamount.toLocaleString('en-US')}</span>
+                                   </span>
+                               </div>
+                               <div className="text-right">
+                                  {viewProject.dueamount > 0 ? (
+                                      <p className="text-[10px] font-bold text-rose-600 uppercase bg-rose-100/50 px-2 py-1 rounded">বাকি: <span className="font-sans">{currency}{viewProject.dueamount.toLocaleString('en-US')}</span></p>
+                                  ) : (
+                                      <p className="text-[10px] font-bold text-emerald-600 uppercase bg-emerald-100/50 px-2 py-1 rounded">সম্পূর্ণ পরিশোধিত</p>
+                                  )}
+                               </div>
+                           </div>
+                           
+                           {/* Progress Bar Container */}
+                           <div className="flex items-center gap-3">
+                               <div className="flex-1 h-2.5 bg-slate-200 rounded-full overflow-hidden">
+                                  <div 
+                                      className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                                      style={{ width: `${viewProject.totalamount > 0 ? (viewProject.paidamount / viewProject.totalamount) * 100 : 0}%` }}
+                                  />
+                               </div>
+                               <span className="text-[10px] font-bold text-emerald-700 uppercase whitespace-nowrap bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">
+                                  জমা: <span className="font-sans">{currency}{viewProject.paidamount.toLocaleString('en-US')}</span>
+                               </span>
+                           </div>
+                      </div>
+
+                    {/* Tracking History */}
                     <div className="space-y-3">
                         <p className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                            <Wallet size={14} className="text-emerald-500" /> পেমেন্ট বিবরণ
+                            <Activity size={14} className="text-indigo-500" /> প্রজেক্ট ট্র্যাকিং
                         </p>
-                        
-                        <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 space-y-3">
-                             <div className="flex justify-between items-center">
-                                 <span className="text-sm font-bold text-slate-500">বাজেট</span>
-                                 <span className="text-base font-black text-slate-800">{currency} {viewProject.totalamount.toLocaleString('bn-BD')}</span>
-                             </div>
-                             
-                             {/* Progress Bar */}
-                             <div className="relative h-3 bg-slate-200 rounded-full overflow-hidden">
-                                <div 
-                                    className="absolute top-0 left-0 h-full bg-emerald-500 rounded-full transition-all duration-500"
-                                    style={{ width: `${viewProject.totalamount > 0 ? (viewProject.paidamount / viewProject.totalamount) * 100 : 0}%` }}
-                                />
-                             </div>
-
-                             <div className="flex justify-between items-center pt-1">
-                                 <div>
-                                     <p className="text-xs font-bold text-emerald-600">পরিশোধ</p>
-                                     <p className="text-sm font-bold text-emerald-700">{currency} {viewProject.paidamount.toLocaleString('bn-BD')}</p>
-                                 </div>
-                                 <div className="text-right">
-                                    {viewProject.dueamount > 0 ? (
-                                        <>
-                                            <p className="text-xs font-bold text-rose-500">বাকি আছে</p>
-                                            <p className="text-sm font-bold text-rose-600">{currency} {viewProject.dueamount.toLocaleString('bn-BD')}</p>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <p className="text-xs font-bold text-emerald-500">বাকি</p>
-                                            <p className="text-sm font-bold text-emerald-600">নেই</p>
-                                        </>
-                                    )}
-                                 </div>
-                             </div>
+                        <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 relative">
+                            <div className="absolute top-4 bottom-4 left-[27px] w-0.5 bg-slate-200"></div>
+                            <div className="space-y-4">
+                                {trackingHistory.map((event, index) => (
+                                    <div key={event.id || index} className="flex relative z-10">
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 border-2 border-white shadow-sm ${
+                                            event.type === 'created' ? 'bg-indigo-100 text-indigo-600' :
+                                            event.type === 'payment' ? 'bg-emerald-100 text-emerald-600' :
+                                            'bg-blue-100 text-blue-600'
+                                        }`}>
+                                            {event.type === 'created' ? <Plus size={14} /> :
+                                             event.type === 'payment' ? <DollarSign size={14} /> :
+                                             <CheckCircle2 size={14} />}
+                                        </div>
+                                        <div className="ml-3 flex-1 pt-1.5">
+                                            <p className="text-sm font-bold text-slate-700">{event.text}</p>
+                                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mt-0.5 gap-1">
+                                                <span className="text-xs font-semibold text-slate-500 tracking-wide font-sans">
+                                                  {new Date(event.date).toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: 'numeric' })}
+                                                  {' • '}
+                                                  {event.date.includes('T') ? new Date(event.date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'Time N/A'}
+                                                </span>
+                                                {event.amount && <span className="text-xs font-bold text-emerald-600 font-sans tracking-wide">+{currency}{event.amount}</span>}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </div>
 
@@ -1068,6 +1171,26 @@ export const Projects: React.FC = () => {
                              <p className="text-xs font-medium text-amber-800 leading-relaxed">{viewProject.notes}</p>
                         </div>
                     )}
+                  </div>
+                </div>
+                </div>
+
+                {/* Footer Buttons */}
+                <div className="p-4 border-t border-slate-100 flex gap-3 shrink-0">
+                    <button 
+                        onClick={handleDownloadImage}
+                        disabled={isGeneratingImage}
+                        className="flex-1 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-slate-200 transition-colors"
+                    >
+                        {isGeneratingImage ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
+                        ছবি সেভ করুন
+                    </button>
+                    <button 
+                        onClick={() => setViewProject(null)}
+                        className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-colors"
+                    >
+                        বন্ধ করুন
+                    </button>
                 </div>
              </div>
           </div>,
@@ -1160,15 +1283,21 @@ export const Projects: React.FC = () => {
                   <div className="grid grid-cols-2 gap-3">
                      <DatePicker 
                        label="শুরু"
-                       value={newProject.createdat}
-                       onChange={(date) => setNewProject({...newProject, createdat: date})}
+                       value={newProject.createdat ? newProject.createdat.split('T')[0] : ''}
+                       onChange={(date) => {
+                           const prevTime = newProject.createdat && newProject.createdat.includes('T') ? newProject.createdat.split('T')[1] : new Date().toISOString().split('T')[1];
+                           setNewProject({...newProject, createdat: date ? `${date}T${prevTime}` : ''});
+                       }}
                        placeholder="শুরু তারিখ"
                      />
                      <DatePicker 
                        label="ডেডলাইন (অপশনাল)"
-                       value={newProject.deadline}
+                       value={newProject.deadline ? newProject.deadline.split('T')[0] : ''}
                        onChange={(date) => {
-                         const update: any = { ...newProject, deadline: date };
+                           const prevTime = newProject.deadline && newProject.deadline.includes('T') ? newProject.deadline.split('T')[1] : new Date().toISOString().split('T')[1];
+                           const fullIsoDate = date ? `${date}T${prevTime}` : '';
+                           
+                         const update: any = { ...newProject, deadline: fullIsoDate };
                          // Auto-set status to Completed when a deadline is selected
                          if (date) {
                            update.status = 'Completed';

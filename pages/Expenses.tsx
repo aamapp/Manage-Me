@@ -422,16 +422,16 @@ export const Expenses: React.FC = () => {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button 
-            onClick={handleOpenAddModal}
-            className="bg-rose-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-rose-200 active:scale-90 transition-transform"
-          >
-            <Plus size={24} />
-          </button>
-          <button 
             onClick={handleDownloadPDF}
             className="bg-emerald-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-emerald-200 active:scale-90 transition-transform"
           >
             <Download size={22} />
+          </button>
+          <button 
+            onClick={handleOpenAddModal}
+            className="bg-rose-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-rose-200 active:scale-90 transition-transform"
+          >
+            <Plus size={24} />
           </button>
         </div>
       </div>
