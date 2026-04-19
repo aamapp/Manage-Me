@@ -206,7 +206,7 @@ export const Expenses: React.FC = () => {
     }
   };
 
-  const filteredExpenses = expenses.filter(e => {
+  const filteredExpenses = React.useMemo(() => expenses.filter(e => {
     let matchesFilter = true;
 
     // Check Date Range Filter
@@ -222,15 +222,16 @@ export const Expenses: React.FC = () => {
                           (EXPENSE_CATEGORY_LABELS[e.category] || '').toLowerCase().includes(searchTerm.toLowerCase());
     
     return matchesFilter && matchesSearch;
-  });
+  }), [expenses, dateRange, searchTerm]);
 
-  const totalExpenseFiltered = filteredExpenses.reduce((acc, curr) => acc + curr.amount, 0);
+  const totalExpenseFiltered = React.useMemo(() => filteredExpenses.reduce((acc, curr) => acc + curr.amount, 0), [filteredExpenses]);
 
   const handleDownloadPDF = async () => {
     if (!listRef.current) return;
     
     window.scrollTo(0, 0); // Ensure we are at the top for reliable capture
     setIsGeneratingPDF(true);
+    window.dispatchEvent(new CustomEvent('app:processing', { detail: true }));
     showToast('পিডিএফ তৈরি হচ্ছে...', 'info');
     
     // Wait a bit for the UI to update
@@ -400,6 +401,7 @@ export const Expenses: React.FC = () => {
       showToast('পিডিএফ তৈরি করতে সমস্যা হয়েছে');
     } finally {
       setIsGeneratingPDF(false);
+      window.dispatchEvent(new CustomEvent('app:processing', { detail: false }));
     }
   };
 

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useTransition } from 'react';
 import { useLocation, useNavigate } from "react-router-dom";
 import { 
   LayoutDashboard, Briefcase, TrendingUp, Receipt, Menu, 
@@ -23,6 +23,8 @@ interface LayoutProps {
 export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   const [isMoreMenuOpen, setMoreMenuOpen] = useState(false);
   const [isAboutOpen, setAboutOpen] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false); // New state for processing animation
+  const [isPending, startTransition] = useTransition(); // Added for smoother navigation
   const { 
     adminSelectedUserId, 
     setAdminSelectedUserId, 
@@ -33,6 +35,19 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   } = useAppContext();
   const location = useLocation();
   const navigate = useNavigate();
+
+  const handleNavigate = (path: string) => {
+    setMoreMenuOpen(false);
+    startTransition(() => {
+      navigate(path, { replace: true });
+    });
+  };
+
+  useEffect(() => {
+    const handleProcessing = (e: any) => setIsProcessing(e.detail);
+    window.addEventListener('app:processing', handleProcessing);
+    return () => window.removeEventListener('app:processing', handleProcessing);
+  }, []);
 
   useEffect(() => {
     if (isMoreMenuOpen || isAboutOpen) {
@@ -96,7 +111,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
 
   const handleBackToUsers = () => {
     setAdminSelectedUserId(null);
-    navigate('/admin-users');
+    handleNavigate('/admin-users');
   };
 
   // Developer Contact Links
@@ -121,7 +136,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
             onClick={() => setAboutOpen(true)}
             className="flex items-center gap-3 cursor-pointer group"
           >
-            <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-indigo-200 ring-2 ring-white group-hover:scale-105 transition-transform">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-indigo-200 ring-2 ring-white transition-all duration-300 ${isProcessing ? 'logo-processing' : 'bg-gradient-to-br from-indigo-600 to-indigo-700 group-hover:scale-105'}`}>
               M
             </div>
             <span className="font-bold text-slate-800 text-xl tracking-tight group-hover:text-indigo-600 transition-colors">{APP_NAME}</span>
@@ -137,7 +152,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
             return (
               <button
                 key={item.path}
-                onClick={() => navigate(item.path, { replace: true })}
+                onClick={() => handleNavigate(item.path)}
                 className={`
                   w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm transition-all duration-200
                   ${isActive 
@@ -166,7 +181,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
             return (
               <button
                 key={item.path}
-                onClick={() => navigate(item.path, { replace: true })}
+                onClick={() => handleNavigate(item.path)}
                 className={`
                   w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm transition-all duration-200
                   ${isActive 
@@ -190,7 +205,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
 
         <div className="p-4 border-t border-slate-100">
           <div 
-            onClick={() => navigate('/profile')}
+            onClick={() => handleNavigate('/profile')}
             className="bg-slate-50 p-3 rounded-2xl border border-slate-100 flex items-center gap-3 mb-3 cursor-pointer hover:bg-slate-100 transition-colors"
           >
             <div className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center shadow-sm overflow-hidden">
@@ -243,7 +258,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                   onClick={() => setAboutOpen(true)}
                   className="flex items-center gap-2.5 cursor-pointer active:opacity-70 transition-opacity group"
                 >
-                  <div className="w-9 h-9 bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-indigo-200 ring-2 ring-white group-active:scale-95 transition-transform">
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-indigo-200 ring-2 ring-white transition-all duration-300 ${isProcessing ? 'logo-processing' : 'bg-gradient-to-br from-indigo-600 to-indigo-700 group-active:scale-95'}`}>
                     M
                   </div>
                   <span className="font-bold text-slate-800 text-lg tracking-tight group-hover:text-indigo-600 transition-colors">{APP_NAME}</span>
@@ -251,7 +266,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
             )}
         </div>
 
-        <div className="flex items-center gap-3" onClick={() => navigate('/profile')}>
+        <div className="flex items-center gap-3" onClick={() => handleNavigate('/profile')}>
           {isAdmin && adminSelectedUserId && (
                <span className="text-[10px] font-bold bg-indigo-50 text-indigo-600 px-2 py-1 rounded-md border border-indigo-100">
                  User View
@@ -294,10 +309,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                 return (
                   <button
                     key={item.path}
-                    onClick={() => {
-                      setMoreMenuOpen(false);
-                      navigate(item.path, { replace: true });
-                    }}
+                    onClick={() => handleNavigate(item.path)}
                     className={`
                       flex flex-col items-center justify-center w-full h-full gap-1 transition-colors duration-200
                       ${isActive ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}
@@ -538,6 +550,22 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                 </div>
               </div>
            </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Fullscreen Processing Overlay */}
+      {isProcessing && createPortal(
+        <div className="fixed inset-0 z-[9999] bg-slate-50/90 backdrop-blur-sm flex flex-col items-center justify-center animate-in fade-in duration-300">
+          <div className="flex flex-col items-center justify-center gap-6">
+            <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-2xl flex items-center justify-center text-white font-bold text-4xl fullscreen-logo-anim ring-4 ring-indigo-100">
+              M
+            </div>
+            <div className="flex flex-col items-center gap-1">
+               <p className="text-slate-600 font-medium text-lg tracking-wide animate-pulse">কন্টেন্ট তৈরি হচ্ছে...</p>
+               <p className="text-slate-400 text-sm">দয়া করে অপেক্ষা করুন</p>
+            </div>
+          </div>
         </div>,
         document.body
       )}

@@ -255,7 +255,7 @@ export const Income: React.FC = () => {
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [showFilters, setShowFilters] = useState(false);
 
-  const filteredPayments = incomeRecords.filter(p => {
+  const filteredPayments = React.useMemo(() => incomeRecords.filter(p => {
     const matchesSearch = (p.projectname || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                           (p.clientname || '').toLowerCase().includes(searchTerm.toLowerCase());
                           
@@ -269,13 +269,13 @@ export const Income: React.FC = () => {
     }
     
     return matchesSearch && matchesMethod && matchesDate;
-  }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()), [incomeRecords, searchTerm, methodFilter, dateRange]);
 
   // Filter: Match name AND ensure Due Amount > 0
-  const projectSuggestions = projects.filter(p => 
+  const projectSuggestions = React.useMemo(() => projects.filter(p => 
     (p.name || '').toLowerCase().includes(projectSearch.toLowerCase()) && 
     p.dueamount > 0
-  );
+  ), [projects, projectSearch]);
 
   const handleSelectProject = (project: Project) => {
     setProjectSearch(project.name);
@@ -286,7 +286,7 @@ export const Income: React.FC = () => {
     setError(null);
   };
 
-  const totalIncome = filteredPayments.reduce((acc, curr) => acc + curr.amount, 0);
+  const totalIncome = React.useMemo(() => filteredPayments.reduce((acc, curr) => acc + curr.amount, 0), [filteredPayments]);
 
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
@@ -296,6 +296,7 @@ export const Income: React.FC = () => {
     
     window.scrollTo(0, 0);
     setIsGeneratingPDF(true);
+    window.dispatchEvent(new CustomEvent('app:processing', { detail: true }));
     showToast('পিডিএফ তৈরি হচ্ছে...', 'info');
     
     await new Promise(resolve => setTimeout(resolve, 800));
@@ -445,6 +446,7 @@ export const Income: React.FC = () => {
       showToast('পিডিএফ তৈরি করতে সমস্যা হয়েছে');
     } finally {
       setIsGeneratingPDF(false);
+      window.dispatchEvent(new CustomEvent('app:processing', { detail: false }));
     }
   };
 

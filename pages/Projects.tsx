@@ -352,7 +352,7 @@ export const Projects: React.FC = () => {
     setClientFilter(null);
   };
 
-  const filteredProjects = projects.filter(p => {
+  const filteredProjects = React.useMemo(() => projects.filter(p => {
     let matchesFilter = false;
     
     // Check Status Filter
@@ -382,14 +382,14 @@ export const Projects: React.FC = () => {
     const matchesSearch = (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
                           (p.clientname || '').toLowerCase().includes(searchTerm.toLowerCase());
     return matchesFilter && matchesSearch;
-  });
+  }), [projects, filter, clientFilter, dateRange, searchTerm]);
 
-  const summaryStats = filteredProjects.reduce((acc, p) => {
+  const summaryStats = React.useMemo(() => filteredProjects.reduce((acc, p) => {
     acc.total += p.totalamount;
     acc.paid += p.paidamount;
     acc.due += p.dueamount;
     return acc;
-  }, { total: 0, paid: 0, due: 0 });
+  }, { total: 0, paid: 0, due: 0 }), [filteredProjects]);
 
   // Details Modal refs and logic
   const detailsRef = useRef<HTMLDivElement>(null);
@@ -436,7 +436,13 @@ export const Projects: React.FC = () => {
   const handleDownloadImage = async () => {
       if (!detailsRef.current || !viewProject) return;
       setIsGeneratingImage(true);
+      window.dispatchEvent(new CustomEvent('app:processing', { detail: true }));
       showToast('ছবি তৈরি হচ্ছে...', 'info');
+      
+      // একটু সময় দেওয়া হচ্ছে যাতে UI আপডেট হয়ে অ্যানিমেশন এবং সাকসেস মেসেজ দেখা যায়
+      // কারণ html2canvas অনেক বড় একটি প্রসেস যা ব্রাউজারের মেইন থ্রেডকে ব্লক করে দেয়।
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
       try {
           const canvas = await html2canvas(detailsRef.current, {
               scale: 4, // Increased scale for Ultra HD resolution
@@ -455,6 +461,7 @@ export const Projects: React.FC = () => {
           showToast('ছবি জেনারেট করতে সমস্যা হয়েছে', 'error');
       } finally {
           setIsGeneratingImage(false);
+          window.dispatchEvent(new CustomEvent('app:processing', { detail: false }));
       }
   };
 
@@ -468,6 +475,7 @@ export const Projects: React.FC = () => {
     
     window.scrollTo(0, 0);
     setIsGeneratingPDF(true);
+    window.dispatchEvent(new CustomEvent('app:processing', { detail: true }));
     showToast('পিডিএফ তৈরি হচ্ছে...', 'info');
     
     // Wait a bit for the UI to update and fonts to settle
@@ -664,6 +672,7 @@ export const Projects: React.FC = () => {
       showToast('পিডিএফ তৈরি করতে সমস্যা হয়েছে');
     } finally {
       setIsGeneratingPDF(false);
+      window.dispatchEvent(new CustomEvent('app:processing', { detail: false }));
     }
   };
 
