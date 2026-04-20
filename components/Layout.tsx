@@ -569,6 +569,19 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
         </div>,
         document.body
       )}
+
+      {/* Page Transition Loading Overlay */}
+      {isPending && !isProcessing && createPortal(
+        <div className="fixed inset-0 z-[9998] bg-slate-50/60 backdrop-blur-md flex flex-col items-center justify-center animate-in fade-in duration-200">
+           <div className="flex flex-col items-center justify-center gap-4">
+             <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-2xl flex items-center justify-center text-white font-bold text-3xl fullscreen-logo-anim ring-4 ring-indigo-100">
+               M
+             </div>
+             <p className="text-indigo-600 font-bold tracking-widest text-[10px] uppercase animate-pulse">পেজ লোড হচ্ছে...</p>
+           </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };

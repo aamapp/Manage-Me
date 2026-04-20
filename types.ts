@@ -13,6 +13,7 @@ export interface Project {
   status: ProjectStatus;
   deadline?: string | null;
   createdat: string;
+  updated_at?: string;
   notes?: string;
   userid: string;
 }

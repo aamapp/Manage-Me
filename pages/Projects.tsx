@@ -239,7 +239,7 @@ export const Projects: React.FC = () => {
         const existingProject = projects.find(p => p.id === activeProjectId);
         const currentPaid = existingProject ? existingProject.paidamount : 0;
         
-        const { error: updateError } = await supabase.from('projects').update({
+        const updatePayload: any = {
           name: projectName,
           clientname: clientName,
           type: newProject.type,
@@ -249,7 +249,14 @@ export const Projects: React.FC = () => {
           deadline: deadlineToSave,
           createdat: createdAtToSave,
           notes: newProject.notes
-        }).eq('id', activeProjectId).eq('userid', user.id);
+        };
+
+        // If status is changed to In Progress and it wasn't prior, record the timestamp
+        if (existingProject && existingProject.status !== 'In Progress' && newProject.status === 'In Progress') {
+           updatePayload.updated_at = new Date().toISOString(); 
+        }
+
+        const { error: updateError } = await supabase.from('projects').update(updatePayload).eq('id', activeProjectId).eq('userid', user.id);
 
         if (updateError) throw updateError;
 
@@ -405,8 +412,10 @@ export const Projects: React.FC = () => {
       ];
 
       if (viewProject.status === 'In Progress' || viewProject.status === 'Completed') {
-          // Add a slight delay to time just for visual ordering if they have the exact same date string
-          const progressDate = new Date(new Date(createdDate).getTime() + 1000).toISOString();
+          // Use updated_at for valid time if available, otherwise fallback to creation date + 1 second
+          const progressDate = viewProject.updated_at 
+            ? viewProject.updated_at 
+            : new Date(new Date(createdDate).getTime() + 1000).toISOString();
           trackingHistory.push({ type: 'progress', date: progressDate, text: 'কাজ শুরু হয়েছে (চলমান)', id: 'progress' });
       }
 
