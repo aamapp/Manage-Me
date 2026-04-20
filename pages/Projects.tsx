@@ -208,6 +208,7 @@ export const Projects: React.FC = () => {
     if (!user) return;
     
     setIsSubmitting(true);
+    window.dispatchEvent(new CustomEvent('app:processing', { detail: { show: true, message: 'প্রজেক্ট সংরক্ষণ করা হচ্ছে...' } }));
     
     // Evaluate possible math expressions from keypad
     const totalamount = Number(safeEval(newProject.totalamount)) || 0;
@@ -327,6 +328,7 @@ export const Projects: React.FC = () => {
       setFormError(err.message || 'ডাটা সেভ করতে সমস্যা হয়েছে');
     } finally {
       setIsSubmitting(false);
+      window.dispatchEvent(new CustomEvent('app:processing', { detail: { show: false } }));
     }
   };
 

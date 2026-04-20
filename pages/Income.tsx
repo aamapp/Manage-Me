@@ -177,6 +177,7 @@ export const Income: React.FC = () => {
     }
 
     setIsSubmitting(true);
+    window.dispatchEvent(new CustomEvent('app:processing', { detail: { show: true, message: 'আয় সংরক্ষণ করা হচ্ছে...' } }));
     const amount = Number(safeEval(newPayment.amount)) || 0;
     const selectedProject = projects.find(p => p.id === selectedProjectId);
     
@@ -239,6 +240,7 @@ export const Income: React.FC = () => {
       setError(err.message);
     } finally {
       setIsSubmitting(false);
+      window.dispatchEvent(new CustomEvent('app:processing', { detail: { show: false } }));
     }
   };
 

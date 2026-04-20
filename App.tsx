@@ -134,10 +134,16 @@ const AppContent: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-slate-500 font-medium animate-pulse">লোড হচ্ছে...</p>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50/90 backdrop-blur-sm animate-in fade-in duration-300">
+        <div className="flex flex-col items-center justify-center gap-6">
+          <div className="premium-loader-container !w-16 !h-16">
+            <div className="premium-loader-ring"></div>
+            <span className="premium-loader-text text-4xl">M</span>
+          </div>
+          <div className="flex flex-col items-center gap-1">
+             <p className="text-slate-600 font-medium text-lg tracking-wide animate-pulse">অ্যাপ চালু হচ্ছে...</p>
+             <p className="text-slate-400 text-sm">দয়া করে অপেক্ষা করুন</p>
+          </div>
         </div>
       </div>
     );
@@ -172,8 +178,14 @@ const AppContent: React.FC = () => {
       )}
       
       <Suspense fallback={
-        <div className="min-h-screen flex items-center justify-center bg-slate-50">
-          <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+        <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50/90 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="flex flex-col items-center justify-center gap-4">
+            <div className="premium-loader-container !w-14 !h-14">
+              <div className="premium-loader-ring"></div>
+              <span className="premium-loader-text text-3xl">M</span>
+            </div>
+            <p className="text-indigo-600 font-bold tracking-widest text-[10px] uppercase animate-pulse">লোড হচ্ছে...</p>
+          </div>
         </div>
       }>
         <Routes>

@@ -126,6 +126,7 @@ export const Expenses: React.FC = () => {
     if (!newExpense.amount || !newExpense.category || !user) return;
     
     setIsSubmitting(true);
+    window.dispatchEvent(new CustomEvent('app:processing', { detail: { show: true, message: 'খরচ সংরক্ষণ করা হচ্ছে...' } }));
     
     // Evaluate possible math expressions
     const parsedAmount = Number(safeEval(newExpense.amount)) || 0;
@@ -173,6 +174,7 @@ export const Expenses: React.FC = () => {
       showToast(`সমস্যা: ${error.message}`);
     } finally {
       setIsSubmitting(false);
+      window.dispatchEvent(new CustomEvent('app:processing', { detail: { show: false } }));
     }
   };
 

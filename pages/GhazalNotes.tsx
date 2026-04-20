@@ -50,6 +50,7 @@ export const GhazalNotes: React.FC = () => {
 
     try {
       setIsSaving(true);
+      window.dispatchEvent(new CustomEvent('app:processing', { detail: { show: true, message: 'গজল সংরক্ষণ করা হচ্ছে...' } }));
       const noteData = {
         title: currentNote.title,
         lyrics: currentNote.lyrics,
@@ -80,6 +81,7 @@ export const GhazalNotes: React.FC = () => {
       showToast('সেভ করতে সমস্যা হয়েছে।');
     } finally {
       setIsSaving(false);
+      window.dispatchEvent(new CustomEvent('app:processing', { detail: { show: false } }));
     }
   };
 

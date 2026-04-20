@@ -24,7 +24,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   const [isMoreMenuOpen, setMoreMenuOpen] = useState(false);
   const [isAboutOpen, setAboutOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false); // New state for processing animation
+  const [processingMessage, setProcessingMessage] = useState('কন্টেন্ট তৈরি হচ্ছে...'); // Dynamic message
   const [isPending, startTransition] = useTransition(); // Added for smoother navigation
+  const [isNavigating, setIsNavigating] = useState(false);
   const { 
     adminSelectedUserId, 
     setAdminSelectedUserId, 
@@ -38,13 +40,30 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
 
   const handleNavigate = (path: string) => {
     setMoreMenuOpen(false);
-    startTransition(() => {
-      navigate(path, { replace: true });
-    });
+    
+    if ((location.pathname + location.search) === path || location.pathname === path) {
+       return;
+    }
+
+    setIsNavigating(true);
+    setTimeout(() => {
+      startTransition(() => {
+        navigate(path, { replace: true });
+        setIsNavigating(false);
+      });
+    }, 150); // Exactly 0.15 seconds wait before jump
   };
 
   useEffect(() => {
-    const handleProcessing = (e: any) => setIsProcessing(e.detail);
+    const handleProcessing = (e: any) => {
+       if (typeof e.detail === 'object') {
+          setIsProcessing(e.detail.show);
+          setProcessingMessage(e.detail.message || 'প্রসেস হচ্ছে...');
+       } else {
+          setIsProcessing(e.detail);
+          setProcessingMessage('প্রসেস হচ্ছে...');
+       }
+    };
     window.addEventListener('app:processing', handleProcessing);
     return () => window.removeEventListener('app:processing', handleProcessing);
   }, []);
@@ -558,11 +577,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
       {isProcessing && createPortal(
         <div className="fixed inset-0 z-[9999] bg-slate-50/90 backdrop-blur-sm flex flex-col items-center justify-center animate-in fade-in duration-300">
           <div className="flex flex-col items-center justify-center gap-6">
-            <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-2xl flex items-center justify-center text-white font-bold text-4xl fullscreen-logo-anim ring-4 ring-indigo-100">
-              M
+            <div className="premium-loader-container !w-16 !h-16">
+              <div className="premium-loader-ring"></div>
+              <span className="premium-loader-text text-4xl">M</span>
             </div>
             <div className="flex flex-col items-center gap-1">
-               <p className="text-slate-600 font-medium text-lg tracking-wide animate-pulse">কন্টেন্ট তৈরি হচ্ছে...</p>
+               <p className="text-slate-600 font-medium text-lg tracking-wide animate-pulse">{processingMessage}</p>
                <p className="text-slate-400 text-sm">দয়া করে অপেক্ষা করুন</p>
             </div>
           </div>
@@ -571,13 +591,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
       )}
 
       {/* Page Transition Loading Overlay */}
-      {isPending && !isProcessing && createPortal(
-        <div className="fixed inset-0 z-[9998] bg-slate-50/60 backdrop-blur-md flex flex-col items-center justify-center animate-in fade-in duration-200">
-           <div className="flex flex-col items-center justify-center gap-4">
-             <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-2xl flex items-center justify-center text-white font-bold text-3xl fullscreen-logo-anim ring-4 ring-indigo-100">
-               M
+      {(isPending || isNavigating) && !isProcessing && createPortal(
+        <div className="fixed inset-0 z-[9998] bg-slate-50/70 flex flex-col items-center justify-center">
+           <div className="flex flex-col items-center justify-center gap-4 drop-shadow-xl transform scale-75">
+             <div className="premium-loader-container !w-14 !h-14">
+                <div className="premium-loader-ring"></div>
+                <span className="premium-loader-text text-3xl">M</span>
              </div>
-             <p className="text-indigo-600 font-bold tracking-widest text-[10px] uppercase animate-pulse">পেজ লোড হচ্ছে...</p>
+             <p className="text-indigo-600 font-bold tracking-widest text-[10px] uppercase animate-pulse">লোড হচ্ছে...</p>
            </div>
         </div>,
         document.body

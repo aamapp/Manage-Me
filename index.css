@@ -36,16 +36,44 @@ body {
   100% { background-position: 0% 50%; }
 }
 
-@keyframes logo-flip {
-  0% {
-    transform: perspective(400px) rotateY(0);
-  }
-  100% {
-    transform: perspective(400px) rotateY(360deg);
-  }
+/* Super Premium, Lag-Free Animation */
+.premium-loader-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.4);
+  box-shadow: 0 8px 32px rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(8px);
 }
 
-.fullscreen-logo-anim {
-  animation: logo-flip 2s infinite cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 10px 25px -5px rgba(79, 70, 229, 0.5), 0 8px 10px -6px rgba(79, 70, 229, 0.3);
+.premium-loader-ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 1.1rem;
+  border: 4px solid transparent;
+  border-top-color: #4f46e5;
+  border-bottom-color: #818cf8;
+  transform: translateZ(0); /* Hardware acceleration */
+  animation: smooth-spin 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.premium-loader-text {
+  font-weight: 900;
+  color: #4f46e5;
+  /* Pure hardware accelerated properties to guarantee NO lag */
+  transform: translateZ(0);
+  animation: smooth-pulse 2s ease-in-out infinite;
+}
+
+@keyframes smooth-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes smooth-pulse {
+  0%, 100% { transform: scale(0.9); opacity: 0.7; }
+  50% { transform: scale(1.1); opacity: 1; text-shadow: 0 0 15px rgba(79, 70, 229, 0.6); }
 }

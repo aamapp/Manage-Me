@@ -121,6 +121,7 @@ export const Clients: React.FC = () => {
     e.preventDefault();
     if (!newClient.name || !user) return;
     setIsSubmitting(true);
+    window.dispatchEvent(new CustomEvent('app:processing', { detail: { show: true, message: 'ক্লায়েন্ট সংরক্ষণ করা হচ্ছে...' } }));
     
     try {
       if (isEditing && activeClientId) {
@@ -164,6 +165,7 @@ export const Clients: React.FC = () => {
       showToast(err.message);
     } finally {
       setIsSubmitting(false);
+      window.dispatchEvent(new CustomEvent('app:processing', { detail: { show: false } }));
     }
   };
 

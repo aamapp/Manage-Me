@@ -89,6 +89,8 @@ const ShoppingLists: React.FC = () => {
       return;
     }
 
+    window.dispatchEvent(new CustomEvent('app:processing', { detail: { show: true, message: 'ফর্দ সংরক্ষণ করা হচ্ছে...' } }));
+
     try {
       const targetUserId = adminSelectedUserId || user?.id;
       if (!targetUserId) return;
@@ -125,6 +127,8 @@ const ShoppingLists: React.FC = () => {
       refreshData();
     } catch (error: any) {
       showToast(`এরর: ${error.message}`);
+    } finally {
+      window.dispatchEvent(new CustomEvent('app:processing', { detail: { show: false } }));
     }
   };
 
