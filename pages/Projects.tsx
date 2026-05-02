@@ -66,7 +66,7 @@ export const Projects: React.FC = () => {
     totalamount: 0,
     paidamount: 0,
     deadline: '',
-    createdat: new Date().toISOString().split('T')[0],
+    createdat: new Date().toISOString(),
     clientname: '',
     notes: ''
   });
@@ -217,7 +217,16 @@ export const Projects: React.FC = () => {
     const clientName = clientSearch.trim();
     const projectName = newProject.name.trim();
     const deadlineToSave = newProject.deadline ? newProject.deadline : null;
-    const createdAtToSave = newProject.createdat || new Date().toISOString();
+    const now = new Date();
+    const localToday = now.toLocaleDateString('en-CA');
+    let createdAtToSave = newProject.createdat;
+    if (!createdAtToSave) {
+      createdAtToSave = now.toISOString();
+    } else if (createdAtToSave === localToday) {
+      createdAtToSave = now.toISOString();
+    } else if (createdAtToSave.length === 10) {
+      createdAtToSave = new Date(`${createdAtToSave}T00:00:00`).toISOString();
+    }
 
     try {
       // 1. Handle Client Creation
@@ -408,36 +417,51 @@ export const Projects: React.FC = () => {
   let trackingHistory: any[] = [];
   if (viewProject) {
       const createdDate = viewProject.createdat || new Date().toISOString();
-      // Base step: Pending/Created
+       // Base step: Pending/Created
       trackingHistory = [
-        { type: 'created', date: createdDate, text: 'প্রজেক্ট যুক্ত হয়েছে (পেন্ডিং)', id: 'create' }
+        { 
+          type: 'created', 
+          date: createdDate, 
+          text: 'প্রজেক্ট যুক্ত হয়েছে (পেন্ডিং)', 
+          id: 'create',
+          // More robust check: if date has time component and it's not exactly midnight/end-of-day
+          hasTime: createdDate.includes('T') && createdDate.split('T')[1]?.substring(0, 8) !== '00:00:00'
+        }
       ];
 
       if (viewProject.status === 'In Progress' || viewProject.status === 'Completed') {
-          // Use updated_at for valid time if available, otherwise fallback to creation date + 1 second
-          const progressDate = viewProject.updated_at 
-            ? viewProject.updated_at 
-            : new Date(new Date(createdDate).getTime() + 1000).toISOString();
-          trackingHistory.push({ type: 'progress', date: progressDate, text: 'কাজ শুরু হয়েছে (চলমান)', id: 'progress' });
+          const progressDate = viewProject.updated_at || new Date(new Date(createdDate).getTime() + 1000).toISOString();
+          trackingHistory.push({ 
+            type: 'progress', 
+            date: progressDate, 
+            text: 'কাজ শুরু হয়েছে (চলমান)', 
+            id: 'progress',
+            hasTime: !!viewProject.updated_at
+          });
       }
 
-      const payments = incomeRecords.filter(r => r.projectid === viewProject.id).map(r => ({
-          type: 'payment',
-          // Append midday time for old payments without time so they sort correctly
-          date: r.date.includes('T') ? r.date : `${r.date}T12:00:00.000Z`,
-          amount: r.amount,
-          method: r.method,
-          text: `পেমেন্ট রিসিভড (${r.method})`,
-          id: r.id
-      }));
+      const payments = incomeRecords.filter(r => r.projectid === viewProject.id).map(r => {
+          const isoDate = r.date.includes('T') ? r.date : new Date(`${r.date}T00:00:00`).toISOString();
+          return {
+            type: 'payment',
+            date: isoDate,
+            hasTime: r.date.includes('T') && r.date.split('T')[1]?.substring(0, 8) !== '00:00:00',
+            amount: r.amount,
+            method: r.method,
+            text: `পেমেন্ট রিসিভড (${r.method})`,
+            id: r.id
+          };
+      });
       trackingHistory.push(...payments);
 
       if (viewProject.status === 'Completed') {
-          let completedDate = viewProject.deadline || new Date(new Date(createdDate).getTime() + 2000).toISOString();
+          let completedDate = viewProject.updated_at || viewProject.deadline || new Date(new Date(createdDate).getTime() + 2000).toISOString();
+          let hasTime = !!viewProject.updated_at;
           if (!completedDate.includes('T')) {
-             completedDate = `${completedDate}T23:59:59.000Z`; // Ensures it sorts at the end of the day
+             completedDate = new Date(`${completedDate}T23:59:59`).toISOString();
+             hasTime = false;
           }
-          trackingHistory.push({ type: 'completed', date: completedDate, text: 'প্রজেক্ট সম্পন্ন ও ডেলিভারি হয়েছে', id: 'complete' });
+          trackingHistory.push({ type: 'completed', date: completedDate, text: 'প্রজেক্ট সম্পন্ন ও ডেলিভারি হয়েছে', id: 'complete', hasTime });
       }
 
       // Final step: Sort chronologically
@@ -1173,7 +1197,7 @@ export const Projects: React.FC = () => {
                                                 <span className="text-xs font-semibold text-slate-500 tracking-wide font-sans">
                                                   {new Date(event.date).toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: 'numeric' })}
                                                   {' • '}
-                                                  {event.date.includes('T') ? new Date(event.date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'Time N/A'}
+                                                  {event.hasTime ? new Date(event.date).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true }) : 'সময় নেই'}
                                                 </span>
                                                 {event.amount && <span className="text-xs font-bold text-emerald-600 font-sans tracking-wide">+{currency}{event.amount}</span>}
                                             </div>

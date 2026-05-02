@@ -47,7 +47,7 @@ export const Expenses: React.FC = () => {
   
   const [newExpense, setNewExpense] = useState<any>({
     category: '',
-    date: new Date().toISOString().split('T')[0],
+    date: new Date().toLocaleDateString('en-CA'),
     amount: 0,
     notes: ''
   });
@@ -168,7 +168,7 @@ export const Expenses: React.FC = () => {
       setModalOpen(false);
       await refreshData(); // Refresh global context
       if (!isEditing) {
-        setNewExpense({ category: '', date: new Date().toISOString().split('T')[0], amount: 0, notes: '' });
+        setNewExpense({ category: '', date: new Date().toLocaleDateString('en-CA'), amount: 0, notes: '' });
       }
     } catch (error: any) {
       showToast(`সমস্যা: ${error.message}`);
@@ -241,7 +241,7 @@ export const Expenses: React.FC = () => {
     
     try {
       const element = listRef.current;
-      const fileName = `ManageMe_Expense_Report_${new Date().toISOString().split('T')[0]}.pdf`;
+      const fileName = `ManageMe_Expense_Report_${new Date().toLocaleDateString('en-CA')}.pdf`;
       
       if (!element) return;
 

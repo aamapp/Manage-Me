@@ -59,7 +59,7 @@ export const Income: React.FC = () => {
   const [newPayment, setNewPayment] = useState<any>({
     projectName: '',
     clientName: '',
-    date: new Date().toISOString().split('T')[0],
+    date: new Date().toLocaleDateString('en-CA'),
     amount: 0,
     method: 'বিকাশ'
   });
@@ -189,9 +189,21 @@ export const Income: React.FC = () => {
         const oldPayment = incomeRecords.find(p => p.id === activePaymentId);
         const delta = amount - (oldPayment?.amount || 0);
 
+        const now = new Date();
+        const localToday = now.toLocaleDateString('en-CA'); // YYYY-MM-DD
+        let dateToSave = newPayment.date;
+        
+        if (dateToSave === localToday) {
+           // If selected date is today, save the exact current time
+           dateToSave = now.toISOString();
+        } else if (dateToSave && dateToSave.length === 10) {
+           // If it's a specific date in the past/future, set it to local midnight of that day
+           dateToSave = new Date(`${dateToSave}T00:00:00`).toISOString();
+        }
+
         let query = supabase.from('income_records').update({
           amount,
-          date: newPayment.date,
+          date: dateToSave,
           method: newPayment.method
         }).eq('id', activePaymentId);
 
@@ -212,12 +224,23 @@ export const Income: React.FC = () => {
         }
         showToast('রেকর্ড আপডেট করা হয়েছে', 'success');
       } else {
+        // Prepare date: if it's the current date (local), use full ISO string to preserve current time
+        const now = new Date();
+        const localToday = now.toLocaleDateString('en-CA'); // YYYY-MM-DD
+        let dateToSave = newPayment.date;
+        
+        if (dateToSave === localToday) {
+           dateToSave = now.toISOString();
+        } else if (dateToSave && dateToSave.length === 10) {
+           dateToSave = new Date(`${dateToSave}T00:00:00`).toISOString();
+        }
+
         const { error: insErr } = await supabase.from('income_records').insert({
           projectid: selectedProjectId,
           projectname: selectedProject?.name,
           clientname: selectedProject?.clientname,
           amount,
-          date: newPayment.date,
+          date: dateToSave,
           method: newPayment.method,
           userid: targetUserId
         });
@@ -245,7 +268,7 @@ export const Income: React.FC = () => {
   };
 
   const resetForm = () => {
-    setNewPayment({ projectName: '', clientName: '', date: new Date().toISOString().split('T')[0], amount: 0, method: 'বিকাশ' });
+    setNewPayment({ projectName: '', clientName: '', date: new Date().toLocaleDateString('en-CA'), amount: 0, method: 'বিকাশ' });
     setProjectSearch('');
     setSelectedProjectId(null);
     setSelectedProjectDue(0);
