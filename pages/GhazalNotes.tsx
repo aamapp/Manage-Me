@@ -88,6 +88,7 @@ export const GhazalNotes: React.FC = () => {
   const handleDelete = async () => {
     if (!currentNote?.id) return;
     try {
+      window.dispatchEvent(new CustomEvent('app:processing', { detail: { show: true, message: 'গজল ডিলিট করা হচ্ছে...' } }));
       const { error } = await supabase
         .from('ghazal_notes')
         .update({ lyrics: `[TRASH] ${currentNote.lyrics || ''}`.trim() })
@@ -100,6 +101,8 @@ export const GhazalNotes: React.FC = () => {
     } catch (error: any) {
       console.error('Error deleting note:', error);
       showToast('ডিলিট করতে সমস্যা হয়েছে।');
+    } finally {
+      window.dispatchEvent(new CustomEvent('app:processing', { detail: { show: false } }));
     }
   };
 

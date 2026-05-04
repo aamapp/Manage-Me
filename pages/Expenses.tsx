@@ -92,9 +92,15 @@ export const Expenses: React.FC = () => {
       showToast('অফলাইনে নতুন খরচ যোগ করা যাবে না', 'error');
       return;
     }
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    const localToday = `${y}-${m}-${d}`;
+    
     setIsEditing(false);
     setActiveExpenseId(null);
-    setNewExpense({ category: '', date: new Date().toISOString().split('T')[0], amount: 0, notes: '' });
+    setNewExpense({ category: '', date: localToday, amount: 0, notes: '' });
     setModalOpen(true);
   };
 
@@ -131,15 +137,35 @@ export const Expenses: React.FC = () => {
     // Evaluate possible math expressions
     const parsedAmount = Number(safeEval(newExpense.amount)) || 0;
     
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    const localToday = `${y}-${m}-${d}`;
+    
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    const ss = String(now.getSeconds()).padStart(2, '0');
+    const currentTimeAtNoon = '12:00:00';
+    const currentTimeNow = `${hh}:${mm}:${ss}`;
+    
+    let dateToSave = newExpense.date;
+    
     // Use selected user ID if admin is viewing a specific user, otherwise current user ID
     const targetUserId = (user.role === 'admin' && adminSelectedUserId) ? adminSelectedUserId : user.id;
 
     try {
       if (isEditing && activeExpenseId) {
+        if (dateToSave === localToday) {
+           dateToSave = new Date(`${dateToSave}T${currentTimeNow}`).toISOString();
+        } else if (dateToSave && dateToSave.length === 10) {
+           dateToSave = new Date(`${dateToSave}T${currentTimeAtNoon}`).toISOString();
+        }
+
         let query = supabase.from('expenses').update({
           category: newExpense.category,
           amount: parsedAmount,
-          date: newExpense.date,
+          date: dateToSave,
           notes: newExpense.notes
         }).eq('id', activeExpenseId);
         
@@ -152,11 +178,17 @@ export const Expenses: React.FC = () => {
         if (error) throw error;
         showToast('খরচ আপডেট হয়েছে', 'success');
       } else {
+        if (dateToSave === localToday) {
+           dateToSave = new Date(`${dateToSave}T${currentTimeNow}`).toISOString();
+        } else if (dateToSave && dateToSave.length === 10) {
+           dateToSave = new Date(`${dateToSave}T${currentTimeAtNoon}`).toISOString();
+        }
+
         // Insert new expense
         const { error } = await supabase.from('expenses').insert({
           category: newExpense.category,
           amount: parsedAmount,
-          date: newExpense.date,
+          date: dateToSave,
           notes: newExpense.notes,
           userid: targetUserId
         });

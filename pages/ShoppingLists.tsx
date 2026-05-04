@@ -141,6 +141,7 @@ const ShoppingLists: React.FC = () => {
 
     if (!window.confirm('আপনি কি নিশ্চিতভাবে এই ফর্দটি ডিলিট করতে চান?')) return;
 
+    window.dispatchEvent(new CustomEvent('app:processing', { detail: { show: true, message: 'ফর্দ ডিলিট করা হচ্ছে...' } }));
     try {
       // Soft delete by prefixing title with [TRASH]
       const listToDelete = shoppingLists.find(l => l.id === id);
@@ -157,6 +158,8 @@ const ShoppingLists: React.FC = () => {
       if (isDetailView) setIsDetailView(false);
     } catch (error: any) {
       showToast(`এরর: ${error.message}`);
+    } finally {
+      window.dispatchEvent(new CustomEvent('app:processing', { detail: { show: false } }));
     }
   };
 
@@ -203,6 +206,7 @@ const ShoppingLists: React.FC = () => {
 
     if (!selectedList) return;
 
+    window.dispatchEvent(new CustomEvent('app:processing', { detail: { show: true, message: 'আইটেম সংরক্ষণ করা হচ্ছে...' } }));
     try {
       let updatedItems = [...(selectedList.items || [])];
       const price = parseFloat(itemPrice) || 0;
@@ -243,6 +247,8 @@ const ShoppingLists: React.FC = () => {
       showToast(editingItem ? 'আইটেম আপডেট করা হয়েছে।' : 'আইটেম যোগ করা হয়েছে।', 'success');
     } catch (error: any) {
       showToast(`এরর: ${error.message}`);
+    } finally {
+      window.dispatchEvent(new CustomEvent('app:processing', { detail: { show: false } }));
     }
   };
 
@@ -278,6 +284,7 @@ const ShoppingLists: React.FC = () => {
 
     if (!window.confirm('আপনি কি নিশ্চিতভাবে এই আইটেমটি ডিলিট করতে চান?')) return;
 
+    window.dispatchEvent(new CustomEvent('app:processing', { detail: { show: true, message: 'আইটেম ডিলিট করা হচ্ছে...' } }));
     try {
       const updatedItems = selectedList.items.filter(item => item.id !== itemId);
       const totalamount = updatedItems.reduce((sum, item) => sum + (item.price || 0), 0);
@@ -296,6 +303,8 @@ const ShoppingLists: React.FC = () => {
       showToast('আইটেম ডিলিট করা হয়েছে।', 'success');
     } catch (error: any) {
       showToast(`এরর: ${error.message}`);
+    } finally {
+      window.dispatchEvent(new CustomEvent('app:processing', { detail: { show: false } }));
     }
   };
 

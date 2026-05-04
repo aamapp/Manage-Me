@@ -216,16 +216,27 @@ export const Projects: React.FC = () => {
     
     const clientName = clientSearch.trim();
     const projectName = newProject.name.trim();
-    const deadlineToSave = newProject.deadline ? newProject.deadline : null;
     const now = new Date();
-    const localToday = now.toLocaleDateString('en-CA');
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    const localToday = `${y}-${m}-${d}`;
+    
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    const ss = String(now.getSeconds()).padStart(2, '0');
+    const currentTimeAtNoon = '12:00:00';
+    const currentTimeNow = `${hh}:${mm}:${ss}`;
+
+    const deadlineToSave = newProject.deadline ? (newProject.deadline.length === 10 ? new Date(`${newProject.deadline}T23:59:59`).toISOString() : newProject.deadline) : null;
+    
     let createdAtToSave = newProject.createdat;
     if (!createdAtToSave) {
-      createdAtToSave = now.toISOString();
+      createdAtToSave = new Date(`${localToday}T${currentTimeNow}`).toISOString();
     } else if (createdAtToSave === localToday) {
-      createdAtToSave = now.toISOString();
+      createdAtToSave = new Date(`${createdAtToSave}T${currentTimeNow}`).toISOString();
     } else if (createdAtToSave.length === 10) {
-      createdAtToSave = new Date(`${createdAtToSave}T00:00:00`).toISOString();
+      createdAtToSave = new Date(`${createdAtToSave}T${currentTimeAtNoon}`).toISOString();
     }
 
     try {
@@ -261,8 +272,8 @@ export const Projects: React.FC = () => {
           notes: newProject.notes
         };
 
-        // If status is changed to In Progress and it wasn't prior, record the timestamp
-        if (existingProject && existingProject.status !== 'In Progress' && newProject.status === 'In Progress') {
+        // If status is changed, record the timestamp
+        if (existingProject && existingProject.status !== newProject.status) {
            updatePayload.updated_at = new Date().toISOString(); 
         }
 
@@ -424,8 +435,10 @@ export const Projects: React.FC = () => {
           date: createdDate, 
           text: 'প্রজেক্ট যুক্ত হয়েছে (পেন্ডিং)', 
           id: 'create',
-          // More robust check: if date has time component and it's not exactly midnight/end-of-day
-          hasTime: createdDate.includes('T') && createdDate.split('T')[1]?.substring(0, 8) !== '00:00:00'
+          // More robust check: if date has time component and it's not exactly midnight or noon
+          hasTime: createdDate.includes('T') && 
+                  createdDate.split('T')[1]?.substring(0, 8) !== '00:00:00' && 
+                  createdDate.split('T')[1]?.substring(0, 8) !== '12:00:00'
         }
       ];
 
@@ -441,11 +454,11 @@ export const Projects: React.FC = () => {
       }
 
       const payments = incomeRecords.filter(r => r.projectid === viewProject.id).map(r => {
-          const isoDate = r.date.includes('T') ? r.date : new Date(`${r.date}T00:00:00`).toISOString();
+          const isoDate = r.date.includes('T') ? r.date : new Date(`${r.date}T12:00:00`).toISOString();
           return {
             type: 'payment',
             date: isoDate,
-            hasTime: r.date.includes('T') && r.date.split('T')[1]?.substring(0, 8) !== '00:00:00',
+            hasTime: r.date.includes('T') && r.date.split('T')[1]?.substring(0, 8) !== '00:00:00' && r.date.split('T')[1]?.substring(0, 8) !== '12:00:00',
             amount: r.amount,
             method: r.method,
             text: `পেমেন্ট রিসিভড (${r.method})`,
@@ -455,13 +468,17 @@ export const Projects: React.FC = () => {
       trackingHistory.push(...payments);
 
       if (viewProject.status === 'Completed') {
-          let completedDate = viewProject.updated_at || viewProject.deadline || new Date(new Date(createdDate).getTime() + 2000).toISOString();
+          // If completed, use updated_at if it's recent, otherwise fallback to deadline or a bit after progress
+          const compDate = viewProject.updated_at || viewProject.deadline || new Date(new Date(createdDate).getTime() + (viewProject.updated_at ? 2000 : 86400000)).toISOString();
           let hasTime = !!viewProject.updated_at;
-          if (!completedDate.includes('T')) {
-             completedDate = new Date(`${completedDate}T23:59:59`).toISOString();
-             hasTime = false;
-          }
-          trackingHistory.push({ type: 'completed', date: completedDate, text: 'প্রজেক্ট সম্পন্ন ও ডেলিভারি হয়েছে', id: 'complete', hasTime });
+          
+          trackingHistory.push({ 
+            type: 'completed', 
+            date: compDate, 
+            text: 'প্রজেক্ট সম্পন্ন ও ডেলিভারি হয়েছে', 
+            id: 'complete', 
+            hasTime 
+          });
       }
 
       // Final step: Sort chronologically
@@ -1324,34 +1341,33 @@ export const Projects: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                     <DatePicker 
-                       label="শুরু"
-                       value={newProject.createdat ? newProject.createdat.split('T')[0] : ''}
-                       onChange={(date) => {
-                           const prevTime = newProject.createdat && newProject.createdat.includes('T') ? newProject.createdat.split('T')[1] : new Date().toISOString().split('T')[1];
-                           setNewProject({...newProject, createdat: date ? `${date}T${prevTime}` : ''});
-                       }}
-                       placeholder="শুরু তারিখ"
-                     />
-                     <DatePicker 
-                       label="ডেডলাইন (অপশনাল)"
-                       value={newProject.deadline ? newProject.deadline.split('T')[0] : ''}
-                       onChange={(date) => {
-                           const prevTime = newProject.deadline && newProject.deadline.includes('T') ? newProject.deadline.split('T')[1] : new Date().toISOString().split('T')[1];
-                           const fullIsoDate = date ? `${date}T${prevTime}` : '';
-                           
-                         const update: any = { ...newProject, deadline: fullIsoDate };
-                         // Auto-set status to Completed when a deadline is selected
-                         if (date) {
-                           update.status = 'Completed';
-                         }
-                         setNewProject(update);
-                       }}
-                       placeholder="ডেডলাইন"
-                       align="right"
-                     />
-                  </div>
+                   <div className="grid grid-cols-2 gap-3">
+                      <DatePicker 
+                        label="শুরু"
+                        value={newProject.createdat ? newProject.createdat.split('T')[0] : ''}
+                        onChange={(date) => {
+                            const now = new Date();
+                            const hh = String(now.getHours()).padStart(2, '0');
+                            const mm = String(now.getMinutes()).padStart(2, '0');
+                            const ss = String(now.getSeconds()).padStart(2, '0');
+                            const currentTime = `${hh}:${mm}:${ss}`;
+                            
+                            const fullIsoDate = date ? new Date(`${date}T${currentTime}`).toISOString() : '';
+                            setNewProject({...newProject, createdat: fullIsoDate});
+                        }}
+                        placeholder="শুরু তারিখ"
+                      />
+                      <DatePicker 
+                        label="ডেডলাইন (অপশনাল)"
+                        value={newProject.deadline ? newProject.deadline.split('T')[0] : ''}
+                        onChange={(date) => {
+                          const fullIsoDate = date ? new Date(`${date}T23:59:59`).toISOString() : '';
+                          setNewProject({ ...newProject, deadline: fullIsoDate });
+                        }}
+                        placeholder="ডেডলাইন"
+                        align="right"
+                      />
+                   </div>
 
                   <button type="submit" disabled={isSubmitting} className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold text-base shadow-lg shadow-indigo-200 active:scale-95 transition-transform flex items-center justify-center gap-2 mt-4">
                     {isSubmitting ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}

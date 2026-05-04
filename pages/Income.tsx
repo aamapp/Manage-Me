@@ -181,6 +181,18 @@ export const Income: React.FC = () => {
     const amount = Number(safeEval(newPayment.amount)) || 0;
     const selectedProject = projects.find(p => p.id === selectedProjectId);
     
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    const localToday = `${y}-${m}-${d}`;
+    
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    const ss = String(now.getSeconds()).padStart(2, '0');
+    const currentTimeAtNoon = '12:00:00';
+    const currentTimeNow = `${hh}:${mm}:${ss}`;
+    
     // Use selected user ID if admin is viewing a specific user, otherwise current user ID
     const targetUserId = (user.role === 'admin' && adminSelectedUserId) ? adminSelectedUserId : user.id;
 
@@ -189,16 +201,14 @@ export const Income: React.FC = () => {
         const oldPayment = incomeRecords.find(p => p.id === activePaymentId);
         const delta = amount - (oldPayment?.amount || 0);
 
-        const now = new Date();
-        const localToday = now.toLocaleDateString('en-CA'); // YYYY-MM-DD
         let dateToSave = newPayment.date;
         
         if (dateToSave === localToday) {
-           // If selected date is today, save the exact current time
-           dateToSave = now.toISOString();
+           // If selected date is today, save the exact current time (local to UTC conversion via JS Date)
+           dateToSave = new Date(`${dateToSave}T${currentTimeNow}`).toISOString();
         } else if (dateToSave && dateToSave.length === 10) {
-           // If it's a specific date in the past/future, set it to local midnight of that day
-           dateToSave = new Date(`${dateToSave}T00:00:00`).toISOString();
+           // If it's a specific date, set to noon to avoid day jumps
+           dateToSave = new Date(`${dateToSave}T${currentTimeAtNoon}`).toISOString();
         }
 
         let query = supabase.from('income_records').update({
@@ -225,14 +235,12 @@ export const Income: React.FC = () => {
         showToast('রেকর্ড আপডেট করা হয়েছে', 'success');
       } else {
         // Prepare date: if it's the current date (local), use full ISO string to preserve current time
-        const now = new Date();
-        const localToday = now.toLocaleDateString('en-CA'); // YYYY-MM-DD
         let dateToSave = newPayment.date;
         
         if (dateToSave === localToday) {
-           dateToSave = now.toISOString();
+           dateToSave = new Date(`${dateToSave}T${currentTimeNow}`).toISOString();
         } else if (dateToSave && dateToSave.length === 10) {
-           dateToSave = new Date(`${dateToSave}T00:00:00`).toISOString();
+           dateToSave = new Date(`${dateToSave}T${currentTimeAtNoon}`).toISOString();
         }
 
         const { error: insErr } = await supabase.from('income_records').insert({
@@ -268,7 +276,19 @@ export const Income: React.FC = () => {
   };
 
   const resetForm = () => {
-    setNewPayment({ projectName: '', clientName: '', date: new Date().toLocaleDateString('en-CA'), amount: 0, method: 'বিকাশ' });
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    const localToday = `${y}-${m}-${d}`;
+
+    setNewPayment({
+      projectName: '',
+      clientName: '',
+      date: localToday,
+      amount: 0,
+      method: 'বিকাশ'
+    });
     setProjectSearch('');
     setSelectedProjectId(null);
     setSelectedProjectDue(0);
