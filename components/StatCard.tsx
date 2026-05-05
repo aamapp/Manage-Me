@@ -56,9 +56,9 @@ export const StatCard: React.FC<StatCardProps> = ({ title, value, icon, isCurren
     <div 
       onClick={onClick}
       className={`
-        relative overflow-hidden bg-white rounded-2xl p-4 
+        relative overflow-hidden bg-white rounded-xl p-3.5 
         border border-slate-100 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] 
-        flex flex-col justify-between h-24 group transition-all duration-300
+        flex flex-col justify-between h-20 group transition-all duration-300
         ${onClick ? 'cursor-pointer active:scale-95 hover:shadow-lg' : ''}
         hover:border-transparent hover:ring-2 ${themes.ring}
       `}
@@ -66,13 +66,13 @@ export const StatCard: React.FC<StatCardProps> = ({ title, value, icon, isCurren
         {/* Abstract Background Gradient Blob */}
         <div className={`absolute -right-5 -top-5 w-20 h-20 rounded-full bg-gradient-to-br ${themes.gradient} opacity-[0.04] blur-xl transition-all duration-500 group-hover:opacity-[0.1] group-hover:scale-125`}></div>
 
-        <div className="flex justify-between items-start z-10 h-full">
-            <div className="flex flex-col justify-between h-full w-full min-w-0 pr-2">
-                <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wider truncate">{title}</p>
-                <h3 className="text-xl font-black text-slate-800 tracking-tight mt-1 truncate">
+        <div className="flex justify-between items-center z-10 h-full">
+            <div className="flex flex-col justify-center h-full w-full min-w-0 pr-2">
+                <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wider truncate mb-0.5">{title}</p>
+                <h3 className="text-[17px] font-black text-slate-800 tracking-tight leading-none truncate">
                     {isCurrency ? (
                         <span className="flex items-baseline gap-0.5">
-                            <span className="text-xs text-slate-400 font-bold">{currency}</span>
+                            <span className="text-[11px] text-slate-400 font-bold">{currency}</span>
                             {Number(safeValue).toLocaleString('en-US')}
                         </span>
                     ) : (
@@ -81,8 +81,8 @@ export const StatCard: React.FC<StatCardProps> = ({ title, value, icon, isCurren
                 </h3>
             </div>
             
-            <div className={`w-9 h-9 rounded-xl ${themes.iconBg} flex items-center justify-center shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6 shrink-0`}>
-                {React.cloneElement(icon as React.ReactElement<any>, { size: 18, strokeWidth: 2.5 })}
+            <div className={`w-8 h-8 rounded-lg ${themes.iconBg} flex items-center justify-center shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6 shrink-0`}>
+                {React.cloneElement(icon as React.ReactElement<any>, { size: 16, strokeWidth: 2.5 })}
             </div>
         </div>
     </div>

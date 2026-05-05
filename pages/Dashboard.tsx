@@ -13,7 +13,9 @@ import {
   Music,
   LayoutDashboard,
   AlertCircle,
-  Users
+  Users,
+  TrendingUp,
+  TrendingDown
 } from 'lucide-react';
 import { StatCard } from '@/components/StatCard';
 import { useAppContext } from '../context/AppContext';
@@ -71,11 +73,27 @@ export const Dashboard: React.FC = () => {
 
   const hasChartData = chartData.some(d => d.income > 0);
 
+  const currentMonthIncome = chartData[5]?.income || 0;
+  const prevMonthIncome = chartData[4]?.income || 0;
+  let percentageChange = 0;
+  if (prevMonthIncome === 0) {
+    if (currentMonthIncome > 0) percentageChange = 100;
+  } else {
+    percentageChange = Math.round(((currentMonthIncome - prevMonthIncome) / prevMonthIncome) * 100);
+  }
+  const isPositive = percentageChange >= 0;
+  const changeColor = isPositive ? "text-emerald-600" : "text-rose-600";
+  const changeIcon = isPositive ? "▲" : "▼";
+  const changeSign = isPositive ? "+" : "";
+  const badgeTheme = isPositive ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-600";
+  const outerTheme = isPositive ? "bg-emerald-50/50 border-emerald-100" : "bg-rose-50/50 border-rose-100";
+  const currentMonthName = chartData[5]?.name || "বর্তমান";
+
   // Added 'key' to identify status for filtering
   const statusSummary = [
-    { key: 'Pending', label: 'পেন্ডিং', count: projects.filter(p => p.status === 'Pending').length, color: 'bg-amber-500' },
-    { key: 'In Progress', label: 'চলমান', count: projects.filter(p => p.status === 'In Progress').length, color: 'bg-blue-500' },
-    { key: 'Completed', label: 'সম্পন্ন', count: projects.filter(p => p.status === 'Completed').length, color: 'bg-emerald-500' },
+    { key: 'Pending', label: 'পেন্ডিং', count: projects.filter(p => p.status === 'Pending').length, textColor: 'text-amber-500' },
+    { key: 'In Progress', label: 'চলমান', count: projects.filter(p => p.status === 'In Progress').length, textColor: 'text-blue-500' },
+    { key: 'Completed', label: 'সম্পন্ন', count: projects.filter(p => p.status === 'Completed').length, textColor: 'text-emerald-500' },
   ];
 
   const recentProjects = [...projects].sort((a, b) => b.createdat.localeCompare(a.createdat)).slice(0, 5);
@@ -90,9 +108,9 @@ export const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 w-full max-w-full pt-2 pb-6 px-1">
+    <div className="space-y-4 w-full max-w-full pt-1 pb-4 px-1">
       {/* Stats Grid - Responsive columns */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
         {/* Row 1 */}
         <StatCard 
           title="মোট বাজেট" 
@@ -129,23 +147,47 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* Middle Section - Chart and Status Summary */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-5">
         {/* Chart Section - Takes 2 columns on desktop */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm w-full overflow-hidden">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-               <h3 className="font-bold text-slate-800 text-base">মাসিক আয়</h3>
-               <p className="text-xs text-slate-400 font-medium mt-0.5">গত ৬ মাসের আয়ের হিসাব</p>
+        <div className="lg:col-span-2 bg-white p-4 lg:p-5 rounded-[20px] lg:rounded-3xl border border-slate-100 shadow-sm w-full overflow-hidden flex flex-col justify-between">
+          <div className="flex items-center justify-between gap-1.5 sm:gap-4 mb-3">
+            <div className="flex items-center gap-2 sm:gap-3 lg:gap-4 w-full">
+              <div className="bg-indigo-50 p-2 sm:p-2.5 rounded-xl text-indigo-600 shrink-0">
+                <Wallet size={18} className="sm:w-5 sm:h-5 md:w-[22px] md:h-[22px]" />
+              </div>
+              <div className="shrink-0 hidden sm:flex flex-col justify-center">
+                 <h3 className="font-bold text-slate-800 text-sm sm:text-base md:text-lg lg:text-xl leading-tight">মাসিক আয়</h3>
+                 <p className="text-[10px] sm:text-[11px] md:text-[13px] text-slate-400 font-medium mt-0.5 whitespace-nowrap text-ellipsis overflow-hidden">গত ৬ মাসের আয়ের হিসাব</p>
+              </div>
+              <div className="shrink-0 flex sm:hidden flex-col justify-center">
+                 <h3 className="font-bold text-slate-800 text-sm leading-tight">মাসিক আয়</h3>
+              </div>
+              
+              <div className={`flex border rounded-[12px] lg:rounded-xl p-1 sm:p-1.5 pr-2 sm:pr-3 lg:pr-4 items-center gap-1 sm:gap-2.5 w-max shrink-0 sm:ml-2 ${outerTheme}`}>
+                <div className={`${badgeTheme} p-1 sm:p-1.5 lg:p-1.5 rounded-lg lg:rounded-[10px] shrink-0`}>
+                  {isPositive ? <TrendingUp size={12} className="sm:w-3.5 sm:h-3.5 lg:w-4 lg:h-4" /> : <TrendingDown size={12} className="sm:w-3.5 sm:h-3.5 lg:w-4 lg:h-4" />}
+                </div>
+                <div className="flex flex-col justify-center">
+                  <div className="flex items-center gap-1 sm:gap-1.5">
+                    <span className="text-slate-800 text-[9px] sm:text-[11px] lg:text-[12px] font-bold whitespace-nowrap">গত মাসের তুলনায়</span>
+                    <span className={`${changeColor} text-[9px] sm:text-[11px] lg:text-[12px] font-extrabold flex items-center whitespace-nowrap`}>
+                      {changeIcon} {changeSign}{percentageChange}%
+                    </span>
+                  </div>
+                  <span className="text-slate-400 text-[8px] sm:text-[9px] lg:text-[10px] font-semibold leading-tight whitespace-nowrap hidden sm:block">{currentMonthName} মাস পর্যন্ত</span>
+                </div>
+              </div>
             </div>
+
             <button 
               onClick={() => navigate('/reports')}
-              className="text-indigo-600 bg-indigo-50 p-2.5 rounded-xl hover:bg-indigo-100 active:scale-90 transition-all"
+              className="text-indigo-600 bg-indigo-50 p-2 sm:p-2.5 rounded-xl hover:bg-indigo-100 active:scale-90 transition-all font-bold shrink-0 ml-auto"
             >
-              <ArrowUpRight size={20} />
+              <ArrowUpRight size={18} className="sm:w-4 sm:h-4 lg:w-5 lg:h-5" />
             </button>
           </div>
           
-          <div className="h-64 w-full -ml-2">
+          <div className="h-32 w-full -ml-2 lg:h-40 z-10">
             {!isMounted ? null : !hasChartData ? (
               <div className="h-full w-full flex flex-col items-center justify-center text-slate-300 gap-3 border-2 border-dashed border-slate-100 rounded-2xl ml-2">
                 <Wallet size={32} className="opacity-50" />
@@ -195,34 +237,49 @@ export const Dashboard: React.FC = () => {
         </div>
 
         {/* Project Status Summary - Takes 1 column on desktop */}
-        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col">
-          <h3 className="font-bold text-slate-800 mb-6 text-base">প্রজেক্ট স্ট্যাটাস</h3>
-          <div className="space-y-5 flex-1 flex flex-col justify-center">
-            {statusSummary.map((status) => (
-              <div 
-                  key={status.key} 
-                  onClick={() => handleStatusClick(status.key)}
-                  className="cursor-pointer group"
-              >
-                <div className="flex justify-between items-center mb-2 text-sm group-hover:text-indigo-600 transition-colors">
-                  <span className="text-slate-600 font-bold group-hover:text-indigo-600">{status.label}</span>
-                  <span className="font-bold text-slate-800 bg-slate-50 px-2.5 py-1 rounded-lg text-xs">{status.count}</span>
+        <div className="bg-white p-4 lg:p-5 rounded-[20px] lg:rounded-3xl border border-slate-100 shadow-sm flex flex-col">
+          <h3 className="font-bold text-slate-800 mb-4 text-base">প্রজেক্ট স্ট্যাটাস</h3>
+          <div className="flex flex-row justify-between items-center flex-1 lg:px-2">
+            {statusSummary.map((status) => {
+              const radius = 44;
+              const circumference = 2 * Math.PI * radius;
+              const offset = totalProjects > 0 ? circumference - (status.count / totalProjects) * circumference : circumference;
+              
+              return (
+                <div 
+                    key={status.key} 
+                    onClick={() => handleStatusClick(status.key)}
+                    className="cursor-pointer group flex flex-col items-center transition-transform hover:scale-105 active:scale-95"
+                >
+                  <div className="relative flex flex-col items-center justify-center w-[80px] h-[80px] sm:w-[90px] sm:h-[90px]">
+                    <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full transform -rotate-90 drop-shadow-sm">
+                      <circle cx="50" cy="50" r={radius} stroke="#e2e8f0" strokeWidth="5" fill="transparent" />
+                      <circle 
+                         cx="50" cy="50" r={radius} 
+                         stroke="currentColor" 
+                         strokeWidth="5" 
+                         fill="transparent" 
+                         strokeDasharray={circumference} 
+                         strokeDashoffset={offset} 
+                         strokeLinecap="round" 
+                         className={`${status.textColor} transition-all duration-1000 ease-out`} 
+                      />
+                    </svg>
+                    <div className="flex flex-col items-center justify-center z-10 pt-1">
+                      <span className="text-[12px] font-bold text-slate-800 mt-1">{status.label}</span>
+                      <span className="text-[22px] font-extrabold text-black leading-tight mt-0.5">{status.count}</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
-                  <div 
-                    className={`${status.color} h-full transition-all duration-1000 rounded-full shadow-sm`} 
-                    style={{ width: `${totalProjects > 0 ? (status.count / totalProjects) * 100 : 0}%` }} 
-                  />
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
 
       {/* Recent Projects List (Cards) */}
-      <div className="pb-6">
-        <div className="flex items-center justify-between mb-4 px-1">
+      <div className="pb-2">
+        <div className="flex items-center justify-between mb-3 px-1">
           <h3 className="font-bold text-slate-800 text-base">সাম্প্রতিক প্রজেক্ট</h3>
           <button 
             onClick={() => navigate('/projects')}
@@ -238,12 +295,12 @@ export const Dashboard: React.FC = () => {
               <p className="text-sm font-medium">কোনো প্রজেক্ট নেই</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {recentProjects.map(p => (
               <div 
                 key={p.id} 
                 onClick={() => navigate('/projects')}
-                className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md hover:border-indigo-100 active:scale-[0.98] transition-all flex items-center justify-between group cursor-pointer"
+                className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:border-indigo-100 active:scale-[0.98] transition-all flex items-center justify-between group cursor-pointer"
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0 mr-3">
                    {/* Smart Icon */}
