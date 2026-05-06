@@ -162,7 +162,7 @@ export const AIAssistant: React.FC = () => {
           return null;
         }
 
-        console.log(`[AI Key Debug] Key found. Prefix: "${finalKey.substring(0, 4)}", Length: ${finalKey.length}`);
+        console.log(`[AI Key Debug] Key found. Prefix: "${finalKey.substring(0, 4)}", Suffix: "...${finalKey.substring(finalKey.length - 4)}", Length: ${finalKey.length}`);
         return finalKey;
       };
 
