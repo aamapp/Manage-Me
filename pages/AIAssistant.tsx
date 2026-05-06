@@ -140,10 +140,15 @@ export const AIAssistant: React.FC = () => {
         
         const finalKey = key ? key.trim() : null;
         
-        // Ignore the placeholder string from AI Studio
-        if (finalKey === "AI Studio Free Tier" || !finalKey) {
-          console.log("[AI Key Debug] No valid key found (placeholder or empty).");
+        // Ignore placeholders
+        if (!finalKey || finalKey === "AI Studio Free Tier" || finalKey === "YOUR_API_KEY") {
+          console.log("[AI Key Debug] No valid key provided (placeholder or empty).");
           return null;
+        }
+
+        // Check for common typo 'Alza' instead of 'AIza'
+        if (finalKey.startsWith('Alza')) {
+          console.warn("[AI Key Debug] Potential typo: Key starts with 'Alza' instead of 'AIza'.");
         }
 
         console.log(`[AI Key Debug] Key loaded. Prefix: "${finalKey.substring(0, 4)}", Length: ${finalKey.length}`);
@@ -152,27 +157,19 @@ export const AIAssistant: React.FC = () => {
 
       const apiKey = getApiKey();
       
-      let aiResponseText = 'দুঃখিত, এমুহূর্তে আমি উত্তর দিতে পারছি না, কারণ এআই কনফিগার করা নেই। আপনার সেটিংস বা ব্রাউজারের এনভায়রনমেন্টে এপিআই কি (API Key) সঠিকভাবে দেওয়া হয়েছে কিনা চেক করুন।';
+      let aiResponseText = 'দুঃখিত, এপিআই কি (API Key) পাওয়া যায়নি। দয়া করে সেটিংস থেকে GEMINI_API_KEY টি সঠিকভাবে সেট করুন।';
       
       try {
         if (apiKey && apiKey.length > 20) {
-          // Standard initialization for @google/generative-ai
           const genAI = new GoogleGenerativeAI(apiKey);
-          
-          // Using a more standard model reference
           const modelName = 'gemini-1.5-flash';
-          console.log(`[AI Request] Using model: ${modelName}`);
-
-          const model = genAI.getGenerativeModel({ 
-            model: modelName,
-          });
+          const model = genAI.getGenerativeModel({ model: modelName });
           
           let chatHistory = [...messages, userMessage].map((msg) => ({
             role: msg.role === 'assistant' ? 'model' : 'user',
             parts: [{ text: msg.content }]
           }));
           
-          // Ensure alternating roles and starting with user
           if (chatHistory.length > 0 && chatHistory[0].role === 'model') {
              chatHistory.shift();
           }
@@ -184,15 +181,13 @@ export const AIAssistant: React.FC = () => {
           
           const response = await result.response;
           aiResponseText = response.text() || 'কোনো উত্তর পাইনি।';
-        } else {
-          aiResponseText = 'দুঃখিত, এপিআই কি (API Key) পাওয়া যায়নি। দয়া করে সেটিংস থেকে GEMINI_API_KEY টি সঠিকভাবে সেট করুন।';
         }
       } catch (error: any) {
-        console.error('AI Error Details:', error);
-        if (error.message?.includes('API key not valid') || (error.status === 400 && error.message?.includes('invalid'))) {
-          aiResponseText = 'আপনার দেওয়া এপিআই কি (API Key) টি সঠিক নয়। এআই স্টুডিও থেকে নতুন একটি কী জেনারেট করে সেটিংস-এ আপডেট করার চেষ্টা করুন এবং নিশ্চিত করুন যে এর সাথে কোনো বাড়তি স্পেস নেই।';
-        } else if (error.message?.includes('quota') || error.status === 429) {
-          aiResponseText = 'দুঃখিত, এপিআই কোটা (Quota) শেষ হয়ে গেছে। কিছুক্ষণ পর আবার চেষ্টা করুন।';
+        console.error('AI Request Failed:', error);
+        if (error.message?.includes('expired') || error.message?.includes('API key not valid') || error.status === 400) {
+          aiResponseText = 'আপনার এপিআই কি (API Key) টি কার্যকর নয় বা মেয়াদ শেষ হয়ে গেছে। দয়া করে এআই স্টুডিও থেকে নতুন কী তৈরি করে সেটিংস-এ আপডেট করুন।';
+        } else if (error.message?.includes('quota')) {
+          aiResponseText = 'এপিআই কোটা শেষ হয়ে গেছে। কিছুক্ষণ পর চেষ্টা করুন।';
         } else {
           aiResponseText = 'দুঃখিত, এআই সার্ভারের সাথে যোগাযোগ করা যাচ্ছে না। আবার চেষ্টা করুন।';
         }
