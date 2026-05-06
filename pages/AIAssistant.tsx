@@ -132,20 +132,8 @@ export const AIAssistant: React.FC = () => {
       Here is the current state of the application data:
       ${JSON.stringify(contextData)}`;
 
-      // Accessing the API key
-      const getApiKey = () => {
-        const hardcodedKey = 'AIzaSyDLWVKuftyLtOpDlndlWRIm57mkeGItsEs';
-        
-        // Try various ways to get the key from env
-        const envKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || 
-                       (import.meta as any).env?.GEMINI_API_KEY ||
-                       (typeof process !== 'undefined' && (process as any).env?.GEMINI_API_KEY);
-                       
-        // Return env key if it looks valid, otherwise backup
-        return (envKey && envKey.length > 20) ? envKey : hardcodedKey;
-      };
-
-      const apiKey = getApiKey();
+      // Accessing the API key as per gemini-api skill for React (Vite)
+      const apiKey = process.env.GEMINI_API_KEY;
       
       let aiResponseText = 'দুঃখিত, এমুহূর্তে আমি উত্তর দিতে পারছি না, কারণ এআই কনফিগার করা নেই। আপনার সেটিংস থেকে এপিআই কি (API Key) সঠিকভাবে দেওয়া হয়েছে কিনা চেক করুন।';
       
@@ -163,9 +151,11 @@ export const AIAssistant: React.FC = () => {
         }
 
         const response = await ai.models.generateContent({
-           model: 'gemini-1.5-flash',
+           model: 'gemini-3-flash-preview',
            contents: chatHistory,
-           systemInstruction: systemInstruction
+           config: {
+             systemInstruction: systemInstruction
+           }
         });
         
         aiResponseText = response.text || 'কোনো উত্তর পাইনি।';
