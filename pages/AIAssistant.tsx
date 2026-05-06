@@ -162,17 +162,13 @@ export const AIAssistant: React.FC = () => {
            chatHistory.shift();
         }
 
-        const model = ai.getGenerativeModel({ 
-          model: 'gemini-1.5-flash',
-          systemInstruction: systemInstruction
-        });
-
-        const result = await model.generateContent({
-           contents: chatHistory
+        const response = await ai.models.generateContent({
+           model: 'gemini-1.5-flash',
+           contents: chatHistory,
+           systemInstruction: systemInstruction
         });
         
-        const response = await result.response;
-        aiResponseText = response.text() || 'কোনো উত্তর পাইনি।';
+        aiResponseText = response.text || 'কোনো উত্তর পাইনি।';
       }
 
       setMessages(prev => [...prev, {
