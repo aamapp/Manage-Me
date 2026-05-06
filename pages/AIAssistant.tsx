@@ -134,12 +134,17 @@ export const AIAssistant: React.FC = () => {
 
       // Accessing the API key
       const getApiKey = () => {
-        // First try standard Vite meta env (requires VITE_ prefix)
-        // Then try process.env (mapped in vite.config)
-        // Finally check GEMINI_API_KEY directly in meta env
-        return (import.meta as any).env?.VITE_GEMINI_API_KEY || 
-               (process as any).env?.GEMINI_API_KEY ||
-               (import.meta as any).env?.GEMINI_API_KEY;
+        const key = (process as any).env?.GEMINI_API_KEY || 
+                    (import.meta as any).env?.VITE_GEMINI_API_KEY || 
+                    (import.meta as any).env?.GEMINI_API_KEY;
+        
+        const finalKey = key ? key.trim() : null;
+        if (finalKey) {
+          console.log(`[AI Key Debug] Key loaded. Prefix: "${finalKey.substring(0, 4)}", Length: ${finalKey.length}`);
+        } else {
+          console.log("[AI Key Debug] No key found in env.");
+        }
+        return finalKey;
       };
 
       const apiKey = getApiKey();
@@ -147,7 +152,7 @@ export const AIAssistant: React.FC = () => {
       let aiResponseText = 'দুঃখিত, এমুহূর্তে আমি উত্তর দিতে পারছি না, কারণ এআই কনফিগার করা নেই। আপনার সেটিংস বা ব্রাউজারের এনভায়রনমেন্টে এপিআই কি (API Key) সঠিকভাবে দেওয়া হয়েছে কিনা চেক করুন।';
       
       try {
-        if (apiKey && apiKey.length > 10) {
+        if (apiKey && apiKey.length > 20) {
           // Standard initialization for @google/generative-ai
           const genAI = new GoogleGenerativeAI(apiKey);
           const model = genAI.getGenerativeModel({ 
@@ -171,13 +176,17 @@ export const AIAssistant: React.FC = () => {
           
           const response = await result.response;
           aiResponseText = response.text() || 'কোনো উত্তর পাইনি।';
+        } else {
+          aiResponseText = 'দুঃখিত, এপিআই কি (API Key) পাওয়া যায়নি। দয়া করে সেটিংস থেকে GEMINI_API_KEY টি সঠিকভাবে সেট করুন।';
         }
       } catch (error: any) {
-        console.error('AI Error:', error);
-        if (error.message?.includes('API key not valid')) {
-          aiResponseText = 'আপনার দেওয়া এপিআই কি (API Key) সঠিক নয় অথবা অকেজো (Invalid/Revoked) করা হয়েছে। দয়া করে নতুন একটি কী জেনারেট করে সেটিংস-এ আপডেট করুন।';
+        console.error('AI Error Details:', error);
+        if (error.message?.includes('API key not valid') || (error.status === 400 && error.message?.includes('invalid'))) {
+          aiResponseText = 'আপনার দেওয়া এপিআই কি (API Key) টি সঠিক নয়। এআই স্টুডিও থেকে নতুন একটি কী জেনারেট করে সেটিংস-এ আপডেট করার চেষ্টা করুন এবং নিশ্চিত করুন যে এর সাথে কোনো বাড়তি স্পেস নেই।';
+        } else if (error.message?.includes('quota') || error.status === 429) {
+          aiResponseText = 'দুঃখিত, এপিআই কোটা (Quota) শেষ হয়ে গেছে। কিছুক্ষণ পর আবার চেষ্টা করুন।';
         } else {
-          aiResponseText = 'দুঃখিত, কোনো একটি সমস্যা হয়েছে। আবার চেষ্টা করুন।';
+          aiResponseText = 'দুঃখিত, এআই সার্ভারের সাথে যোগাযোগ করা যাচ্ছে না। আবার চেষ্টা করুন।';
         }
       }
 
