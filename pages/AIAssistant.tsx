@@ -146,30 +146,39 @@ export const AIAssistant: React.FC = () => {
       
       let aiResponseText = 'দুঃখিত, এমুহূর্তে আমি উত্তর দিতে পারছি না, কারণ এআই কনফিগার করা নেই। আপনার সেটিংস বা ব্রাউজারের এনভায়রনমেন্টে এপিআই কি (API Key) সঠিকভাবে দেওয়া হয়েছে কিনা চেক করুন।';
       
-      if (apiKey && apiKey.length > 10) {
-        // Standard initialization for @google/generative-ai
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ 
-          model: 'gemini-1.5-flash',
-          systemInstruction: systemInstruction 
-        });
-        
-        let chatHistory = [...messages, userMessage].map((msg) => ({
-          role: msg.role === 'assistant' ? 'model' : 'user',
-          parts: [{ text: msg.content }]
-        }));
-        
-        // Ensure alternating roles and starting with user
-        if (chatHistory.length > 0 && chatHistory[0].role === 'model') {
-           chatHistory.shift();
-        }
+      try {
+        if (apiKey && apiKey.length > 10) {
+          // Standard initialization for @google/generative-ai
+          const genAI = new GoogleGenerativeAI(apiKey);
+          const model = genAI.getGenerativeModel({ 
+            model: 'gemini-1.5-flash',
+            systemInstruction: systemInstruction 
+          });
+          
+          let chatHistory = [...messages, userMessage].map((msg) => ({
+            role: msg.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: msg.content }]
+          }));
+          
+          // Ensure alternating roles and starting with user
+          if (chatHistory.length > 0 && chatHistory[0].role === 'model') {
+             chatHistory.shift();
+          }
 
-        const result = await model.generateContent({
-           contents: chatHistory
-        });
-        
-        const response = await result.response;
-        aiResponseText = response.text() || 'কোনো উত্তর পাইনি।';
+          const result = await model.generateContent({
+             contents: chatHistory
+          });
+          
+          const response = await result.response;
+          aiResponseText = response.text() || 'কোনো উত্তর পাইনি।';
+        }
+      } catch (error: any) {
+        console.error('AI Error:', error);
+        if (error.message?.includes('API key not valid')) {
+          aiResponseText = 'আপনার দেওয়া এপিআই কি (API Key) সঠিক নয় অথবা অকেজো (Invalid/Revoked) করা হয়েছে। দয়া করে নতুন একটি কী জেনারেট করে সেটিংস-এ আপডেট করুন।';
+        } else {
+          aiResponseText = 'দুঃখিত, কোনো একটি সমস্যা হয়েছে। আবার চেষ্টা করুন।';
+        }
       }
 
       setMessages(prev => [...prev, {
