@@ -203,7 +203,7 @@ export const AIAssistant: React.FC = () => {
       } catch (error: any) {
         console.error("AI Request Failed Details:", error);
         if (error.message?.includes("expired") || error.message?.includes("API key not valid") || error.status === 400) {
-          aiResponseText = "আপনার এপিআই কি (API Key) টি কার্যকর নয় বা মেয়াদ শেষ হয়ে গেছে। আপনি যদি Vercel-এ নতুন কি (Key) আপডেট করে থাকেন, তবে সেটিংস সেভ করার পর অবশ্যই প্রজেক্টটি Redeploy করুন। অন্যথায় নতুন কি-টি কাজ করবে না।";
+          aiResponseText = "আপনার এপিআই কি (API Key) টি কার্যকর নয় বা মেয়াদ শেষ হয়ে গেছে। আপনি যদি Vercel-এ নতুন কি (Key) আপডেট করে Redeploy করে থাকেন, তবে দয়া করে ব্রাউজারে Hard Reload (Ctrl+Shift+R) দিন অথবা সেটিংস থেকে 'অ্যাপ ক্যাশ ক্লিয়ার' করুন। কারণ ব্রাউজার আগের কি (Key) ক্যাশ করে রেখেছে।";
         } else if (error.message?.includes("not found") || error.status === 404) {
           aiResponseText = "দুঃখিত, এই এপিআই কি (API Key) দিয়ে জেমিনি মডেলটি পাওয়া যাচ্ছে না (404 Error)। নিশ্চিত করুন যে আপনার কি-টি 'AIza' দিয়ে শুরু হয়েছে (A, I - বড় হাতের) এবং Google AI Studio-তে Gemini API সচল আছে। টাইপ করার সময় 'I' (বড় হাতের আই) আর 'l' (ছোট হাতের এল) এর মধ্যে পার্থক্য খেয়াল করুন।";
         } else if (error.message?.includes("quota")) {
