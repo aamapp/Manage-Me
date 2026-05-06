@@ -132,13 +132,23 @@ export const AIAssistant: React.FC = () => {
       Here is the current state of the application data:
       ${JSON.stringify(contextData)}`;
 
-      // Accessing the API key as per gemini-api skill
-      const apiKey = process.env.GEMINI_API_KEY;
+      // Accessing the API key
+      const getApiKey = () => {
+        // First try standard Vite meta env (requires VITE_ prefix)
+        // Then try process.env (mapped in vite.config)
+        // Finally check GEMINI_API_KEY directly in meta env
+        return (import.meta as any).env?.VITE_GEMINI_API_KEY || 
+               (process as any).env?.GEMINI_API_KEY ||
+               (import.meta as any).env?.GEMINI_API_KEY;
+      };
+
+      const apiKey = getApiKey();
       
-      let aiResponseText = 'দুঃখিত, এমুহূর্তে আমি উত্তর দিতে পারছি না, কারণ এআই কনফিগার করা নেই। আপনার সেটিংস থেকে এপিআই কি (API Key) সঠিকভাবে দেওয়া হয়েছে কিনা চেক করুন।';
+      let aiResponseText = 'দুঃখিত, এমুহূর্তে আমি উত্তর দিতে পারছি না, কারণ এআই কনফিগার করা নেই। আপনার সেটিংস বা ব্রাউজারের এনভায়রনমেন্টে এপিআই কি (API Key) সঠিকভাবে দেওয়া হয়েছে কিনা চেক করুন।';
       
-      if (apiKey) {
-        const genAI = new GoogleGenAI({ apiKey });
+      if (apiKey && apiKey.length > 10) {
+        // Standard initialization for @google/genai
+        const genAI = new GoogleGenAI(apiKey);
         const model = genAI.getGenerativeModel({ 
           model: 'gemini-1.5-flash',
           systemInstruction: systemInstruction 
