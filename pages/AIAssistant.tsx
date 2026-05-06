@@ -132,14 +132,13 @@ export const AIAssistant: React.FC = () => {
       Here is the current state of the application data:
       ${JSON.stringify(contextData)}`;
 
-      // NOTE: Using a free API Key requires user to input it or having it in env
-      // But based on guidelines, for free models, API key is already in env
-      const apiKey = process.env.GEMINI_API_KEY || (import.meta as any).env.VITE_GEMINI_API_KEY;
+      // First check for VITE_ prefix (standard for Vite client-side)
+      const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY || (import.meta as any).env.GEMINI_API_KEY;
       
       let aiResponseText = 'দুঃখিত, এমুহূর্তে আমি উত্তর দিতে পারছি না, কারণ এআই কনফিগার করা নেই।';
       
       if (apiKey) {
-        const ai = new GoogleGenAI({ apiKey });
+        const ai = new GoogleGenAI(apiKey);
         
         let chatHistory = [...messages, userMessage].map((msg) => ({
           role: msg.role === 'assistant' ? 'model' : 'user',
@@ -151,15 +150,17 @@ export const AIAssistant: React.FC = () => {
            chatHistory.shift();
         }
 
-        const response = await ai.models.generateContent({
-           model: 'gemini-2.5-flash',
-           contents: chatHistory,
-           config: {
-             systemInstruction: systemInstruction
-           }
+        const model = ai.getGenerativeModel({ 
+          model: 'gemini-1.5-flash',
+          systemInstruction: systemInstruction
+        });
+
+        const result = await model.generateContent({
+           contents: chatHistory
         });
         
-        aiResponseText = response.text || 'কোনো উত্তর পাইনি।';
+        const response = await result.response;
+        aiResponseText = response.text() || 'কোনো উত্তর পাইনি।';
       }
 
       setMessages(prev => [...prev, {
