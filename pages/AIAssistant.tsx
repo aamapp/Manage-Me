@@ -132,12 +132,22 @@ export const AIAssistant: React.FC = () => {
       Here is the current state of the application data:
       ${JSON.stringify(contextData)}`;
 
-      // First check for VITE_ prefix (standard for Vite client-side)
-      const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY || (import.meta as any).env.GEMINI_API_KEY;
+      // Accessing the API key
+      const apiKey = 
+        (typeof process !== 'undefined' && process.env ? (process.env as any).GEMINI_API_KEY : null) || 
+        (import.meta as any).env?.VITE_GEMINI_API_KEY || 
+        (import.meta as any).env?.GEMINI_API_KEY;
       
-      let aiResponseText = 'দুঃখিত, এমুহূর্তে আমি উত্তর দিতে পারছি না, কারণ এআই কনফিগার করা নেই।';
+      console.log("Checking API Key availability...");
+      if (!apiKey) {
+        console.error("API Key not found in any expected environment variable.");
+      } else {
+        console.log("API Key found. Length:", apiKey.length);
+      }
       
-      if (apiKey) {
+      let aiResponseText = 'দুঃখিত, এমুহূর্তে আমি উত্তর দিতে পারছি না, কারণ এআই কনফিগার করা নেই। আপনার সেটিংস থেকে এপিআই কি (API Key) সঠিকভাবে দেওয়া হয়েছে কিনা চেক করুন।';
+      
+      if (apiKey && apiKey.length > 20) {
         const ai = new GoogleGenAI(apiKey);
         
         let chatHistory = [...messages, userMessage].map((msg) => ({
