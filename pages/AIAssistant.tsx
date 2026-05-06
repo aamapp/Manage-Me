@@ -132,33 +132,34 @@ export const AIAssistant: React.FC = () => {
       Here is the current state of the application data:
       ${JSON.stringify(contextData)}`;
 
-      // Accessing the API key as per gemini-api skill for React (Vite)
+      // Accessing the API key as per gemini-api skill
       const apiKey = process.env.GEMINI_API_KEY;
       
       let aiResponseText = 'দুঃখিত, এমুহূর্তে আমি উত্তর দিতে পারছি না, কারণ এআই কনফিগার করা নেই। আপনার সেটিংস থেকে এপিআই কি (API Key) সঠিকভাবে দেওয়া হয়েছে কিনা চেক করুন।';
       
       if (apiKey) {
-        const ai = new GoogleGenAI({ apiKey });
+        const genAI = new GoogleGenAI({ apiKey });
+        const model = genAI.getGenerativeModel({ 
+          model: 'gemini-1.5-flash',
+          systemInstruction: systemInstruction 
+        });
         
         let chatHistory = [...messages, userMessage].map((msg) => ({
           role: msg.role === 'assistant' ? 'model' : 'user',
           parts: [{ text: msg.content }]
         }));
         
-        // Start history with a user message if needed, or simply drop the first model message
+        // Ensure alternating roles and starting with user
         if (chatHistory.length > 0 && chatHistory[0].role === 'model') {
            chatHistory.shift();
         }
 
-        const response = await ai.models.generateContent({
-           model: 'gemini-3-flash-preview',
-           contents: chatHistory,
-           config: {
-             systemInstruction: systemInstruction
-           }
+        const result = await model.generateContent({
+           contents: chatHistory
         });
         
-        aiResponseText = response.text || 'কোনো উত্তর পাইনি।';
+        const response = await result.response;
+        aiResponseText = response.text() || 'কোনো উত্তর পাইনি।';
       }
 
       setMessages(prev => [...prev, {
