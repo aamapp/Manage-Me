@@ -518,7 +518,7 @@ export const Expenses: React.FC = () => {
       </div>
 
       {/* Report Content Area (for PDF) */}
-      <div id="pdf-container" ref={listRef} className={`${isGeneratingPDF ? 'block' : 'space-y-4 rounded-[2.5rem]'} px-1 py-4 bg-white`}>
+      <div id="pdf-container" ref={listRef} className={`${isGeneratingPDF ? 'block' : 'space-y-4 rounded-xl sm:rounded-2xl'} px-1 sm:px-2 py-4 bg-white`}>
         
         {isGeneratingPDF && (
           <div id="pdf-header" className="mb-8 border-b border-slate-200 pb-6 flex justify-between items-start">

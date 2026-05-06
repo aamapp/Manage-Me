@@ -1,10 +1,22 @@
 /* Tailwind is handled via CDN in index.html */
 
+@font-face {
+  font-family: 'Kohinoor Bangla';
+  src: url('https://cdn.jsdelivr.net/gh/manthib/Typhaine@master/Site/maheer/assets/font/KohinoorBangla-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 body {
   font-family: 'Hind Siliguri', sans-serif;
   background-color: #f8fafc;
   /* Prevent pull-to-refresh on mobile browsers / WebView */
   overscroll-behavior-y: none;
+}
+
+.recharts-wrapper, .recharts-surface, .recharts-responsive-container, .recharts-wrapper * {
+  outline: none !important;
 }
 
 @keyframes premium-glow {

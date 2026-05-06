@@ -1,0 +1,293 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { Bot, Send, User, Loader2 } from 'lucide-react';
+import { GoogleGenAI } from '@google/genai';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { useAppContext } from '@/context/AppContext';
+
+// We are going to initialize the ai using the API KEY from env.
+// For now, this is a placeholder UI. 
+
+interface Message {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export const AIAssistant: React.FC = () => {
+  const { 
+    projects, 
+    clients, 
+    incomeRecords, 
+    expenses, 
+    ghazalNotes, 
+    shoppingLists, 
+    user 
+  } = useAppContext();
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: '1',
+      role: 'assistant',
+      content: 'আসসালামু আলাইকুম! আমি আপনার এআই অ্যাসিস্ট্যান্ট। আপনার প্রজেক্ট, ক্লায়েন্ট, আয় বা ব্যয়ের বিষয়ে যেকোনো তথ্য জানার থাকলে আমাকে জিজ্ঞেস করতে পারেন।'
+    }
+  ]);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || isLoading) return;
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: input.trim()
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setInput('');
+    setIsLoading(true);
+
+    try {
+      const totalBudget = projects.reduce((sum, p) => sum + (p.totalamount || 0), 0);
+      const totalPaid = projects.reduce((sum, p) => sum + (p.paidamount || 0), 0);
+      const totalDue = projects.reduce((sum, p) => sum + (p.dueamount || 0), 0);
+      
+      const totalIncome = incomeRecords.reduce((sum, i) => sum + (i.amount || 0), 0);
+      const totalExpense = expenses.reduce((sum, i) => sum + (i.amount || 0), 0);
+
+      const contextData = {
+        totalProjects: projects.length,
+        totalClients: clients.length,
+        totalBudget,
+        totalPaid,
+        totalDue,
+        totalIncome,
+        totalExpense,
+        projectsList: projects.map(p => ({
+          name: p.name,
+          client: p.clientname,
+          type: p.type,
+          budget: p.totalamount,
+          paid: p.paidamount,
+          due: p.dueamount,
+          status: p.status,
+          deadline: p.deadline,
+          createdAt: p.createdat,
+          notes: p.notes,
+        })),
+        incomeList: incomeRecords.map(i => ({
+          client: i.clientname,
+          project: i.projectname,
+          amount: i.amount,
+          date: i.date,
+          method: i.method
+        })),
+        expenseList: expenses.map(e => ({
+          category: e.category,
+          amount: e.amount,
+          date: e.date,
+          notes: e.notes
+        })),
+        clientsList: clients.map(c => ({
+          name: c.name,
+          contact: c.contact,
+          totalProjects: c.totalprojects,
+          totalEarnings: c.totalearnings
+        })),
+        shoppingLists: shoppingLists.map(s => ({
+          title: s.title,
+          date: s.date,
+          itemsCount: s.items?.length || 0,
+          totalAmount: s.totalamount,
+          notes: s.notes
+        })),
+        ghazalNotes: ghazalNotes.map(g => ({
+          title: g.title,
+          lyricsExcerpt: g.lyrics ? g.lyrics.substring(0, 100) + '...' : ''
+        }))
+      };
+
+      const systemInstruction = `You are a highly intelligent, empathetic, and human-like AI assistant for managing a creative agency and project management app. 
+      You speak fluently and naturally in Bengali, as if you are a friendly colleague or personal manager.
+      
+      Guidelines for your conversation:
+      1. Conversational & Natural: Talk like a human. Be polite, smart, and helpful. Avoid sounding like a robot.
+      2. Greetings: If the user greets you, reply with "আসসালামু আলাইকুম" or "ওয়ালাইকুম আসসালাম". Do not add greetings in the middle or start of regular answers if the user didn't greet you first.
+      3. Understanding Context: Read the user's intent. If they ask about income, don't just dump data—summarize it nicely.
+      4. Formatting: Use Markdown (bold, lists) to make your answers easy to read, but keep the tone conversational.
+      5. Don't mention JSON or system data. Just answer naturally based on the data provided.
+      
+      Today's date is: ${new Date().toLocaleDateString('bn-BD', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} (ISO: ${new Date().toISOString()}).
+      
+      Here is the current state of the application data:
+      ${JSON.stringify(contextData)}`;
+
+      // NOTE: Using a free API Key requires user to input it or having it in env
+      // But based on guidelines, for free models, API key is already in env
+      const apiKey = process.env.GEMINI_API_KEY || (import.meta as any).env.VITE_GEMINI_API_KEY;
+      
+      let aiResponseText = 'দুঃখিত, এমুহূর্তে আমি উত্তর দিতে পারছি না, কারণ এআই কনফিগার করা নেই।';
+      
+      if (apiKey) {
+        const ai = new GoogleGenAI({ apiKey });
+        
+        let chatHistory = [...messages, userMessage].map((msg) => ({
+          role: msg.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: msg.content }]
+        }));
+        
+        // Start history with a user message if needed, or simply drop the first model message
+        if (chatHistory.length > 0 && chatHistory[0].role === 'model') {
+           chatHistory.shift();
+        }
+
+        const response = await ai.models.generateContent({
+           model: 'gemini-2.5-flash',
+           contents: chatHistory,
+           config: {
+             systemInstruction: systemInstruction
+           }
+        });
+        
+        aiResponseText = response.text || 'কোনো উত্তর পাইনি।';
+      }
+
+      setMessages(prev => [...prev, {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: aiResponseText
+      }]);
+      
+    } catch (error: any) {
+      console.error("AI Error:", error);
+      let errorMessage = 'দুঃখিত, কোনো একটি সমস্যা হয়েছে। আবার চেষ্টা করুন।';
+      
+      if (error?.status === 429 || error?.message?.includes('429')) {
+         errorMessage = 'দুঃখিত, কোটা শেষ হয়ে গেছে। কিছুক্ষণ পর আবার চেষ্টা করুন।';
+      }
+
+      setMessages(prev => [...prev, {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: errorMessage
+      }]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-[calc(100vh-140px)] lg:h-[calc(100vh-40px)]">
+      {/* Header */}
+      <div className="px-4 py-4 sm:px-6 sm:py-6 shrink-0 bg-white border-b border-indigo-50/50 rounded-t-3xl shadow-sm z-10 flex items-center gap-3">
+         <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+             <Bot size={24} />
+         </div>
+         <div>
+            <h1 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight leading-none mb-1">
+              এআই অ্যাসিস্ট্যান্ট
+            </h1>
+            <p className="text-xs sm:text-sm font-bold text-slate-500">আপনার ব্যক্তিগত স্মার্ট হেল্পার</p>
+         </div>
+      </div>
+
+      {/* Chat Area */}
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-[#f8fafc] space-y-6">
+        {messages.map((message) => (
+          <div 
+            key={message.id} 
+            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+          >
+            <div className={`flex gap-3 max-w-[85%] sm:max-w-[75%] ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-1 ${message.role === 'user' ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200 text-indigo-600'}`}>
+                {message.role === 'user' ? <User size={16} /> : <Bot size={18} />}
+              </div>
+              <div className={`p-3.5 sm:p-4 rounded-2xl ${
+                  message.role === 'user' 
+                  ? 'bg-indigo-600 text-white rounded-tr-sm shadow-md' 
+                  : 'bg-white text-slate-700 rounded-tl-sm shadow-sm border border-slate-100'
+                }`}
+                style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
+              >
+                <div className="text-sm font-medium leading-relaxed markdown-body">
+                  <ReactMarkdown 
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                       ul: ({node, ...props}) => <ul className="list-disc pl-4 my-2" {...props} />,
+                       ol: ({node, ...props}) => <ol className="list-decimal pl-4 my-2" {...props} />,
+                       p: ({node, ...props}) => <p className="my-1" {...props} />,
+                       strong: ({node, ...props}) => <strong className="font-bold" {...props} />,
+                       h1: ({node, ...props}) => <h1 className="text-lg font-bold my-2" {...props} />,
+                       h2: ({node, ...props}) => <h2 className="text-base font-bold my-2" {...props} />,
+                       h3: ({node, ...props}) => <h3 className="text-sm font-bold my-1" {...props} />,
+                    }}
+                  >
+                    {message.content}
+                  </ReactMarkdown>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+        {isLoading && (
+          <div className="flex justify-start">
+            <div className="flex gap-3 max-w-[85%] sm:max-w-[75%] flex-row">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-1 bg-white border border-slate-200 text-indigo-600">
+                <Bot size={18} />
+              </div>
+              <div className="p-3.5 sm:p-4 rounded-2xl bg-white text-slate-700 rounded-tl-sm shadow-sm border border-slate-100 flex items-center gap-1.5 h-[52px]">
+                <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
+            </div>
+          </div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input Area */}
+      <div className="shrink-0 p-4 sm:p-6 bg-white border-t border-slate-100 rounded-b-3xl">
+        <form onSubmit={handleSendMessage} className="flex items-center gap-3 max-w-4xl mx-auto">
+          <div className="relative flex-1 flex items-center bg-slate-50 border border-slate-200 rounded-[24px] focus-within:ring-4 focus-within:ring-indigo-500/10 focus-within:border-indigo-500/50 transition-all shadow-sm pr-2">
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage(e);
+                }
+              }}
+              placeholder="আপনার প্রশ্ন লিখুন..."
+              className="w-full bg-transparent border-none px-5 py-4 text-sm sm:text-base font-medium text-slate-700 focus:outline-none resize-none min-h-[56px] max-h-[150px] leading-relaxed"
+              style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
+              rows={1}
+            />
+            <button
+              type="submit"
+              disabled={isLoading || !input.trim()}
+              className={`shrink-0 w-11 h-11 rounded-full flex items-center justify-center transition-all shadow-md active:scale-95 ${
+                !input.trim() || isLoading 
+                ? 'bg-slate-200 text-slate-400' 
+                : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-200'
+              }`}
+            >
+              <Send size={20} className={`${isLoading ? 'opacity-50' : 'translate-x-0.5'}`} />
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};

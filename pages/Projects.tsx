@@ -823,7 +823,7 @@ export const Projects: React.FC = () => {
       </div>
 
       {/* Report Content Area (for PDF) */}
-      <div id="pdf-container" ref={listRef} className={`${isGeneratingPDF ? 'block' : 'space-y-4 rounded-[2.5rem]'} px-1 py-4 bg-white`}>
+      <div id="pdf-container" ref={listRef} className={`${isGeneratingPDF ? 'block' : 'space-y-4 rounded-xl sm:rounded-2xl'} px-1 sm:px-2 py-4 bg-white`}>
         
         {isGeneratingPDF && (
           <div id="pdf-header" className="mb-8 border-b border-slate-200 pb-6 flex justify-between items-start">
@@ -994,15 +994,15 @@ export const Projects: React.FC = () => {
                           <Users size={isGeneratingPDF ? 14 : 10} className="shrink-0" /> {p.clientname}
                         </p>
                         <div className={`flex items-center ${isGeneratingPDF ? 'gap-2' : 'gap-1 mt-2.5'} overflow-x-auto no-scrollbar pb-1`}>
-                          <div className={`flex items-center ${isGeneratingPDF ? 'gap-1.5 px-3 py-1.5 rounded-xl' : 'gap-1 px-2 py-1 rounded-lg'} bg-slate-50 shrink-0`}>
+                          <div className={`flex items-center ${isGeneratingPDF ? 'gap-1.5 px-3 py-1.5 rounded-xl' : 'gap-1 px-1.5 py-1 rounded-lg'} bg-slate-50 shrink-0`}>
                             <span className={`${isGeneratingPDF ? 'text-xs' : 'text-[10px]'} font-bold text-slate-400`}>বাজেট</span>
                             <span className={`${isGeneratingPDF ? 'text-sm' : 'text-xs'} font-black text-slate-700`}>{currency}{p.totalamount.toLocaleString('bn-BD')}</span>
                           </div>
-                          <div className={`flex items-center ${isGeneratingPDF ? 'gap-1.5 px-3 py-1.5 rounded-xl' : 'gap-1 px-2 py-1 rounded-lg'} bg-emerald-50 shrink-0`}>
+                          <div className={`flex items-center ${isGeneratingPDF ? 'gap-1.5 px-3 py-1.5 rounded-xl' : 'gap-1 px-1.5 py-1 rounded-lg'} bg-emerald-50 shrink-0`}>
                             <span className={`${isGeneratingPDF ? 'text-xs' : 'text-[10px]'} font-bold text-emerald-500`}>আদায়</span>
                             <span className={`${isGeneratingPDF ? 'text-sm' : 'text-xs'} font-black text-emerald-600`}>{currency}{p.paidamount.toLocaleString('bn-BD')}</span>
                           </div>
-                          <div className={`flex items-center ${isGeneratingPDF ? 'gap-1.5 px-3 py-1.5 rounded-xl' : 'gap-1 px-2 py-1 rounded-lg'} shrink-0 ${p.dueamount > 0 ? 'bg-rose-50' : 'bg-slate-50'}`}>
+                          <div className={`flex items-center ${isGeneratingPDF ? 'gap-1.5 px-3 py-1.5 rounded-xl' : 'gap-1 px-1.5 py-1 rounded-lg'} shrink-0 ${p.dueamount > 0 ? 'bg-rose-50' : 'bg-slate-50'}`}>
                             <span className={`${isGeneratingPDF ? 'text-xs' : 'text-[10px]'} font-bold ${p.dueamount > 0 ? 'text-rose-400' : 'text-slate-400'}`}>বকেয়া</span>
                             <span className={`${isGeneratingPDF ? 'text-sm' : 'text-xs'} font-black ${p.dueamount > 0 ? 'text-rose-600' : 'text-slate-500'}`}>{currency}{p.dueamount.toLocaleString('bn-BD')}</span>
                           </div>

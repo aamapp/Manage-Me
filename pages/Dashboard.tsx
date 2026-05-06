@@ -2,8 +2,7 @@
 import React, { useMemo } from 'react';
 import { useNavigate } from "react-router-dom";
 import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  Cell
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
 import { 
   Briefcase, 
@@ -187,7 +186,7 @@ export const Dashboard: React.FC = () => {
             </button>
           </div>
           
-          <div className="h-32 w-full -ml-2 lg:h-40 z-10">
+          <div className="h-32 w-full -ml-2 lg:h-40 z-10 focus:outline-none [&_*]:outline-none">
             {!isMounted ? null : !hasChartData ? (
               <div className="h-full w-full flex flex-col items-center justify-center text-slate-300 gap-3 border-2 border-dashed border-slate-100 rounded-2xl ml-2">
                 <Wallet size={32} className="opacity-50" />
@@ -195,8 +194,14 @@ export const Dashboard: React.FC = () => {
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} debounce={50}>
-                <BarChart data={chartData} margin={{ top: 10, right: 0, left: -15, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <AreaChart data={chartData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#818cf8" stopOpacity={0.4}/>
+                      <stop offset="95%" stopColor="#818cf8" stopOpacity={0.0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                   <XAxis 
                     dataKey="name" 
                     axisLine={false} 
@@ -210,7 +215,7 @@ export const Dashboard: React.FC = () => {
                     tick={{fill: '#94a3b8', fontSize: 11, fontWeight: 500}}
                   />
                   <Tooltip 
-                    cursor={{fill: '#f8fafc', radius: 8}}
+                    cursor={{stroke: '#cbd5e1', strokeWidth: 1.5, strokeDasharray: '4 4'}}
                     contentStyle={{ 
                       borderRadius: '16px', 
                       border: 'none', 
@@ -221,16 +226,15 @@ export const Dashboard: React.FC = () => {
                     }}
                     formatter={(value: number) => [`${currency} ${value.toLocaleString('en-US')}`, '']}
                   />
-                  <Bar 
+                  <Area 
+                    type="monotone" 
                     dataKey="income" 
-                    radius={[6, 6, 6, 6]} 
-                    barSize={30}
-                  >
-                    {chartData.map((_entry, index) => (
-                      <Cell key={`cell-${index}`} fill={index === 5 ? '#6366f1' : '#cbd5e1'} />
-                    ))}
-                  </Bar>
-                </BarChart>
+                    stroke="#6366f1" 
+                    strokeWidth={3}
+                    fillOpacity={1} 
+                    fill="url(#colorIncome)" 
+                  />
+                </AreaChart>
               </ResponsiveContainer>
             )}
           </div>
@@ -266,8 +270,8 @@ export const Dashboard: React.FC = () => {
                       />
                     </svg>
                     <div className="flex flex-col items-center justify-center z-10 pt-1">
-                      <span className="text-[12px] font-bold text-slate-800 mt-1">{status.label}</span>
-                      <span className="text-[22px] font-extrabold text-black leading-tight mt-0.5">{status.count}</span>
+                      <span className={`text-[12px] font-medium ${status.textColor} mt-1`}>{status.label}</span>
+                      <span className="text-[22px] font-extrabold text-slate-800 leading-tight mt-0.5">{status.count}</span>
                     </div>
                   </div>
                 </div>

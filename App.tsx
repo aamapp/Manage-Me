@@ -24,6 +24,7 @@ import { IconGenerator } from '@/pages/IconGenerator';
 import { Profile } from '@/pages/Profile';
 import ShoppingLists from '@/pages/ShoppingLists';
 import Trash from '@/pages/Trash';
+import { AIAssistant } from '@/pages/AIAssistant';
 
 const Login = lazy(() => import('@/pages/Login').then(module => ({ default: module.Login })));
 const Signup = lazy(() => import('@/pages/Signup').then(module => ({ default: module.Signup })));
@@ -217,6 +218,7 @@ const AppContent: React.FC = () => {
                     <Route path="/reports" element={<Reports />} />
                     <Route path="/settings" element={<Settings />} />
                     <Route path="/profile" element={<Profile />} />
+                    <Route path="/ai-assistant" element={<AIAssistant />} />
                     <Route path="/ghazal-notes" element={<GhazalNotes />} />
                     <Route path="/shopping-lists" element={<ShoppingLists />} />
                     <Route path="/trash" element={<Trash />} />
