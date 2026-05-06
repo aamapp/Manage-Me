@@ -12,7 +12,7 @@ interface ConfirmModalProps {
   isProcessing?: boolean;
   confirmText?: string;
   cancelText?: string;
-  type?: 'danger' | 'warning';
+  type?: 'danger' | 'warning' | 'primary';
 }
 
 export const ConfirmModal: React.FC<ConfirmModalProps> = ({ 
@@ -34,7 +34,11 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
         className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 animate-in zoom-in-95 duration-200 border border-slate-100"
         onClick={e => e.stopPropagation()}
       >
-        <div className={`w-14 h-14 rounded-full flex items-center justify-center mb-5 mx-auto ${type === 'danger' ? 'bg-rose-50 text-rose-500' : 'bg-amber-50 text-amber-500'}`}>
+        <div className={`w-14 h-14 rounded-full flex items-center justify-center mb-5 mx-auto ${
+          type === 'danger' ? 'bg-rose-50 text-rose-500' : 
+          type === 'warning' ? 'bg-amber-50 text-amber-500' :
+          'bg-indigo-50 text-indigo-500'
+        }`}>
           <AlertTriangle size={28} />
         </div>
         
@@ -52,7 +56,11 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
           <button 
             onClick={onConfirm}
             disabled={isProcessing}
-            className={`flex-1 py-3.5 rounded-xl font-bold text-white shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 ${type === 'danger' ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-200' : 'bg-amber-600 hover:bg-amber-700 shadow-amber-200'}`}
+            className={`flex-1 py-3.5 rounded-xl font-bold text-white shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 ${
+              type === 'danger' ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-200' : 
+              type === 'warning' ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-200' :
+              'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200'
+            }`}
           >
             {isProcessing ? <Loader2 size={18} className="animate-spin" /> : confirmText}
           </button>

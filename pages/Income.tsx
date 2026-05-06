@@ -602,13 +602,13 @@ export const Income: React.FC = () => {
               <DatePicker 
                 label="শুরু তারিখ"
                 value={dateRange.start}
-                onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
+                onChange={(date) => setDateRange({ ...dateRange, start: date })}
                 placeholder="শুরু তারিখ"
               />
               <DatePicker 
                 label="শেষ তারিখ"
                 value={dateRange.end}
-                onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
+                onChange={(date) => setDateRange({ ...dateRange, end: date })}
                 placeholder="শেষ তারিখ"
               />
             </div>

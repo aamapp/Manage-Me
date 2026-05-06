@@ -125,16 +125,16 @@ const Trash: React.FC = () => {
                 <h3 className="font-bold text-gray-900 text-lg mb-1">{project.name}</h3>
                 <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
                   <div className="flex items-center gap-1">
-                    <User className="w-4 h-4" /> {project.client_name || 'Unknown Client'}
+                    <User className="w-4 h-4" /> {project.clientname || 'Unknown Client'}
                   </div>
                   <div className="flex items-center gap-1">
-                    <Receipt className="w-4 h-4" /> বাজেট: ৳{project.budget}
+                    <Receipt className="w-4 h-4" /> বাজেট: ৳{project.totalamount}
                   </div>
                   <div className="flex items-center gap-1">
-                    <CheckCircle2 className="w-4 h-4 text-green-500" /> পেইড: ৳{project.paid_amount}
+                    <CheckCircle2 className="w-4 h-4 text-green-500" /> পেইড: ৳{project.paidamount}
                   </div>
                   <div className="flex items-center gap-1">
-                    <Clock className="w-4 h-4 text-orange-500" /> ডিউ: ৳{project.due_amount}
+                    <Clock className="w-4 h-4 text-orange-500" /> ডিউ: ৳{project.dueamount}
                   </div>
                 </div>
               </div>
@@ -372,8 +372,8 @@ const Trash: React.FC = () => {
           ? "আপনি কি এই আইটেমটি রিস্টোর করতে চান?" 
           : "এটি স্থায়ীভাবে মুছে ফেলা হবে এবং আর ফিরে পাওয়া যাবে না। আপনি কি নিশ্চিত?"}
         confirmText={confirmAction === 'restore' ? "রিস্টোর করুন" : "ডিলিট করুন"}
-        confirmColor={confirmAction === 'restore' ? "blue" : "red"}
-        isLoading={confirmAction === 'restore' ? isRestoring : isDeleting}
+        type={confirmAction === 'restore' ? "primary" : "danger"}
+        isProcessing={confirmAction === 'restore' ? isRestoring : isDeleting}
       />
     </div>
   );

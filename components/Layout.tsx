@@ -436,7 +436,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                   className="flex flex-col items-center justify-center p-2 rounded-xl bg-white border border-slate-100 shadow-sm active:scale-95 transition-all group hover:border-indigo-200 hover:shadow-md"
                 >
                   <div className="w-7 h-7 rounded-full bg-slate-50 text-slate-600 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300 shadow-sm mb-1.5 relative">
-                    {React.cloneElement(item.icon as React.ReactElement, { size: 14 })}
+                    {React.cloneElement(item.icon as React.ReactElement<{ size?: number }>, { size: 14 })}
                     {item.path === '/trash' && trashCount > 0 && (
                       <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[8px] font-black px-1 py-0.5 rounded-full min-w-[14px] h-[14px] flex items-center justify-center shadow-sm ring-2 bg-white group-hover:ring-indigo-600 transition-all animate-in zoom-in duration-300">
                         {trashCount}

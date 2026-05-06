@@ -134,62 +134,82 @@ export const AIAssistant: React.FC = () => {
 
       // Accessing the API key
       const getApiKey = () => {
-        const key = (process as any).env?.GEMINI_API_KEY || 
-                    (import.meta as any).env?.VITE_GEMINI_API_KEY || 
+        // Higher priority to VITE_ prefix for client-side bundle stability
+        const key = (import.meta as any).env?.VITE_GEMINI_API_KEY || 
+                    (process as any).env?.GEMINI_API_KEY || 
+                    (process as any).env?.VITE_GEMINI_API_KEY ||
                     (import.meta as any).env?.GEMINI_API_KEY;
         
         const finalKey = key ? key.trim() : null;
         
+        // Check for common typo 'Alza' instead of 'AIza'
+        if (finalKey && (finalKey.startsWith('Alza') || finalKey.startsWith('alza'))) {
+          console.warn("[AI Key Debug] Potential typo detected: Key starts with 'Alza' or 'alza' instead of 'AIza'.");
+          return "TYPO_DETECTED";
+        }
+
+        // Check if starts with AIza
+        if (finalKey && finalKey.length > 0 && !finalKey.startsWith('AIza')) {
+          console.warn("[AI Key Debug] Key does not start with 'AIza'. Prefix: " + finalKey.substring(0, 4));
+        }
+
         // Ignore placeholders
-        if (!finalKey || finalKey === "AI Studio Free Tier" || finalKey === "YOUR_API_KEY") {
-          console.log("[AI Key Debug] No valid key provided (placeholder or empty).");
+        if (!finalKey || 
+            finalKey === "AI Studio Free Tier" || 
+            finalKey === "YOUR_API_KEY" || 
+            finalKey.length < 30) {
+          console.log("[AI Key Debug] No valid key provided yet.");
           return null;
         }
 
-        // Check for common typo 'Alza' instead of 'AIza'
-        if (finalKey.startsWith('Alza')) {
-          console.warn("[AI Key Debug] Potential typo: Key starts with 'Alza' instead of 'AIza'.");
-        }
-
-        console.log(`[AI Key Debug] Key loaded. Prefix: "${finalKey.substring(0, 4)}", Length: ${finalKey.length}`);
+        console.log(`[AI Key Debug] Key found. Prefix: "${finalKey.substring(0, 4)}", Length: ${finalKey.length}`);
         return finalKey;
       };
 
       const apiKey = getApiKey();
+      
+      if (apiKey === "TYPO_DETECTED") {
+        setMessages(prev => [...prev, {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: 'আপনার এপিআই কি (API Key) টিতে সম্ভবত একটি টাইপো (Typo) রয়েছে। কি-টি "AIza" (বড় হাতের A, বড় হাতের I, ছোট হাতের z, ছোট হাতের a) দিয়ে শুরু হওয়ার কথা, কিন্তু আপনারটি "Alza" দিয়ে শুরু হয়েছে। দয়া করে সেটিংস থেকে কি-টি ঠিক করুন (ছোট হাতের l এর জায়গায় বড় হাতের I হবে)।'
+        }]);
+        setIsLoading(false);
+        return;
+      }
       
       let aiResponseText = 'দুঃখিত, এপিআই কি (API Key) পাওয়া যায়নি। দয়া করে সেটিংস থেকে GEMINI_API_KEY টি সঠিকভাবে সেট করুন।';
       
       try {
         if (apiKey && apiKey.length > 20) {
           const genAI = new GoogleGenerativeAI(apiKey);
-          const modelName = 'gemini-1.5-flash';
-          const model = genAI.getGenerativeModel({ model: modelName });
+          const model = genAI.getGenerativeModel({ 
+            model: "gemini-1.5-flash",
+          });
           
-          let chatHistory = [...messages, userMessage].map((msg) => ({
-            role: msg.role === 'assistant' ? 'model' : 'user',
+          const chatHistory = [...messages.slice(1), userMessage].map((msg) => ({
+            role: msg.role === "assistant" ? "model" : "user",
             parts: [{ text: msg.content }]
           }));
           
-          if (chatHistory.length > 0 && chatHistory[0].role === 'model') {
-             chatHistory.shift();
-          }
-
           const result = await model.generateContent({
              contents: chatHistory,
-             systemInstruction: { role: 'system', parts: [{ text: systemInstruction }] } as any
+             systemInstruction: systemInstruction 
           });
           
           const response = await result.response;
-          aiResponseText = response.text() || 'কোনো উত্তর পাইনি।';
+          aiResponseText = response.text() || "কোনো উত্তর পাইনি।";
         }
       } catch (error: any) {
-        console.error('AI Request Failed:', error);
-        if (error.message?.includes('expired') || error.message?.includes('API key not valid') || error.status === 400) {
-          aiResponseText = 'আপনার এপিআই কি (API Key) টি কার্যকর নয় বা মেয়াদ শেষ হয়ে গেছে। দয়া করে এআই স্টুডিও থেকে নতুন কী তৈরি করে সেটিংস-এ আপডেট করুন।';
-        } else if (error.message?.includes('quota')) {
-          aiResponseText = 'এপিআই কোটা শেষ হয়ে গেছে। কিছুক্ষণ পর চেষ্টা করুন।';
+        console.error("AI Request Failed Details:", error);
+        if (error.message?.includes("expired") || error.message?.includes("API key not valid") || error.status === 400) {
+          aiResponseText = "আপনার এপিআই কি (API Key) টি কার্যকর নয় বা মেয়াদ শেষ হয়ে গেছে। দয়া করে এআই স্টুডিও থেকে নতুন কী তৈরি করে সেটিংস-এ আপডেট করুন।";
+        } else if (error.message?.includes("not found") || error.status === 404) {
+          aiResponseText = "দুঃখিত, এই এপিআই কি (API Key) দিয়ে জেমিনি মডেলটি পাওয়া যাচ্ছে না (404 Error)। নিশ্চিত করুন যে আপনার কি-টি 'AIza' দিয়ে শুরু হয়েছে (A, I - বড় হাতের) এবং Google AI Studio-তে Gemini API সচল আছে। টাইপ করার সময় 'I' (বড় হাতের আই) আর 'l' (ছোট হাতের এল) এর মধ্যে পার্থক্য খেয়াল করুন।";
+        } else if (error.message?.includes("quota")) {
+          aiResponseText = "এপিআই কোটা শেষ হয়ে গেছে। কিছুক্ষণ পর চেষ্টা করুন।";
         } else {
-          aiResponseText = 'দুঃখিত, এআই সার্ভারের সাথে যোগাযোগ করা যাচ্ছে না। আবার চেষ্টা করুন।';
+          aiResponseText = "দুঃখিত, এআই সার্ভারের সাথে যোগাযোগ করা যাচ্ছে না। আবার চেষ্টা করুন।";
         }
       }
 
