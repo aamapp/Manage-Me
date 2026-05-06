@@ -133,22 +133,24 @@ export const AIAssistant: React.FC = () => {
       ${JSON.stringify(contextData)}`;
 
       // Accessing the API key
-      const apiKey = 
-        (typeof process !== 'undefined' && process.env ? (process.env as any).GEMINI_API_KEY : null) || 
-        (import.meta as any).env?.VITE_GEMINI_API_KEY || 
-        (import.meta as any).env?.GEMINI_API_KEY;
-      
-      console.log("Checking API Key availability...");
-      if (!apiKey) {
-        console.error("API Key not found in any expected environment variable.");
-      } else {
-        console.log("API Key found. Length:", apiKey.length);
-      }
+      const getApiKey = () => {
+        const hardcodedKey = 'AIzaSyDLWVKuftyLtOpDlndlWRIm57mkeGItsEs';
+        
+        // Try various ways to get the key from env
+        const envKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || 
+                       (import.meta as any).env?.GEMINI_API_KEY ||
+                       (typeof process !== 'undefined' && (process as any).env?.GEMINI_API_KEY);
+                       
+        // Return env key if it looks valid, otherwise backup
+        return (envKey && envKey.length > 20) ? envKey : hardcodedKey;
+      };
+
+      const apiKey = getApiKey();
       
       let aiResponseText = 'দুঃখিত, এমুহূর্তে আমি উত্তর দিতে পারছি না, কারণ এআই কনফিগার করা নেই। আপনার সেটিংস থেকে এপিআই কি (API Key) সঠিকভাবে দেওয়া হয়েছে কিনা চেক করুন।';
       
-      if (apiKey && apiKey.length > 20) {
-        const ai = new GoogleGenAI(apiKey);
+      if (apiKey) {
+        const ai = new GoogleGenAI({ apiKey });
         
         let chatHistory = [...messages, userMessage].map((msg) => ({
           role: msg.role === 'assistant' ? 'model' : 'user',
@@ -269,8 +271,8 @@ export const AIAssistant: React.FC = () => {
 
       {/* Input Area */}
       <div className="shrink-0 p-4 sm:p-6 bg-white border-t border-slate-100 rounded-b-3xl">
-        <form onSubmit={handleSendMessage} className="flex items-center gap-3 max-w-4xl mx-auto">
-          <div className="relative flex-1 flex items-center bg-slate-50 border border-slate-200 rounded-[24px] focus-within:ring-4 focus-within:ring-indigo-500/10 focus-within:border-indigo-500/50 transition-all shadow-sm pr-2">
+        <form onSubmit={handleSendMessage} className="max-w-4xl mx-auto">
+          <div className="relative flex items-center bg-slate-50 border border-slate-200 rounded-[32px] focus-within:ring-4 focus-within:ring-indigo-500/10 focus-within:border-indigo-500/50 transition-all shadow-sm p-1.5 pr-2 pl-1">
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -281,7 +283,7 @@ export const AIAssistant: React.FC = () => {
                 }
               }}
               placeholder="আপনার প্রশ্ন লিখুন..."
-              className="w-full bg-transparent border-none px-5 py-4 text-sm sm:text-base font-medium text-slate-700 focus:outline-none resize-none min-h-[56px] max-h-[150px] leading-relaxed"
+              className="flex-1 bg-transparent border-none px-4 py-3 text-sm sm:text-base font-medium text-slate-700 focus:outline-none resize-none min-h-[52px] max-h-[150px] leading-relaxed"
               style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
               rows={1}
             />
