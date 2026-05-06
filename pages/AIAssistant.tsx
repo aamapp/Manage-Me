@@ -139,11 +139,14 @@ export const AIAssistant: React.FC = () => {
                     (import.meta as any).env?.GEMINI_API_KEY;
         
         const finalKey = key ? key.trim() : null;
-        if (finalKey) {
-          console.log(`[AI Key Debug] Key loaded. Prefix: "${finalKey.substring(0, 4)}", Length: ${finalKey.length}`);
-        } else {
-          console.log("[AI Key Debug] No key found in env.");
+        
+        // Ignore the placeholder string from AI Studio
+        if (finalKey === "AI Studio Free Tier" || !finalKey) {
+          console.log("[AI Key Debug] No valid key found (placeholder or empty).");
+          return null;
         }
+
+        console.log(`[AI Key Debug] Key loaded. Prefix: "${finalKey.substring(0, 4)}", Length: ${finalKey.length}`);
         return finalKey;
       };
 
@@ -155,9 +158,13 @@ export const AIAssistant: React.FC = () => {
         if (apiKey && apiKey.length > 20) {
           // Standard initialization for @google/generative-ai
           const genAI = new GoogleGenerativeAI(apiKey);
+          
+          // Using a more standard model reference
+          const modelName = 'gemini-1.5-flash';
+          console.log(`[AI Request] Using model: ${modelName}`);
+
           const model = genAI.getGenerativeModel({ 
-            model: 'gemini-1.5-flash',
-            systemInstruction: systemInstruction 
+            model: modelName,
           });
           
           let chatHistory = [...messages, userMessage].map((msg) => ({
@@ -171,7 +178,8 @@ export const AIAssistant: React.FC = () => {
           }
 
           const result = await model.generateContent({
-             contents: chatHistory
+             contents: chatHistory,
+             systemInstruction: { role: 'system', parts: [{ text: systemInstruction }] } as any
           });
           
           const response = await result.response;
