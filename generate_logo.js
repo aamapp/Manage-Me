@@ -1,7 +1,7 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 async function generateLogo() {
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const ai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
   const response = await ai.models.generateContent({
     model: 'gemini-3.1-flash-image-preview',
     contents: {

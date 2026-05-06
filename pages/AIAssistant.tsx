@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Bot, Send, User, Loader2 } from 'lucide-react';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useAppContext } from '@/context/AppContext';
@@ -147,8 +147,8 @@ export const AIAssistant: React.FC = () => {
       let aiResponseText = 'দুঃখিত, এমুহূর্তে আমি উত্তর দিতে পারছি না, কারণ এআই কনফিগার করা নেই। আপনার সেটিংস বা ব্রাউজারের এনভায়রনমেন্টে এপিআই কি (API Key) সঠিকভাবে দেওয়া হয়েছে কিনা চেক করুন।';
       
       if (apiKey && apiKey.length > 10) {
-        // Standard initialization for @google/genai
-        const genAI = new GoogleGenAI(apiKey);
+        // Standard initialization for @google/generative-ai
+        const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({ 
           model: 'gemini-1.5-flash',
           systemInstruction: systemInstruction 
