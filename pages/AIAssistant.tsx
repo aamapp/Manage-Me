@@ -183,19 +183,46 @@ export const AIAssistant: React.FC = () => {
       try {
         if (apiKey && apiKey.length > 20) {
           const genAI = new GoogleGenerativeAI(apiKey);
-          const model = genAI.getGenerativeModel({ 
-            model: "gemini-1.5-flash",
-          });
-          
           const chatHistory = [...messages.slice(1), userMessage].map((msg) => ({
             role: msg.role === "assistant" ? "model" : "user",
             parts: [{ text: msg.content }]
           }));
-          
-          const result = await model.generateContent({
-             contents: chatHistory,
-             systemInstruction: systemInstruction 
-          });
+
+          const modelsToTry = ["gemini-1.5-flash", "gemini-2.5-flash", "gemini-pro-latest", "gemini-1.5-flash-latest", "gemini-pro"];
+          let result = null;
+          let lastError = null;
+
+          for (const modelName of modelsToTry) {
+            try {
+              console.log(`[AI Model Config] Trying model: ${modelName}`);
+              const model = genAI.getGenerativeModel({ model: modelName });
+              
+              if (modelName === "gemini-pro") {
+                  // gemini-pro 1.0 does not support systemInstruction, manually prepend
+                  const historyWithSystem = [{ role: 'user', parts: [{ text: systemInstruction }]}, { role: 'model', parts: [{ text: 'Understood.' }]}, ...chatHistory];
+                  result = await model.generateContent({
+                     contents: historyWithSystem
+                  });
+              } else {
+                  result = await model.generateContent({
+                     contents: chatHistory,
+                     systemInstruction: systemInstruction 
+                  });
+              }
+              break; // Success! We found a working model.
+            } catch (error: any) {
+              console.warn(`[AI Model Config] Model ${modelName} failed:`, error.message || error);
+              lastError = error;
+              if (error.status === 404 || error.message?.toLowerCase().includes("not found")) {
+                continue; // Try the next model
+              }
+              break; // If it's a different error like 403 or 400 or 429, don't guess other models.
+            }
+          }
+
+          if (!result) {
+            throw lastError;
+          }
           
           const response = await result.response;
           aiResponseText = response.text() || "কোনো উত্তর পাইনি।";
