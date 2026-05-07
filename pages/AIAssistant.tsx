@@ -274,6 +274,10 @@ export const AIAssistant: React.FC = () => {
                 if (isApiKeyError) {
                    throw error; // Immediately throw, because no model will work with a bad API key
                 }
+
+                if (error.status === 429 || errorStr.includes('quota')) {
+                   throw error; // Fail fast on quota exhausted
+                }
                 
                 // If the error seems to be about tools validation, and we are using tools, remember it but continue
                 if (error.status === 400 && errorStr.includes('tool')) {
