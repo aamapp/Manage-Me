@@ -131,8 +131,23 @@ User Message: ${userMessage}`;
        }
        throw new Error(`জেমিনি মডেল পাওয়া যাচ্ছে না। দয়া করে সেটিংস চেক করুন।`);
     } else if (error.status === 400 || error.message?.includes("API key")) {
-       throw new Error(`আপনার এপিআই কি (API Key) সঠিক নয়। ദয়া করে সেটিংস বা .env চেক করুন।`);
+       throw new Error(`আপনার এপিআই কি (API Key) সঠিক নয়। দয়া করে সেটিংস বা .env চেক করুন।`);
+    } else if (error.status === 503 || error.status === 500 || error.message?.includes("503") || error.message?.includes("high demand") || error.message?.includes("UNAVAILABLE")) {
+       throw new Error(`সার্ভারে বর্তমানে অতিরিক্ত চাপ রয়েছে। দয়া করে কিছুক্ষণ পর আবার চেষ্টা করুন।`);
     }
+    
+    // Parse JSON error from Google Gen AI if available
+    if (error.message && error.message.includes("{")) {
+       try {
+         const parsedError = JSON.parse(error.message);
+         if (parsedError.error?.code === 503 || parsedError.error?.status === "UNAVAILABLE") {
+            throw new Error(`সার্ভারে বর্তমানে অতিরিক্ত চাপ রয়েছে। দয়া করে কিছুক্ষণ পর আবার চেষ্টা করুন।`);
+         }
+       } catch (e) {
+         // ignore parse error
+       }
+    }
+    
     throw error;
   }
 }

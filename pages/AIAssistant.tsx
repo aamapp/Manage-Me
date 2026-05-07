@@ -186,6 +186,11 @@ export const AIAssistant: React.FC = () => {
       console.error("AI Error:", error);
       let errorMessage = error.message || 'দুঃখিত, কোনো একটি সমস্যা হয়েছে। আবার চেষ্টা করুন।';
       
+      // If the error message is a JSON string (like from the API), show a generic Bengali message instead of raw JSON
+      if (typeof errorMessage === 'string' && errorMessage.trim().startsWith('{')) {
+         errorMessage = 'সার্ভারে সাময়িক সমস্যা হচ্ছে। দয়া করে কিছুক্ষণ পর আবার চেষ্টা করুন।';
+      }
+      
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
