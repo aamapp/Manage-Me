@@ -145,7 +145,7 @@ export const AIAssistant: React.FC = () => {
                     (process as any).env?.VITE_GEMINI_API_KEY ||
                     (import.meta as any).env?.GEMINI_API_KEY;
         
-        const finalKey = key ? key.trim() : null;
+        const finalKey = key ? key.trim() : "AIzaSyAGBKfd_B3Wceo1SXkUiMbJ3zn6lM1ir9E";
         
         // Check for common typo 'Alza' instead of 'AIza'
         if (finalKey && (finalKey.startsWith('Alza') || finalKey.startsWith('alza'))) {
