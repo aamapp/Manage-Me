@@ -245,6 +245,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         shoppingQuery.order('createdat', { ascending: false })
       ]);
 
+      // If there's an error in critical initial fetches, abort to prevent wiping local cache with empty arrays
+      if (projRes.error || clientRes.error || incomeRes.error || expenseRes.error) {
+        throw new Error(projRes.error?.message || clientRes.error?.message || incomeRes.error?.message || expenseRes.error?.message || 'Failed to fetch data');
+      }
+
       if (projRes.error) console.warn(`Project load error: ${projRes.error.message}`);
       
       const pData = projRes.data as Project[] || [];
@@ -614,6 +619,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (mounted) {
             const metadata = session.user.user_metadata;
             
+            // Set user immediately from metadata for fast UI, background fetch will update if needed
+            const initialUser = {
+                id: session.user.id,
+                email: session.user.email || '',
+                name: metadata?.name || 'User',
+                phone: metadata?.phone || '',
+                occupation: metadata?.occupation || '',
+                avatar_url: metadata?.avatar_url || '',
+                language: metadata?.language || 'bn',
+                currency: metadata?.currency || '৳',
+                role: metadata?.role || 'user',
+                createdat: session.user.created_at
+            };
+            setUser((prev) => prev ? prev : initialUser);
+
             // Background Sync with Profile Table (Source of Truth)
             supabase.from('profiles')
               .select('*')
@@ -621,22 +641,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               .neq('id', `cb-${Date.now()}`)
               .abortSignal(AbortSignal.timeout(5000))
               .maybeSingle()
-             .then(({ data: profile }) => {
-                 if (mounted) {
+             .then(({ data: profile, error: profError }) => {
+                 if (mounted && !profError && profile) {
                      const avatarUrl = profile?.avatar_url || metadata?.avatar_url || '';
                      const cacheBuster = avatarUrl ? `${avatarUrl}${avatarUrl.includes('?') ? '&' : '?'}t=${Date.now()}` : '';
 
                      setUser({
                          id: session.user.id,
                          email: session.user.email || '',
-                         name: profile?.name || metadata?.name || 'User',
-                         phone: profile?.phone || metadata?.phone || '',
-                         occupation: profile?.occupation || metadata?.occupation || '',
+                         name: profile.name || metadata?.name || 'User',
+                         phone: profile.phone || metadata?.phone || '',
+                         occupation: profile.occupation || metadata?.occupation || '',
                          avatar_url: cacheBuster || avatarUrl,
-                         language: profile?.language || metadata?.language || 'bn',
-                         currency: profile?.currency || metadata?.currency || '৳',
+                         language: profile.language || metadata?.language || 'bn',
+                         currency: profile.currency || metadata?.currency || '৳',
                          role: metadata?.role || 'user',
-                         createdat: profile?.createdat || session.user.created_at
+                         createdat: profile.createdat || session.user.created_at
                      });
                  }
              }, (err: any) => {

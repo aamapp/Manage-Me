@@ -3,6 +3,8 @@ import { Bot, Send, User, Loader2 } from 'lucide-react';
 import { GoogleGenerativeAI, FunctionDeclaration, SchemaType } from '@google/generative-ai';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '@/context/AppContext';
 
@@ -195,7 +197,7 @@ export const AIAssistant: React.FC = () => {
             functionDeclarations: [
               {
                 name: "download_report",
-                description: "Download a report as a CSV file. Use this when the user asks to download, export, or save a report/list.",
+                description: "Download a report as a PDF file. Use this when the user asks to download, export, or save a report/list.",
                 parameters: {
                   type: SchemaType.OBJECT,
                   properties: {
@@ -306,40 +308,48 @@ export const AIAssistant: React.FC = () => {
             } else if (call.name === "download_report") {
                const topic = (call.args as any).topic;
                
-               const downloadCSV = (data: any[], filename: string) => {
+               const downloadPDF = (data: any[], filename: string, title: string) => {
                   if (!data || data.length === 0) return;
-                  const headers = Object.keys(data[0] || {}).join(",");
-                  const rows = data.map(obj => Object.values(obj).map(v => `"${(v?.toString() || '').replace(/"/g, '""')}"`).join(",")).join("\n");
-                  const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + headers + "\n" + rows;
-                  const encodedUri = encodeURI(csvContent);
-                  const link = document.createElement("a");
-                  link.setAttribute("href", encodedUri);
-                  link.setAttribute("download", filename);
-                  document.body.appendChild(link);
-                  link.click();
-                  document.body.removeChild(link);
+                  const doc = new jsPDF();
+                  
+                  // Add a title
+                  doc.setFontSize(18);
+                  doc.text(title, 14, 20);
+                  
+                  const headers = Object.keys(data[0] || {});
+                  const rows = data.map(obj => Object.values(obj).map(v => v?.toString() || ''));
+                  
+                  autoTable(doc, {
+                    head: [headers],
+                    body: rows,
+                    startY: 30,
+                    styles: { fontSize: 10, cellPadding: 3 },
+                    headStyles: { fillColor: [63, 81, 181] },
+                  });
+                  
+                  doc.save(filename);
                };
                
                switch(topic) {
                   case 'projects':
-                     downloadCSV(contextData.projectsList, `Projects_Report_${Date.now()}.csv`);
-                     aiResponseText = "প্রজেক্ট লিস্ট এর ডেটা অটোম্যাক যুক্ত হয়ে CSV ফাইল হিসেবে ডাউনলোড শুরু হয়েছে!";
+                     downloadPDF(contextData.projectsList, `Projects_Report_${Date.now()}.pdf`, 'Projects Report');
+                     aiResponseText = "প্রজেক্ট লিস্ট এর ডেটা অটোম্যাক যুক্ত হয়ে PDF ফাইল হিসেবে ডাউনলোড শুরু হয়েছে!";
                      break;
                   case 'income':
-                     downloadCSV(contextData.incomeList, `Income_Report_${Date.now()}.csv`);
-                     aiResponseText = "আয় এর রিপোর্ট ডেটা অটোম্যাক যুক্ত হয়ে CSV ফাইল হিসেবে ডাউনলোড শুরু হয়েছে!";
+                     downloadPDF(contextData.incomeList, `Income_Report_${Date.now()}.pdf`, 'Income Report');
+                     aiResponseText = "আয় এর রিপোর্ট ডেটা অটোম্যাক যুক্ত হয়ে PDF ফাইল হিসেবে ডাউনলোড শুরু হয়েছে!";
                      break;
                   case 'expense':
-                     downloadCSV(contextData.expenseList, `Expense_Report_${Date.now()}.csv`);
-                     aiResponseText = "ব্যয়ের রিপোর্ট ডেটা অটোম্যাক যুক্ত হয়ে CSV ফাইল হিসেবে ডাউনলোড শুরু হয়েছে!";
+                     downloadPDF(contextData.expenseList, `Expense_Report_${Date.now()}.pdf`, 'Expense Report');
+                     aiResponseText = "ব্যয়ের রিপোর্ট ডেটা অটোম্যাক যুক্ত হয়ে PDF ফাইল হিসেবে ডাউনলোড শুরু হয়েছে!";
                      break;
                   case 'clients':
-                     downloadCSV(contextData.clientsList, `Clients_Report_${Date.now()}.csv`);
-                     aiResponseText = "ক্লায়েন্ট লিস্টের ডেটা অটোম্যাক যুক্ত হয়ে CSV ফাইল হিসেবে ডাউনলোড শুরু হয়েছে!";
+                     downloadPDF(contextData.clientsList, `Clients_Report_${Date.now()}.pdf`, 'Clients Report');
+                     aiResponseText = "ক্লায়েন্ট লিস্টের ডেটা অটোম্যাক যুক্ত হয়ে PDF ফাইল হিসেবে ডাউনলোড শুরু হয়েছে!";
                      break;
                   default:
-                     downloadCSV(contextData.projectsList, `Report_${Date.now()}.csv`);
-                     aiResponseText = "আপনার রিপোর্টটি ডেটা অটোম্যাক যুক্ত হয়ে CSV ফাইল হিসেবে ডাউনলোড শুরু হয়েছে!";
+                     downloadPDF(contextData.projectsList, `Report_${Date.now()}.pdf`, 'Report');
+                     aiResponseText = "আপনার রিপোর্টটি ডেটা অটোম্যাক যুক্ত হয়ে PDF ফাইল হিসেবে ডাউনলোড শুরু হয়েছে!";
                }
             } else {
                aiResponseText = response.text() || "আমি প্রক্রিয়াটি সম্পন্ন করেছি।";
