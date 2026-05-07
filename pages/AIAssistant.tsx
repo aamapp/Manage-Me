@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Bot, Send, User, Loader2 } from 'lucide-react';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, FunctionDeclaration, SchemaType } from '@google/generative-ai';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '@/context/AppContext';
 
 // We are going to initialize the ai using the API KEY from env.
@@ -24,6 +25,7 @@ export const AIAssistant: React.FC = () => {
     shoppingLists, 
     user 
   } = useAppContext();
+  const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -122,10 +124,11 @@ export const AIAssistant: React.FC = () => {
       
       Guidelines for your conversation:
       1. Conversational & Natural: Talk like a human. Be polite, smart, and helpful. Avoid sounding like a robot.
-      2. Greetings: If the user greets you, reply with "আসসালামু আলাইকুম" or "ওয়ালাইকুম আসসালাম". Do not add greetings in the middle or start of regular answers if the user didn't greet you first.
+      2. Greetings: If the user greets with "সালাম" or "আসসালামু আলাইকুম", reply with "ওয়ালাইকুম আসসালাম". If the user says "Hello" or "Hi", reply with "হ্যালো! কেমন আছেন?". Adjust the greeting to match the user's tone. Do not add unnecessary greetings if the user didn't greet you first.
       3. Understanding Context: Read the user's intent. If they ask about income, don't just dump data—summarize it nicely.
       4. Formatting: Use Markdown (bold, lists) to make your answers easy to read, but keep the tone conversational.
       5. Don't mention JSON or system data. Just answer naturally based on the data provided.
+      6. Actions & Commands: You have the ability to perform actions using tools. If the user asks to "navigate to", "open", or "go to" a page, use the \`navigate_to_page\` function. If the user asks to "download", "export", or "save" a report or list, use the \`download_report\` function.
       
       Today's date is: ${new Date().toLocaleDateString('bn-BD', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} (ISO: ${new Date().toISOString()}).
       
@@ -188,35 +191,89 @@ export const AIAssistant: React.FC = () => {
             parts: [{ text: msg.content }]
           }));
 
-          const modelsToTry = ["gemini-1.5-flash", "gemini-2.5-flash", "gemini-pro-latest", "gemini-1.5-flash-latest", "gemini-pro"];
+          const aiTools: Tool[] = [{
+            functionDeclarations: [
+              {
+                name: "download_report",
+                description: "Download a report as a CSV file. Use this when the user asks to download, export, or save a report/list.",
+                parameters: {
+                  type: SchemaType.OBJECT,
+                  properties: {
+                    topic: {
+                      type: SchemaType.STRING,
+                      description: "The topic: 'projects', 'income', 'expense', 'clients'"
+                    }
+                  },
+                  required: ["topic"]
+                }
+              },
+              {
+                name: "navigate_to_page",
+                description: "Navigate the user to a specific page or section of the app. Use this when the user wants to see, search or filter something visually on the screen.",
+                parameters: {
+                  type: SchemaType.OBJECT,
+                  properties: {
+                    page_name: {
+                      type: SchemaType.STRING,
+                      description: "The name of the page to navigate to: 'dashboard', 'projects', 'income', 'expenses', 'clients', 'reports', 'settings', 'shopping', 'assistant'."
+                    }
+                  },
+                  required: ["page_name"]
+                }
+              }
+            ]
+          }];
+
+          const modelsToTry = ["gemini-1.5-flash", "gemini-2.5-flash", "gemini-pro-latest", "gemini-1.5-flash-latest"];
           let result = null;
           let lastError = null;
 
           for (const modelName of modelsToTry) {
-            try {
-              console.log(`[AI Model Config] Trying model: ${modelName}`);
-              const model = genAI.getGenerativeModel({ model: modelName });
-              
-              if (modelName === "gemini-pro") {
-                  // gemini-pro 1.0 does not support systemInstruction, manually prepend
-                  const historyWithSystem = [{ role: 'user', parts: [{ text: systemInstruction }]}, { role: 'model', parts: [{ text: 'Understood.' }]}, ...chatHistory];
-                  result = await model.generateContent({
-                     contents: historyWithSystem
-                  });
-              } else {
-                  result = await model.generateContent({
-                     contents: chatHistory,
-                     systemInstruction: systemInstruction 
-                  });
+            let modelSuccess = false;
+            let retries = 2; // Allow 2 retries
+            
+            while (retries > 0 && !modelSuccess) {
+              try {
+                console.log(`[AI Model Config] Trying model: ${modelName} with tools (Retries left: ${retries - 1})`);
+                const model = genAI.getGenerativeModel({ 
+                  model: modelName,
+                  tools: aiTools
+                });
+                
+                result = await model.generateContent({
+                   contents: chatHistory,
+                   systemInstruction: systemInstruction 
+                });
+                
+                modelSuccess = true;
+                break; // Success! We found a working model.
+              } catch (error: any) {
+                console.warn(`[AI Model Config] Model ${modelName} failed:`, error.message || error);
+                lastError = error;
+                
+                // If it's a temporary server error or fetch failure, retry
+                const errorStr = (error.message || '').toLowerCase();
+                const isTempError = error.status === 503 || error.status === 500 || error.status === 502 || error.status === 429 || errorStr.includes('fetch failed') || errorStr.includes('network') || errorStr.includes('internal');
+                
+                if (isTempError) {
+                  retries--;
+                  if (retries > 0) {
+                     await new Promise(resolve => setTimeout(resolve, 1500)); // wait 1.5s before retry
+                     continue;
+                  }
+                }
+                
+                if (error.status === 404 || errorStr.includes("not found")) {
+                  break; // Try the next model
+                }
+                
+                // If it's a 400 Bad Request, it might be due to tool arguments formatting or context size. 
+                // We'll still break this model's retry loop and let it try the next model just in case.
+                break; 
               }
-              break; // Success! We found a working model.
-            } catch (error: any) {
-              console.warn(`[AI Model Config] Model ${modelName} failed:`, error.message || error);
-              lastError = error;
-              if (error.status === 404 || error.message?.toLowerCase().includes("not found")) {
-                continue; // Try the next model
-              }
-              break; // If it's a different error like 403 or 400 or 429, don't guess other models.
+            }
+            if (modelSuccess) {
+               break;
             }
           }
 
@@ -225,7 +282,71 @@ export const AIAssistant: React.FC = () => {
           }
           
           const response = await result.response;
-          aiResponseText = response.text() || "কোনো উত্তর পাইনি।";
+          const functionCalls = response.functionCalls();
+          
+          if (functionCalls && functionCalls.length > 0) {
+            const call = functionCalls[0];
+            
+            if (call.name === "navigate_to_page") {
+               const pageName = (call.args as any).page_name;
+               const pathMap: any = {
+                 'dashboard': '/',
+                 'projects': '/projects',
+                 'income': '/income',
+                 'expenses': '/expenses',
+                 'clients': '/clients',
+                 'reports': '/reports',
+                 'settings': '/settings',
+                 'shopping': '/shopping-lists',
+                 'assistant': '/ai-assistant'
+               };
+               const path = pathMap[pageName?.toLowerCase()] || '/';
+               navigate(path);
+               aiResponseText = `আমি আপনাকে ব্রাউজারের ${pageName} পেইজে নিয়ে এসেছি।`;
+            } else if (call.name === "download_report") {
+               const topic = (call.args as any).topic;
+               
+               const downloadCSV = (data: any[], filename: string) => {
+                  if (!data || data.length === 0) return;
+                  const headers = Object.keys(data[0] || {}).join(",");
+                  const rows = data.map(obj => Object.values(obj).map(v => `"${(v?.toString() || '').replace(/"/g, '""')}"`).join(",")).join("\n");
+                  const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + headers + "\n" + rows;
+                  const encodedUri = encodeURI(csvContent);
+                  const link = document.createElement("a");
+                  link.setAttribute("href", encodedUri);
+                  link.setAttribute("download", filename);
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+               };
+               
+               switch(topic) {
+                  case 'projects':
+                     downloadCSV(contextData.projectsList, `Projects_Report_${Date.now()}.csv`);
+                     aiResponseText = "প্রজেক্ট লিস্ট এর ডেটা অটোম্যাক যুক্ত হয়ে CSV ফাইল হিসেবে ডাউনলোড শুরু হয়েছে!";
+                     break;
+                  case 'income':
+                     downloadCSV(contextData.incomeList, `Income_Report_${Date.now()}.csv`);
+                     aiResponseText = "আয় এর রিপোর্ট ডেটা অটোম্যাক যুক্ত হয়ে CSV ফাইল হিসেবে ডাউনলোড শুরু হয়েছে!";
+                     break;
+                  case 'expense':
+                     downloadCSV(contextData.expenseList, `Expense_Report_${Date.now()}.csv`);
+                     aiResponseText = "ব্যয়ের রিপোর্ট ডেটা অটোম্যাক যুক্ত হয়ে CSV ফাইল হিসেবে ডাউনলোড শুরু হয়েছে!";
+                     break;
+                  case 'clients':
+                     downloadCSV(contextData.clientsList, `Clients_Report_${Date.now()}.csv`);
+                     aiResponseText = "ক্লায়েন্ট লিস্টের ডেটা অটোম্যাক যুক্ত হয়ে CSV ফাইল হিসেবে ডাউনলোড শুরু হয়েছে!";
+                     break;
+                  default:
+                     downloadCSV(contextData.projectsList, `Report_${Date.now()}.csv`);
+                     aiResponseText = "আপনার রিপোর্টটি ডেটা অটোম্যাক যুক্ত হয়ে CSV ফাইল হিসেবে ডাউনলোড শুরু হয়েছে!";
+               }
+            } else {
+               aiResponseText = response.text() || "আমি প্রক্রিয়াটি সম্পন্ন করেছি।";
+            }
+          } else {
+            aiResponseText = response.text() || "কোনো উত্তর পাইনি।";
+          }
         }
       } catch (error: any) {
         console.error("AI Request Failed Details:", error);
@@ -236,7 +357,7 @@ export const AIAssistant: React.FC = () => {
         } else if (error.message?.includes("quota")) {
           aiResponseText = "এপিআই কোটা শেষ হয়ে গেছে। কিছুক্ষণ পর চেষ্টা করুন।";
         } else {
-          aiResponseText = "দুঃখিত, এআই সার্ভারের সাথে যোগাযোগ করা যাচ্ছে না। আবার চেষ্টা করুন।";
+          aiResponseText = "সার্ভারে অতিরিক্ত চাপ বা নেটওয়ার্ক সমস্যার কারণে যোগাযোগ করা যাচ্ছে না। দয়া করে একটু পর আবার চেষ্টা করুন।";
         }
       }
 
