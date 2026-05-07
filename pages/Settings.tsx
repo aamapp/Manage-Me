@@ -23,9 +23,6 @@ export const Settings: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
   const [isChangingPass, setIsChangingPass] = useState(false);
   
-  // Custom API Key
-  const [customApiKey, setCustomApiKey] = useState(localStorage.getItem('custom_gemini_api_key') || '');
-  
   // 'setup' means setting a new pin, 'disable' means verifying pin to turn it off
   const [pinAction, setPinAction] = useState<'setup' | 'disable' | null>(null);
   
@@ -137,12 +134,6 @@ export const Settings: React.FC = () => {
     await new Promise(resolve => setTimeout(resolve, 600));
     
     // 4. Stop Loading
-    if (customApiKey) {
-        localStorage.setItem('custom_gemini_api_key', customApiKey.trim());
-    } else {
-        localStorage.removeItem('custom_gemini_api_key');
-    }
-    
     setIsSaving(false);
     showToast('সেটিংস সেভ হয়েছে', 'success');
 
@@ -299,17 +290,6 @@ export const Settings: React.FC = () => {
                         <option value="AED">আমিরাতি দিরহাম (AED)</option>
                         <option value="MYR">মালয়েশিয়ান রিঙ্গিত (MYR)</option>
                     </select>
-                </div>
-                <div className="md:col-span-2">
-                    <label className="block text-sm font-semibold text-slate-700 mb-2 mt-2">নিজস্ব জেমিনি এপিআই কি (Custom Gemini API Key - ঐচ্ছিক)</label>
-                    <input 
-                      type="password" 
-                      value={customApiKey} 
-                      onChange={(e) => setCustomApiKey(e.target.value)} 
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 font-medium" 
-                      placeholder="AIza..." 
-                    />
-                    <p className="text-xs text-slate-500 mt-2">যদি এআই অ্যাসিস্ট্যান্ট কাজ না করে বা কোটা শেষ দেখায়, তবে আপনার নিজস্ব এপিআই কি ব্যবহার করতে পারেন।</p>
                 </div>
              </div>
              <button onClick={handleSave} disabled={isSaving || isUploading || !isOnline} className={`w-full flex justify-center items-center gap-2 px-6 py-3.5 rounded-xl font-bold text-white transition-all shadow-lg mt-2 ${isSaving || isUploading || !isOnline ? 'bg-indigo-400 cursor-not-allowed shadow-none' : 'bg-indigo-600 hover:bg-indigo-700 active:scale-95 shadow-indigo-100'}`}>

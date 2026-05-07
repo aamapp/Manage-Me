@@ -139,9 +139,6 @@ export const AIAssistant: React.FC = () => {
 
       // Accessing the API key
       const getApiKey = () => {
-        const customKey = localStorage.getItem('custom_gemini_api_key');
-        if (customKey) return customKey.trim();
-
         // Higher priority to VITE_ prefix for client-side bundle stability
         const key = (import.meta as any).env?.VITE_GEMINI_API_KEY || 
                     (process as any).env?.GEMINI_API_KEY || 
@@ -276,10 +273,6 @@ export const AIAssistant: React.FC = () => {
                 
                 if (isApiKeyError) {
                    throw error; // Immediately throw, because no model will work with a bad API key
-                }
-
-                if (error.status === 429 || errorStr.includes('quota')) {
-                   throw error; // Fail fast on quota exhausted
                 }
                 
                 // If the error seems to be about tools validation, and we are using tools, remember it but continue
