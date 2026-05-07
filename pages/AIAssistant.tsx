@@ -226,52 +226,74 @@ export const AIAssistant: React.FC = () => {
             ]
           }];
 
-          const modelsToTry = ["gemini-1.5-flash", "gemini-2.5-flash", "gemini-pro-latest", "gemini-1.5-flash-latest"];
+          const modelsToTry = [
+            { name: "gemini-1.5-flash", useTools: true },
+            { name: "gemini-1.5-flash", useTools: false },
+            { name: "gemini-2.0-flash", useTools: true },
+            { name: "gemini-2.0-flash", useTools: false },
+            { name: "gemini-pro", useTools: false }
+          ];
+          
           let result = null;
           let lastError = null;
 
-          for (const modelName of modelsToTry) {
+          for (const modelConfig of modelsToTry) {
             let modelSuccess = false;
-            let retries = 2; // Allow 2 retries
+            let retries = 1; // Allow 1 retry per config
             
-            while (retries > 0 && !modelSuccess) {
+            while (retries >= 0 && !modelSuccess) {
               try {
-                console.log(`[AI Model Config] Trying model: ${modelName} with tools (Retries left: ${retries - 1})`);
-                const model = genAI.getGenerativeModel({ 
-                  model: modelName,
-                  tools: aiTools
-                });
+                console.log(`[AI Model Config] Trying model: ${modelConfig.name} (Tools: ${modelConfig.useTools})`);
+                const modelParams: any = { model: modelConfig.name };
+                if (modelConfig.useTools) {
+                  modelParams.tools = aiTools;
+                }
+                const model = genAI.getGenerativeModel(modelParams);
                 
-                result = await model.generateContent({
-                   contents: chatHistory,
-                   systemInstruction: systemInstruction 
-                });
+                if (modelConfig.name === "gemini-pro") {
+                  // gemini-pro might not support systemInstruction properly
+                  const historyWithSystem = [{ role: 'user', parts: [{ text: systemInstruction }]}, { role: 'model', parts: [{ text: 'Understood.' }]}, ...chatHistory];
+                  result = await model.generateContent({ contents: historyWithSystem });
+                } else {
+                  result = await model.generateContent({
+                     contents: chatHistory,
+                     systemInstruction: systemInstruction 
+                  });
+                }
                 
                 modelSuccess = true;
                 break; // Success! We found a working model.
               } catch (error: any) {
-                console.warn(`[AI Model Config] Model ${modelName} failed:`, error.message || error);
-                lastError = error;
+                console.warn(`[AI Model Config] Model ${modelConfig.name} (Tools: ${modelConfig.useTools}) failed:`, error.message || error);
                 
-                // If it's a temporary server error or fetch failure, retry
+                // Keep track of the most relevant error to show the user
+                // API Key errors are more important than 404s
                 const errorStr = (error.message || '').toLowerCase();
-                const isTempError = error.status === 503 || error.status === 500 || error.status === 502 || error.status === 429 || errorStr.includes('fetch failed') || errorStr.includes('network') || errorStr.includes('internal');
+                const isApiKeyError = error.status === 400 && (errorStr.includes('api key') || errorStr.includes('expired') || errorStr.includes('key_invalid'));
                 
-                if (isTempError) {
+                if (isApiKeyError) {
+                   throw error; // Immediately throw, because no model will work with a bad API key
+                }
+                
+                // If the error seems to be about tools validation, and we are using tools, remember it but continue
+                if (error.status === 400 && errorStr.includes('tool')) {
+                   lastError = error;
+                   break;
+                }
+
+                if (!lastError || lastError.status === 404) {
+                   lastError = error; // Prioritize non-404 errors as the root cause over "model not found"
+                }
+
+                const isTempError = error.status === 503 || error.status === 500 || error.status === 502 || error.status === 429 || errorStr.includes('fetch failed') || errorStr.includes('network');
+                
+                if (isTempError && retries > 0) {
                   retries--;
-                  if (retries > 0) {
-                     await new Promise(resolve => setTimeout(resolve, 1500)); // wait 1.5s before retry
-                     continue;
-                  }
+                  await new Promise(resolve => setTimeout(resolve, 1500)); // wait 1.5s before retry
+                  continue;
                 }
                 
-                if (error.status === 404 || errorStr.includes("not found")) {
-                  break; // Try the next model
-                }
-                
-                // If it's a 400 Bad Request, it might be due to tool arguments formatting or context size. 
-                // We'll still break this model's retry loop and let it try the next model just in case.
-                break; 
+                break; // Move to next modelConfig if not retrying
               }
             }
             if (modelSuccess) {
@@ -280,7 +302,7 @@ export const AIAssistant: React.FC = () => {
           }
 
           if (!result) {
-            throw lastError;
+            throw lastError || new Error("All AI models failed.");
           }
           
           const response = await result.response;
