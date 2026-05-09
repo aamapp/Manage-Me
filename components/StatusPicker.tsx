@@ -43,10 +43,10 @@ export const StatusPicker: React.FC<StatusPickerProps> = ({ value, onChange, opt
 
   return (
     <div className="relative w-full" ref={containerRef}>
-      {label && <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">{label}</label>}
       <div 
         onClick={() => setIsOpen(!isOpen)}
-        className={`w-full px-4 py-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 flex items-center justify-between cursor-pointer transition-all ${isOpen ? 'ring-2 ring-indigo-500 border-indigo-500' : ''}`}
+        className={`w-full px-4 pb-2.5 pt-4 bg-white border border-slate-200 rounded-xl font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 flex items-center justify-between cursor-pointer transition-all ${isOpen ? 'ring-2 ring-indigo-500 border-indigo-500' : ''}`}
+        style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
       >
         <div className="flex items-center gap-2">
           {getStatusIcon(value)}
@@ -54,6 +54,7 @@ export const StatusPicker: React.FC<StatusPickerProps> = ({ value, onChange, opt
         </div>
         <ChevronDown size={18} className={`text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
       </div>
+      {label && <label className={`absolute text-sm font-bold duration-300 transform z-10 origin-[0] bg-white px-2 left-2 cursor-pointer pointer-events-none ${value || isOpen ? '-translate-y-4 scale-[0.80] top-2' : 'top-1/2 -translate-y-1/2 scale-100'} ${isOpen ? 'text-indigo-600' : 'text-slate-500'}`} style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>{label}</label>}
 
       {isOpen && (
         <div className="absolute top-full mt-2 w-full bg-white border border-slate-100 rounded-2xl shadow-2xl z-[100] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 origin-top">

@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { useAppContext } from '../context/AppContext';
+import { MoreVertical, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
 interface StatCardProps {
   title: string;
@@ -9,9 +10,15 @@ interface StatCardProps {
   isCurrency?: boolean;
   color: 'indigo' | 'emerald' | 'rose' | 'blue' | 'amber' | 'purple';
   onClick?: () => void;
+  trend?: {
+    value: number | string;
+    label: string;
+    isPositive: boolean;
+    colorClass?: string;
+  }
 }
 
-export const StatCard: React.FC<StatCardProps> = ({ title, value, icon, isCurrency, color, onClick }) => {
+export const StatCard: React.FC<StatCardProps> = ({ title, value, icon, isCurrency, color, onClick, trend }) => {
   const { user } = useAppContext();
   const currency = user?.currency || '৳';
   
@@ -23,32 +30,26 @@ export const StatCard: React.FC<StatCardProps> = ({ title, value, icon, isCurren
     indigo: { 
       iconBg: 'bg-indigo-50 text-indigo-600', 
       ring: 'group-hover:ring-indigo-100',
-      gradient: 'from-indigo-500 to-violet-600'
     },
     emerald: { 
       iconBg: 'bg-emerald-50 text-emerald-600', 
       ring: 'group-hover:ring-emerald-100',
-      gradient: 'from-emerald-500 to-teal-600'
     },
     rose: { 
       iconBg: 'bg-rose-50 text-rose-600', 
       ring: 'group-hover:ring-rose-100',
-      gradient: 'from-rose-500 to-pink-600'
     },
     blue: { 
       iconBg: 'bg-blue-50 text-blue-600', 
       ring: 'group-hover:ring-blue-100',
-      gradient: 'from-blue-500 to-cyan-600'
     },
     amber: { 
       iconBg: 'bg-amber-50 text-amber-600', 
       ring: 'group-hover:ring-amber-100',
-      gradient: 'from-amber-500 to-orange-600'
     },
     purple: { 
       iconBg: 'bg-purple-50 text-purple-600', 
       ring: 'group-hover:ring-purple-100',
-      gradient: 'from-purple-500 to-fuchsia-600'
     },
   }[color];
 
@@ -56,35 +57,48 @@ export const StatCard: React.FC<StatCardProps> = ({ title, value, icon, isCurren
     <div 
       onClick={onClick}
       className={`
-        relative overflow-hidden bg-white rounded-xl p-3.5 
-        border border-slate-100 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] 
-        flex flex-col justify-between h-20 group transition-all duration-300
-        ${onClick ? 'cursor-pointer active:scale-95 hover:shadow-lg' : ''}
-        hover:border-transparent hover:ring-2 ${themes.ring}
+        relative bg-white rounded-2xl p-3.5 sm:p-4
+        border border-slate-100 shadow-[0_2px_15px_-4px_rgba(0,0,0,0.05)] 
+        flex flex-col group transition-all duration-300
+        ${onClick ? 'cursor-pointer active:scale-95 hover:shadow-lg hover:border-transparent hover:ring-2 ' + themes.ring : ''}
       `}
     >
-        {/* Abstract Background Gradient Blob */}
-        <div className={`absolute -right-5 -top-5 w-20 h-20 rounded-full bg-gradient-to-br ${themes.gradient} opacity-[0.04] blur-xl transition-all duration-500 group-hover:opacity-[0.1] group-hover:scale-125`}></div>
-
-        <div className="flex justify-between items-center z-10 h-full">
-            <div className="flex flex-col justify-center h-full w-full min-w-0 pr-2">
-                <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wider truncate mb-0.5">{title}</p>
-                <h3 className="text-[17px] font-black text-slate-800 tracking-tight leading-none truncate">
+        <div className="flex justify-between items-center w-full">
+            <div className="flex flex-col min-w-0 pr-2">
+                <p className="text-slate-500 text-[14px] font-semibold tracking-wide mb-1" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>{title}</p>
+        
+                <h3 className="text-[17px] sm:text-[19px] font-black text-slate-800 tracking-tight leading-none truncate">
                     {isCurrency ? (
-                        <span className="flex items-baseline gap-0.5">
-                            <span className="text-[11px] text-slate-400 font-bold">{currency}</span>
-                            {Number(safeValue).toLocaleString('en-US')}
+                        <span className="flex items-baseline gap-1">
+                            <span className="text-[14px] font-bold text-slate-400">{currency}</span>
+                            <span className="truncate">{Number(safeValue).toLocaleString('en-US')}</span>
                         </span>
                     ) : (
-                        Number(safeValue).toLocaleString('en-US')
+                        <span className="truncate">{Number(safeValue).toLocaleString('en-US')}</span>
                     )}
                 </h3>
             </div>
             
-            <div className={`w-8 h-8 rounded-lg ${themes.iconBg} flex items-center justify-center shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6 shrink-0`}>
-                {React.cloneElement(icon as React.ReactElement<any>, { size: 16, strokeWidth: 2.5 })}
+            <div className={`w-[36px] h-[36px] rounded-lg ${themes?.iconBg} flex items-center justify-center shrink-0`}>
+                {React.cloneElement(icon as React.ReactElement<any>, { size: 18, strokeWidth: 2.5 })}
             </div>
         </div>
+
+        {trend && (
+           <div className="flex items-center gap-1 mt-3">
+             <div className={`${trend.colorClass || (trend.isPositive ? 'text-emerald-500' : 'text-rose-500')} flex items-center gap-0.5 font-bold text-[12px] sm:text-[13px]`}>
+               {trend.isPositive ? (
+                  <ArrowUpRight size={14} strokeWidth={3} />
+               ) : (
+                  <ArrowDownRight size={14} strokeWidth={3} />
+               )}
+               <span className="tracking-tight">
+                  {trend.value}{typeof trend.value === 'number' && '%'}
+               </span>
+             </div>
+             <span className="text-[12px] sm:text-[13px] font-medium text-slate-500" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>{trend.label}</span>
+           </div>
+        )}
     </div>
   );
 };

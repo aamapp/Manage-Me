@@ -29,7 +29,7 @@ export const AIAssistant: React.FC = () => {
     {
       id: '1',
       role: 'assistant',
-      content: 'আসসালামু আলাইকুম! আমি আপন এআই (Apon AI)। আপনার প্রজেক্ট, ক্লায়েন্ট, আয় বা ব্যয়ের বিষয়ে যেকোনো তথ্য জানার থাকলে আমাকে জিজ্ঞেস করতে পারেন।'
+      content: 'আসসালামু আলাইকুম! আমি আপনার এআই অ্যাসিস্ট্যান্ট। আপনার প্রজেক্ট, ক্লায়েন্ট, ইনকাম বা খরচ সম্পর্কে যেকোনো প্রশ্ন করতে পারেন।'
     }
   ]);
   const [input, setInput] = useState('');
@@ -209,13 +209,10 @@ export const AIAssistant: React.FC = () => {
              <Bot size={24} />
          </div>
          <div>
-            <h1 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight leading-none mb-1">
-              আপন এআই
+            <h1 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight leading-none mb-1" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+              এআই অ্যাসিস্ট্যান্ট
             </h1>
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <p className="text-xs sm:text-sm font-bold text-slate-500">অনলাইন (Online)</p>
-            </div>
+            <p className="text-xs sm:text-sm font-bold text-slate-500" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>আপনার ব্যক্তিগত স্মার্ট হেল্পার</p>
          </div>
       </div>
 

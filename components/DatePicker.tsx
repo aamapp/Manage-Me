@@ -89,14 +89,15 @@ export const DatePicker: React.FC<DatePickerProps> = ({ value, onChange, placeho
 
   return (
     <div className="relative w-full" ref={containerRef}>
-      {label && <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">{label}</label>}
       <div 
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-3 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 flex items-center justify-between cursor-pointer"
+        className={`w-full px-4 pb-2.5 pt-4 bg-white border border-slate-200 rounded-xl font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 flex items-center justify-between cursor-pointer transition-all ${isOpen ? 'ring-2 ring-indigo-500 border-indigo-500' : ''}`}
+        style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
       >
-        <span>{value ? new Date(value).toLocaleDateString('bn-BD') : (placeholder || 'তারিখ')}</span>
-        <CalendarIcon size={14} className="text-slate-400" />
+        <span className="text-sm">{value ? new Date(value).toLocaleDateString('bn-BD') : ''}</span>
+        <CalendarIcon size={18} className="text-slate-400" />
       </div>
+      {label && <label className={`absolute text-sm font-bold duration-300 transform z-10 origin-[0] bg-white px-2 left-2 cursor-pointer pointer-events-none ${value || isOpen ? '-translate-y-4 scale-[0.80] top-2' : 'top-1/2 -translate-y-1/2 scale-100'} ${isOpen ? 'text-indigo-600' : 'text-slate-500'}`} style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>{label}</label>}
 
       {isOpen && (
         <div className={`absolute top-full mt-2 w-64 bg-white border border-slate-100 rounded-2xl shadow-2xl z-[100] p-4 animate-in fade-in zoom-in-95 duration-200 origin-top ${align === 'right' ? 'right-0' : 'left-0'}`}>

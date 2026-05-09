@@ -88,6 +88,48 @@ export const Dashboard: React.FC = () => {
   const outerTheme = isPositive ? "bg-emerald-50/50 border-emerald-100" : "bg-rose-50/50 border-rose-100";
   const currentMonthName = chartData[5]?.name || "বর্তমান";
 
+  // Helpers for trend calculations
+  const isCurrentMonth = (dateStr: string | undefined | null) => {
+    if (!dateStr) return false;
+    const [yearStr, monthStr] = dateStr.split('T')[0].split('-');
+    const now = new Date();
+    return parseInt(monthStr) - 1 === now.getMonth() && parseInt(yearStr) === now.getFullYear();
+  }
+
+  const isLastMonth = (dateStr: string | undefined | null) => {
+    if (!dateStr) return false;
+    const [yearStr, monthStr] = dateStr.split('T')[0].split('-');
+    const now = new Date();
+    let currentMonth = now.getMonth();
+    let currentYear = now.getFullYear();
+    let lastMonthIndex = currentMonth === 0 ? 11 : currentMonth - 1;
+    let lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+    return parseInt(monthStr) - 1 === lastMonthIndex && parseInt(yearStr) === lastMonthYear;
+  }
+
+  // Calculate Budget Trend
+  const currentMonthBudget = projects.filter(p => isCurrentMonth(p.createdat)).reduce((acc, curr) => acc + (curr.totalamount || 0), 0);
+  const lastMonthBudget = projects.filter(p => isLastMonth(p.createdat)).reduce((acc, curr) => acc + (curr.totalamount || 0), 0);
+  let budgetPct = 0;
+  if (lastMonthBudget === 0) {
+      budgetPct = currentMonthBudget > 0 ? 100 : 0;
+  } else {
+      budgetPct = Math.round(((currentMonthBudget - lastMonthBudget) / lastMonthBudget) * 1000) / 10;
+  }
+
+  // Calculate Projects Trend
+  const currentMonthProjectsCount = projects.filter(p => isCurrentMonth(p.createdat)).length;
+
+  // Calculate Due Trend
+  const currentMonthDue = projects.filter(p => isCurrentMonth(p.createdat)).reduce((acc, curr) => acc + (curr.dueamount || 0), 0);
+  const lastMonthDue = projects.filter(p => isLastMonth(p.createdat)).reduce((acc, curr) => acc + (curr.dueamount || 0), 0);
+  let duePct = 0;
+  if (lastMonthDue === 0) {
+       duePct = currentMonthDue > 0 ? 100 : 0;
+  } else {
+       duePct = Math.round(((currentMonthDue - lastMonthDue) / lastMonthDue) * 1000) / 10;
+  }
+
   // Added 'key' to identify status for filtering
   const statusSummary = [
     { key: 'Pending', label: 'পেন্ডিং', count: projects.filter(p => p.status === 'Pending').length, textColor: 'text-amber-500' },
@@ -117,6 +159,7 @@ export const Dashboard: React.FC = () => {
           isCurrency={true} 
           icon={<Briefcase />} 
           color="indigo" 
+          trend={{ value: Math.abs(budgetPct), label: "এই মাসে", isPositive: budgetPct >= 0 }}
         />
         
         <StatCard 
@@ -125,6 +168,7 @@ export const Dashboard: React.FC = () => {
           isCurrency={true} 
           icon={<Wallet />} 
           color="emerald" 
+          trend={{ value: Math.abs(percentageChange), label: "এই মাসে", isPositive: isPositive }}
         />
 
         {/* Row 2 */}
@@ -133,6 +177,12 @@ export const Dashboard: React.FC = () => {
           value={totalProjects} 
           icon={<LayoutDashboard />} 
           color="blue" 
+          trend={{ 
+             value: Math.abs(currentMonthProjectsCount), 
+             label: "টি নতুন", 
+             isPositive: currentMonthProjectsCount >= 0,
+             colorClass: 'text-blue-500'
+          }}
         />
         
         <StatCard 
@@ -142,6 +192,7 @@ export const Dashboard: React.FC = () => {
           icon={<AlertCircle />} 
           color="rose" 
           onClick={handleDueClick}
+          trend={{ value: Math.abs(duePct), label: "এই মাসে", isPositive: duePct < 0 /* lower due is positive */ }}
         />
       </div>
 
@@ -155,11 +206,11 @@ export const Dashboard: React.FC = () => {
                 <Wallet size={18} className="sm:w-5 sm:h-5 md:w-[22px] md:h-[22px]" />
               </div>
               <div className="shrink-0 hidden sm:flex flex-col justify-center">
-                 <h3 className="font-bold text-slate-800 text-sm sm:text-base md:text-lg lg:text-xl leading-tight">মাসিক আয়</h3>
-                 <p className="text-[10px] sm:text-[11px] md:text-[13px] text-slate-400 font-medium mt-0.5 whitespace-nowrap text-ellipsis overflow-hidden">গত ৬ মাসের আয়ের হিসাব</p>
+                 <h3 className="font-bold text-slate-800 text-sm sm:text-base md:text-lg lg:text-xl leading-tight" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>মাসিক আয়</h3>
+                 <p className="text-[10px] sm:text-[11px] md:text-[13px] text-slate-400 font-medium mt-0.5 whitespace-nowrap text-ellipsis overflow-hidden" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>গত ৬ মাসের আয়ের হিসাব</p>
               </div>
               <div className="shrink-0 flex sm:hidden flex-col justify-center">
-                 <h3 className="font-bold text-slate-800 text-sm leading-tight">মাসিক আয়</h3>
+                 <h3 className="font-bold text-slate-800 text-sm leading-tight" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>মাসিক আয়</h3>
               </div>
               
               <div className={`flex border rounded-[12px] lg:rounded-xl p-1 sm:p-1.5 pr-2 sm:pr-3 lg:pr-4 items-center gap-1 sm:gap-2.5 w-max shrink-0 sm:ml-2 ${outerTheme}`}>
@@ -242,7 +293,7 @@ export const Dashboard: React.FC = () => {
 
         {/* Project Status Summary - Takes 1 column on desktop */}
         <div className="bg-white p-4 lg:p-5 rounded-[20px] lg:rounded-3xl border border-slate-100 shadow-sm flex flex-col">
-          <h3 className="font-bold text-slate-800 mb-4 text-base">প্রজেক্ট স্ট্যাটাস</h3>
+          <h3 className="font-bold text-slate-800 mb-4 text-[15px] lg:text-base" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>প্রজেক্ট স্ট্যাটাস</h3>
           <div className="flex flex-row justify-between items-center flex-1 lg:px-2">
             {statusSummary.map((status) => {
               const radius = 44;
@@ -284,10 +335,14 @@ export const Dashboard: React.FC = () => {
       {/* Recent Projects List (Cards) */}
       <div className="pb-2">
         <div className="flex items-center justify-between mb-3 px-1">
-          <h3 className="font-bold text-slate-800 text-base">সাম্প্রতিক প্রজেক্ট</h3>
+          <h3 className="font-bold text-slate-800 text-[15px] lg:text-base relative pl-3" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+              <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+              সাম্প্রতিক প্রজেক্ট
+          </h3>
           <button 
             onClick={() => navigate('/projects')}
-            className="text-indigo-600 text-xs font-bold bg-indigo-50 px-4 py-1.5 rounded-full hover:bg-indigo-100 transition-colors"
+            className="text-indigo-600 text-[11px] font-bold bg-indigo-50 px-3.5 py-1.5 rounded-full hover:bg-indigo-100 transition-colors"
+            style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
           >
             সব দেখুন
           </button>
@@ -324,8 +379,8 @@ export const Dashboard: React.FC = () => {
                 </div>
                 
                 <div className="text-right whitespace-nowrap">
-                  <p className="font-bold text-slate-800 text-sm">{currency} {p.totalamount.toLocaleString('en-US')}</p>
-                  <p className="text-[9px] text-slate-400 mt-0.5 font-bold bg-slate-50 px-1.5 py-0.5 rounded inline-block">
+                  <p className="font-bold text-slate-800 text-[15px]">{currency} {p.totalamount.toLocaleString('en-US')}</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5 font-bold bg-slate-50 px-1.5 py-0.5 rounded inline-block">
                     {p.deadline ? p.deadline : 'No Date'}
                   </p>
                 </div>

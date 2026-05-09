@@ -989,7 +989,7 @@ export const Projects: React.FC = () => {
                          <Music size={isGeneratingPDF ? 28 : 20} />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <h3 className={`font-bold text-slate-800 ${isGeneratingPDF ? 'text-lg mb-1.5' : 'text-sm'} truncate leading-snug`}>{p.name}</h3>
+                        <h3 className={`font-bold text-slate-800 ${isGeneratingPDF ? 'text-lg mb-1.5' : 'text-sm'} truncate leading-snug`} style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>{p.name}</h3>
                         <p className={`${isGeneratingPDF ? 'text-sm' : 'text-[11px]'} text-slate-500 font-medium truncate flex items-center gap-1.5 ${isGeneratingPDF ? 'mb-3' : 'mt-1'}`}>
                           <Users size={isGeneratingPDF ? 14 : 10} className="shrink-0" /> {p.clientname}
                         </p>
@@ -1114,7 +1114,7 @@ export const Projects: React.FC = () => {
                                   <Music size={24} />
                               </div>
                               <div className="flex-1">
-                                  <h2 className="text-xl font-black text-slate-800 mb-1 leading-tight">{viewProject.name}</h2>
+                                  <h2 className="text-xl font-black text-slate-800 mb-1 leading-tight" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>{viewProject.name}</h2>
                                   <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${viewProject.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' : viewProject.status === 'In Progress' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
                                       {PROJECT_STATUS_LABELS[viewProject.status]}
                                   </span>
@@ -1263,7 +1263,7 @@ export const Projects: React.FC = () => {
         <div className="fixed inset-0 z-[1000] bg-white flex flex-col h-[100dvh] animate-in fade-in duration-200">
             {/* Header - Compact */}
             <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
-              <h2 className="text-base font-bold text-slate-800">
+              <h2 className="text-base font-bold text-slate-800" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
                 {isEditing ? 'প্রজেক্ট এডিট' : 'নতুন প্রজেক্ট'}
               </h2>
               <button disabled={isSubmitting} onClick={() => setModalOpen(false)} className="p-2 bg-slate-50 rounded-full text-slate-500 hover:bg-slate-100 transition-colors">
@@ -1286,14 +1286,14 @@ export const Projects: React.FC = () => {
                     </div>
                   )}
 
-                  <div>
-                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">প্রজেক্ট নাম</label>
-                    <input type="text" value={newProject.name} onChange={e => setNewProject({...newProject, name: e.target.value})} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none text-sm" placeholder="নাম লিখুন..." />
+                  <div className="relative">
+                    <input type="text" id="project_name_input" value={newProject.name} onChange={e => setNewProject({...newProject, name: e.target.value})} className="block px-4 pb-2.5 pt-4 w-full text-sm font-bold text-slate-800 bg-white rounded-xl border border-slate-200 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 peer transition-colors" placeholder=" " style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }} />
+                    <label htmlFor="project_name_input" className="absolute text-sm font-bold text-slate-500 duration-300 transform -translate-y-4 scale-[0.80] top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-focus:text-indigo-600 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-[0.80] peer-focus:-translate-y-4 left-2 cursor-text" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>প্রজেক্ট নাম</label>
                   </div>
 
                   <div className="relative" ref={clientInputRef}>
-                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">ক্লায়েন্ট</label>
-                    <input type="text" value={clientSearch} onFocus={() => setShowClientSuggestions(true)} onChange={e => {setClientSearch(e.target.value); setShowClientSuggestions(true);}} className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none text-sm" placeholder="ক্লায়েন্ট খুঁজুন..." />
+                    <input type="text" id="client_input" value={clientSearch} onFocus={() => setShowClientSuggestions(true)} onChange={e => {setClientSearch(e.target.value); setShowClientSuggestions(true);}} className="block px-4 pb-2.5 pt-4 w-full text-sm font-bold text-slate-800 bg-white rounded-xl border border-slate-200 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 peer transition-colors" placeholder=" " style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }} autoComplete="off" />
+                    <label htmlFor="client_input" className="absolute text-sm font-bold text-slate-500 duration-300 transform -translate-y-4 scale-[0.80] top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-focus:text-indigo-600 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-[0.80] peer-focus:-translate-y-4 left-2 cursor-text" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>ক্লায়েন্ট</label>
                     
                     {showClientSuggestions && (clientSearch || clientSuggestions.length > 0) && (
                       <div className="absolute top-full mt-1 w-full bg-white border border-slate-100 rounded-xl shadow-2xl max-h-40 overflow-y-auto z-[60]">
@@ -1319,25 +1319,25 @@ export const Projects: React.FC = () => {
                   />
 
                   <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">বাজেট ({currency})</label>
+                    <div className="relative">
                       <div 
                         onClick={() => openKeypad('total')}
-                        className="keypad-trigger w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 active:bg-slate-100 transition-colors flex items-center justify-between cursor-pointer"
+                        className={`keypad-trigger relative w-full px-4 pb-2.5 pt-4 bg-white border border-slate-200 rounded-xl font-bold text-slate-800 active:bg-slate-50 transition-colors flex items-center justify-between cursor-pointer ${(showKeypad && activeAmountField === 'total') ? 'ring-2 ring-indigo-500 border-indigo-500' : ''}`}
                       >
-                         <span className="text-sm">{newProject.totalamount || 0}</span>
-                         <Calculator size={16} className="text-slate-400" />
+                         <span className="text-sm">{newProject.totalamount || ((showKeypad && activeAmountField === 'total') ? '0' : '')}</span>
+                         <Calculator size={18} className="text-slate-400" />
                       </div>
+                      <label className={`absolute text-sm font-bold duration-300 transform z-10 origin-[0] bg-white px-2 left-2 cursor-pointer pointer-events-none ${(newProject.totalamount || (showKeypad && activeAmountField === 'total')) ? '-translate-y-4 scale-[0.80] top-2' : 'top-1/2 -translate-y-1/2 scale-100'} ${(showKeypad && activeAmountField === 'total') ? 'text-indigo-600' : 'text-slate-500'}`} style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>বাজেট ({currency})</label>
                     </div>
-                    <div>
-                      <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">পরিশোধ ({currency})</label>
+                    <div className="relative">
                       <div 
                         onClick={() => openKeypad('paid')}
-                        className="keypad-trigger w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-emerald-600 active:bg-slate-100 transition-colors flex items-center justify-between cursor-pointer"
+                        className={`keypad-trigger relative w-full px-4 pb-2.5 pt-4 bg-white border border-slate-200 rounded-xl font-bold text-emerald-600 active:bg-slate-50 transition-colors flex items-center justify-between cursor-pointer ${(showKeypad && activeAmountField === 'paid') ? 'ring-2 ring-indigo-500 border-indigo-500' : ''}`}
                       >
-                         <span className="text-sm">{newProject.paidamount || 0}</span>
-                         <Calculator size={16} className="text-slate-400" />
+                         <span className="text-sm">{newProject.paidamount || ((showKeypad && activeAmountField === 'paid') ? '0' : '')}</span>
+                         <Calculator size={18} className="text-slate-400" />
                       </div>
+                      <label className={`absolute text-sm font-bold duration-300 transform z-10 origin-[0] bg-white px-2 left-2 cursor-pointer pointer-events-none ${(newProject.paidamount || (showKeypad && activeAmountField === 'paid')) ? '-translate-y-4 scale-[0.80] top-2' : 'top-1/2 -translate-y-1/2 scale-100'} ${(showKeypad && activeAmountField === 'paid') ? 'text-indigo-600' : 'text-slate-500'}`} style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>পরিশোধ ({currency})</label>
                     </div>
                   </div>
 
@@ -1369,7 +1369,7 @@ export const Projects: React.FC = () => {
                       />
                    </div>
 
-                  <button type="submit" disabled={isSubmitting} className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold text-base shadow-lg shadow-indigo-200 active:scale-95 transition-transform flex items-center justify-center gap-2 mt-4">
+                  <button type="submit" disabled={isSubmitting} className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold text-base shadow-lg shadow-indigo-200 active:scale-95 transition-transform flex items-center justify-center gap-2 mt-4" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
                     {isSubmitting ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}
                     সেভ করুন
                   </button>

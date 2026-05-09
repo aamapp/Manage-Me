@@ -25,8 +25,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   const [isAboutOpen, setAboutOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false); // New state for processing animation
   const [processingMessage, setProcessingMessage] = useState('কন্টেন্ট তৈরি হচ্ছে...'); // Dynamic message
-  const [isPending, startTransition] = useTransition(); // Added for smoother navigation
   const [isNavigating, setIsNavigating] = useState(false);
+  
+  // Swipe state
+  const [touchStart, setTouchStart] = useState<{ x: number, y: number } | null>(null);
+  const [touchEnd, setTouchEnd] = useState<{ x: number, y: number } | null>(null);
+
   const { 
     adminSelectedUserId, 
     setAdminSelectedUserId, 
@@ -47,12 +51,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
 
     setIsNavigating(true);
     setTimeout(() => {
-      startTransition(() => {
-        navigate(path, { replace: true });
-        setIsNavigating(false);
-      });
-    }, 150); // Exactly 0.15 seconds wait before jump
+      navigate(path, { replace: true });
+    }, 10);
   };
+
+  useEffect(() => {
+     setIsNavigating(false);
+  }, [location.pathname, location.search]);
 
   useEffect(() => {
     const handleProcessing = (e: any) => {
@@ -123,10 +128,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   ];
 
   const handleNavigation = (path: string) => {
-    navigate(path, { replace: true });
+    setIsNavigating(true);
     setTimeout(() => {
-        setMoreMenuOpen(false);
-    }, 150);
+      navigate(path, { replace: true });
+      setMoreMenuOpen(false);
+    }, 10);
   };
 
   const handleBackToUsers = () => {
@@ -147,8 +153,49 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
     phone: "tel:+8801612505145"
   };
 
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart({ x: e.targetTouches[0].clientX, y: e.targetTouches[0].clientY });
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd({ x: e.targetTouches[0].clientX, y: e.targetTouches[0].clientY });
+  };
+
+  const onTouchEndHandler = () => {
+    if (!touchStart || !touchEnd) return;
+    
+    if (isMoreMenuOpen || isAboutOpen || isProcessing || isNavigating) return;
+
+    const dx = touchStart.x - touchEnd.x;
+    const dy = touchStart.y - touchEnd.y;
+    
+    const isHorizontalSwipe = Math.abs(dx) > Math.abs(dy);
+
+    if (isHorizontalSwipe && Math.abs(dx) > minSwipeDistance) {
+      const isLeftSwipe = dx > 0;
+      const isRightSwipe = dx < 0;
+
+      const currentPath = location.pathname;
+      const primaryPaths = PRIMARY_NAV.map(nav => nav.path);
+      const currentIndex = primaryPaths.indexOf(currentPath);
+      
+      if (currentIndex !== -1) {
+         if (isLeftSwipe && currentIndex < primaryPaths.length - 1) {
+            handleNavigate(primaryPaths[currentIndex + 1]);
+         } else if (isRightSwipe && currentIndex > 0) {
+            handleNavigate(primaryPaths[currentIndex - 1]);
+         }
+      }
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50 font-sans w-full overflow-x-hidden selection:bg-indigo-100 selection:text-indigo-700 flex flex-col lg:flex-row">
+    <div 
+      className="min-h-screen bg-slate-50 font-sans w-full overflow-x-hidden selection:bg-indigo-100 selection:text-indigo-700 flex flex-col lg:flex-row"
+    >
       {/* Desktop Sidebar - Visible only on LG screens */}
       <aside className="hidden lg:flex flex-col w-72 bg-white border-r border-slate-200 h-screen lg:fixed lg:top-0 lg:left-0 z-50">
         <div className="p-6 border-b border-slate-100">
@@ -426,7 +473,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                 </button>
             )}
 
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 px-2">অন্যান্য মেনু</h3>
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 px-2" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>অন্যান্য মেনু</h3>
 
             <div className="grid grid-cols-2 gap-2 mb-4">
               {SECONDARY_NAV.map((item) => (
@@ -443,7 +490,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                       </span>
                     )}
                   </div>
-                  <p className="font-bold text-slate-800 text-[10px] leading-tight text-center">{item.name}</p>
+                  <p className="font-bold text-slate-800 text-[10px] leading-tight text-center" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>{item.name}</p>
                 </button>
               ))}
             </div>
@@ -592,18 +639,19 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
       )}
 
       {/* Page Transition Loading Overlay */}
-      {(isPending || isNavigating) && !isProcessing && createPortal(
-        <div className="fixed inset-0 z-[9998] bg-slate-50/70 flex flex-col items-center justify-center">
+      {isNavigating && !isProcessing && createPortal(
+        <div className="fixed inset-0 z-[9998] bg-slate-50/10 backdrop-blur-[8px] flex flex-col items-center justify-center">
            <div className="flex flex-col items-center justify-center gap-4 drop-shadow-xl transform scale-75">
-             <div className="premium-loader-container !w-14 !h-14">
+             <div className="premium-loader-container !w-20 !h-20">
                 <div className="premium-loader-ring"></div>
-                <span className="premium-loader-text text-3xl">M</span>
+                <span className="premium-loader-text text-4xl">M</span>
              </div>
-             <p className="text-indigo-600 font-bold tracking-widest text-[10px] uppercase animate-pulse">লোড হচ্ছে...</p>
+             <p className="text-indigo-600 font-bold tracking-widest text-base uppercase animate-pulse">লোড হচ্ছে...</p>
            </div>
         </div>,
         document.body
       )}
+
     </div>
   );
 };
