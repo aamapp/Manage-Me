@@ -94,3 +94,23 @@ export interface ShoppingList {
   createdat: string;
   notes?: string;
 }
+
+export interface DueTransaction {
+  id: string;
+  type: 'receive' | 'give';
+  amount: number;
+  description: string;
+  date: string;
+}
+
+export interface DuePerson {
+  id: string;
+  name: string;
+  phone: string;
+  address: string;
+  date: string;
+  avatar?: string;
+  transactions: DueTransaction[];
+  userid: string;
+  createdat?: string;
+}

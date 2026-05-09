@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Receipt, Plus, Search, Tag, X, ShoppingCart, Loader2, Trash2, MoreVertical, Pencil, Calculator, CalendarDays, Download, Filter, Music, Share2, ExternalLink, Copy, AlertCircle } from 'lucide-react';
+import { Receipt, Plus, Search, Tag, X, ShoppingCart, Loader2, Trash2, MoreVertical, Pencil, Calculator, CalendarDays, Download, Filter, Music, Share2, ExternalLink, Copy, AlertCircle, Banknote, ArrowRightLeft, ArrowDown, ArrowUp, Users, MapPin, Phone, User as UserIcon, Calendar, ImagePlus, DollarSign, FileText } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { EXPENSE_CATEGORY_LABELS, APP_NAME } from '../constants';
@@ -10,6 +10,7 @@ import { supabase } from '../lib/supabase';
 import { NumericKeypad } from '@/components/NumericKeypad';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { DatePicker } from '@/components/DatePicker';
+import { DuePerson, DueTransaction } from '../types';
 
 export const Expenses: React.FC = () => {
   // Use cached expenses from AppContext
@@ -17,6 +18,7 @@ export const Expenses: React.FC = () => {
   const [isModalOpen, setModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeTab, setActiveTab] = useState<'expenses' | 'dues'>('expenses');
   
   // New states for Edit/Delete menu
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
@@ -441,7 +443,35 @@ export const Expenses: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start justify-between">
+      {/* Sub-Navigation Tabs */}
+      <div className="flex bg-slate-100 p-1.5 rounded-2xl mb-2 w-full md:w-fit mx-auto lg:mx-0">
+        <button
+          onClick={() => setActiveTab('expenses')}
+          className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
+            activeTab === 'expenses'
+              ? 'bg-white text-rose-600 shadow-sm'
+              : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <Receipt size={18} /> খরচের হিসাব
+        </button>
+        <button
+          onClick={() => setActiveTab('dues')}
+          className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
+            activeTab === 'dues'
+              ? 'bg-white text-emerald-600 shadow-sm'
+              : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <ArrowRightLeft size={18} /> দেনা পাওনা
+        </button>
+      </div>
+
+      {activeTab === 'dues' ? (
+        <DuesManager />
+      ) : (
+        <>
+          <div className="flex items-start justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-bold text-slate-800">
@@ -690,6 +720,8 @@ export const Expenses: React.FC = () => {
           )}
         </div>
       </div>
+      </>
+      )}
 
       <ConfirmModal 
         isOpen={showDeleteModal}
@@ -881,6 +913,416 @@ export const Expenses: React.FC = () => {
             />
         </div>,
         document.body
+      )}
+    </div>
+  );
+};
+
+const DuesManager: React.FC = () => {
+  const { user, duePersons, setDuePersons, showToast, isOnline } = useAppContext();
+  const persons = duePersons;
+
+  const [activeView, setActiveView] = useState<'list' | 'details'>('list');
+  const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
+  
+  const [isAddPersonModalOpen, setAddPersonModalOpen] = useState(false);
+  const [isAddTransactionModalOpen, setAddTransactionModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  const [transactionType, setTransactionType] = useState<'receive' | 'give'>('receive');
+
+  // Form states for Add Person
+  const [newPersonName, setNewPersonName] = useState('');
+  const [newPersonPhone, setNewPersonPhone] = useState('');
+  const [newPersonAddress, setNewPersonAddress] = useState('');
+  const [newPersonDate, setNewPersonDate] = useState(new Date().toLocaleDateString('bn-BD'));
+  const [newPersonAvatar, setNewPersonAvatar] = useState('');
+
+  // Form states for Add Transaction
+  const [txAmount, setTxAmount] = useState('');
+  const [txDescription, setTxDescription] = useState('');
+  const [txDate, setTxDate] = useState(new Date().toLocaleDateString('bn-BD'));
+  
+  const [isSubmittingPerson, setIsSubmittingPerson] = useState(false);
+  const [isSubmittingTx, setIsSubmittingTx] = useState(false);
+
+  const getPersonBalance = (person: DuePerson) => {
+    return person.transactions.reduce((acc, curr) => {
+      return curr.type === 'receive' ? acc + curr.amount : acc - curr.amount;
+    }, 0);
+  };
+
+  const handleAddPerson = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPersonName || !user || !isOnline) {
+      if (!isOnline) showToast("ইন্টারনেট সংযোগ নেই");
+      return;
+    }
+    
+    setIsSubmittingPerson(true);
+    const newPerson: DuePerson = {
+      id: crypto.randomUUID(),
+      name: newPersonName,
+      phone: newPersonPhone,
+      address: newPersonAddress,
+      date: newPersonDate,
+      avatar: newPersonAvatar,
+      transactions: [],
+      userid: user.id
+    };
+    
+    try {
+      const { error } = await supabase.from('due_persons').insert([newPerson]);
+      if (error) throw error;
+      
+      setDuePersons([newPerson, ...persons]);
+      setNewPersonName('');
+      setNewPersonPhone('');
+      setNewPersonAddress('');
+      setNewPersonAvatar('');
+      setNewPersonDate(new Date().toLocaleDateString('bn-BD'));
+      setAddPersonModalOpen(false);
+      showToast('যোগ করা হয়েছে', 'success');
+    } catch(e: any) {
+      showToast('ব্যর্থ হয়েছে: ' + e.message);
+    } finally {
+      setIsSubmittingPerson(false);
+    }
+  };
+
+  const handleAddTransaction = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!txAmount || !selectedPersonId || !user || !isOnline) {
+      if (!isOnline) showToast("ইন্টারনেট সংযোগ নেই");
+      return;
+    }
+    
+    setIsSubmittingTx(true);
+    const newTx: DueTransaction = {
+      id: crypto.randomUUID(),
+      type: transactionType,
+      amount: Number(txAmount),
+      description: txDescription,
+      date: txDate
+    };
+
+    try {
+      const person = persons.find(p => p.id === selectedPersonId);
+      if (!person) throw new Error("ব্যক্তি পাওয়া যায়নি");
+      
+      const updatedTransactions = [newTx, ...person.transactions];
+      
+      const { error } = await supabase
+        .from('due_persons')
+        .update({ transactions: updatedTransactions })
+        .eq('id', selectedPersonId)
+        .eq('userid', user.id);
+        
+      if (error) throw error;
+      
+      setDuePersons(prev => prev.map(p => {
+        if (p.id === selectedPersonId) {
+          return { ...p, transactions: updatedTransactions };
+        }
+        return p;
+      }));
+
+      setTxAmount('');
+      setTxDescription('');
+      setAddTransactionModalOpen(false);
+      showToast('লেনদেন যোগ করা হয়েছে', 'success');
+    } catch(e: any) {
+      showToast('ব্যর্থ হয়েছে: ' + e.message);
+    } finally {
+      setIsSubmittingTx(false);
+    }
+  };
+
+  if (activeView === 'details' && selectedPersonId) {
+    const person = persons.find(p => p.id === selectedPersonId);
+    if (!person) return null;
+    
+    const balance = getPersonBalance(person);
+
+    return (
+      <div className="bg-slate-50 min-h-[500px] rounded-3xl pb-20 relative">
+        {/* Header */}
+        <div className="flex items-center gap-4 bg-white p-4 rounded-t-3xl border-b border-slate-100">
+          <button onClick={() => setActiveView('list')} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+            <ArrowRightLeft size={24} className="text-slate-700 rotate-180" />
+          </button>
+          <h2 className="text-xl font-bold text-slate-800">ব্যক্তির বিবরণ</h2>
+        </div>
+
+        <div className="p-4 space-y-4">
+          {/* File Card */}
+          <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 relative">
+            <div className="flex gap-4 items-start">
+              <div className="w-16 h-16 bg-slate-200 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-indigo-500 font-bold text-xl bg-indigo-100">
+                 {person.name.charAt(0)}
+              </div>
+              <div className="flex-1 text-left">
+                <h3 className="text-lg font-bold text-slate-800">{person.name}</h3>
+                <div className="flex items-center gap-1.5 text-slate-500 mt-1 text-sm">
+                  <MapPin size={14} /> {person.address || 'ঠিকানা নেই'}
+                </div>
+                <div className="flex items-center gap-1.5 text-emerald-600 font-medium mt-1 text-sm">
+                  <span className="w-5 h-5 bg-emerald-100 rounded-full flex items-center justify-center p-0.5"><Phone size={12} className="text-emerald-600" /></span> {person.phone}
+                </div>
+              </div>
+            </div>
+            <div className="text-xs text-slate-400 font-medium absolute bottom-4 right-4">{person.date}</div>
+          </div>
+
+          {/* Summary Card */}
+          <div className={`p-4 rounded-xl flex items-center justify-between border ${balance > 0 ? 'bg-emerald-50 border-emerald-100' : balance < 0 ? 'bg-rose-50 border-rose-100' : 'bg-rose-50 border-rose-100'}`}>
+            <div className={`flex items-center gap-2 font-bold ${balance >= 0 ? 'text-rose-600' : 'text-rose-600'}`}>
+              {balance > 0 ? <ArrowDown size={20} /> : <ArrowUp size={20} />} 
+              {balance > 0 ? 'পাবো' : balance < 0 ? 'দিবো' : 'দিবো'}
+            </div>
+            <div className={`text-xl font-black ${balance >= 0 ? 'text-rose-600' : 'text-rose-600'}`}>
+              {Math.abs(balance).toLocaleString('en-IN') || '০'}
+            </div>
+          </div>
+
+          {/* Transaction List */}
+          <div className="space-y-3">
+            {person.transactions.map(t => (
+              <div key={t.id} className={`p-4 rounded-xl flex items-center gap-3 border shadow-sm ${t.type === 'receive' ? 'bg-emerald-50/50 border-emerald-100' : 'bg-rose-50/50 border-rose-100'}`}>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${t.type === 'receive' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
+                  {t.type === 'receive' ? <ArrowDown size={20} /> : <ArrowUp size={20} />}
+                </div>
+                <div className="flex-1 text-left">
+                  <h4 className="font-bold text-slate-800">{t.description || (t.type === 'receive' ? 'পেলাম' : 'দিলাম')}</h4>
+                  <div className="text-xs text-slate-500 font-medium">{t.date}</div>
+                </div>
+                <div className={`text-lg font-bold ${t.type === 'receive' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                  {t.amount.toLocaleString('en-IN')}
+                </div>
+                <button className="text-slate-400 hover:text-slate-600"><MoreVertical size={18} /></button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* FAB */}
+        <button 
+          onClick={() => setAddTransactionModalOpen(true)}
+          className="fixed lg:absolute bottom-6 right-6 w-14 h-14 bg-blue-600 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-blue-700 active:scale-95 transition-all z-10"
+        >
+          <Plus size={28} />
+        </button>
+
+        {/* Add Transaction Modal */}
+        {isAddTransactionModalOpen && (
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+             <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl relative">
+                <div className="p-6">
+                  <h3 className="text-xl font-bold text-center text-slate-800 mb-6">লেনদেন অ্যাড করুন</h3>
+                  
+                  <div className="flex gap-4 mb-6">
+                    <button 
+                      type="button"
+                      onClick={() => setTransactionType('receive')}
+                      className={`flex-1 py-3 rounded-xl font-bold text-lg border transition-colors ${transactionType === 'receive' ? 'bg-emerald-500 text-white border-emerald-600 shadow-sm' : 'bg-slate-50 text-emerald-600 border-slate-200'}`}
+                    >
+                      পেলাম
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => setTransactionType('give')}
+                      className={`flex-1 py-3 rounded-xl font-bold text-lg border transition-colors ${transactionType === 'give' ? 'bg-rose-50 text-rose-600 border-slate-200' : 'bg-slate-50 text-rose-500 border-slate-200'}`}
+                    >
+                      দিলাম
+                    </button>
+                  </div>
+
+                  <form className="space-y-4" onSubmit={handleAddTransaction}>
+                    <div className="relative">
+                      <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"><DollarSign size={20} /></div>
+                      <input type="number" value={txAmount} onChange={e => setTxAmount(e.target.value)} placeholder="টাকার পরিমাণ দিন" className="w-full py-3.5 pl-12 pr-4 bg-white border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-xl outline-none" required />
+                    </div>
+                    <div className="relative">
+                      <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"><FileText size={20} /></div>
+                      <input type="text" value={txDescription} onChange={e => setTxDescription(e.target.value)} placeholder="বিবরণ (ঐচ্ছিক)" className="w-full py-3.5 pl-12 pr-4 bg-white border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-xl outline-none" />
+                    </div>
+                    <div className="relative z-10">
+                      <DatePicker 
+                        label="তারিখ"
+                        value={txDate}
+                        onChange={(date) => setTxDate(date)}
+                        placeholder="তারিখ"
+                      />
+                    </div>
+
+                    <button type="submit" disabled={isSubmittingTx} className="w-full flex justify-center items-center gap-2 py-3.5 mt-2 bg-blue-600 text-white font-bold text-lg rounded-xl transition-colors hover:bg-blue-700 shadow-md">
+                      {isSubmittingTx ? <Loader2 size={24} className="animate-spin" /> : null}
+                      সেভ করুন
+                    </button>
+                    <button type="button" onClick={() => setAddTransactionModalOpen(false)} className="w-full py-3 mt-2 text-slate-500 font-bold text-sm rounded-xl transition-colors hover:bg-slate-100">
+                      বাতিল করুন
+                    </button>
+                  </form>
+                </div>
+             </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // --- LIST VIEW ---
+  
+  const filteredPersons = persons.filter(p => p.name.includes(searchQuery) || p.phone.includes(searchQuery));
+
+  const totalReceive = persons.reduce((acc, p) => acc + (getPersonBalance(p) > 0 ? getPersonBalance(p) : 0), 0);
+  const totalGive = persons.reduce((acc, p) => acc + (getPersonBalance(p) < 0 ? Math.abs(getPersonBalance(p)) : 0), 0);
+
+  return (
+    <div className="space-y-4 relative min-h-[500px]">
+      {/* Top Summaries */}
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+         <div className="bg-white rounded-2xl p-3 sm:p-4 border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center">
+            <div className="flex items-center justify-center gap-1.5 text-emerald-500 font-bold md:text-lg mb-1">
+              <ArrowDown size={18} /> পাবো
+            </div>
+            <div className="text-xl sm:text-2xl font-black text-emerald-600">{totalReceive.toLocaleString('en-IN') || '০'}</div>
+         </div>
+         <div className="bg-white rounded-2xl p-3 sm:p-4 border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center">
+            <div className="flex items-center justify-center gap-1.5 text-rose-500 font-bold md:text-lg mb-1">
+              <ArrowUp size={18} /> দিবো
+            </div>
+            <div className="text-xl sm:text-2xl font-black text-rose-600">{totalGive.toLocaleString('en-IN') || '০'}</div>
+         </div>
+         <div className="bg-white rounded-2xl p-3 sm:p-4 border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center">
+            <div className="flex items-center justify-center gap-1.5 text-blue-500 font-bold md:text-lg mb-1">
+              <UserIcon size={18} /> মোট
+            </div>
+            <div className="text-xl sm:text-2xl font-black text-blue-600">{persons.length} জন</div>
+         </div>
+      </div>
+
+      {/* Search */}
+      <div className="relative">
+        <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+          <Search className="text-slate-400" size={20} />
+        </div>
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="নাম বা ফোন নম্বর দিয়ে খুঁজুন..."
+          className="w-full py-4 pl-12 pr-4 bg-white border border-slate-200 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm transition-all text-slate-700"
+        />
+      </div>
+
+      {/* Persons List */}
+      <div className="space-y-3 pb-20 mt-2">
+        {filteredPersons.map(person => {
+          const balance = getPersonBalance(person);
+          const bgClass = balance < 0 ? 'bg-rose-50/50' : balance > 0 ? 'bg-emerald-50/50' : 'bg-slate-50/50';
+          const textClass = balance < 0 ? 'text-rose-600' : balance > 0 ? 'text-emerald-600' : 'text-slate-600';
+          
+          return (
+            <div 
+              key={person.id} 
+              onClick={() => { setSelectedPersonId(person.id); setActiveView('details'); }}
+              className={`p-4 rounded-2xl flex items-center gap-4 border border-slate-50 shadow-sm cursor-pointer hover:shadow-md transition-all ${bgClass}`}
+            >
+              <div className="w-14 h-14 bg-slate-200 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-indigo-500 font-bold text-xl bg-indigo-100">
+                 {person.name.charAt(0)}
+              </div>
+              <div className="flex-1 min-w-0 text-left">
+                <h3 className="text-lg font-bold text-slate-800 truncate">{person.name}</h3>
+                <p className="text-sm text-slate-500 truncate">{person.phone}</p>
+              </div>
+              <div className={`text-lg font-bold shrink-0 ${textClass}`}> 
+                {Math.abs(balance).toLocaleString('en-IN') || '০'}
+              </div>
+              <button className="text-slate-400 hover:text-slate-600 ml-2">
+                <MoreVertical size={20} />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* FAB */}
+      <button 
+        onClick={() => setAddPersonModalOpen(true)}
+        className="fixed lg:absolute bottom-6 right-6 w-14 h-14 bg-teal-500 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-teal-600 active:scale-95 transition-all z-10"
+      >
+        <Plus size={28} />
+      </button>
+
+      {/* Add Person Modal */}
+      {isAddPersonModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl relative">
+              <div className="p-6 text-center">
+                
+                <div className="flex justify-center mb-6 mt-4">
+                  <label className="w-24 h-24 rounded-full border-2 border-blue-200 bg-blue-50 flex items-center justify-center text-blue-500 overflow-hidden cursor-pointer hover:bg-blue-100 transition-colors">
+                    {newPersonAvatar ? (
+                      <img src={newPersonAvatar} alt="Avatar" className="w-full h-full object-cover" />
+                    ) : (
+                      <ImagePlus size={40} />
+                    )}
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      className="hidden" 
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          if (file.size > 1 * 1024 * 1024) {
+                            showToast('ছবির সাইজ ১ মেগাবাইটের কম হতে হবে');
+                            return;
+                          }
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            setNewPersonAvatar(reader.result as string);
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+
+                <form className="space-y-4" onSubmit={handleAddPerson}>
+                  <div className="relative">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"><UserIcon size={20} /></div>
+                    <input type="text" value={newPersonName} onChange={e => setNewPersonName(e.target.value)} placeholder="নাম" className="w-full py-3.5 pl-12 pr-4 bg-white border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-xl outline-none" required />
+                  </div>
+                  <div className="relative">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"><Phone size={20} /></div>
+                    <input type="tel" value={newPersonPhone} onChange={e => setNewPersonPhone(e.target.value)} placeholder="ফোন নম্বর (ঐচ্ছিক)" className="w-full py-3.5 pl-12 pr-4 bg-white border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-xl outline-none" />
+                  </div>
+                  <div className="relative">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"><MapPin size={20} /></div>
+                    <input type="text" value={newPersonAddress} onChange={e => setNewPersonAddress(e.target.value)} placeholder="ঠিকানা (ঐচ্ছিক)" className="w-full py-3.5 pl-12 pr-4 bg-white border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-xl outline-none" />
+                  </div>
+                  <div className="relative z-10">
+                    <DatePicker 
+                      label="তারিখ"
+                      value={newPersonDate}
+                      onChange={(date) => setNewPersonDate(date)}
+                      placeholder="তারিখ"
+                    />
+                  </div>
+
+                  <button type="submit" disabled={isSubmittingPerson} className="w-full flex justify-center items-center gap-2 py-3.5 mt-2 bg-blue-600 text-white font-bold text-lg rounded-xl transition-colors hover:bg-blue-700 shadow-md">
+                    {isSubmittingPerson ? <Loader2 size={24} className="animate-spin" /> : null}
+                    সেভ করুন
+                  </button>
+                  <button type="button" onClick={() => setAddPersonModalOpen(false)} className="w-full py-3 mt-2 text-slate-500 font-bold text-sm rounded-xl transition-colors hover:bg-slate-100">
+                    বাতিল করুন
+                  </button>
+                </form>
+              </div>
+            </div>
+        </div>
       )}
     </div>
   );

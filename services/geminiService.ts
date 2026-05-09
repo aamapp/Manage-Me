@@ -6,7 +6,7 @@ let aiModelName = 'gemini-2.5-flash';
 
 // Attempt to initialize using import.meta.env
 try {
-  const apiKey = import.meta.env?.VITE_GEMINI_API_KEY || (process as any)?.env?.VITE_GEMINI_API_KEY || (process as any)?.env?.GEMINI_API_KEY;
+  const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || (process as any)?.env?.VITE_GEMINI_API_KEY || (process as any)?.env?.GEMINI_API_KEY;
   if (apiKey && apiKey.length > 20) {
     aiClient = new GoogleGenAI({ apiKey });
     aiConfigured = true;
@@ -57,7 +57,7 @@ const aiTools = [{
     },
     {
       name: "generate_image",
-      description: "Generates an image. Use this tool if the user explicitly asks to generate, create, or draw an image or picture.",
+      description: "Generates an image. ONLY use this tool if the user explicitly says words like 'ছবি তৈরি করো', 'আঁকো', 'image', 'draw', or 'generate an image'. Do NOT use this tool for answering questions about numbers, counts, reports, or analytics.",
       parameters: {
         type: Type.OBJECT,
         properties: {
@@ -95,7 +95,7 @@ export async function generateAiImage(prompt: string): Promise<string> {
     // 1. Generate a clear English visual prompt from the user's input/context.
     const promptEnhancerResponse = await aiClient.models.generateContent({
       model: aiModelName,
-      contents: `You are an expert prompt engineer for an AI image generator (like Midjourney or Imagen). The user wants an image based on the following context (which might be in Bengali). Create a concise, visually descriptive prompt in English (max 40 words). Only output the english prompt, no extra text. Context: "${prompt}"`,
+      contents: `You are an expert prompt engineer for an AI image generator (like Midjourney or Imagen). The user wants an image based on the following context (which might be in Bengali). Create a concise, visually descriptive prompt in English (max 40 words). Make it visually stunning and conceptual. Do NOT include instructions to render specific text, numbers, or accurate data charts in the image, because image models cannot plot real data. Only output the english prompt, no extra text. Context: "${prompt}"`,
     });
     
     let enhancedPrompt = promptEnhancerResponse.text?.trim() || "A beautiful abstract digital art illustration";

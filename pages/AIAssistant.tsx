@@ -1,9 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Bot, Send, User, Loader2, ArrowLeft, Image as ImageIcon, Copy, Check } from "lucide-react";
+import { Bot, Send, User, Loader2, ArrowLeft, Copy, Check } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 import { useNavigate } from "react-router-dom";
 import { useAppContext } from "@/context/AppContext";
 import { generateAiResponse, generateAiImage } from "@/services/geminiService";
@@ -58,28 +56,6 @@ export const AIAssistant: React.FC = () => {
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
     setActiveMessageId(null);
-  };
-
-  const handleGenerateImage = async (contextText: string) => {
-    setActiveMessageId(null);
-    setIsLoading(true);
-    
-    // Add a placeholder message for the image
-    const placeholderId = "img-" + Date.now().toString();
-    setMessages(prev => [...prev, { id: placeholderId, role: "assistant", content: "আপনার তথ্যের আলোকে ছবি তৈরি করা হচ্ছে...\n\n![Generating.](https://picsum.photos/seed/picsum/300/300?blur=10)" }]);
-
-    try {
-      const prompt = `Based on the following text, generate a visually appealing image:\n${contextText.substring(0, 500)}`;
-      const base64Url = await generateAiImage(prompt);
-      
-      setMessages(prev => prev.map(msg => msg.id === placeholderId ? { ...msg, content: `![Generated Image](${base64Url})` } : msg));
-    } catch (e: any) {
-      console.error(e);
-      const errorMsg = e.message ? `দুঃখিত, ছবিটি তৈরি করা সম্ভব হয়নি: ${e.message}` : "দুঃখিত, ছবিটি তৈরি করা সম্ভব হয়নি। (দয়া করে API Key চেক করুন)";
-      setMessages(prev => prev.map(msg => msg.id === placeholderId ? { ...msg, content: errorMsg } : msg));
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   const scrollToBottom = () => {
@@ -190,32 +166,98 @@ export const AIAssistant: React.FC = () => {
         } else if (call.name === "download_report") {
           const topic = call.args.topic;
 
-          const downloadPDF = (
+          const downloadPDF = async (
             data: any[],
             filename: string,
             title: string,
           ) => {
             if (!data || data.length === 0) return;
-            const doc = new jsPDF();
-
-            // Add a title
-            doc.setFontSize(18);
-            doc.text(title, 14, 20);
 
             const headers = Object.keys(data[0] || {});
-            const rows = data.map((obj) =>
-              Object.values(obj).map((v) => v?.toString() || ""),
-            );
-
-            autoTable(doc, {
-              head: [headers],
-              body: rows,
-              startY: 30,
-              styles: { fontSize: 10, cellPadding: 3 },
-              headStyles: { fillColor: [63, 81, 181] },
+            
+            // Create a wrapper element for rendering
+            const element = document.createElement("div");
+            element.style.padding = "20px";
+            element.style.fontFamily = "'Kohinoor Bangla', sans-serif, Arial";
+            element.style.backgroundColor = "white";
+            
+            // Title
+            const h1 = document.createElement("h2");
+            h1.innerText = title;
+            h1.style.color = "#1e293b";
+            h1.style.textAlign = "center";
+            h1.style.marginBottom = "24px";
+            element.appendChild(h1);
+            
+            // Table
+            const table = document.createElement("table");
+            table.style.width = "100%";
+            table.style.borderCollapse = "collapse";
+            table.style.marginBottom = "20px";
+            table.style.fontSize = "12px";
+            
+            // Thead
+            const thead = document.createElement("thead");
+            const trHead = document.createElement("tr");
+            headers.forEach(h => {
+              const th = document.createElement("th");
+              th.innerText = h.charAt(0).toUpperCase() + h.slice(1);
+              th.style.borderBottom = "2px solid #cbd5e1";
+              th.style.padding = "10px 8px";
+              th.style.backgroundColor = "#f8fafc";
+              th.style.color = "#334155";
+              th.style.textAlign = "left";
+              th.style.fontWeight = "bold";
+              trHead.appendChild(th);
             });
-
-            doc.save(filename);
+            thead.appendChild(trHead);
+            table.appendChild(thead);
+            
+            // Tbody
+            const tbody = document.createElement("tbody");
+            data.forEach((row, i) => {
+              const tr = document.createElement("tr");
+              tr.style.backgroundColor = i % 2 === 0 ? "#ffffff" : "#f8fafc";
+              headers.forEach(h => {
+                const td = document.createElement("td");
+                td.innerText = row[h]?.toString() || "";
+                td.style.borderBottom = "1px solid #f1f5f9";
+                td.style.padding = "10px 8px";
+                td.style.color = "#475569";
+                tr.appendChild(td);
+              });
+              tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+            
+            element.appendChild(table);
+            
+            // Add to DOM temporarily to ensure fonts are rendered and available
+            element.style.position = "absolute";
+            element.style.left = "-9999px";
+            element.style.top = "-9999px";
+            document.body.appendChild(element);
+            
+            const opt = {
+              margin:       15,
+              filename:     filename,
+              image:        { type: 'jpeg', quality: 0.98 },
+              html2canvas:  { scale: 2, useCORS: true },
+              jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
+            };
+            
+            try {
+              // @ts-ignore
+              const html2pdfModule = await import('html2pdf.js');
+              const html2pdf: any = html2pdfModule.default ? html2pdfModule.default : html2pdfModule;
+              await html2pdf().set(opt).from(element).save();
+            } catch (err) {
+              console.error("PDF generation failed:", err);
+            } finally {
+              if (document.body.contains(element)) {
+                document.body.removeChild(element);
+              }
+            }
           };
 
           switch (topic) {
@@ -328,12 +370,12 @@ export const AIAssistant: React.FC = () => {
         >
           <ArrowLeft size={20} />
         </button>
-        <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-          <Bot size={24} />
+        <div className="w-9 h-9 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+          <Bot size={22} />
         </div>
         <div className="flex-1 min-w-0">
           <h1
-            className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight leading-tight mb-0.5 truncate"
+            className="text-lg sm:text-xl font-bold text-slate-800 tracking-tight leading-none mb-0.5 truncate"
             style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
           >
             এআই অ্যাসিস্ট্যান্ট
@@ -447,13 +489,6 @@ export const AIAssistant: React.FC = () => {
                     >
                       {copiedId === message.id ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
                       {copiedId === message.id ? "কপি হয়েছে" : "কপি করুন"}
-                    </button>
-                    <button
-                      onClick={() => handleGenerateImage(message.content)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-full hover:bg-indigo-100 transition-colors shadow-sm active:scale-95"
-                    >
-                      <ImageIcon size={14} />
-                      ছবি জেনারেট
                     </button>
                   </div>
                 )}

@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { Project, Client, User, IncomeRecord, UserProfile, Expense, GhazalNote, ShoppingList } from '@/types';
+import { Project, Client, User, IncomeRecord, UserProfile, Expense, GhazalNote, ShoppingList, DuePerson } from '@/types';
 import { supabase, isConfigured } from '@/lib/supabase';
 
 interface ToastState {
@@ -30,6 +30,10 @@ interface AppContextType {
   setShoppingLists: React.Dispatch<React.SetStateAction<ShoppingList[]>>;
   trashedShoppingLists: ShoppingList[];
   setTrashedShoppingLists: React.Dispatch<React.SetStateAction<ShoppingList[]>>;
+  duePersons: DuePerson[];
+  setDuePersons: React.Dispatch<React.SetStateAction<DuePerson[]>>;
+  trashedDuePersons: DuePerson[];
+  setTrashedDuePersons: React.Dispatch<React.SetStateAction<DuePerson[]>>;
   trashedClients: Client[];
   setTrashedClients: React.Dispatch<React.SetStateAction<Client[]>>;
   
@@ -39,6 +43,7 @@ interface AppContextType {
   allIncomeRecords: IncomeRecord[];
   allExpenses: Expense[];
   allShoppingLists: ShoppingList[];
+  allDuePersons: DuePerson[];
   
   // Profiles Data (For Admin List)
   userProfiles: UserProfile[];
@@ -97,6 +102,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [trashedGhazalNotes, setTrashedGhazalNotes] = useState<GhazalNote[]>([]);
   const [shoppingLists, setShoppingLists] = useState<ShoppingList[]>([]);
   const [trashedShoppingLists, setTrashedShoppingLists] = useState<ShoppingList[]>([]);
+  const [duePersons, setDuePersons] = useState<DuePerson[]>([]);
+  const [trashedDuePersons, setTrashedDuePersons] = useState<DuePerson[]>([]);
   const [trashedClients, setTrashedClients] = useState<Client[]>([]);
 
   // Master State (All data cache for Admin)
@@ -105,6 +112,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [allIncomeRecords, setAllIncomeRecords] = useState<IncomeRecord[]>([]);
   const [allExpenses, setAllExpenses] = useState<Expense[]>([]);
   const [allShoppingLists, setAllShoppingLists] = useState<ShoppingList[]>([]);
+  const [allDuePersons, setAllDuePersons] = useState<DuePerson[]>([]);
   
   // User Profiles
   const [userProfiles, setUserProfiles] = useState<UserProfile[]>([]);
@@ -141,11 +149,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (parsed.trashedGhazalNotes) setTrashedGhazalNotes(parsed.trashedGhazalNotes);
           if (parsed.shoppingLists) setShoppingLists(parsed.shoppingLists);
           if (parsed.trashedShoppingLists) setTrashedShoppingLists(parsed.trashedShoppingLists);
+          if (parsed.duePersons) setDuePersons(parsed.duePersons);
+          if (parsed.trashedDuePersons) setTrashedDuePersons(parsed.trashedDuePersons);
           if (parsed.allProjects) setAllProjects(parsed.allProjects);
           if (parsed.allClients) setAllClients(parsed.allClients);
           if (parsed.allIncomeRecords) setAllIncomeRecords(parsed.allIncomeRecords);
           if (parsed.allExpenses) setAllExpenses(parsed.allExpenses);
           if (parsed.allShoppingLists) setAllShoppingLists(parsed.allShoppingLists);
+          if (parsed.allDuePersons) setAllDuePersons(parsed.allDuePersons);
           if (parsed.userProfiles) setUserProfiles(parsed.userProfiles);
         }
       } catch (e) {
@@ -194,11 +205,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (parsed.trashedGhazalNotes) setTrashedGhazalNotes(parsed.trashedGhazalNotes);
         if (parsed.shoppingLists) setShoppingLists(parsed.shoppingLists);
         if (parsed.trashedShoppingLists) setTrashedShoppingLists(parsed.trashedShoppingLists);
+        if (parsed.duePersons) setDuePersons(parsed.duePersons);
+        if (parsed.trashedDuePersons) setTrashedDuePersons(parsed.trashedDuePersons);
         if (parsed.allProjects) setAllProjects(parsed.allProjects);
         if (parsed.allClients) setAllClients(parsed.allClients);
         if (parsed.allIncomeRecords) setAllIncomeRecords(parsed.allIncomeRecords);
         if (parsed.allExpenses) setAllExpenses(parsed.allExpenses);
         if (parsed.allShoppingLists) setAllShoppingLists(parsed.allShoppingLists);
+        if (parsed.allDuePersons) setAllDuePersons(parsed.allDuePersons);
         if (parsed.userProfiles) setUserProfiles(parsed.userProfiles);
       } catch (e) {
         console.warn("Cache hydration failed", e);
@@ -225,6 +239,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       let expenseQuery = supabase.from('expenses').select('*');
       let ghazalQuery = supabase.from('ghazal_notes').select('*');
       let shoppingQuery = supabase.from('shopping_lists').select('*');
+      let duePersonsQuery = supabase.from('due_persons').select('*');
 
       // If NOT admin, filter at DB level for efficiency/security
       if (!isAdmin) {
@@ -234,15 +249,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         expenseQuery = expenseQuery.eq('userid', user.id);
         ghazalQuery = ghazalQuery.eq('userid', user.id);
         shoppingQuery = shoppingQuery.eq('userid', user.id);
+        duePersonsQuery = duePersonsQuery.eq('userid', user.id);
       }
 
-      const [projRes, clientRes, incomeRes, expenseRes, ghazalRes, shoppingRes] = await Promise.all([
+      const [projRes, clientRes, incomeRes, expenseRes, ghazalRes, shoppingRes, duePersonsRes] = await Promise.all([
         projQuery.order('createdat', { ascending: false }),
         clientQuery.order('name', { ascending: true }),
         incomeQuery.order('date', { ascending: false }),
         expenseQuery.order('date', { ascending: false }),
         ghazalQuery.order('createdat', { ascending: false }),
-        shoppingQuery.order('createdat', { ascending: false })
+        shoppingQuery.order('createdat', { ascending: false }),
+        duePersonsQuery.order('createdat', { ascending: false })
       ]);
 
       // If there's an error in critical initial fetches, abort to prevent wiping local cache with empty arrays
@@ -258,6 +275,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const eData = expenseRes.data as Expense[] || [];
       const gData = ghazalRes.data as GhazalNote[] || [];
       const sData = shoppingRes.data as ShoppingList[] || [];
+      const dData = duePersonsRes.data as DuePerson[] || [];
 
       if (isAdmin) {
         // Store everything in Master State
@@ -266,6 +284,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setAllIncomeRecords(iData);
         setAllExpenses(eData);
         setAllShoppingLists(sData);
+        setAllDuePersons(dData);
         
         // Fetch User Profiles for Admin List
         const { data: profiles, error: profError } = await supabase.from('profiles').select('*');
@@ -283,6 +302,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           allIncomeRecords: iData,
           allExpenses: eData,
           allShoppingLists: sData,
+          allDuePersons: dData,
           userProfiles: profilesData,
           lastUpdated: Date.now()
         }));
@@ -293,6 +313,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             const userExpenses = eData.filter(e => e.userid === adminSelectedUserId);
             const userGhazals = gData.filter(g => g.userid === adminSelectedUserId);
             const userShopping = sData.filter(s => s.userid === adminSelectedUserId);
+            const userDuePersons = dData.filter(d => d.userid === adminSelectedUserId);
 
             setProjects(userProjects.filter(p => !p.notes?.startsWith('[TRASH]')));
             setTrashedProjects(userProjects.filter(p => p.notes?.startsWith('[TRASH]')));
@@ -304,6 +325,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setTrashedGhazalNotes(userGhazals.filter(g => g.lyrics?.startsWith('[TRASH]')));
             setShoppingLists(userShopping.filter(s => !s.title?.startsWith('[TRASH]')));
             setTrashedShoppingLists(userShopping.filter(s => s.title?.startsWith('[TRASH]')));
+            setDuePersons(userDuePersons.filter(d => !d.name.startsWith('[TRASH]')));
+            setTrashedDuePersons(userDuePersons.filter(d => d.name.startsWith('[TRASH]')));
             setClients(cData.filter(c => c.userid === adminSelectedUserId && !c.contact?.startsWith('[TRASH]')));
             setTrashedClients(cData.filter(c => c.userid === adminSelectedUserId && c.contact?.startsWith('[TRASH]')));
             setIncomeRecords(iData.filter(i => {
@@ -327,6 +350,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setTrashedGhazalNotes([]);
             setShoppingLists([]);
             setTrashedShoppingLists([]);
+            setDuePersons([]);
+            setTrashedDuePersons([]);
         }
       } else {
         // Normal User: Visible = All fetched
@@ -345,6 +370,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const userTrashedGhazals = gData.filter(g => g.lyrics?.startsWith('[TRASH]'));
         const userShopping = sData.filter(s => !s.title?.startsWith('[TRASH]'));
         const userTrashedShopping = sData.filter(s => s.title?.startsWith('[TRASH]'));
+        const userDuePersons = dData.filter(d => !d.name.startsWith('[TRASH]'));
+        const userTrashedDuePersons = dData.filter(d => d.name.startsWith('[TRASH]'));
 
         setProjects(userProjects);
         setTrashedProjects(userTrashedProjects);
@@ -357,6 +384,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setTrashedGhazalNotes(userTrashedGhazals);
         setShoppingLists(userShopping);
         setTrashedShoppingLists(userTrashedShopping);
+        setDuePersons(userDuePersons);
+        setTrashedDuePersons(userTrashedDuePersons);
 
         // Update Cache for Offline Support
         const cacheKey = `manage_me_cache_${user.id}`;
@@ -372,6 +401,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           trashedGhazalNotes: userTrashedGhazals,
           shoppingLists: userShopping,
           trashedShoppingLists: userTrashedShopping,
+          duePersons: userDuePersons,
+          trashedDuePersons: userTrashedDuePersons,
           lastUpdated: Date.now()
         }));
       }
@@ -705,6 +736,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses' }, () => refreshData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ghazal_notes' }, () => refreshData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'shopping_lists' }, () => refreshData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'due_persons' }, () => refreshData())
       .subscribe();
 
     return () => {
@@ -718,8 +750,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       incomeRecords, setIncomeRecords, expenses, setExpenses, trashedExpenses, setTrashedExpenses,
       ghazalNotes, setGhazalNotes, trashedGhazalNotes, setTrashedGhazalNotes,
       shoppingLists, setShoppingLists, trashedShoppingLists, setTrashedShoppingLists,
+      duePersons, setDuePersons, trashedDuePersons, setTrashedDuePersons,
       trashedClients, setTrashedClients,
-      allProjects, allClients, allIncomeRecords, allExpenses, allShoppingLists,
+      allProjects, allClients, allIncomeRecords, allExpenses, allShoppingLists, allDuePersons,
       userProfiles,
       user, setUser, loading, refreshData,
       toast, showToast, hideToast,
