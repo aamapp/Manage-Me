@@ -54,6 +54,20 @@ const aiTools = [{
         },
         required: ["page_name"]
       }
+    },
+    {
+      name: "generate_image",
+      description: "Generates an image. Use this tool if the user explicitly asks to generate, create, or draw an image or picture.",
+      parameters: {
+        type: Type.OBJECT,
+        properties: {
+          prompt: {
+            type: Type.STRING,
+            description: "A detailed prompt for the image to be generated, based on the user's request and context."
+          }
+        },
+        required: ["prompt"]
+      }
     }
   ]
 }];
@@ -64,6 +78,62 @@ export interface AiResponseData {
     name: string;
     args: any;
   };
+}
+
+export async function generateAiImage(prompt: string): Promise<string> {
+  if (!aiClient) {
+    const customKey = localStorage.getItem('custom_gemini_api_key');
+    if (customKey && customKey.length > 20) {
+      aiClient = new GoogleGenAI({ apiKey: customKey.trim() });
+      aiConfigured = true;
+    } else {
+      throw new Error("API Key is missing.");
+    }
+  }
+
+  try {
+    // 1. Generate a clear English visual prompt from the user's input/context.
+    const promptEnhancerResponse = await aiClient.models.generateContent({
+      model: aiModelName,
+      contents: `You are an expert prompt engineer for an AI image generator (like Midjourney or Imagen). The user wants an image based on the following context (which might be in Bengali). Create a concise, visually descriptive prompt in English (max 40 words). Only output the english prompt, no extra text. Context: "${prompt}"`,
+    });
+    
+    let enhancedPrompt = promptEnhancerResponse.text?.trim() || "A beautiful abstract digital art illustration";
+    // Remove any markdown formatting or quotes
+    enhancedPrompt = enhancedPrompt.replace(/['"]/g, '').replace(/\n/g, ' ').trim();
+
+    // 2. Since standard Gemini API keys often don't have access to Imagen 3 (returning 403),
+    // we use a reliable free fallback (pollinations.ai) to actually render the image,
+    // using the Gemini-enhanced prompt!
+    const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(enhancedPrompt)}?width=1024&height=1024&nologo=true`;
+    
+    // We return the URL directly
+    return imageUrl;
+
+  } catch (error: any) {
+    let is404 = error.status === 404 || error.message?.includes("404");
+    if (error.message && error.message.includes("{")) {
+       try {
+         const parsedError = JSON.parse(error.message);
+         if (parsedError.error?.code === 404 || parsedError.error?.status === "NOT_FOUND") {
+            is404 = true;
+         }
+       } catch (e) {}
+    }
+
+    if (is404) {
+       // Fallback to gemini-1.5-flash if 2.5-flash is not found
+       if (aiModelName === 'gemini-2.5-flash') {
+         aiModelName = 'gemini-2.0-flash';
+         return generateAiImage(prompt);
+       } else if (aiModelName === 'gemini-2.0-flash') {
+         aiModelName = 'gemini-1.5-flash';
+         return generateAiImage(prompt);
+       }
+    }
+    console.error("Image generation process error:", error);
+    throw new Error("ছবি তৈরি করতে সমস্যা হচ্ছে। দয়া করে আবার চেষ্টা করুন।");
+  }
 }
 
 export async function generateAiResponse(userMessage: string, chatHistory: any[], contextData: any): Promise<AiResponseData> {
@@ -118,9 +188,17 @@ User Message: ${userMessage}`;
       throw new Error("No response received from the model.");
     }
   } catch (error: any) {
-    if (error.status === 429 || error.message?.includes("429") || error.message?.includes("quota")) {
+    let errorCode = error.status;
+    if (error.message && error.message.includes("{")) {
+       try {
+         const parsedError = JSON.parse(error.message);
+         errorCode = parsedError.error?.code || errorCode;
+       } catch (e) {}
+    }
+
+    if (errorCode === 429 || error.message?.includes("429") || error.message?.includes("quota")) {
       throw new Error("এপিআই কোটা শেষ হয়ে গেছে। কিছুক্ষণ পর আবার চেষ্টা করুন।");
-    } else if (error.status === 404) {
+    } else if (errorCode === 404 || error.message?.includes("404") || error.message?.includes("NOT_FOUND")) {
        // Fallback to gemini-1.5-flash if 2.5-flash is not found
        if (aiModelName === 'gemini-2.5-flash') {
          aiModelName = 'gemini-2.0-flash';

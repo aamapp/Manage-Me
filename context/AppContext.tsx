@@ -394,9 +394,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           supabase.auth.signOut().catch(() => {});
           setUser(null);
           showToast('আপনার সেশনের মেয়াদ শেষ হয়েছে, দয়া করে পুনরায় লগইন করুন।', 'info');
-      } else if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
+      } else if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError') || error.name === 'AbortError' || error.message?.includes('Lock broken')) {
           // Silently handle offline fetch errors, as cached data is already loaded
-          console.log("Network fetch failed (likely offline). Relying on cached data.");
+          console.log("Network fetch/lock failed. Relying on cached data.");
       } else {
           showToast(`কানেকশন এরর: ${error.message}`);
       }
@@ -632,7 +632,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 role: metadata?.role || 'user',
                 createdat: session.user.created_at
             };
-            setUser((prev) => prev ? prev : initialUser);
+            setUser(user ? user : initialUser);
 
             // Background Sync with Profile Table (Source of Truth)
             supabase.from('profiles')
