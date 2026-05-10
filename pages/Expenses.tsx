@@ -980,7 +980,7 @@ const DuesManager: React.FC = () => {
 
   const getPersonBalance = (person: DuePerson) => {
     return person.transactions.reduce((acc, curr) => {
-      return curr.type === 'receive' ? acc + curr.amount : acc - curr.amount;
+      return curr.type === 'give' ? acc + curr.amount : acc - curr.amount;
     }, 0);
   };
 
@@ -1241,12 +1241,12 @@ const DuesManager: React.FC = () => {
           </div>
 
           {/* Summary Card */}
-          <div className={`p-2.5 rounded-xl flex items-center justify-between border ${balance > 0 ? 'bg-emerald-50 border-emerald-100' : balance < 0 ? 'bg-rose-50 border-rose-100' : 'bg-rose-50 border-rose-100'}`} style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
-            <div className={`flex items-center gap-2 font-bold ${balance >= 0 ? 'text-rose-600' : 'text-rose-600'}`}>
-              {balance > 0 ? <ArrowDown size={18} /> : <ArrowUp size={18} />} 
-              {balance > 0 ? 'পাবো' : balance < 0 ? 'দিবো' : 'দিবো'}
+          <div className={`p-2.5 rounded-xl flex items-center justify-between border ${balance > 0 ? 'bg-emerald-50 border-emerald-100' : balance < 0 ? 'bg-rose-50 border-rose-100' : 'bg-slate-50 border-slate-200'}`} style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+            <div className={`flex items-center gap-2 font-bold ${balance > 0 ? 'text-emerald-600' : balance < 0 ? 'text-rose-600' : 'text-slate-600'}`}>
+              {balance > 0 ? <ArrowDown size={18} /> : balance < 0 ? <ArrowUp size={18} /> : null} 
+              {balance > 0 ? 'পাবো' : balance < 0 ? 'দিবো' : 'হিসাব শূন্য'}
             </div>
-            <div className={`text-lg font-black ${balance >= 0 ? 'text-rose-600' : 'text-rose-600'}`}>
+            <div className={`text-lg font-black ${balance > 0 ? 'text-emerald-600' : balance < 0 ? 'text-rose-600' : 'text-slate-600'}`}>
               {Math.abs(balance).toLocaleString('en-IN') || '০'}
             </div>
           </div>
