@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { TrendingUp, Plus, Search, Calendar, DollarSign, X, ReceiptText, Briefcase, CreditCard, AlertCircle, MoreVertical, Pencil, Trash2, Users, Loader2, CalendarDays, Wallet, Clock, Zap, Rocket, Landmark, Banknote, Calculator, Download, Music, Filter } from 'lucide-react';
+import { TrendingUp, Plus, Search, Calendar, DollarSign, X, ReceiptText, Briefcase, CreditCard, AlertCircle, MoreVertical, Pencil, SquarePen, Trash2, Users, Loader2, CalendarDays, Wallet, Clock, Zap, Rocket, Landmark, Banknote, Calculator, Download, Music, Filter } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { useAppContext } from '../context/AppContext';
@@ -740,13 +740,14 @@ export const Income: React.FC = () => {
                                         handleOpenEditModal(payment); 
                                       }}
                                       disabled={!isOnline}
-                                      className={`w-full px-4 py-2.5 text-left text-xs font-bold flex items-center gap-2 transition-colors
-                                        ${!isOnline ? 'text-slate-300 cursor-not-allowed' : 'text-slate-600 hover:bg-slate-50 hover:text-emerald-600'}
+                                      className={`w-full px-4 py-3 text-left text-sm font-bold flex items-center gap-3 transition-colors
+                                        ${!isOnline ? 'text-slate-300 cursor-not-allowed' : 'text-slate-700 hover:bg-slate-50'}
                                       `}
+                                      style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
                                   >
-                                      <Pencil size={14} /> এডিট
+                                      <SquarePen size={18} className={!isOnline ? 'text-slate-300' : 'text-slate-500'} /> এডিট
                                   </button>
-                                  <div className="h-px bg-slate-50 w-full my-0.5"></div>
+                                  <div className="h-px bg-slate-50 w-full"></div>
                                   <button 
                                       onClick={(e) => { 
                                         e.stopPropagation(); 
@@ -757,11 +758,12 @@ export const Income: React.FC = () => {
                                         initiateDelete(payment.id, payment); 
                                       }}
                                       disabled={!isOnline}
-                                      className={`w-full px-4 py-2.5 text-left text-xs font-bold flex items-center gap-2 transition-colors
+                                      className={`w-full px-4 py-3 text-left text-sm font-bold flex items-center gap-3 transition-colors
                                         ${!isOnline ? 'text-slate-300 cursor-not-allowed' : 'text-rose-500 hover:bg-rose-50'}
                                       `}
+                                      style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
                                   >
-                                       <Trash2 size={14} /> ডিলিট
+                                       <Trash2 size={18} className={!isOnline ? 'text-slate-300' : 'text-rose-500'} /> ডিলিট
                                   </button>
                               </div>
                           )}

@@ -408,7 +408,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
     } catch (error: any) {
-      console.error("Refresh Data Error:", error);
       if (error.message?.includes('JWT') || 
           error.message?.includes('Unauthorized') || 
           error.message?.includes('Refresh Token') ||
@@ -416,6 +415,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           error.status === 400 ||
           error.status === 401) {
           
+          console.error("Auth Error:", error);
           // Clear local storage manually as a fallback
           for (const key in localStorage) {
             if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
@@ -427,8 +427,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           showToast('আপনার সেশনের মেয়াদ শেষ হয়েছে, দয়া করে পুনরায় লগইন করুন।', 'info');
       } else if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError') || error.name === 'AbortError' || error.message?.includes('Lock broken')) {
           // Silently handle offline fetch errors, as cached data is already loaded
-          console.log("Network fetch/lock failed. Relying on cached data.");
+          console.warn("Network fetch/lock failed. Relying on cached data.", error);
+          if (error.message?.includes('Failed to fetch')) {
+             showToast('নেটওয়ার্ক এরর! আপনার সুপাবেজ প্রজেক্ট কি পজ (pause) হয়ে আছে? অথবা CORS সেটিংস চেক করুন।', 'info');
+          }
       } else {
+          console.error("Refresh Data Error:", error);
           showToast(`কানেকশন এরর: ${error.message}`);
       }
     } finally {
