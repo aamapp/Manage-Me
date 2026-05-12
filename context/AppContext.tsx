@@ -654,6 +654,95 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, []);
 
+  // Daily Reminder Logic (সকাল, দুপুর, রাত - ৩ বার অটো চেক)
+  useEffect(() => {
+    if (!user || !isOnline || projects.length === 0) return;
+
+    const checkDailyReminders = async () => {
+      const now = new Date();
+      const currentHour = now.getHours();
+      const todayDate = now.toISOString().split('T')[0];
+      
+      // ৩টি সময় স্লট (সকাল ৯-১১, দুপুর ২-৫, রাত ৮-১০)
+      let slot = "";
+      if (currentHour >= 9 && currentHour < 11) slot = "morning";
+      else if (currentHour >= 14 && currentHour < 17) slot = "afternoon";
+      else if (currentHour >= 20 && currentHour < 22) slot = "night";
+
+      if (!slot) return;
+
+      const storageKey = `reminder_sent_${user.id}_${todayDate}_${slot}`;
+      if (localStorage.getItem(storageKey)) return; // এই স্লটে অলরেডি রিমাইন্ডার দেওয়া হয়েছে
+
+      console.log(`Checking ${slot} reminders for ${user.id}...`);
+
+      let reminderMessages = [];
+      
+      // ১. বকেয়া বিল চেক
+      const dueProjects = projects.filter(p => Number(p.dueamount) > 0);
+      if (dueProjects.length > 0) {
+        const totalDue = dueProjects.reduce((sum, p) => sum + Number(p.dueamount), 0);
+        reminderMessages.push(`বকেয়া বিল: ৳${totalDue}`);
+      }
+
+      // ২. পেন্ডিং প্রজেক্ট চেক
+      const pendingCount = projects.filter(p => p.status === 'pending').length;
+      if (pendingCount > 0) {
+        reminderMessages.push(`পেন্ডিং প্রজেক্ট: ${pendingCount}টি`);
+      }
+
+      // ৩. দেনা/ধার চেক (Due Persons)
+      let borrowedTotal = 0;
+      duePersons.forEach(person => {
+        let receive = 0;
+        let give = 0;
+        person.transactions?.forEach(tx => {
+          if (tx.type === 'receive') receive += Number(tx.amount || 0);
+          if (tx.type === 'give') give += Number(tx.amount || 0);
+        });
+        if (receive - give > 0) borrowedTotal += (receive - give);
+      });
+
+      if (borrowedTotal > 0) {
+        reminderMessages.push(`আপনার মোট দেনা: ৳${borrowedTotal}`);
+      }
+
+      if (reminderMessages.length > 0) {
+        const title = "ডেইলি রিমাইন্ডার 🔔";
+        const body = reminderMessages.join(', ') + '। অনুগ্রহ করে সব চেক করুন।';
+        
+        // Notifications লিস্টে যোগ করা
+        const newNotif: AppNotification = {
+          id: Math.random().toString(36).substring(2),
+          title,
+          body,
+          icon: 'bell',
+          is_read: false,
+          createdat: new Date().toISOString(),
+          userid: user.id,
+          actionUrl: '/notifications'
+        };
+
+        setNotifications(prev => [newNotif, ...prev]);
+        
+        // অ্যাপের ভিতরে টোস্ট মেসেজ দেখানো
+        showToast(body, 'info');
+
+        // স্টোরেজে সেভ করা যাতে এই স্লটে আর নোটিফিকেশন না আসে
+        localStorage.setItem(storageKey, 'true');
+      }
+    };
+
+    // ৫ সেকেন্ড পর প্রথম চেক এবং প্রতি ১ ঘণ্টা পর পর অটো চেক
+    const timer = setTimeout(checkDailyReminders, 5000);
+    const intervalId = setInterval(checkDailyReminders, 60 * 60 * 1000); 
+
+    return () => {
+      clearTimeout(timer);
+      clearInterval(intervalId);
+    };
+  }, [user, projects, duePersons, isOnline, showToast]);
+
   // Effect to re-filter data when Admin selection changes without re-fetching
   useEffect(() => {
     if (user?.role === 'admin') {
