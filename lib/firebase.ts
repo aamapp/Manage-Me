@@ -15,7 +15,7 @@ export const requestNotificationPermission = async (userId: string) => {
       
       // Get the FCM token
       const token = await getToken(messaging, {
-        vapidKey: 'YOUR_VAPID_KEY_HERE' // We will tell the user to replace this or use a generic one if we don't have it
+        vapidKey: 'BDbjGbPon8pjckPCxZ7xewSIEkWsnUPwl0KyYMLGHyqWI-uQydbC4d8bgEXDsAY-7jFvTU_WG4Q8Pec_Ziyp0b0'
       });
       
       if (token) {

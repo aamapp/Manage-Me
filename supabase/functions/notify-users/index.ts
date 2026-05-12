@@ -21,6 +21,7 @@ serve(async (req) => {
     )
 
     const payload = await req.json()
+    console.log("Webhook payload received:", payload);
 
     let userId = ''
     let title = ''
@@ -54,15 +55,22 @@ serve(async (req) => {
       body = payload.body
     }
 
+    console.log(`Checking token for userId: ${userId}`);
+
     if (!userId || !title || !body) {
-      throw new Error('Missing required fields or unrecognized webhook payload')
+      console.log("Missing required fields:", { userId, title, body });
+      return new Response(JSON.stringify({ message: "Missing required fields" }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      })
     }
 
     // 1. Get the user's FCM token from auth.users (user_metadata)
     // Note: To access auth.users, we MUST use the SERVICE_ROLE_KEY
     const { data: userData, error: userError } = await supabaseClient.auth.admin.getUserById(userId)
     
-    if (userError || !userData.user) {
+    if (userError || !userData?.user) {
+      console.error(`User fetch error: ${userError?.message}`);
       throw new Error(`Error fetching user: ${userError?.message}`)
     }
 
@@ -70,11 +78,14 @@ serve(async (req) => {
     const fcmToken = userMetadata?.fcm_token
 
     if (!fcmToken) {
+      console.log(`No FCM token found for user ${userId}. Cannot send notification.`);
       return new Response(JSON.stringify({ message: "User does not have an FCM token" }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       })
     }
+
+    console.log(`Pushing notification to FCM Token: ${fcmToken.substring(0, 15)}...`);
 
     // 2. Get the Firebase Service Account JSON string from environment variables
     const serviceAccountStr = Deno.env.get('FIREBASE_SERVICE_ACCOUNT')
@@ -112,9 +123,27 @@ serve(async (req) => {
             title: title,
             body: body,
           },
+          android: {
+            priority: "high",
+            notification: {
+              channel_id: "fcm_default_channel",
+              sound: "default"
+            }
+          },
+          webpush: {
+            headers: {
+              Urgency: "high",
+            },
+            notification: {
+              requireInteraction: true,
+              sound: "default"
+            }
+          },
           // Optional data payload
           data: {
-            click_action: "FLUTTER_NOTIFICATION_CLICK" // Adjust based on android app needs
+            title: title,
+            body: body,
+            click_action: "FLUTTER_NOTIFICATION_CLICK"
           }
         },
       }),
@@ -122,16 +151,19 @@ serve(async (req) => {
 
     if (!fcmResponse.ok) {
       const errorData = await fcmResponse.text()
+      console.error("FCM API Error response:", errorData);
       throw new Error(`FCM Error: ${errorData}`)
     }
 
     const responseData = await fcmResponse.json()
+    console.log("Successfully sent push notification!", responseData);
 
     return new Response(JSON.stringify({ success: true, response: responseData }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })
   } catch (error) {
+    console.error("Critical function error:", error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
