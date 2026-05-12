@@ -24,10 +24,19 @@ export const requestNotificationPermission = async (userId: string) => {
     window.setAndroidFCMToken = async (token: string) => {
       console.log('Received FCM token from Android:', token);
       if (token && userId) {
-        await supabase.auth.updateUser({
-          data: { fcm_token: token }
-        });
-        alert('অ্যান্ড্রয়েড অ্যাপে নোটিফিকেশন সফলভাবে চালু হয়েছে!');
+        // Fetch current user metadata to avoid infinite loop
+        const { data } = await supabase.auth.getUser();
+        const currentToken = data?.user?.user_metadata?.fcm_token;
+        
+        if (currentToken !== token) {
+          await supabase.auth.updateUser({
+            data: { fcm_token: token }
+          });
+          // Dispatch custom event for elegant toast instead of annoying alert
+          window.dispatchEvent(new CustomEvent('app_toast', { 
+            detail: { message: 'অ্যান্ড্রয়েড অ্যাপে নোটিফিকেশন সফলভাবে চালু হয়েছে!', type: 'success' } 
+          }));
+        }
       }
     };
 

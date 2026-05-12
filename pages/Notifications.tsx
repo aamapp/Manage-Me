@@ -5,7 +5,7 @@ import { useAppContext } from '../context/AppContext';
 
 export const Notifications = () => {
   const navigate = useNavigate();
-  const { notifications, dismissNotification, dismissAllNotifications } = useAppContext();
+  const { notifications, dismissNotification, markNotificationAsRead, dismissAllNotifications } = useAppContext();
 
   const handleDeleteAll = () => {
     if (notifications.length === 0) return;
@@ -72,13 +72,26 @@ export const Notifications = () => {
           notifications.map((notification) => (
             <div 
               key={notification.id} 
-              className="bg-white rounded-[16px] p-3 flex gap-3 items-start shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] cursor-pointer active:scale-[0.99] transition-transform relative pr-10"
+              onClick={() => {
+                if (!notification.is_read) {
+                  markNotificationAsRead(notification.id);
+                }
+                if (notification.actionUrl) {
+                  navigate(notification.actionUrl);
+                }
+              }}
+              className={`rounded-[16px] p-3 flex gap-3 items-start shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] cursor-pointer active:scale-[0.99] transition-all relative pr-10 hover:bg-slate-50 border ${!notification.is_read ? 'bg-indigo-50/30 border-indigo-100' : 'bg-white border-transparent opacity-80'}`}
             >
-              {getIcon(notification.icon)}
+              <div className="relative shrink-0">
+                {getIcon(notification.icon)}
+                {!notification.is_read && (
+                  <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-rose-500 border-2 border-white rounded-full shadow-sm"></span>
+                )}
+              </div>
               <div className="flex-1 min-w-0 pt-0.5">
-                <h3 className="font-bold text-slate-800 text-[15px] leading-tight mb-1 truncate" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>{notification.title}</h3>
-                <p className="text-[13px] text-slate-500 leading-snug mb-1 truncate">{notification.body}</p>
-                <span className="text-[11px] text-slate-400 font-medium">{formatDate(notification.createdat)}</span>
+                <h3 className={`text-[15px] leading-tight mb-1 truncate ${!notification.is_read ? 'font-black text-slate-800' : 'font-bold text-slate-700'}`} style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>{notification.title}</h3>
+                <p className={`text-[13px] leading-snug mb-1 truncate ${!notification.is_read ? 'text-slate-600 font-medium' : 'text-slate-500'}`}>{notification.body}</p>
+                <span className={`text-[11px] ${!notification.is_read ? 'text-indigo-400 font-bold' : 'text-slate-400 font-medium'}`}>{formatDate(notification.createdat)}</span>
               </div>
               <button 
                 onClick={(e) => {

@@ -43,8 +43,16 @@ const AuthListener: React.FC = () => {
       }
     });
 
+    const handleAppToast = (e: any) => {
+      if (e.detail?.message) {
+        showToast(e.detail.message, e.detail.type || 'info');
+      }
+    };
+    window.addEventListener('app_toast', handleAppToast);
+
     return () => {
       subscription.unsubscribe();
+      window.removeEventListener('app_toast', handleAppToast);
     };
   }, [navigate, showToast]);
 

@@ -20,6 +20,17 @@ export const Projects: React.FC = () => {
   const { projects, setProjects, clients, setClients, user, refreshData, showToast, isOnline, incomeRecords } = useAppContext();
   const location = useLocation();
   const currency = user?.currency || '৳';
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const viewId = searchParams.get('view');
+    if (viewId && projects.length > 0) {
+      const project = projects.find(p => p.id === viewId);
+      if (project) {
+        setViewProject(project);
+      }
+    }
+  }, [location.search, projects]);
   
   // Added 'Due' to the type for local filtering
   const [filter, setFilter] = useState<ProjectStatus | 'All' | 'Due'>('All');

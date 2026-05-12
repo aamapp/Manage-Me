@@ -124,4 +124,5 @@ export interface AppNotification {
   is_read: boolean;
   createdat: string;
   userid: string;
+  actionUrl?: string;
 }

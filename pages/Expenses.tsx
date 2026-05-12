@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Receipt, Plus, Search, Tag, X, ShoppingCart, Loader2, Trash2, MoreVertical, Pencil, SquarePen, Calculator, CalendarDays, Download, Filter, Music, Share2, ExternalLink, Copy, AlertCircle, Banknote, ArrowRightLeft, ArrowDown, ArrowUp, Users, MapPin, Phone, User as UserIcon, Calendar, ImagePlus, DollarSign, FileText, ArrowLeft } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { EXPENSE_CATEGORY_LABELS, APP_NAME } from '../constants';
@@ -15,10 +16,19 @@ import { DuePerson, DueTransaction } from '../types';
 export const Expenses: React.FC = () => {
   // Use cached expenses from AppContext
   const { user, showToast, adminSelectedUserId, expenses, setExpenses, refreshData, isOnline } = useAppContext();
+  const location = useLocation();
   const [isModalOpen, setModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState<'expenses' | 'dues'>('expenses');
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const viewId = searchParams.get('view');
+    if (viewId) {
+      setActiveTab('dues');
+    }
+  }, [location.search]);
   
   // New states for Edit/Delete menu
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
@@ -923,9 +933,22 @@ export const Expenses: React.FC = () => {
 const DuesManager: React.FC = () => {
   const { user, duePersons, setDuePersons, showToast, isOnline } = useAppContext();
   const persons = duePersons;
+  const location = useLocation();
 
   const [activeView, setActiveView] = useState<'list' | 'details'>('list');
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const viewId = searchParams.get('view');
+    if (viewId && persons.length > 0) {
+      const person = persons.find(p => p.id === viewId);
+      if (person) {
+        setSelectedPersonId(viewId);
+        setActiveView('details');
+      }
+    }
+  }, [location.search, persons]);
   
   const [isAddPersonModalOpen, setAddPersonModalOpen] = useState(false);
   const [isAddTransactionModalOpen, setAddTransactionModalOpen] = useState(false);

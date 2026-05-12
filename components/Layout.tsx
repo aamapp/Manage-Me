@@ -448,7 +448,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
               className="w-9 h-9 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 hover:text-indigo-600 transition-colors relative"
             >
               <Bell size={20} />
-              {notifications && notifications.length > 0 && (
+              {notifications && notifications.filter(n => !n.is_read).length > 0 && (
                 <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
               )}
             </button>

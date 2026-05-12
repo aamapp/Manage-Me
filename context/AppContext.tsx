@@ -40,6 +40,7 @@ interface AppContextType {
   // App Notifications
   notifications: AppNotification[];
   dismissNotification: (id: string) => void;
+  markNotificationAsRead: (id: string) => void;
   dismissAllNotifications: () => void;
   
   // Master Data (Contains ALL data for Admin)
@@ -142,10 +143,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   });
 
+  const [readNotifications, setReadNotifications] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('manage_me_read_notifications') || '[]');
+    } catch {
+      return [];
+    }
+  });
+
   const dismissNotification = useCallback((id: string) => {
     setDismissedNotifications(prev => {
       const next = [...prev, id];
       localStorage.setItem('manage_me_dismissed_notifications', JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const markNotificationAsRead = useCallback((id: string) => {
+    setReadNotifications(prev => {
+      if (prev.includes(id)) return prev;
+      const next = [...prev, id];
+      localStorage.setItem('manage_me_read_notifications', JSON.stringify(next));
       return next;
     });
   }, []);
@@ -165,9 +183,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             title: `প্রজেক্ট পেন্ডিং: ${p.name}`,
             body: `আপনার "${p.name}" প্রজেক্টটি এখনো পেন্ডিং অবস্থায় আছে।`,
             icon: 'alert',
-            is_read: false,
+            is_read: readNotifications.includes(pendingId),
             createdat: p.createdat,
-            userid: user.id
+            userid: user.id,
+            actionUrl: `/projects?view=${p.id}`
           });
         }
       }
@@ -181,9 +200,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             title: `প্রজেক্ট বকেয়া: ${p.name}`,
             body: `${p.clientname} এর কাছে এই প্রজেক্টের জন্য ${p.dueamount} ${user.currency} বকেয়া আছে।`,
             icon: 'bell',
-            is_read: false,
+            is_read: readNotifications.includes(dueId),
             createdat: p.createdat,
-            userid: user.id
+            userid: user.id,
+            actionUrl: `/projects?view=${p.id}`
           });
         }
       }
@@ -205,9 +225,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             title: `টাকা পাবেন: ${person.name}`,
             body: `${person.name} এর কাছে আপনি ${total} ${user.currency} পাবেন।`,
             icon: 'bell',
-            is_read: false,
+            is_read: readNotifications.includes(receiveId),
             createdat: person.createdat || new Date().toISOString(),
-            userid: user.id
+            userid: user.id,
+            actionUrl: `/expenses?view=${person.id}`
           });
         }
       } else if (total < 0) {
@@ -218,9 +239,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             title: `টাকা পাবে: ${person.name}`,
             body: `${person.name} আপনার কাছে ${Math.abs(total)} ${user.currency} পাবে। পরিশোধ করুন।`,
             icon: 'alert',
-            is_read: false,
+            is_read: readNotifications.includes(oweId),
             createdat: person.createdat || new Date().toISOString(),
-            userid: user.id
+            userid: user.id,
+            actionUrl: `/expenses?view=${person.id}`
           });
         }
       }
@@ -229,7 +251,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Sort descending by createdat
     notifs.sort((a, b) => new Date(b.createdat).getTime() - new Date(a.createdat).getTime());
     return notifs;
-  }, [projects, duePersons, user, dismissedNotifications]);
+  }, [projects, duePersons, user, dismissedNotifications, readNotifications]);
 
   const dismissAllNotifications = useCallback(() => {
     const currentIds = notifications.map(n => n.id);
@@ -879,7 +901,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       appPin, setAppPin,
       adminSelectedUserId, setAdminSelectedUserId,
       isOnline,
-      notifications, dismissNotification, dismissAllNotifications
+      notifications, dismissNotification, markNotificationAsRead, dismissAllNotifications
     }}>
       {children}
     </AppContext.Provider>
