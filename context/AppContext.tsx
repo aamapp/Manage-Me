@@ -176,41 +176,50 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     projects.forEach(p => {
       // Pending check
       if (p.status === 'Pending' || p.status.includes('পেন্ডিং')) {
-        const pendingId = `proj-pending-${p.id}`;
-        if (!dismissedNotifications.includes(pendingId)) {
-          notifs.push({
-            id: pendingId,
-            title: `প্রজেক্ট পেন্ডিং: ${p.name}`,
-            body: `আপনার "${p.name}" প্রজেক্টটি এখনো পেন্ডিং অবস্থায় আছে।`,
-            icon: 'alert',
-            is_read: readNotifications.includes(pendingId),
-            createdat: p.createdat,
-            userid: user.id,
-            actionUrl: `/projects?view=${p.id}`
-          });
+        const isOneMinuteOld = new Date().getTime() - new Date(p.createdat).getTime() > 60000;
+        if (isOneMinuteOld) {
+          const pendingId = `proj-pending-${p.id}`;
+          if (!dismissedNotifications.includes(pendingId)) {
+            notifs.push({
+              id: pendingId,
+              title: `প্রজেক্ট পেন্ডিং: ${p.name}`,
+              body: `আপনার "${p.name}" প্রজেক্টটি এখনো পেন্ডিং অবস্থায় আছে।`,
+              icon: 'alert',
+              is_read: readNotifications.includes(pendingId),
+              createdat: p.createdat,
+              userid: user.id,
+              actionUrl: `/projects?view=${p.id}`
+            });
+          }
         }
       }
 
       // Due check
       if (p.dueamount > 0) {
-        const dueId = `proj-due-${p.id}-${p.dueamount}`;
-        if (!dismissedNotifications.includes(dueId)) {
-          notifs.push({
-            id: dueId,
-            title: `প্রজেক্ট বকেয়া: ${p.name}`,
-            body: `${p.clientname} এর কাছে এই প্রজেক্টের জন্য ${p.dueamount} ${user.currency} বকেয়া আছে।`,
-            icon: 'bell',
-            is_read: readNotifications.includes(dueId),
-            createdat: p.createdat,
-            userid: user.id,
-            actionUrl: `/projects?view=${p.id}`
-          });
+        const isOneMinuteOld = new Date().getTime() - new Date(p.createdat).getTime() > 60000;
+        if (isOneMinuteOld) {
+          const dueId = `proj-due-${p.id}-${p.dueamount}`;
+          if (!dismissedNotifications.includes(dueId)) {
+            notifs.push({
+              id: dueId,
+              title: `প্রজেক্ট বকেয়া: ${p.name}`,
+              body: `${p.clientname} এর কাছে এই প্রজেক্টের জন্য ${p.dueamount} ${user.currency} বকেয়া আছে।`,
+              icon: 'bell',
+              is_read: readNotifications.includes(dueId),
+              createdat: p.createdat,
+              userid: user.id,
+              actionUrl: `/projects?view=${p.id}`
+            });
+          }
         }
       }
     });
 
     // 2. Due Person Notifications (দেনা-পাওনা)
     duePersons.forEach(person => {
+      const isOneMinuteOld = person.createdat ? (new Date().getTime() - new Date(person.createdat).getTime() > 60000) : true;
+      if (!isOneMinuteOld) return;
+
       let total = 0;
       person.transactions.forEach(t => {
         if (t.type === 'receive') total += t.amount;

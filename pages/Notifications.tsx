@@ -1,17 +1,22 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ArrowLeft, Trash2, Gift, Bell, AlertCircle, Info, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
+import { ConfirmModal } from '../components/ConfirmModal';
 
 export const Notifications = () => {
   const navigate = useNavigate();
   const { notifications, dismissNotification, markNotificationAsRead, dismissAllNotifications } = useAppContext();
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const handleDeleteAll = () => {
     if (notifications.length === 0) return;
-    if (window.confirm('আপনি কি সব নোটিফিকেশন সরাতে চান?')) {
-      dismissAllNotifications();
-    }
+    setShowConfirm(true);
+  };
+
+  const handleConfirmDelete = () => {
+    dismissAllNotifications();
+    setShowConfirm(false);
   };
 
   const getIcon = (type: string) => {
@@ -106,6 +111,16 @@ export const Notifications = () => {
           ))
         )}
       </div>
+
+      <ConfirmModal
+        isOpen={showConfirm}
+        onClose={() => setShowConfirm(false)}
+        onConfirm={handleConfirmDelete}
+        title="সব নোটিফিকেশন সরান"
+        message="আপনি কি নিশ্চিত যে আপনি সব নোটিফিকেশন বোর্ড থেকে সরাতে চান? এই কাজটি আর পূর্বাবস্থায় ফিরিয়ে নেওয়া যাবে না।"
+        confirmText="সরান"
+        cancelText="বাতিল"
+      />
     </div>
   );
 };
