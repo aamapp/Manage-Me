@@ -305,6 +305,37 @@ export const Settings: React.FC = () => {
                সিকিউরিটি
              </h4>
 
+             {/* Notification Settings */}
+             <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6 flex items-center justify-between">
+                 <div className="flex items-center gap-3">
+                     <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${user?.fcm_token ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-200 text-slate-500'}`}>
+                         <Bell size={20} />
+                     </div>
+                     <div>
+                         <p className="font-bold text-slate-800 text-sm">নোটিফিকেশন</p>
+                         <p className="text-xs text-slate-500">{user?.fcm_token ? 'চালু আছে' : 'বন্ধ আছে / পারমিশন দেওয়া হয়নি'}</p>
+                     </div>
+                 </div>
+                 <button 
+                    onClick={async () => {
+                      if (!isOnline) {
+                        showToast('অফলাইনে নোটিফিকেশন চালু করা যাবে না', 'error');
+                        return;
+                      }
+                      try {
+                        const { requestNotificationPermission } = await import('@/lib/firebase');
+                        await requestNotificationPermission(user.id);
+                        showToast('নোটিফিকেশন পারমিশন চেক করা হয়েছে। পেজ রিলোড দিন।', 'info');
+                      } catch (err) {
+                        showToast('পারমিশন রিকুয়েস্ট ফেইল হয়েছে', 'error');
+                      }
+                    }}
+                    className={`px-4 py-2 rounded-lg font-bold text-sm text-white bg-indigo-600 hover:bg-indigo-700 transition-colors`}
+                 >
+                     {user?.fcm_token ? 'রিসেট' : 'চালু করুন'}
+                 </button>
+             </div>
+
              {/* App Lock */}
              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6 flex items-center justify-between">
                  <div className="flex items-center gap-3">

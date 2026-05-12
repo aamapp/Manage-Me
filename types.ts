@@ -54,6 +54,7 @@ export interface User {
   phone?: string;
   occupation?: string;
   avatar_url?: string;
+  fcm_token?: string;
   language: 'bn' | 'en';
   currency: string;
   role: 'user' | 'admin';
