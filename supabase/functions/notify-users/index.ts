@@ -26,6 +26,13 @@ serve(async (req) => {
     let userId = ''
     let title = ''
     let body = ''
+    let imageUrl = ''
+
+    // User uploaded public bucket URLs for notifications
+    const PENDING_IMG = 'https://qlmdoatgvovggvgzhwoy.supabase.co/storage/v1/object/public/notification-images/PENDING_IMG.png';
+    const DUE_IMG = 'https://qlmdoatgvovggvgzhwoy.supabase.co/storage/v1/object/public/notification-images/DUE_IMG.png';
+    const INCOME_IMG = 'https://qlmdoatgvovggvgzhwoy.supabase.co/storage/v1/object/public/notification-images/INCOME_IMG.png';
+    const DUE_PERSON_IMG = 'https://qlmdoatgvovggvgzhwoy.supabase.co/storage/v1/object/public/notification-images/DENA_PAWNA_IMG.png';
 
     // Check if it's a Supabase Database Webhook Payload
     if (payload.type && payload.record && payload.table) {
@@ -34,14 +41,25 @@ serve(async (req) => {
         if (payload.type === 'INSERT') {
           title = `নতুন প্রজেক্ট: ${payload.record.name}`
           body = `আপনার প্রজেক্টটি পেন্ডিং আছে। বকেয়া: ${payload.record.dueamount || 0}`
+          if (payload.record.status === 'pending') {
+            imageUrl = PENDING_IMG;
+          } else if (payload.record.dueamount > 0) {
+            imageUrl = DUE_IMG;
+          }
         } else if (payload.type === 'UPDATE') {
           title = `প্রজেক্ট আপডেট: ${payload.record.name}`
           body = `প্রজেক্টটির স্ট্যাটাস এখন ${payload.record.status}। বকেয়া: ${payload.record.dueamount || 0}`
+          if (payload.record.status === 'pending') {
+            imageUrl = PENDING_IMG;
+          } else if (payload.record.dueamount > 0) {
+            imageUrl = DUE_IMG;
+          }
         }
       } else if (payload.table === 'due_persons') {
         userId = payload.record.userid || payload.record.userId
         title = `দেনা-পাওনা আপডেট`
         body = `${payload.record.name} এর প্রোফাইলে পরিবর্তন হয়েছে।`
+        imageUrl = DUE_PERSON_IMG;
       } else {
         // Fallback for other tables
         userId = payload.record.userid || payload.record.userId
@@ -53,6 +71,7 @@ serve(async (req) => {
       userId = payload.userId
       title = payload.title
       body = payload.body
+      imageUrl = payload.imageUrl || ''
     }
 
     console.log(`Checking token for userId: ${userId}`);
@@ -110,43 +129,49 @@ serve(async (req) => {
     }
 
     // 4. Send the push notification via Firebase HTTP v1 API
+    const fcmMessage: any = {
+      message: {
+        token: fcmToken,
+        notification: {
+          title: title,
+          body: body,
+        },
+        android: {
+          priority: "high",
+          notification: {
+            channel_id: "fcm_default_channel",
+            sound: "default"
+          }
+        },
+        webpush: {
+          headers: {
+            Urgency: "high",
+          },
+          notification: {
+            requireInteraction: true,
+            sound: "default"
+          }
+        },
+        // Optional data payload
+        data: {
+          title: title,
+          body: body,
+          click_action: "FLUTTER_NOTIFICATION_CLICK"
+        }
+      }
+    };
+
+    if (imageUrl) {
+      fcmMessage.message.notification.image = imageUrl;
+    }
+
     const fcmResponse = await fetch(`https://fcm.googleapis.com/v1/projects/${serviceAccount.project_id}/messages:send`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${accessToken}`,
       },
-      body: JSON.stringify({
-        message: {
-          token: fcmToken,
-          notification: {
-            title: title,
-            body: body,
-          },
-          android: {
-            priority: "high",
-            notification: {
-              channel_id: "fcm_default_channel",
-              sound: "default"
-            }
-          },
-          webpush: {
-            headers: {
-              Urgency: "high",
-            },
-            notification: {
-              requireInteraction: true,
-              sound: "default"
-            }
-          },
-          // Optional data payload
-          data: {
-            title: title,
-            body: body,
-            click_action: "FLUTTER_NOTIFICATION_CLICK"
-          }
-        },
-      }),
+      body: JSON.stringify(fcmMessage),
     })
 
     if (!fcmResponse.ok) {

@@ -117,19 +117,46 @@ serve(async (req) => {
       }
 
       // 5. Construct Notification Message if any condition is met
+      let imageUrl = '';
+      const PENDING_IMG = 'https://qlmdoatgvovggvgzhwoy.supabase.co/storage/v1/object/public/notification-images/PENDING_IMG.png';
+      const DUE_IMG = 'https://qlmdoatgvovggvgzhwoy.supabase.co/storage/v1/object/public/notification-images/DUE_IMG.png';
+      const INCOME_IMG = 'https://qlmdoatgvovggvgzhwoy.supabase.co/storage/v1/object/public/notification-images/INCOME_IMG.png';
+      const DUE_PERSON_IMG = 'https://qlmdoatgvovggvgzhwoy.supabase.co/storage/v1/object/public/notification-images/DENA_PAWNA_IMG.png';
+
       if (totalDueAmount > 0) {
           notificationBodyList.push(`বকেয়া বিল: ৳${totalDueAmount}`);
+          imageUrl = DUE_IMG;
       }
       if (pendingProjectsCount > 0) {
           notificationBodyList.push(`পেন্ডিং প্রজেক্ট: ${pendingProjectsCount}টি`);
+          if (!imageUrl) imageUrl = PENDING_IMG;
       }
       if (borrowedAmount > 0) {
           notificationBodyList.push(`দেনা/ধার: ৳${borrowedAmount}`);
+          if (!imageUrl) imageUrl = DUE_PERSON_IMG;
       }
 
       if (notificationBodyList.length > 0) {
           const bodyMessage = notificationBodyList.join(', ') + '। অনুগ্রহ করে চেক করুন।';
           
+          const fcmMessage: any = {
+            message: {
+              token: fcmToken,
+              notification: {
+                title: "ডেইলি রিমাইন্ডার 🔔",
+                body: bodyMessage,
+              },
+              android: {
+                priority: "high",
+                notification: { channel_id: "fcm_default_channel", sound: "default" }
+              }
+            }
+          };
+
+          if (imageUrl) {
+            fcmMessage.message.notification.image = imageUrl;
+          }
+
           // Send FCM Notification
           const fcmResponse = await fetch(`https://fcm.googleapis.com/v1/projects/${serviceAccount.project_id}/messages:send`, {
             method: 'POST',
@@ -137,19 +164,7 @@ serve(async (req) => {
               'Content-Type': 'application/json',
               Authorization: `Bearer ${accessToken}`,
             },
-            body: JSON.stringify({
-              message: {
-                token: fcmToken,
-                notification: {
-                  title: "ডেইলি রিমাইন্ডার 🔔",
-                  body: bodyMessage,
-                },
-                android: {
-                  priority: "high",
-                  notification: { channel_id: "fcm_default_channel", sound: "default" }
-                }
-              },
-            }),
+            body: JSON.stringify(fcmMessage),
           })
       
           if (fcmResponse.ok) {
