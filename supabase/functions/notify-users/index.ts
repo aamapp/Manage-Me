@@ -33,7 +33,7 @@ serve(async (req) => {
         userId = payload.record.userid || payload.record.userId
         if (payload.type === 'INSERT') {
           title = `নতুন প্রজেক্ট: ${payload.record.name}`
-          body = `আপনার প্রজেক্টটি পিন্ডিং আছে। বকেয়া: ${payload.record.dueamount || 0}`
+          body = `আপনার প্রজেক্টটি পেন্ডিং আছে। বকেয়া: ${payload.record.dueamount || 0}`
         } else if (payload.type === 'UPDATE') {
           title = `প্রজেক্ট আপডেট: ${payload.record.name}`
           body = `প্রজেক্টটির স্ট্যাটাস এখন ${payload.record.status}। বকেয়া: ${payload.record.dueamount || 0}`

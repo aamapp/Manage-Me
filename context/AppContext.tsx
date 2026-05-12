@@ -135,6 +135,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [adminSelectedUserId, setAdminSelectedUserId] = useState<string | null>(null);
 
   // Notifications State
+  const [localNotifications, setLocalNotifications] = useState<AppNotification[]>([]);
   const [dismissedNotifications, setDismissedNotifications] = useState<string[]>(() => {
     try {
       return JSON.parse(localStorage.getItem('manage_me_dismissed_notifications') || '[]');
@@ -257,10 +258,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     });
 
+    // Add local notifications that are not dismissed
+    localNotifications.forEach(localNotif => {
+      if (!dismissedNotifications.includes(localNotif.id)) {
+        notifs.push({
+           ...localNotif,
+           is_read: localNotif.is_read || readNotifications.includes(localNotif.id)
+        });
+      }
+    });
+
     // Sort descending by createdat
     notifs.sort((a, b) => new Date(b.createdat).getTime() - new Date(a.createdat).getTime());
     return notifs;
-  }, [projects, duePersons, user, dismissedNotifications, readNotifications]);
+  }, [projects, duePersons, user, dismissedNotifications, readNotifications, localNotifications]);
 
   const dismissAllNotifications = useCallback(() => {
     const currentIds = notifications.map(n => n.id);
@@ -732,7 +743,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           actionUrl: '/notifications'
         };
 
-        setNotifications(prev => [newNotif, ...prev]);
+        setLocalNotifications(prev => [newNotif, ...prev]);
         
         // অ্যাপের ভিতরে টোস্ট মেসেজ দেখানো
         showToast(body, 'info');
