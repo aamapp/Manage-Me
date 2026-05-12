@@ -26,6 +26,7 @@ import {
   User,
   ShoppingBag,
   Bot,
+  Bell,
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { APP_NAME } from "@/constants";
@@ -63,10 +64,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
     trashedExpenses,
     trashedGhazalNotes,
     isOnline,
+    notifications,
   } = useAppContext();
   const location = useLocation();
   const navigate = useNavigate();
   const isAiAssistant = location.pathname === "/ai-assistant";
+  const isNotifications = location.pathname === "/notifications";
+  const isFullScreenPage = isAiAssistant || isNotifications;
 
   const handleNavigate = (path: string) => {
     setMoreMenuOpen(false);
@@ -410,7 +414,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
       </aside>
 
       {/* Mobile Header (App Bar) - Fixed to ensure it stays on top */}
-      {!isAiAssistant && (
+      {!isFullScreenPage && (
         <header className="fixed top-0 inset-x-0 h-16 bg-white/90 backdrop-blur-md border-b border-slate-200/80 flex lg:hidden items-center justify-between px-5 z-40 max-w-[100vw] shadow-sm transition-all duration-200">
           <div className="flex items-center gap-2">
             {/* Show Back Button for Admin if User Selected */}
@@ -438,42 +442,53 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
             )}
           </div>
 
-          <div
-            className="flex items-center gap-3"
-            onClick={() => handleNavigate("/profile")}
-          >
-            {isAdmin && adminSelectedUserId && (
-              <span className="text-[10px] font-bold bg-indigo-50 text-indigo-600 px-2 py-1 rounded-md border border-indigo-100">
-                User View
-              </span>
-            )}
-            {user.avatar_url && isOnline ? (
-              <img
-                key={`${user.avatar_url}-${avatarCacheBuster}`}
-                src={getAvatarUrl(user.avatar_url) || ""}
-                alt={user.name}
-                className="w-9 h-9 rounded-full border-2 border-white shadow-md object-cover ring-1 ring-slate-100"
-                referrerPolicy="no-referrer"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || "User")}&background=random`;
-                }}
-              />
-            ) : (
-              <div className="w-9 h-9 bg-indigo-50 border border-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold text-sm shadow-sm">
-                <User size={18} />
-              </div>
-            )}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => handleNavigate("/notifications")}
+              className="w-9 h-9 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 hover:text-indigo-600 transition-colors relative"
+            >
+              <Bell size={20} />
+              {notifications && notifications.length > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
+              )}
+            </button>
+            <div
+              className="flex items-center cursor-pointer active:scale-95 transition-transform"
+              onClick={() => handleNavigate("/profile")}
+            >
+              {isAdmin && adminSelectedUserId && (
+                <span className="text-[10px] font-bold bg-indigo-50 text-indigo-600 px-2 py-1 rounded-md border border-indigo-100 mr-2">
+                  User View
+                </span>
+              )}
+              {user.avatar_url && isOnline ? (
+                <img
+                  key={`${user.avatar_url}-${avatarCacheBuster}`}
+                  src={getAvatarUrl(user.avatar_url) || ""}
+                  alt={user.name}
+                  className="w-9 h-9 rounded-full border-2 border-white shadow-md object-cover ring-1 ring-slate-100"
+                  referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || "User")}&background=random`;
+                  }}
+                />
+              ) : (
+                <div className="w-9 h-9 bg-indigo-50 border border-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold text-sm shadow-sm">
+                  <User size={18} />
+                </div>
+              )}
+            </div>
           </div>
         </header>
       )}
 
       {/* Main Content Area */}
       <main
-        className={`flex-1 ${isAiAssistant ? "p-0" : "pt-[68px] lg:pt-8 pb-[72px] lg:pb-8 px-3 lg:px-8"} animate-in fade-in duration-300 w-full max-w-[100vw] lg:max-w-none overflow-x-hidden lg:ml-72`}
+        className={`flex-1 ${isFullScreenPage ? "p-0" : "pt-[68px] lg:pt-8 pb-[72px] lg:pb-8 px-3 lg:px-8"} animate-in fade-in duration-300 w-full max-w-[100vw] lg:max-w-none overflow-x-hidden lg:ml-72`}
       >
         <div
-          className={`max-w-7xl mx-auto w-full ${isAiAssistant ? "h-[100dvh] lg:h-auto" : ""}`}
+          className={`max-w-7xl mx-auto w-full ${isFullScreenPage ? "h-[100dvh] lg:h-auto" : ""}`}
         >
           <OfflineBanner />
           {children}
@@ -481,7 +496,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
       </main>
 
       {/* Fixed Bottom Navigation Bar - Hide if Admin is on User List page or on Desktop */}
-      {(!isAdmin || adminSelectedUserId) && !isAiAssistant && (
+      {(!isAdmin || adminSelectedUserId) && !isFullScreenPage && (
         <div className="fixed bottom-0 inset-x-0 z-50 bg-white border-t border-slate-100 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] pb-safe lg:hidden">
           <nav className="flex justify-between items-center px-6 h-[60px] w-full max-w-lg mx-auto">
             {PRIMARY_NAV.map((item) => {

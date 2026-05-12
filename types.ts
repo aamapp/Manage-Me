@@ -114,3 +114,13 @@ export interface DuePerson {
   userid: string;
   createdat?: string;
 }
+
+export interface AppNotification {
+  id: string;
+  title: string;
+  body: string;
+  icon: 'gift' | 'bell' | 'alert' | string;
+  is_read: boolean;
+  createdat: string;
+  userid: string;
+}

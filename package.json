@@ -42,6 +42,7 @@
     "@google/genai": "^1.46.0",
     "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.98.0",
+    "firebase": "^12.13.0",
     "html2canvas": "1.4.1",
     "html2pdf.js": "^0.14.0",
     "jspdf": "^4.2.0",

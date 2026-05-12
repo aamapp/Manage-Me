@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { Project, Client, User, IncomeRecord, UserProfile, Expense, GhazalNote, ShoppingList, DuePerson } from '@/types';
+import { Project, Client, User, IncomeRecord, UserProfile, Expense, GhazalNote, ShoppingList, DuePerson, AppNotification } from '@/types';
 import { supabase, isConfigured } from '@/lib/supabase';
 
 interface ToastState {
@@ -36,6 +36,11 @@ interface AppContextType {
   setTrashedDuePersons: React.Dispatch<React.SetStateAction<DuePerson[]>>;
   trashedClients: Client[];
   setTrashedClients: React.Dispatch<React.SetStateAction<Client[]>>;
+  
+  // App Notifications
+  notifications: AppNotification[];
+  dismissNotification: (id: string) => void;
+  dismissAllNotifications: () => void;
   
   // Master Data (Contains ALL data for Admin)
   allProjects: Project[];
@@ -127,7 +132,114 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Admin Selection State
   const [adminSelectedUserId, setAdminSelectedUserId] = useState<string | null>(null);
-  
+
+  // Notifications State
+  const [dismissedNotifications, setDismissedNotifications] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('manage_me_dismissed_notifications') || '[]');
+    } catch {
+      return [];
+    }
+  });
+
+  const dismissNotification = useCallback((id: string) => {
+    setDismissedNotifications(prev => {
+      const next = [...prev, id];
+      localStorage.setItem('manage_me_dismissed_notifications', JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const notifications = React.useMemo(() => {
+    if (!user) return [];
+    const notifs: AppNotification[] = [];
+
+    // 1. Project Notifications
+    projects.forEach(p => {
+      // Pending check
+      if (p.status === 'Pending' || p.status.includes('পেন্ডিং')) {
+        const pendingId = `proj-pending-${p.id}`;
+        if (!dismissedNotifications.includes(pendingId)) {
+          notifs.push({
+            id: pendingId,
+            title: `প্রজেক্ট পেন্ডিং: ${p.name}`,
+            body: `আপনার "${p.name}" প্রজেক্টটি এখনো পেন্ডিং অবস্থায় আছে।`,
+            icon: 'alert',
+            is_read: false,
+            createdat: p.createdat,
+            userid: user.id
+          });
+        }
+      }
+
+      // Due check
+      if (p.dueamount > 0) {
+        const dueId = `proj-due-${p.id}-${p.dueamount}`;
+        if (!dismissedNotifications.includes(dueId)) {
+          notifs.push({
+            id: dueId,
+            title: `প্রজেক্ট বকেয়া: ${p.name}`,
+            body: `${p.clientname} এর কাছে এই প্রজেক্টের জন্য ${p.dueamount} ${user.currency} বকেয়া আছে।`,
+            icon: 'bell',
+            is_read: false,
+            createdat: p.createdat,
+            userid: user.id
+          });
+        }
+      }
+    });
+
+    // 2. Due Person Notifications (দেনা-পাওনা)
+    duePersons.forEach(person => {
+      let total = 0;
+      person.transactions.forEach(t => {
+        if (t.type === 'receive') total += t.amount;
+        if (t.type === 'give') total -= t.amount;
+      });
+
+      if (total > 0) {
+        const receiveId = `person-due-${person.id}-${total}`;
+        if (!dismissedNotifications.includes(receiveId)) {
+          notifs.push({
+            id: receiveId,
+            title: `টাকা পাবেন: ${person.name}`,
+            body: `${person.name} এর কাছে আপনি ${total} ${user.currency} পাবেন।`,
+            icon: 'bell',
+            is_read: false,
+            createdat: person.createdat || new Date().toISOString(),
+            userid: user.id
+          });
+        }
+      } else if (total < 0) {
+        const oweId = `person-owe-${person.id}-${total}`;
+        if (!dismissedNotifications.includes(oweId)) {
+          notifs.push({
+            id: oweId,
+            title: `টাকা পাবে: ${person.name}`,
+            body: `${person.name} আপনার কাছে ${Math.abs(total)} ${user.currency} পাবে। পরিশোধ করুন।`,
+            icon: 'alert',
+            is_read: false,
+            createdat: person.createdat || new Date().toISOString(),
+            userid: user.id
+          });
+        }
+      }
+    });
+
+    // Sort descending by createdat
+    notifs.sort((a, b) => new Date(b.createdat).getTime() - new Date(a.createdat).getTime());
+    return notifs;
+  }, [projects, duePersons, user, dismissedNotifications]);
+
+  const dismissAllNotifications = useCallback(() => {
+    const currentIds = notifications.map(n => n.id);
+    setDismissedNotifications(prev => {
+      const next = Array.from(new Set([...prev, ...currentIds]));
+      localStorage.setItem('manage_me_dismissed_notifications', JSON.stringify(next));
+      return next;
+    });
+  }, [notifications]);
+
   // Load cache immediately on mount
   useEffect(() => {
     const savedUser = localStorage.getItem('last_known_user');
@@ -763,7 +875,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       isAppLocked, setIsAppLocked,
       appPin, setAppPin,
       adminSelectedUserId, setAdminSelectedUserId,
-      isOnline
+      isOnline,
+      notifications, dismissNotification, dismissAllNotifications
     }}>
       {children}
     </AppContext.Provider>

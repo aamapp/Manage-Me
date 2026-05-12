@@ -7,6 +7,7 @@ import { AppLock } from '@/components/AppLock';
 import { ScrollToTop } from '@/components/ScrollToTop';
 import { AppProvider, useAppContext } from '@/context/AppContext';
 import { supabase, isConfigured } from '@/lib/supabase';
+import { requestNotificationPermission, setupOnMessageListener } from '@/lib/firebase';
 
 // Direct imports for main pages
 import { Dashboard } from '@/pages/Dashboard';
@@ -22,6 +23,7 @@ import { AdminUserList } from '@/pages/AdminUserList'; // New Import
 import { GhazalNotes } from '@/pages/GhazalNotes';
 import { IconGenerator } from '@/pages/IconGenerator';
 import { Profile } from '@/pages/Profile';
+import { Notifications } from '@/pages/Notifications';
 import ShoppingLists from '@/pages/ShoppingLists';
 import Trash from '@/pages/Trash';
 import { AIAssistant } from '@/pages/AIAssistant';
@@ -52,6 +54,14 @@ const AuthListener: React.FC = () => {
 const AppContent: React.FC = () => {
   // Added 'setUser' to destructuring to enable manual optimistic logout
   const { user, setUser, loading, toast, showToast, hideToast, isAppLocked, setIsAppLocked, appPin } = useAppContext();
+
+  useEffect(() => {
+    if (user && isConfigured) {
+      setupOnMessageListener();
+      // Optional/Wait for user interaction if needed in real production, but for now we attempt to request:
+      requestNotificationPermission(user.id);
+    }
+  }, [user]);
 
   const handleLogin = async (email: string, password?: string) => {
     if (!isConfigured) {
@@ -218,6 +228,7 @@ const AppContent: React.FC = () => {
                     <Route path="/reports" element={<Reports />} />
                     <Route path="/settings" element={<Settings />} />
                     <Route path="/profile" element={<Profile />} />
+                    <Route path="/notifications" element={<Notifications />} />
                     <Route path="/ai-assistant" element={<AIAssistant />} />
                     <Route path="/ghazal-notes" element={<GhazalNotes />} />
                     <Route path="/shopping-lists" element={<ShoppingLists />} />

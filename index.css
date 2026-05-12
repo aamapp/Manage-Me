@@ -13,6 +13,19 @@ body {
   background-color: #f8fafc;
   /* Prevent pull-to-refresh on mobile browsers / WebView */
   overscroll-behavior-y: none;
+  /* Prevent text selection to feel like native app */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+input, textarea {
+  /* Allow selection within input and textarea elements */
+  -webkit-user-select: auto;
+  user-select: auto;
 }
 
 .recharts-wrapper, .recharts-surface, .recharts-responsive-container, .recharts-wrapper * {
