@@ -577,6 +577,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Handle Online/Offline Status with Active Ping Check
   useEffect(() => {
+    // Expose global function for Android WebView to send FCM Token
+    (window as any).receiveFCMTokenFromAndroid = async (token: string | null) => {
+      if (token) {
+        console.log('FCM Token received from WebChromeClient:', token);
+        localStorage.setItem('fcm_token_cache', token);
+        
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user) {
+            // Update User Metadata
+            await supabase.auth.updateUser({
+              data: { fcm_token: token }
+            });
+            
+            // Also update the profiles table
+            await supabase.from('profiles').update({ fcm_token: token }).eq('id', session.user.id);
+            console.log('FCM Token successfully synced to Supabase profile.');
+          }
+        } catch (error) {
+          console.error('Failed to sync FCM token to Supabase:', error);
+        }
+      } else {
+        console.log('FCM Permission denied/failed on Android device.');
+      }
+    };
+
     const checkActualConnectivity = async () => {
       if (!navigator.onLine) {
         setIsOnline(false);
@@ -789,6 +815,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (mounted) {
             const metadata = session.user.user_metadata;
             
+            // Sync FCM Token from Cache to Supabase if it exists and differs
+            const cachedFCMToken = localStorage.getItem('fcm_token_cache');
+            if (cachedFCMToken && metadata?.fcm_token !== cachedFCMToken) {
+               try {
+                   console.log("Syncing cached FCM token after login state change...");
+                   await supabase.auth.updateUser({ data: { fcm_token: cachedFCMToken } });
+                   await supabase.from('profiles').update({ fcm_token: cachedFCMToken }).eq('id', session.user.id);
+                   metadata.fcm_token = cachedFCMToken; // update local var for subsequent UI
+               } catch(e) {
+                   console.log("Failed to sync FCM token", e);
+               }
+            }
+
             // Set user immediately from metadata for fast UI, background fetch will update if needed
             const initialUser = {
                 id: session.user.id,
