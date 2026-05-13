@@ -149,23 +149,22 @@ export const Settings: React.FC = () => {
                     phone: formData.phone,
                     occupation: formData.occupation,
                     language: formData.language,
-                    currency: formData.currency
+                    currency: formData.currency,
+                    reminder_times: formData.reminder_times
                     // Removed avatar_url to prevent overwriting with stale state
                 }
             });
 
             if (authError) throw authError;
 
-            // Update profiles table silently with all fields
+            // Update profiles table silently (only fields that exist in the DB schema)
             const { error: profileError } = await supabase.from('profiles').upsert({ 
                 id: user.id,
                 name: formData.name,
                 phone: formData.phone,
                 occupation: formData.occupation,
                 currency: formData.currency,
-                language: formData.language,
-                reminder_times: formData.reminder_times
-                // Removed avatar_url to prevent overwriting with stale state
+                language: formData.language
             }, { onConflict: 'id' });
 
             if (profileError) throw profileError;

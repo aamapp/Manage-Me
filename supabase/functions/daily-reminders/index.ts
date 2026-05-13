@@ -32,7 +32,7 @@ serve(async (req) => {
     // 2. Fetch all profiles that have an FCM token
     const { data: profiles, error: profileError } = await supabaseClient
       .from('profiles')
-      .select('id, name, fcm_token, reminder_times')
+      .select('id, name, fcm_token')
       .not('fcm_token', 'is', null)
 
     if (profileError) throw profileError
@@ -50,7 +50,21 @@ serve(async (req) => {
     console.log(`Current Hour in BD: ${currentHourBD}`);
 
     // 3. Setup Firebase Auth for FCM Push
-    const serviceAccountStr = Deno.env.get('FIREBASE_SERVICE_ACCOUNT')
+    let serviceAccountStr = Deno.env.get('FIREBASE_SERVICE_ACCOUNT');
+    
+    // Fallback: If not in environment, try fetching from app_settings
+    if (!serviceAccountStr) {
+      const { data: settingsData } = await supabaseClient
+        .from('app_settings')
+        .select('firebase_service_account')
+        .single();
+      if (settingsData && settingsData.firebase_service_account) {
+        serviceAccountStr = typeof settingsData.firebase_service_account === 'string' 
+          ? settingsData.firebase_service_account 
+          : JSON.stringify(settingsData.firebase_service_account);
+      }
+    }
+
     if (!serviceAccountStr) {
       throw new Error('FIREBASE_SERVICE_ACCOUNT environment variable is missing')
     }
@@ -74,7 +88,12 @@ serve(async (req) => {
       const fcmToken = user.fcm_token;
       if (!fcmToken) continue;
 
-      const userTimes = user.reminder_times || ['09:00', '15:00', '21:00'];
+      // Fetch user_metadata to get reminder_times
+      const { data: authUser, error: authErr } = await supabaseClient.auth.admin.getUserById(user.id);
+      let userTimes = ['09:00', '15:00', '21:00'];
+      if (!authErr && authUser?.user?.user_metadata?.reminder_times) {
+        userTimes = authUser.user.user_metadata.reminder_times;
+      }
       
       let isScheduledHour = false;
       for (const t of userTimes) {

@@ -69,12 +69,22 @@ serve(async (req) => {
           }
           if (dueChanged) {
             let img = DUE_IMG;
-            if (payload.record.dueamount === 0 || (payload.old_record && payload.old_record.dueamount > payload.record.dueamount)) {
+            let customTitle = `বকেয়া আপডেট: ${payload.record.name}`;
+            let customBody = `প্রজেক্টটির বকেয়া এখন ${payload.record.dueamount} টাকা।`;
+
+            if (payload.old_record && payload.old_record.dueamount > payload.record.dueamount) {
               img = INCOME_IMG;
+              customTitle = `ইনকাম যুক্ত হয়েছে: ${payload.record.name}`;
+              customBody = `আপনার প্রজেক্টে পেমেন্ট যুক্ত হয়েছে। এখন বকেয়া আছে ${payload.record.dueamount} টাকা।`;
+            } else if (payload.record.dueamount === 0) {
+              img = INCOME_IMG;
+              customTitle = `বকেয়া পরিশোধিত: ${payload.record.name}`;
+              customBody = `প্রজেক্টটির সমস্ত বকেয়া পরিশোধ করা হয়েছে!`;
             }
+
             notificationsToSend.push({
-              title: `বকেয়া আপডেট: ${payload.record.name}`,
-              body: `প্রজেক্টটির বকেয়া এখন ${payload.record.dueamount} টাকা।`,
+              title: customTitle,
+              body: customBody,
               imageUrl: img
             });
           }
@@ -191,6 +201,7 @@ serve(async (req) => {
     for (const notif of notificationsToSend) {
       if (!notif.title || !notif.body) continue;
 
+      const uniqueId = Math.floor(Math.random() * 100000000).toString();
       const fcmMessage: any = {
         message: {
           token: fcmToken,
@@ -202,7 +213,8 @@ serve(async (req) => {
             priority: "high",
             notification: {
               channel_id: "fcm_default_channel",
-              sound: "default"
+              sound: "default",
+              tag: uniqueId // Force distinct notification
             }
           },
           webpush: {
@@ -218,7 +230,9 @@ serve(async (req) => {
           data: {
             title: notif.title,
             body: notif.body,
-            click_action: "FLUTTER_NOTIFICATION_CLICK"
+            click_action: "FLUTTER_NOTIFICATION_CLICK",
+            notification_id: uniqueId,
+            image: notif.imageUrl || ""
           }
         }
       };
@@ -226,7 +240,6 @@ serve(async (req) => {
       if (notif.imageUrl) {
         fcmMessage.message.notification.image = notif.imageUrl;
         fcmMessage.message.android.notification.image = notif.imageUrl;
-        fcmMessage.message.data.image = notif.imageUrl;
       }
 
       const fcmResponse = await fetch(`https://fcm.googleapis.com/v1/projects/${serviceAccount.project_id}/messages:send`, {
