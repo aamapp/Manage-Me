@@ -58,6 +58,7 @@ export interface User {
   language: 'bn' | 'en';
   currency: string;
   role: 'user' | 'admin';
+  reminder_times?: string[];
   createdat?: string;
 }
 
@@ -66,6 +67,7 @@ export interface UserProfile {
   name: string | null;
   email: string | null;
   avatar_url: string | null;
+  reminder_times?: string[] | null;
   createdat?: string;
 }
 

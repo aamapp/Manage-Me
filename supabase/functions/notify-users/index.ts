@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4"
-import { JWT } from "npm:google-auth-library@9"
+import { JWT } from "https://esm.sh/google-auth-library@9"
 
 // CORS headers
 const corsHeaders = {
@@ -23,10 +23,8 @@ serve(async (req) => {
     const payload = await req.json()
     console.log("Webhook payload received:", payload);
 
-    let userId = ''
-    let title = ''
-    let body = ''
-    let imageUrl = ''
+    let userId = '';
+    let notificationsToSend: { title: string; body: string; imageUrl: string }[] = [];
 
     // User uploaded public bucket URLs for notifications
     const PENDING_IMG = 'https://qlmdoatgvovggvgzhwoy.supabase.co/storage/v1/object/public/notification-images/PENDING_IMG.png';
@@ -37,48 +35,89 @@ serve(async (req) => {
     // Check if it's a Supabase Database Webhook Payload
     if (payload.type && payload.record && payload.table) {
       if (payload.table === 'projects') {
-        userId = payload.record.userid || payload.record.userId
+        userId = payload.record.userid || payload.record.userId;
         if (payload.type === 'INSERT') {
-          title = `নতুন প্রজেক্ট: ${payload.record.name}`
-          body = `আপনার প্রজেক্টটি পেন্ডিং আছে। বকেয়া: ${payload.record.dueamount || 0}`
-          if (payload.record.status === 'pending') {
-            imageUrl = PENDING_IMG;
-          } else if (payload.record.dueamount > 0) {
-            imageUrl = DUE_IMG;
+          notificationsToSend.push({
+            title: `নতুন প্রজেক্ট: ${payload.record.name}`,
+            body: `প্রজেক্টটির স্ট্যাটাস এখন ${payload.record.status || 'Pending'}।`,
+            imageUrl: (payload.record.status || '').toLowerCase() === 'pending' ? PENDING_IMG : INCOME_IMG
+          });
+          if (payload.record.dueamount > 0) {
+            notificationsToSend.push({
+              title: `বকেয়া আপডেট: ${payload.record.name}`,
+              body: `প্রজেক্টটিতে বকেয়া আছে: ${payload.record.dueamount} টাকা।`,
+              imageUrl: DUE_IMG
+            });
           }
         } else if (payload.type === 'UPDATE') {
-          title = `প্রজেক্ট আপডেট: ${payload.record.name}`
-          body = `প্রজেক্টটির স্ট্যাটাস এখন ${payload.record.status}। বকেয়া: ${payload.record.dueamount || 0}`
-          if (payload.record.status === 'pending') {
-            imageUrl = PENDING_IMG;
-          } else if (payload.record.dueamount > 0) {
-            imageUrl = DUE_IMG;
+          let statusChanged = false;
+          let dueChanged = false;
+          
+          if (payload.old_record) {
+             statusChanged = payload.old_record.status !== payload.record.status;
+             dueChanged = payload.old_record.dueamount !== payload.record.dueamount;
+          } else {
+             statusChanged = true;
+          }
+
+          if (statusChanged) {
+            notificationsToSend.push({
+              title: `স্ট্যাটাস আপডেট: ${payload.record.name}`,
+              body: `প্রজেক্টটির স্ট্যাটাস এখন ${payload.record.status}।`,
+              imageUrl: (payload.record.status || '').toLowerCase() === 'pending' ? PENDING_IMG : INCOME_IMG
+            });
+          }
+          if (dueChanged) {
+            let img = DUE_IMG;
+            if (payload.record.dueamount === 0 || (payload.old_record && payload.old_record.dueamount > payload.record.dueamount)) {
+              img = INCOME_IMG;
+            }
+            notificationsToSend.push({
+              title: `বকেয়া আপডেট: ${payload.record.name}`,
+              body: `প্রজেক্টটির বকেয়া এখন ${payload.record.dueamount} টাকা।`,
+              imageUrl: img
+            });
+          }
+          
+          if (!statusChanged && !dueChanged) {
+             notificationsToSend.push({
+               title: `প্রজেক্ট আপডেট: ${payload.record.name}`,
+               body: `আপনার প্রজেক্ট আপডেট করা হয়েছে।`,
+               imageUrl: PENDING_IMG
+             });
           }
         }
       } else if (payload.table === 'due_persons') {
-        userId = payload.record.userid || payload.record.userId
-        title = `দেনা-পাওনা আপডেট`
-        body = `${payload.record.name} এর প্রোফাইলে পরিবর্তন হয়েছে।`
-        imageUrl = DUE_PERSON_IMG;
+        userId = payload.record.userid || payload.record.userId;
+        notificationsToSend.push({
+          title: `দেনা-পাওনা আপডেট`,
+          body: `${payload.record.name} এর প্রোফাইলে পরিবর্তন হয়েছে।`,
+          imageUrl: DUE_PERSON_IMG
+        });
       } else {
         // Fallback for other tables
-        userId = payload.record.userid || payload.record.userId
-        title = `নতুন আপডেট`
-        body = `আপনার অ্যাকাউন্টে নতুন আপডেট এসেছে।`
+        userId = payload.record.userid || payload.record.userId;
+        notificationsToSend.push({
+          title: `নতুন আপডেট`,
+          body: `আপনার অ্যাকাউন্টে নতুন আপডেট এসেছে।`,
+          imageUrl: ''
+        });
       }
     } else {
       // Direct call
-      userId = payload.userId
-      title = payload.title
-      body = payload.body
-      imageUrl = payload.imageUrl || ''
+      userId = payload.userId;
+      notificationsToSend.push({
+        title: payload.title,
+        body: payload.body,
+        imageUrl: payload.imageUrl || ''
+      });
     }
 
     console.log(`Checking token for userId: ${userId}`);
 
-    if (!userId || !title || !body) {
-      console.log("Missing required fields:", { userId, title, body });
-      return new Response(JSON.stringify({ message: "Missing required fields" }), {
+    if (!userId || notificationsToSend.length === 0) {
+      console.log("Missing required fields or no notifications to send.", { userId });
+      return new Response(JSON.stringify({ message: "Missing required fields or no notifications" }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       })
@@ -107,9 +146,27 @@ serve(async (req) => {
     console.log(`Pushing notification to FCM Token: ${fcmToken.substring(0, 15)}...`);
 
     // 2. Get the Firebase Service Account JSON string from environment variables
-    const serviceAccountStr = Deno.env.get('FIREBASE_SERVICE_ACCOUNT')
+    let serviceAccountStr = Deno.env.get('FIREBASE_SERVICE_ACCOUNT');
+    
+    // Fallback: If not in environment secrets, try fetching from app_settings table
     if (!serviceAccountStr) {
-      throw new Error('FIREBASE_SERVICE_ACCOUNT environment variable is missing')
+      const { data: settingsData, error: settingsError } = await supabaseClient
+        .from('app_settings')
+        .select('firebase_service_account')
+        .single();
+        
+      if (settingsError || !settingsData) {
+        console.error("Error fetching Firebase Service Account from app_settings:", settingsError);
+        throw new Error("Firebase configuration not found in app_settings table or FIREBASE_SERVICE_ACCOUNT secret.");
+      }
+      
+      serviceAccountStr = typeof settingsData.firebase_service_account === 'string' 
+        ? settingsData.firebase_service_account 
+        : JSON.stringify(settingsData.firebase_service_account);
+    }
+
+    if (!serviceAccountStr) {
+      throw new Error('FIREBASE_SERVICE_ACCOUNT environment variable or app_settings is missing')
     }
 
     const serviceAccount = JSON.parse(serviceAccountStr)
@@ -128,65 +185,74 @@ serve(async (req) => {
       throw new Error("Failed to generate access token for FCM")
     }
 
-    // 4. Send the push notification via Firebase HTTP v1 API
-    const fcmMessage: any = {
-      message: {
-        token: fcmToken,
-        notification: {
-          title: title,
-          body: body,
-        },
-        android: {
-          priority: "high",
+    // 4. Send the push notifications via Firebase HTTP v1 API
+    const allResponses = [];
+
+    for (const notif of notificationsToSend) {
+      if (!notif.title || !notif.body) continue;
+
+      const fcmMessage: any = {
+        message: {
+          token: fcmToken,
           notification: {
-            channel_id: "fcm_default_channel",
-            sound: "default"
-          }
-        },
-        webpush: {
-          headers: {
-            Urgency: "high",
+            title: notif.title,
+            body: notif.body,
           },
-          notification: {
-            requireInteraction: true,
-            sound: "default"
+          android: {
+            priority: "high",
+            notification: {
+              channel_id: "fcm_default_channel",
+              sound: "default"
+            }
+          },
+          webpush: {
+            headers: {
+              Urgency: "high",
+            },
+            notification: {
+              requireInteraction: true,
+              sound: "default"
+            }
+          },
+          // Optional data payload
+          data: {
+            title: notif.title,
+            body: notif.body,
+            click_action: "FLUTTER_NOTIFICATION_CLICK"
           }
-        },
-        // Optional data payload
-        data: {
-          title: title,
-          body: body,
-          click_action: "FLUTTER_NOTIFICATION_CLICK"
         }
+      };
+
+      if (notif.imageUrl) {
+        fcmMessage.message.notification.image = notif.imageUrl;
+        fcmMessage.message.android.notification.image = notif.imageUrl;
+        fcmMessage.message.data.image = notif.imageUrl;
       }
-    };
 
-    if (imageUrl) {
-      fcmMessage.message.notification.image = imageUrl;
+      const fcmResponse = await fetch(`https://fcm.googleapis.com/v1/projects/${serviceAccount.project_id}/messages:send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(fcmMessage),
+      });
+
+      if (!fcmResponse.ok) {
+        const errorData = await fcmResponse.text();
+        console.error("FCM API Error response:", errorData);
+        allResponses.push({ success: false, error: errorData });
+      } else {
+        const responseData = await fcmResponse.json();
+        console.log("Successfully sent push notification!", responseData);
+        allResponses.push({ success: true, response: responseData });
+      }
     }
 
-    const fcmResponse = await fetch(`https://fcm.googleapis.com/v1/projects/${serviceAccount.project_id}/messages:send`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify(fcmMessage),
-    })
-
-    if (!fcmResponse.ok) {
-      const errorData = await fcmResponse.text()
-      console.error("FCM API Error response:", errorData);
-      throw new Error(`FCM Error: ${errorData}`)
-    }
-
-    const responseData = await fcmResponse.json()
-    console.log("Successfully sent push notification!", responseData);
-
-    return new Response(JSON.stringify({ success: true, response: responseData }), {
+    return new Response(JSON.stringify({ success: true, responses: allResponses }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
-    })
+    });
   } catch (error) {
     console.error("Critical function error:", error.message);
     return new Response(JSON.stringify({ error: error.message }), {

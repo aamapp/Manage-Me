@@ -683,18 +683,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const currentHour = now.getHours();
       const todayDate = now.toISOString().split('T')[0];
       
-      // ৩টি সময় স্লট (সকাল ৯-১১, দুপুর ২-৫, রাত ৮-১০)
-      let slot = "";
-      if (currentHour >= 9 && currentHour < 11) slot = "morning";
-      else if (currentHour >= 14 && currentHour < 17) slot = "afternoon";
-      else if (currentHour >= 20 && currentHour < 22) slot = "night";
+      const userTimes = user.reminder_times || ['09:00', '15:00', '21:00'];
+      
+      // Find if current hour matches any scheduled hour
+      let targetTimeStr = "";
+      for (const t of userTimes) {
+          const tHour = parseInt(t.split(':')[0], 10);
+          if (currentHour === tHour) {
+              targetTimeStr = t;
+              break;
+          }
+      }
 
-      if (!slot) return;
+      if (!targetTimeStr) return; // Not in any reminder hour
 
-      const storageKey = `reminder_sent_${user.id}_${todayDate}_${slot}`;
-      if (localStorage.getItem(storageKey)) return; // এই স্লটে অলরেডি রিমাইন্ডার দেওয়া হয়েছে
-
-      console.log(`Checking ${slot} reminders for ${user.id}...`);
+      const storageKey = `reminder_sent_${user.id}_${todayDate}_${targetTimeStr}`;
+      if (localStorage.getItem(storageKey)) return; // Already sent for this reminder slot today
+      
+      console.log(`Checking reminders for scheduled time ${targetTimeStr} (User: ${user.id})...`);
 
       let reminderMessages = [];
       

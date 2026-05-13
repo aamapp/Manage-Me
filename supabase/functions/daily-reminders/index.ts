@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4"
-import { JWT } from "npm:google-auth-library@9"
+import { JWT } from "https://esm.sh/google-auth-library@9"
 
 // CORS headers
 const corsHeaders = {
@@ -32,12 +32,22 @@ serve(async (req) => {
     // 2. Fetch all profiles that have an FCM token
     const { data: profiles, error: profileError } = await supabaseClient
       .from('profiles')
-      .select('id, name, fcm_token')
+      .select('id, name, fcm_token, reminder_times')
       .not('fcm_token', 'is', null)
 
     if (profileError) throw profileError
 
     console.log(`Found ${profiles?.length || 0} users with FCM tokens.`);
+    
+    // Get current hour in BD timezone (Asia/Dhaka) assuming target users are in BD
+    const currentHourBD = parseInt(
+      new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Dhaka',
+        hour: 'numeric',
+        hour12: false
+      }).format(new Date()), 10
+    );
+    console.log(`Current Hour in BD: ${currentHourBD}`);
 
     // 3. Setup Firebase Auth for FCM Push
     const serviceAccountStr = Deno.env.get('FIREBASE_SERVICE_ACCOUNT')
@@ -63,6 +73,21 @@ serve(async (req) => {
     for (const user of profiles || []) {
       const fcmToken = user.fcm_token;
       if (!fcmToken) continue;
+
+      const userTimes = user.reminder_times || ['09:00', '15:00', '21:00'];
+      
+      let isScheduledHour = false;
+      for (const t of userTimes) {
+          const tHour = parseInt(t.split(':')[0], 10);
+          if (currentHourBD === tHour || (currentHourBD === 24 && tHour === 0)) {
+              isScheduledHour = true;
+              break;
+          }
+      }
+
+      if (!isScheduledHour) {
+          continue; // Skip this user if it's not their scheduled hour
+      }
 
       let notificationBodyList: string[] = [];
       let totalDueAmount = 0;
@@ -149,12 +174,19 @@ serve(async (req) => {
               android: {
                 priority: "high",
                 notification: { channel_id: "fcm_default_channel", sound: "default" }
+              },
+              data: {
+                title: "ডেইলি রিমাইন্ডার 🔔",
+                body: bodyMessage,
+                click_action: "FLUTTER_NOTIFICATION_CLICK"
               }
             }
           };
 
           if (imageUrl) {
             fcmMessage.message.notification.image = imageUrl;
+            fcmMessage.message.android.notification.image = imageUrl;
+            fcmMessage.message.data.image = imageUrl;
           }
 
           // Send FCM Notification
