@@ -11,7 +11,7 @@ CREATE EXTENSION IF NOT EXISTS pg_cron;
 
 SELECT cron.schedule(
   'daily-reminders-job-1',
-  '0 9,14,20 * * *', -- Runs at minute 0 past hour 9, 14, and 20
+  '*/15 * * * *', -- Runs every 15 minutes
   $$
     SELECT net.http_post(
         url:='https://YOUR_PROJECT_REF.supabase.co/functions/v1/daily-reminders',

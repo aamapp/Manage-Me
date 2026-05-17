@@ -712,7 +712,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       // ২. পেন্ডিং প্রজেক্ট চেক
-      const pendingCount = projects.filter(p => p.status === 'pending').length;
+      const pendingCount = projects.filter(p => p.status === 'Pending').length;
       if (pendingCount > 0) {
         reminderMessages.push(`পেন্ডিং প্রজেক্ট: ${pendingCount}টি`);
       }

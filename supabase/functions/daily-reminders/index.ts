@@ -88,29 +88,12 @@ serve(async (req) => {
       const fcmToken = user.fcm_token;
       if (!fcmToken) continue;
 
-      // Fetch user_metadata to get reminder_times
-      const { data: authUser, error: authErr } = await supabaseClient.auth.admin.getUserById(user.id);
-      let userTimes = ['09:00', '15:00', '21:00'];
-      if (!authErr && authUser?.user?.user_metadata?.reminder_times) {
-        userTimes = authUser.user.user_metadata.reminder_times;
-      }
-      
-      let isScheduledHour = false;
-      for (const t of userTimes) {
-          const tHour = parseInt(t.split(':')[0], 10);
-          if (currentHourBD === tHour || (currentHourBD === 24 && tHour === 0)) {
-              isScheduledHour = true;
-              break;
-          }
+      // For testing: Send every 15 minutes between 6 AM and 11 PM (BD time)
+      if (currentHourBD < 6 || currentHourBD > 23) {
+          continue; // Skip if it's outside 6 AM to 11 PM
       }
 
-      if (!isScheduledHour) {
-          continue; // Skip this user if it's not their scheduled hour
-      }
-
-      let notificationBodyList: string[] = [];
-      let totalDueAmount = 0;
-      let pendingProjectsCount = 0;
+      let notificationsToSend: any[] = [];
       let borrowedAmount = 0;
 
       // --- Check 1: Projects with Due Amount
@@ -120,8 +103,15 @@ serve(async (req) => {
         .eq('userid', user.id)
         .gt('dueamount', 0);
       
+      const DUE_IMG = 'https://qlmdoatgvovggvgzhwoy.supabase.co/storage/v1/object/public/notification-images/DUE_IMG.png';
       if (dueProjects && dueProjects.length > 0) {
-        dueProjects.forEach(p => totalDueAmount += Number(p.dueamount));
+        for (const p of dueProjects) {
+          notificationsToSend.push({
+            title: "ডেইলি রিমাইন্ডার 🔔",
+            body: `আপনার "${p.name}" প্রজেক্টে বকেয়া আছে ৳${p.dueamount}।`,
+            imageUrl: DUE_IMG
+          });
+        }
       }
 
       // --- Check 2: Pending Projects
@@ -131,18 +121,24 @@ serve(async (req) => {
         .eq('userid', user.id)
         .eq('status', 'pending');
         
+      const PENDING_IMG = 'https://qlmdoatgvovggvgzhwoy.supabase.co/storage/v1/object/public/notification-images/PENDING_IMG.png';
       if (pendingProjects && pendingProjects.length > 0) {
-        pendingProjectsCount = pendingProjects.length;
+        for (const p of pendingProjects) {
+          notificationsToSend.push({
+            title: "প্রজেক্ট পেন্ডিং ⚠️",
+            body: `আপনার "${p.name}" প্রজেক্টটি এখনো পেন্ডিং অবস্থায় আছে।`,
+            imageUrl: PENDING_IMG
+          });
+        }
       }
 
       // --- Check 3: Borrowed Money (Dues & Obligations)
-      // Transactions: 'receive' means user received (borrowed), 'give' means user gave (lent)
-      // If we calculate total receive - total give > 0, user owes money (Total ধার).
       const { data: duePersons } = await supabaseClient
         .from('due_persons')
         .select('transactions')
         .eq('userid', user.id);
         
+      const DUE_PERSON_IMG = 'https://qlmdoatgvovggvgzhwoy.supabase.co/storage/v1/object/public/notification-images/DENA_PAWNA_IMG.png';
       if (duePersons && duePersons.length > 0) {
           duePersons.forEach((person: any) => {
               if (person.transactions && Array.isArray(person.transactions)) {
@@ -160,53 +156,35 @@ serve(async (req) => {
           })
       }
 
-      // 5. Construct Notification Message if any condition is met
-      let imageUrl = '';
-      const PENDING_IMG = 'https://qlmdoatgvovggvgzhwoy.supabase.co/storage/v1/object/public/notification-images/PENDING_IMG.png';
-      const DUE_IMG = 'https://qlmdoatgvovggvgzhwoy.supabase.co/storage/v1/object/public/notification-images/DUE_IMG.png';
-      const INCOME_IMG = 'https://qlmdoatgvovggvgzhwoy.supabase.co/storage/v1/object/public/notification-images/INCOME_IMG.png';
-      const DUE_PERSON_IMG = 'https://qlmdoatgvovggvgzhwoy.supabase.co/storage/v1/object/public/notification-images/DENA_PAWNA_IMG.png';
-
-      if (totalDueAmount > 0) {
-          notificationBodyList.push(`বকেয়া বিল: ৳${totalDueAmount}`);
-          imageUrl = DUE_IMG;
-      }
-      if (pendingProjectsCount > 0) {
-          notificationBodyList.push(`পেন্ডিং প্রজেক্ট: ${pendingProjectsCount}টি`);
-          if (!imageUrl) imageUrl = PENDING_IMG;
-      }
       if (borrowedAmount > 0) {
-          notificationBodyList.push(`দেনা/ধার: ৳${borrowedAmount}`);
-          if (!imageUrl) imageUrl = DUE_PERSON_IMG;
+        notificationsToSend.push({
+          title: "দেনা/ধার রিমাইন্ডার 💸",
+          body: `আপনার মোট দেনা/ধার আছে ৳${borrowedAmount}। অনুগ্রহ করে শোধ করুন।`,
+          imageUrl: DUE_PERSON_IMG
+        });
       }
 
-      if (notificationBodyList.length > 0) {
-          const bodyMessage = notificationBodyList.join(', ') + '। অনুগ্রহ করে চেক করুন।';
+      // 5. Send separate notifications
+      for (const notif of notificationsToSend) {
+          const uniqueTag = Math.floor(Math.random() * 100000000).toString();
           
           const fcmMessage: any = {
             message: {
               token: fcmToken,
-              notification: {
-                title: "ডেইলি রিমাইন্ডার 🔔",
-                body: bodyMessage,
-              },
               android: {
-                priority: "high",
-                notification: { channel_id: "fcm_default_channel", sound: "default" }
+                priority: "high"
               },
               data: {
-                title: "ডেইলি রিমাইন্ডার 🔔",
-                body: bodyMessage,
-                click_action: "FLUTTER_NOTIFICATION_CLICK"
+                title: notif.title,
+                body: notif.body,
+                click_action: "FLUTTER_NOTIFICATION_CLICK",
+                notification_id: uniqueTag,
+                channel_id: "fcm_default_channel",
+                sound: "default",
+                image: notif.imageUrl || ""
               }
             }
           };
-
-          if (imageUrl) {
-            fcmMessage.message.notification.image = imageUrl;
-            fcmMessage.message.android.notification.image = imageUrl;
-            fcmMessage.message.data.image = imageUrl;
-          }
 
           // Send FCM Notification
           const fcmResponse = await fetch(`https://fcm.googleapis.com/v1/projects/${serviceAccount.project_id}/messages:send`, {

@@ -13,6 +13,7 @@ import {
   Users,
   Tags,
   Trash2,
+  HardDrive,
   Info,
   Globe,
   Phone,
@@ -196,6 +197,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
       path: "/trash",
       icon: <Trash2 size={20} />,
       desc: "ডিলিট করা প্রজেক্ট",
+    },
+    {
+      name: "প্রজেক্ট ব্যাকআপ",
+      path: "/projects-backup",
+      icon: <HardDrive size={20} />,
+      desc: "সম্পন্ন প্রজেক্ট ব্যাকআপ",
     },
     {
       name: "সেটিংস",

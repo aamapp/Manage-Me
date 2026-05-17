@@ -1,5 +1,7 @@
 /* Tailwind is handled via CDN in index.html */
 
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap');
+
 @font-face {
   font-family: 'Kohinoor Bangla';
   src: url('https://cdn.jsdelivr.net/gh/manthib/Typhaine@master/Site/maheer/assets/font/KohinoorBangla-Regular.ttf') format('truetype');
@@ -9,7 +11,7 @@
 }
 
 body {
-  font-family: 'Hind Siliguri', sans-serif;
+  font-family: 'Kohinoor Bangla', sans-serif !important;
   background-color: #f8fafc;
   /* Prevent pull-to-refresh on mobile browsers / WebView */
   overscroll-behavior-y: none;

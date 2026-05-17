@@ -205,17 +205,8 @@ serve(async (req) => {
       const fcmMessage: any = {
         message: {
           token: fcmToken,
-          notification: {
-            title: notif.title,
-            body: notif.body,
-          },
           android: {
-            priority: "high",
-            notification: {
-              channel_id: "fcm_default_channel",
-              sound: "default",
-              tag: uniqueId // Force distinct notification
-            }
+            priority: "high"
           },
           webpush: {
             headers: {
@@ -232,15 +223,12 @@ serve(async (req) => {
             body: notif.body,
             click_action: "FLUTTER_NOTIFICATION_CLICK",
             notification_id: uniqueId,
+            channel_id: "fcm_default_channel",
+            sound: "default",
             image: notif.imageUrl || ""
           }
         }
       };
-
-      if (notif.imageUrl) {
-        fcmMessage.message.notification.image = notif.imageUrl;
-        fcmMessage.message.android.notification.image = notif.imageUrl;
-      }
 
       const fcmResponse = await fetch(`https://fcm.googleapis.com/v1/projects/${serviceAccount.project_id}/messages:send`, {
         method: 'POST',

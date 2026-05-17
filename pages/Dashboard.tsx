@@ -205,13 +205,13 @@ export const Dashboard: React.FC = () => {
               <div className="bg-indigo-50 p-2 sm:p-2.5 rounded-xl text-indigo-600 shrink-0">
                 <Wallet size={18} className="sm:w-5 sm:h-5 md:w-[22px] md:h-[22px]" />
               </div>
-              <div className="shrink-0 hidden sm:flex flex-col justify-center">
-                 <h3 className="font-bold text-slate-800 text-sm sm:text-base md:text-lg lg:text-xl leading-tight" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>মাসিক আয়</h3>
-                 <p className="text-[10px] sm:text-[11px] md:text-[13px] text-slate-400 font-medium mt-0.5 whitespace-nowrap text-ellipsis overflow-hidden" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>গত ৬ মাসের আয়ের হিসাব</p>
-              </div>
-              <div className="shrink-0 flex sm:hidden flex-col justify-center">
-                 <h3 className="font-bold text-slate-800 text-sm leading-tight" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>মাসিক আয়</h3>
-              </div>
+                  <div className="shrink-0 hidden sm:flex flex-col justify-center">
+                     <h3 className="font-black text-slate-800 text-sm sm:text-base md:text-lg lg:text-xl leading-none" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>মাসিক আয়</h3>
+                     <p className="text-[10px] sm:text-[11px] md:text-[13px] text-slate-400 font-bold mt-1.5 whitespace-nowrap text-ellipsis overflow-hidden uppercase tracking-wider" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>গত ৬ মাসের আয়ের হিসাব</p>
+                  </div>
+                  <div className="shrink-0 flex sm:hidden flex-col justify-center">
+                     <h3 className="font-black text-slate-800 text-sm leading-none" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>মাসিক আয়</h3>
+                  </div>
               
               <div className={`flex border rounded-[12px] lg:rounded-xl p-1 sm:p-1.5 pr-2 sm:pr-3 lg:pr-4 items-center gap-1 sm:gap-2.5 w-max shrink-0 sm:ml-2 ${outerTheme}`}>
                 <div className={`${badgeTheme} p-1 sm:p-1.5 lg:p-1.5 rounded-lg lg:rounded-[10px] shrink-0`}>
@@ -293,7 +293,7 @@ export const Dashboard: React.FC = () => {
 
         {/* Project Status Summary - Takes 1 column on desktop */}
         <div className="bg-white p-4 lg:p-5 rounded-[20px] lg:rounded-3xl border border-slate-100 shadow-sm flex flex-col">
-          <h3 className="font-bold text-slate-800 mb-4 text-[15px] lg:text-base" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>প্রজেক্ট স্ট্যাটাস</h3>
+          <h3 className="font-black text-slate-800 mb-5 text-[15px] lg:text-base leading-none" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>প্রজেক্ট স্ট্যাটাস</h3>
           <div className="flex flex-row justify-between items-center flex-1 lg:px-2">
             {statusSummary.map((status) => {
               const radius = 44;
@@ -334,14 +334,14 @@ export const Dashboard: React.FC = () => {
 
       {/* Recent Projects List (Cards) */}
       <div className="pb-2">
-        <div className="flex items-center justify-between mb-3 px-1">
-          <h3 className="font-bold text-slate-800 text-[15px] lg:text-base relative pl-3" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
-              <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+        <div className="flex items-center justify-between mb-4 px-1">
+          <h3 className="font-black text-slate-900 text-base lg:text-lg relative pl-3 leading-none" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+              <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-indigo-600"></span>
               সাম্প্রতিক প্রজেক্ট
           </h3>
           <button 
             onClick={() => navigate('/projects')}
-            className="text-indigo-600 text-[11px] font-bold bg-indigo-50 px-3.5 py-1.5 rounded-full hover:bg-indigo-100 transition-colors"
+            className="text-indigo-600 text-[10px] font-black bg-indigo-50 px-4 py-1.5 rounded-full hover:bg-indigo-100 transition-all uppercase tracking-wider"
             style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
           >
             সব দেখুন
@@ -351,7 +351,7 @@ export const Dashboard: React.FC = () => {
         {recentProjects.length === 0 ? (
           <div className="bg-white p-12 rounded-3xl border border-slate-100 text-center text-slate-400">
               <Inbox size={40} className="mx-auto mb-3 opacity-20" />
-              <p className="text-sm font-medium">কোনো প্রজেক্ট নেই</p>
+              <p className="text-sm font-bold">কোনো প্রজেক্ট নেই</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -359,28 +359,28 @@ export const Dashboard: React.FC = () => {
               <div 
                 key={p.id} 
                 onClick={() => navigate('/projects')}
-                className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:border-indigo-100 active:scale-[0.98] transition-all flex items-center justify-between group cursor-pointer"
+                className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm hover:shadow-md hover:border-indigo-100 active:scale-[0.98] transition-all flex items-center justify-between group cursor-pointer"
               >
-                <div className="flex items-center gap-3 flex-1 min-w-0 mr-3">
+                <div className="flex items-center gap-3 flex-1 min-w-0 mr-2">
                    {/* Smart Icon */}
-                   <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                     <Music size={20} />
+                   <div className="w-9 h-9 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                     <Music size={18} />
                    </div>
                    
                    <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 mb-0.5">
-                         <h4 className="font-bold text-slate-800 text-sm truncate">{p.name}</h4>
-                         <span className={`w-2 h-2 rounded-full ring-1 ring-white shrink-0 ${p.status === 'Completed' ? 'bg-emerald-500' : p.status === 'In Progress' ? 'bg-blue-500' : 'bg-amber-500'}`}></span>
+                         <h4 className="font-bold text-slate-800 text-xs truncate leading-none" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>{p.name}</h4>
+                         <span className={`w-1.5 h-1.5 rounded-full ring-1 ring-white shrink-0 ${p.status === 'Completed' ? 'bg-emerald-500' : p.status === 'In Progress' ? 'bg-blue-500' : 'bg-amber-500'}`}></span>
                       </div>
-                      <p className="text-[11px] text-slate-500 truncate font-medium flex items-center gap-1">
+                      <p className="text-[10px] text-slate-400 truncate font-bold flex items-center gap-1 mt-1">
                          <Users size={10} /> {p.clientname}
                       </p>
                    </div>
                 </div>
                 
                 <div className="text-right whitespace-nowrap">
-                  <p className="font-bold text-slate-800 text-[15px]">{currency} {p.totalamount.toLocaleString('en-US')}</p>
-                  <p className="text-[10px] text-slate-400 mt-0.5 font-bold bg-slate-50 px-1.5 py-0.5 rounded inline-block">
+                  <p className="font-black text-slate-900 text-sm leading-none" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>{currency} {p.totalamount.toLocaleString('en-US')}</p>
+                  <p className="text-[9px] text-slate-400 mt-1 font-black bg-slate-50 px-1.5 py-0.5 rounded inline-block uppercase tracking-tight">
                     {p.deadline ? p.deadline : 'No Date'}
                   </p>
                 </div>

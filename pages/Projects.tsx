@@ -745,7 +745,7 @@ export const Projects: React.FC = () => {
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold text-slate-800">প্রজেক্ট তালিকা</h1>
+            <h1 className="text-lg font-extrabold text-slate-900 tracking-tight">প্রজেক্ট তালিকা</h1>
             <button 
               onClick={() => setShowDateFilter(!showDateFilter)}
               className={`p-1.5 rounded-lg transition-all ${showDateFilter || dateRange.start || dateRange.end ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'}`}
