@@ -143,17 +143,18 @@ serve(async (req) => {
     }
 
     const userMetadata = userData.user.user_metadata
-    const fcmToken = userMetadata?.fcm_token
-
-    if (!fcmToken) {
-      console.log(`No FCM token found for user ${userId}. Cannot send notification.`);
-      return new Response(JSON.stringify({ message: "User does not have an FCM token" }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      })
-    }
-
-    console.log(`Pushing notification to FCM Token: ${fcmToken.substring(0, 15)}...`);
+      const rawFcmToken = userMetadata?.fcm_token || "";
+      const fcmTokens = Array.from(new Set(rawFcmToken.split(',').map((t: string) => t.trim()).filter(Boolean)));
+  
+      if (fcmTokens.length === 0) {
+        console.log(`No FCM token found for user ${userId}. Cannot send notification.`);
+        return new Response(JSON.stringify({ message: "User does not have an FCM token" }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        })
+      }
+  
+      console.log(`Pushing notification to ${fcmTokens.length} FCM Tokens...`);
 
     // 2. Get the Firebase Service Account JSON string from environment variables
     let serviceAccountStr = Deno.env.get('FIREBASE_SERVICE_ACCOUNT');
@@ -198,55 +199,66 @@ serve(async (req) => {
     // 4. Send the push notifications via Firebase HTTP v1 API
     const allResponses = [];
 
-    for (const notif of notificationsToSend) {
-      if (!notif.title || !notif.body) continue;
+    for (const token of fcmTokens) {
+      for (const notif of notificationsToSend) {
+        if (!notif.title || !notif.body) continue;
 
-      const uniqueId = Math.floor(Math.random() * 100000000).toString();
-      const fcmMessage: any = {
-        message: {
-          token: fcmToken,
-          android: {
-            priority: "high"
-          },
-          webpush: {
-            headers: {
-              Urgency: "high",
-            },
+        const uniqueId = Math.floor(Math.random() * 100000000).toString();
+        const fcmMessage = {
+          message: {
+            token: token,
             notification: {
-              requireInteraction: true,
-              sound: "default"
+              title: notif.title,
+              body: notif.body,
+              image: notif.imageUrl || ""
+            },
+            android: {
+              priority: "high",
+              notification: {
+                channel_id: "fcm_default_channel",
+                sound: "default",
+                image: notif.imageUrl || ""
+              }
+            },
+            webpush: {
+              headers: {
+                Urgency: "high",
+              },
+              notification: {
+                requireInteraction: true,
+                sound: "default"
+              }
+            },
+            // Optional data payload
+            data: {
+              title: notif.title,
+              body: notif.body,
+              click_action: "FLUTTER_NOTIFICATION_CLICK",
+              notification_id: uniqueId,
+              channel_id: "fcm_default_channel",
+              image: notif.imageUrl || ""
             }
-          },
-          // Optional data payload
-          data: {
-            title: notif.title,
-            body: notif.body,
-            click_action: "FLUTTER_NOTIFICATION_CLICK",
-            notification_id: uniqueId,
-            channel_id: "fcm_default_channel",
-            sound: "default",
-            image: notif.imageUrl || ""
           }
+        };
+
+        const fcmResponse = await fetch(`https://fcm.googleapis.com/v1/projects/${serviceAccount.project_id}/messages:send`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify(fcmMessage),
+        });
+
+        if (!fcmResponse.ok) {
+          const errorData = await fcmResponse.text();
+          console.error("FCM API Error response:", errorData);
+          allResponses.push({ success: false, error: errorData });
+        } else {
+          const responseData = await fcmResponse.json();
+          console.log("Successfully sent push notification!", responseData);
+          allResponses.push({ success: true, response: responseData });
         }
-      };
-
-      const fcmResponse = await fetch(`https://fcm.googleapis.com/v1/projects/${serviceAccount.project_id}/messages:send`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify(fcmMessage),
-      });
-
-      if (!fcmResponse.ok) {
-        const errorData = await fcmResponse.text();
-        console.error("FCM API Error response:", errorData);
-        allResponses.push({ success: false, error: errorData });
-      } else {
-        const responseData = await fcmResponse.json();
-        console.log("Successfully sent push notification!", responseData);
-        allResponses.push({ success: true, response: responseData });
       }
     }
 

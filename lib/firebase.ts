@@ -15,6 +15,15 @@ declare global {
 const app = initializeApp(firebaseConfig);
 const messaging = getMessaging(app);
 
+const mergeTokens = (existingTokens: string | null | undefined, newToken: string) => {
+  if (!existingTokens) return newToken;
+  const tokensArray = existingTokens.split(',').map(t => t.trim()).filter(Boolean);
+  if (!tokensArray.includes(newToken)) {
+    tokensArray.push(newToken);
+  }
+  return tokensArray.join(',');
+};
+
 export const requestNotificationPermission = async (userId: string) => {
   // Check if we are inside Android WebView with Native Bridge
   if (window.AndroidBridge) {
@@ -24,22 +33,34 @@ export const requestNotificationPermission = async (userId: string) => {
     window.setAndroidFCMToken = async (token: string) => {
       console.log('Received FCM token from Android:', token);
       if (token && userId) {
-        // Update both user metadata and profiles table
+        
+        // 1. Fetch current profile to get older tokens
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('fcm_token')
+          .eq('id', userId)
+          .single();
+
+        const newFCMTokenStr = mergeTokens(profile?.fcm_token, token);
+
+        // Update profiles table
         const { error: profileError } = await supabase
           .from('profiles')
-          .update({ fcm_token: token })
+          .update({ fcm_token: newFCMTokenStr })
           .eq('id', userId);
 
         if (profileError) {
           console.error('Error updating FCM token in profiles:', profileError);
         }
 
+        // 2. Fetch and update user metadata
         const { data } = await supabase.auth.getUser();
-        const currentToken = data?.user?.user_metadata?.fcm_token;
+        const currentMetaToken = data?.user?.user_metadata?.fcm_token;
+        const newMetaFCMTokenStr = mergeTokens(currentMetaToken, token);
         
-        if (currentToken !== token) {
+        if (currentMetaToken !== newMetaFCMTokenStr) {
           await supabase.auth.updateUser({
-            data: { fcm_token: token }
+            data: { fcm_token: newMetaFCMTokenStr }
           });
           
           window.dispatchEvent(new CustomEvent('app_toast', { 
@@ -74,14 +95,30 @@ export const requestNotificationPermission = async (userId: string) => {
         console.log('FCM Token:', token);
         // Save the token to Supabase for this user (in both user_metadata and profiles table)
         if (userId) {
-          await supabase.auth.updateUser({
-            data: { fcm_token: token }
-          });
+          // 1. Fetch current profile
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('fcm_token')
+            .eq('id', userId)
+            .single();
+
+          const newFCMTokenStr = mergeTokens(profile?.fcm_token, token);
 
           await supabase
             .from('profiles')
-            .update({ fcm_token: token })
+            .update({ fcm_token: newFCMTokenStr })
             .eq('id', userId);
+
+          // 2. Fetch and update User Metadata
+          const { data } = await supabase.auth.getUser();
+          const currentMetaToken = data?.user?.user_metadata?.fcm_token;
+          const newMetaFCMTokenStr = mergeTokens(currentMetaToken, token);
+
+          if (currentMetaToken !== newMetaFCMTokenStr) {
+            await supabase.auth.updateUser({
+              data: { fcm_token: newMetaFCMTokenStr }
+            });
+          }
         }
       } else {
         console.log('No registration token available. Request permission to generate one.');

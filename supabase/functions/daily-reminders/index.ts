@@ -86,8 +86,9 @@ serve(async (req) => {
 
     // 4. Loop through each user and check for conditions
     for (const user of profiles || []) {
-      const fcmToken = user.fcm_token;
-      if (!fcmToken) continue;
+      const rawFcmToken = user.fcm_token || "";
+      const fcmTokens = Array.from(new Set(rawFcmToken.split(',').map((t: string) => t.trim()).filter(Boolean)));
+      if (fcmTokens.length === 0) continue;
 
       // Send every 10 minutes (triggered by cron) between 6 AM and 11 PM (BD time)
       if (currentHourBD < 6 || currentHourBD >= 23) {
@@ -167,51 +168,53 @@ serve(async (req) => {
       }
 
       // 5. Send separate notifications
-      for (const notif of notificationsToSend) {
-          const uniqueTag = Math.floor(Math.random() * 100000000).toString();
-          
-          const fcmMessage = {
-            message: {
-              token: fcmToken,
-              notification: {
-                title: notif.title,
-                body: notif.body,
-                image: notif.imageUrl || ""
-              },
-              android: {
-                priority: "high",
+      for (const token of fcmTokens) {
+        for (const notif of notificationsToSend) {
+            const uniqueTag = Math.floor(Math.random() * 100000000).toString();
+            
+            const fcmMessage = {
+              message: {
+                token: token,
                 notification: {
+                  title: notif.title,
+                  body: notif.body,
+                  image: notif.imageUrl || ""
+                },
+                android: {
+                  priority: "high",
+                  notification: {
+                    channel_id: "fcm_default_channel",
+                    sound: "default",
+                    image: notif.imageUrl || ""
+                  }
+                },
+                data: {
+                  title: notif.title,
+                  body: notif.body,
+                  click_action: "FLUTTER_NOTIFICATION_CLICK",
+                  notification_id: uniqueTag,
                   channel_id: "fcm_default_channel",
-                  sound: "default",
                   image: notif.imageUrl || ""
                 }
-              },
-              data: {
-                title: notif.title,
-                body: notif.body,
-                click_action: "FLUTTER_NOTIFICATION_CLICK",
-                notification_id: uniqueTag,
-                channel_id: "fcm_default_channel",
-                image: notif.imageUrl || ""
               }
-            }
-          };
+            };
 
-          // Send FCM Notification
-          const fcmResponse = await fetch(`https://fcm.googleapis.com/v1/projects/${serviceAccount.project_id}/messages:send`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${accessToken}`,
-            },
-            body: JSON.stringify(fcmMessage),
-          })
-      
-          if (fcmResponse.ok) {
-            notificationsSent++;
-          } else {
-            console.error(`Failed to send FCM to user ${user.id}:`, await fcmResponse.text());
-          }
+            // Send FCM Notification
+            const fcmResponse = await fetch(`https://fcm.googleapis.com/v1/projects/${serviceAccount.project_id}/messages:send`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${accessToken}`,
+              },
+              body: JSON.stringify(fcmMessage),
+            })
+        
+            if (fcmResponse.ok) {
+              notificationsSent++;
+            } else {
+              console.error(`Failed to send FCM to user ${user.id}:`, await fcmResponse.text());
+            }
+        }
       }
     }
 
