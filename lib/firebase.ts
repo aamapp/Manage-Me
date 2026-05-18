@@ -24,7 +24,16 @@ export const requestNotificationPermission = async (userId: string) => {
     window.setAndroidFCMToken = async (token: string) => {
       console.log('Received FCM token from Android:', token);
       if (token && userId) {
-        // Fetch current user metadata to avoid infinite loop
+        // Update both user metadata and profiles table
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({ fcm_token: token })
+          .eq('id', userId);
+
+        if (profileError) {
+          console.error('Error updating FCM token in profiles:', profileError);
+        }
+
         const { data } = await supabase.auth.getUser();
         const currentToken = data?.user?.user_metadata?.fcm_token;
         
@@ -32,7 +41,7 @@ export const requestNotificationPermission = async (userId: string) => {
           await supabase.auth.updateUser({
             data: { fcm_token: token }
           });
-          // Dispatch custom event for elegant toast instead of annoying alert
+          
           window.dispatchEvent(new CustomEvent('app_toast', { 
             detail: { message: 'অ্যান্ড্রয়েড অ্যাপে নোটিফিকেশন সফলভাবে চালু হয়েছে!', type: 'success' } 
           }));
@@ -63,11 +72,16 @@ export const requestNotificationPermission = async (userId: string) => {
       
       if (token) {
         console.log('FCM Token:', token);
-        // Save the token to Supabase for this user (in user_metadata)
+        // Save the token to Supabase for this user (in both user_metadata and profiles table)
         if (userId) {
           await supabase.auth.updateUser({
             data: { fcm_token: token }
           });
+
+          await supabase
+            .from('profiles')
+            .update({ fcm_token: token })
+            .eq('id', userId);
         }
       } else {
         console.log('No registration token available. Request permission to generate one.');

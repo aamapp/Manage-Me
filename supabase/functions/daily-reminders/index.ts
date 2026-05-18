@@ -29,10 +29,11 @@ serve(async (req) => {
 
     console.log("Starting Daily Reminders Cron Job...");
 
-    // 2. Fetch all profiles that have an FCM token
+    // 2. Fetch all profiles that have an fcm_token
+    // Use select('*') instead of specific columns to avoid errors if the column was just added
     const { data: profiles, error: profileError } = await supabaseClient
       .from('profiles')
-      .select('id, name, fcm_token')
+      .select('*')
       .not('fcm_token', 'is', null)
 
     if (profileError) throw profileError
@@ -88,9 +89,10 @@ serve(async (req) => {
       const fcmToken = user.fcm_token;
       if (!fcmToken) continue;
 
-      // For testing: Send every 15 minutes between 6 AM and 11 PM (BD time)
-      if (currentHourBD < 6 || currentHourBD > 23) {
-          continue; // Skip if it's outside 6 AM to 11 PM
+      // Send every 10 minutes (triggered by cron) between 6 AM and 11 PM (BD time)
+      if (currentHourBD < 6 || currentHourBD >= 23) {
+          console.log(`Skipping notification for user ${user.id} due to outside active hours (${currentHourBD}).`);
+          continue; 
       }
 
       let notificationsToSend: any[] = [];
@@ -168,11 +170,21 @@ serve(async (req) => {
       for (const notif of notificationsToSend) {
           const uniqueTag = Math.floor(Math.random() * 100000000).toString();
           
-          const fcmMessage: any = {
+          const fcmMessage = {
             message: {
               token: fcmToken,
+              notification: {
+                title: notif.title,
+                body: notif.body,
+                image: notif.imageUrl || ""
+              },
               android: {
-                priority: "high"
+                priority: "high",
+                notification: {
+                  channel_id: "fcm_default_channel",
+                  sound: "default",
+                  image: notif.imageUrl || ""
+                }
               },
               data: {
                 title: notif.title,
@@ -180,7 +192,6 @@ serve(async (req) => {
                 click_action: "FLUTTER_NOTIFICATION_CLICK",
                 notification_id: uniqueTag,
                 channel_id: "fcm_default_channel",
-                sound: "default",
                 image: notif.imageUrl || ""
               }
             }
