@@ -62,7 +62,7 @@ export const AppLock: React.FC<AppLockProps> = ({ mode, onSuccess, onCancel, sav
   }, [pin, mode, savedPin, confirmStep, firstPin, onSuccess]);
 
   return (
-    <div className={`fixed inset-0 z-[2000] bg-slate-900 flex flex-col items-center p-6 text-white animate-in fade-in duration-300 ${(!savedPin && mode === 'unlock') ? 'justify-start pt-40' : 'justify-center'}`}>
+    <div className={`fixed inset-0 z-[2000] bg-slate-900 flex flex-col items-center p-6 text-white animate-in fade-in duration-300 ${(!savedPin && mode === 'unlock') ? 'justify-start pt-16' : 'justify-center'}`}>
       
       {/* Show Cancel/Close button if onCancel is provided (e.g. inside Settings) */}
       {onCancel && (
