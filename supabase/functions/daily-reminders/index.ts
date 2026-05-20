@@ -90,9 +90,21 @@ serve(async (req) => {
       const fcmTokens = Array.from(new Set(rawFcmToken.split(',').map((t: string) => t.trim()).filter(Boolean)));
       if (fcmTokens.length === 0) continue;
 
-      // Runs 3 times a day (triggered by cron), fallback check to ensure it's between 6 AM and 11 PM (BD time)
-      if (currentHourBD < 6 || currentHourBD >= 23) {
-          console.log(`Skipping notification for user ${user.id} due to outside active hours (${currentHourBD}).`);
+      // Get target hours from user's settings or default
+      const userTimes = user.reminder_times || ['09:00', '15:00', '21:00'];
+      
+      let isTargetHour = false;
+      for (const t of userTimes) {
+          const tHour = parseInt(t.split(':')[0], 10);
+          if (currentHourBD === tHour) {
+              isTargetHour = true;
+              break;
+          }
+      }
+
+      // If this is not the user's preferred target hour, skip sending
+      if (!isTargetHour) {
+          console.log(`Skipping notification for user ${user.id} - Not their preferred time.`);
           continue; 
       }
 

@@ -91,7 +91,9 @@ export const Settings: React.FC = () => {
           updated_at: new Date().toISOString()
         }, { onConflict: 'id' });
 
-      if (profileError) throw profileError;
+      if (profileError) {
+          console.warn("Profile table update warning:", profileError.message);
+      }
 
       // 5. Update Local State
       setUser(prev => prev ? ({ ...prev, avatar_url: publicUrl }) : null);
@@ -160,14 +162,13 @@ export const Settings: React.FC = () => {
             // Update profiles table silently (only fields that exist in the DB schema)
             const { error: profileError } = await supabase.from('profiles').upsert({ 
                 id: user.id,
-                name: formData.name,
-                phone: formData.phone,
-                occupation: formData.occupation,
-                currency: formData.currency,
-                language: formData.language
+                name: formData.name
             }, { onConflict: 'id' });
 
-            if (profileError) throw profileError;
+            if (profileError) {
+                console.warn("Profile table update warning:", profileError.message);
+                // Not throwing here because user_metadata is already updated successfully, and profiles table is just a secondary mirror
+            }
 
         } catch (err: any) {
             console.error("Background Sync Error:", err);
