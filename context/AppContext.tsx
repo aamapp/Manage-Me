@@ -65,6 +65,8 @@ interface AppContextType {
   setIsAppLocked: React.Dispatch<React.SetStateAction<boolean>>;
   appPin: string | null;
   setAppPin: (pin: string | null) => void;
+  isFingerprintEnabled: boolean;
+  setIsFingerprintEnabled: (enabled: boolean) => void;
   isOnline: boolean;
   
   // Admin Specific
@@ -129,6 +131,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // App Lock State
   const [isAppLocked, setIsAppLocked] = useState(false);
   const [appPin, setAppPinState] = useState<string | null>(null);
+  const [isFingerprintEnabledState, setIsFingerprintEnabledState] = useState<boolean>(false);
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
 
   // Admin Selection State
@@ -337,6 +340,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         localStorage.removeItem('manage_me_pin');
     }
     setAppPinState(pin);
+  };
+
+  const setIsFingerprintEnabled = (enabled: boolean) => {
+    if (enabled) {
+      localStorage.setItem('manage_me_fingerprint', 'true');
+    } else {
+      localStorage.removeItem('manage_me_fingerprint');
+    }
+    setIsFingerprintEnabledState(enabled);
   };
 
   const refreshData = async () => {
@@ -796,10 +808,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     let mounted = true;
     
-    // Check local storage for PIN
+    // Check local storage for PIN and Fingerprint
     const savedPin = localStorage.getItem('manage_me_pin');
     if (savedPin) {
         setAppPinState(savedPin);
+        setIsAppLocked(true); 
+    }
+
+    const savedFingerprint = localStorage.getItem('manage_me_fingerprint');
+    if (savedFingerprint === 'true') {
+        setIsFingerprintEnabledState(true);
         setIsAppLocked(true); 
     }
 
@@ -1053,6 +1071,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       toast, showToast, hideToast,
       isAppLocked, setIsAppLocked,
       appPin, setAppPin,
+      isFingerprintEnabled: isFingerprintEnabledState, setIsFingerprintEnabled,
       adminSelectedUserId, setAdminSelectedUserId,
       isOnline,
       notifications, dismissNotification, markNotificationAsRead, dismissAllNotifications

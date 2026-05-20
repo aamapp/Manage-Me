@@ -62,7 +62,7 @@ const AuthListener: React.FC = () => {
 
 const AppContent: React.FC = () => {
   // Added 'setUser' to destructuring to enable manual optimistic logout
-  const { user, setUser, loading, toast, showToast, hideToast, isAppLocked, setIsAppLocked, appPin } = useAppContext();
+  const { user, setUser, loading, toast, showToast, hideToast, isAppLocked, setIsAppLocked, appPin, isFingerprintEnabled } = useAppContext();
 
   useEffect(() => {
     if (user && isConfigured) {
@@ -71,6 +71,23 @@ const AppContent: React.FC = () => {
       requestNotificationPermission(user.id);
     }
   }, [user]);
+
+  useEffect(() => {
+    // Expose the global callback for Android native bridge to call upon biometric success
+    (window as any).onBiometricSuccess = () => {
+      setIsAppLocked(false);
+      showToast('লক খোলা হয়েছে', 'success');
+    };
+    
+    // Auto-request biometric when app starts if supported and locked
+    if (isAppLocked && isFingerprintEnabled && (window as any).AndroidBridge) {
+      try {
+        (window as any).AndroidBridge.requestFingerprintAuth();
+      } catch (err) {
+        console.error('Failed to trigger native biometric', err);
+      }
+    }
+  }, [isAppLocked, isFingerprintEnabled, setIsAppLocked]);
 
   const handleLogin = async (email: string, password?: string) => {
     if (!isConfigured) {
@@ -169,11 +186,11 @@ const AppContent: React.FC = () => {
     );
   }
 
-  if (isAppLocked && appPin) {
+  if (isAppLocked && (appPin || isFingerprintEnabled)) {
     return (
       <AppLock 
         mode="unlock" 
-        savedPin={appPin} 
+        savedPin={appPin || undefined} 
         onSuccess={() => setIsAppLocked(false)} 
       />
     );

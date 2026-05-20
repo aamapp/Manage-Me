@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Delete, Lock, Unlock, X } from 'lucide-react';
+import { Delete, Lock, Unlock, X, Fingerprint } from 'lucide-react';
 
 interface AppLockProps {
   mode: 'unlock' | 'setup';
@@ -114,8 +114,25 @@ export const AppLock: React.FC<AppLockProps> = ({ mode, onSuccess, onCancel, sav
           </button>
         ))}
         
-        {/* Empty Space for alignment */}
-        <div className="flex items-center justify-center" />
+        {/* Empty Space for alignment (could use it for Fingerprint) */}
+        <div className="flex items-center justify-center">
+          {mode === 'unlock' && (
+             <button
+                onClick={() => {
+                  try {
+                    if ((window as any).AndroidBridge) {
+                      (window as any).AndroidBridge.requestFingerprintAuth();
+                    } else {
+                      console.log("AndroidBridge not found. Fingerprint invoked in dev.");
+                    }
+                  } catch(e) {}
+                }}
+                className="w-16 h-16 rounded-full hover:bg-slate-700 active:scale-95 transition-all text-emerald-400 flex items-center justify-center mx-auto"
+             >
+                <Fingerprint size={28} />
+             </button>
+          )}
+        </div>
         
         <button
           onClick={() => handlePress('0')}

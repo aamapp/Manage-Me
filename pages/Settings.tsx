@@ -1,13 +1,13 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { User as UserIcon, Bell, Shield, Palette, Globe, Save, CheckCircle2, Loader2, Camera, UploadCloud, AlertCircle, Lock, Key, Trash2 } from 'lucide-react';
+import { User as UserIcon, Bell, Shield, Palette, Globe, Save, CheckCircle2, Loader2, Camera, UploadCloud, AlertCircle, Lock, Key, Trash2, Fingerprint } from 'lucide-react';
 import { APP_NAME } from '../constants';
 import { useAppContext } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
 import { AppLock } from '@/components/AppLock';
 
 export const Settings: React.FC = () => {
-  const { user, setUser, showToast, appPin, setAppPin, isOnline } = useAppContext();
+  const { user, setUser, showToast, appPin, setAppPin, isOnline, isFingerprintEnabled, setIsFingerprintEnabled } = useAppContext();
   const [formData, setFormData] = useState({
     name: user?.name || '',
     email: user?.email || '',
@@ -379,6 +379,33 @@ export const Settings: React.FC = () => {
                     className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${appPin ? 'bg-indigo-600' : 'bg-slate-300'}`}
                  >
                      <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform duration-300 shadow-sm ${appPin ? 'left-7' : 'left-1'}`}></div>
+                 </button>
+             </div>
+
+             {/* Fingerprint Lock */}
+             <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6 flex items-center justify-between">
+                 <div className="flex items-center gap-3">
+                     <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${isFingerprintEnabled ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-200 text-slate-500'}`}>
+                         <Fingerprint size={20} />
+                     </div>
+                     <div>
+                         <p className="font-bold text-slate-800 text-sm">ফিঙ্গারপ্রিন্ট লক</p>
+                         <p className="text-xs text-slate-500">{isFingerprintEnabled ? 'ফিঙ্গারপ্রিন্ট চালু আছে' : 'ফিঙ্গারপ্রিন্ট দিয়ে অ্যাপ লক করুন'}</p>
+                     </div>
+                 </div>
+                 <button 
+                    onClick={() => {
+                      const newState = !isFingerprintEnabled;
+                      setIsFingerprintEnabled(newState);
+                      if (newState) {
+                        showToast('ফিঙ্গারপ্রিন্ট লক চালু করা হয়েছে', 'success');
+                      } else {
+                        showToast('ফিঙ্গারপ্রিন্ট লক বন্ধ করা হয়েছে', 'success');
+                      }
+                    }}
+                    className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${isFingerprintEnabled ? 'bg-indigo-600' : 'bg-slate-300'}`}
+                 >
+                     <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform duration-300 shadow-sm ${isFingerprintEnabled ? 'left-7' : 'left-1'}`}></div>
                  </button>
              </div>
 

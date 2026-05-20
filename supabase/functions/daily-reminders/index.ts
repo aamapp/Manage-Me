@@ -90,7 +90,7 @@ serve(async (req) => {
       const fcmTokens = Array.from(new Set(rawFcmToken.split(',').map((t: string) => t.trim()).filter(Boolean)));
       if (fcmTokens.length === 0) continue;
 
-      // Send every 10 minutes (triggered by cron) between 6 AM and 11 PM (BD time)
+      // Runs 3 times a day (triggered by cron), fallback check to ensure it's between 6 AM and 11 PM (BD time)
       if (currentHourBD < 6 || currentHourBD >= 23) {
           console.log(`Skipping notification for user ${user.id} due to outside active hours (${currentHourBD}).`);
           continue; 
