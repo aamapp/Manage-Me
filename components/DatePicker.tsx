@@ -89,15 +89,15 @@ export const DatePicker: React.FC<DatePickerProps> = ({ value, onChange, placeho
 
   return (
     <div className="relative w-full" ref={containerRef}>
-      {label && <label className="text-xs font-bold text-slate-500 uppercase mb-1 block" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>{label}</label>}
       <div 
         onClick={() => setIsOpen(!isOpen)}
-        className={`w-full px-4 py-3 bg-white border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 flex items-center justify-between cursor-pointer transition-all ${isOpen ? 'ring-2 ring-indigo-500 border-indigo-500' : ''}`}
+        className={`w-full px-4 py-3.5 bg-transparent border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 flex items-center justify-between cursor-pointer transition-all ${isOpen ? 'ring-2 ring-indigo-500 border-indigo-500' : ''}`}
         style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
       >
         <span className="text-sm">{value ? new Date(value).toLocaleDateString('bn-BD') : (placeholder || '')}</span>
         <CalendarIcon size={18} className="text-slate-400" />
       </div>
+      {label && <label className={`absolute text-sm font-bold duration-300 transform z-10 origin-[0] left-3 px-1 pointer-events-none transition-all ${(value || isOpen) ? 'top-0 -translate-y-1/2 scale-[0.80] bg-white' : 'top-1/2 -translate-y-1/2 scale-100 bg-transparent'} ${isOpen ? 'text-indigo-600' : 'text-slate-500'}`} style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>{label}</label>}
 
       {isOpen && (
         <div className={`absolute top-full mt-2 w-64 bg-white border border-slate-100 rounded-2xl shadow-2xl z-[150] p-4 animate-in fade-in slide-in-from-top-2 duration-200 origin-top ${align === 'right' ? 'right-0' : 'left-0'}`}>

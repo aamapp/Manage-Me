@@ -91,7 +91,12 @@ serve(async (req) => {
       if (fcmTokens.length === 0) continue;
 
       // Get target hours from user's settings or default
-      const userTimes = user.reminder_times || ['09:00', '15:00', '21:00'];
+      let userTimes = user.reminder_times;
+      if (!userTimes || userTimes.length === 0) {
+          const { data: { user: authUser } } = await supabaseClient.auth.admin.getUserById(user.id);
+          userTimes = authUser?.user_metadata?.reminder_times;
+      }
+      userTimes = userTimes || ['09:00', '15:00', '21:00'];
       
       let isTargetHour = false;
       for (const t of userTimes) {
