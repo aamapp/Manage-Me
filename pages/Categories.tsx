@@ -58,7 +58,7 @@ export const Categories: React.FC = () => {
 
   useEffect(() => {
     fetchCategories();
-  }, [user, adminSelectedUserId, expenses, allExpenses]);
+  }, [user?.id, user?.role, adminSelectedUserId, expenses, allExpenses]);
 
   const handleOpenRename = (currentName: string) => {
     if (!isOnline) {

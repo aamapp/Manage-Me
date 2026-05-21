@@ -779,7 +779,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       clearTimeout(timer);
       clearInterval(intervalId);
     };
-  }, [user, projects, duePersons, isOnline, showToast]);
+  }, [user?.id, user?.reminder_times?.join(':'), projects, duePersons, isOnline, showToast]);
 
   // Effect to re-filter data when Admin selection changes without re-fetching
   useEffect(() => {
@@ -803,7 +803,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setShoppingLists([]);
         }
     }
-  }, [adminSelectedUserId, allProjects, allClients, allIncomeRecords, allExpenses, user]);
+  }, [adminSelectedUserId, allProjects, allClients, allIncomeRecords, allExpenses, allShoppingLists, user?.role]);
 
   useEffect(() => {
     let mounted = true;
@@ -1038,7 +1038,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (user) {
       refreshData();
     }
-  }, [user]);
+  }, [user?.id]);
 
   // Real-time Data Sync
   useEffect(() => {
@@ -1058,7 +1058,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user?.id, isConfigured]);
 
   return (
     <AppContext.Provider value={{ 
