@@ -130,8 +130,7 @@ export const Settings: React.FC = () => {
         phone: formData.phone,
         occupation: formData.occupation,
         language: formData.language as 'bn' | 'en',
-        currency: formData.currency,
-        reminder_times: formData.reminder_times
+        currency: formData.currency
       };
     });
 
@@ -151,8 +150,7 @@ export const Settings: React.FC = () => {
                     phone: formData.phone,
                     occupation: formData.occupation,
                     language: formData.language,
-                    currency: formData.currency,
-                    reminder_times: formData.reminder_times
+                    currency: formData.currency
                     // Removed avatar_url to prevent overwriting with stale state
                 }
             });
@@ -294,30 +292,6 @@ export const Settings: React.FC = () => {
                         <option value="AED">আমিরাতি দিরহাম (AED)</option>
                         <option value="MYR">মালয়েশিয়ান রিঙ্গিত (MYR)</option>
                     </select>
-                </div>
-                <div className="md:col-span-2">
-                   <label className="block text-sm font-semibold text-slate-700 mb-2">ডেইলি রিমাইন্ডার সময় (৩ বার)</label>
-                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                     <input 
-                       type="time" 
-                       value={formData.reminder_times?.[0] || '09:00'} 
-                       onChange={(e) => setFormData(prev => ({ ...prev, reminder_times: [e.target.value, prev.reminder_times?.[1] || '15:00', prev.reminder_times?.[2] || '21:00'] }))}
-                       className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 font-medium text-sm sm:text-base" 
-                     />
-                     <input 
-                       type="time" 
-                       value={formData.reminder_times?.[1] || '15:00'} 
-                       onChange={(e) => setFormData(prev => ({ ...prev, reminder_times: [prev.reminder_times?.[0] || '09:00', e.target.value, prev.reminder_times?.[2] || '21:00'] }))}
-                       className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 font-medium text-sm sm:text-base" 
-                     />
-                     <input 
-                       type="time" 
-                       value={formData.reminder_times?.[2] || '21:00'} 
-                       onChange={(e) => setFormData(prev => ({ ...prev, reminder_times: [prev.reminder_times?.[0] || '09:00', prev.reminder_times?.[1] || '15:00', e.target.value] }))}
-                       className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 font-medium text-sm sm:text-base" 
-                     />
-                   </div>
-                   <p className="text-xs text-slate-500 mt-2">ডিফল্টভাবে সকাল ৯টা, বিকেল ৩টা এবং রাত ৯টায় নোটিফিকেশন চেক হবে।</p>
                 </div>
              </div>
              <button onClick={handleSave} disabled={isSaving || isUploading || !isOnline} className={`w-full flex justify-center items-center gap-2 px-6 py-3.5 rounded-xl font-bold text-white transition-all shadow-lg mt-2 ${isSaving || isUploading || !isOnline ? 'bg-indigo-400 cursor-not-allowed shadow-none' : 'bg-indigo-600 hover:bg-indigo-700 active:scale-95 shadow-indigo-100'}`}>

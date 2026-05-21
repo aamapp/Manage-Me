@@ -90,13 +90,8 @@ serve(async (req) => {
       const fcmTokens = Array.from(new Set(rawFcmToken.split(',').map((t: string) => t.trim()).filter(Boolean)));
       if (fcmTokens.length === 0) continue;
 
-      // Get target hours from user's settings or default
-      let userTimes = user.reminder_times;
-      if (!userTimes || userTimes.length === 0) {
-          const { data: { user: authUser } } = await supabaseClient.auth.admin.getUserById(user.id);
-          userTimes = authUser?.user_metadata?.reminder_times;
-      }
-      userTimes = userTimes || ['09:00', '15:00', '21:00'];
+      // Use default target hours since custom settings were removed
+      const userTimes = ['09:00', '15:00', '21:00'];
       
       let isTargetHour = false;
       for (const t of userTimes) {
@@ -109,8 +104,21 @@ serve(async (req) => {
 
       // If this is not the user's preferred target hour, skip sending
       if (!isTargetHour) {
-          console.log(`Skipping notification for user ${user.id} - Not their preferred time.`);
+          console.log(`Skipping notification for user ${user.id} - Not a target hour.`);
           continue; 
+      }
+
+      // Check last notified time to prevent sending multiple times in the same hour block
+      // Important if Cron runs more frequently than 1 hour (e.g. every 10 mins)
+      const { data: { user: authUser } } = await supabaseClient.auth.admin.getUserById(user.id);
+      const lastNotifiedAtStr = authUser?.user_metadata?.last_notified_at;
+      const lastNotifiedAt = lastNotifiedAtStr ? new Date(lastNotifiedAtStr) : null;
+      const now = new Date();
+      
+      // If notified in the last 2 hours, skip
+      if (lastNotifiedAt && (now.getTime() - lastNotifiedAt.getTime() < 2 * 60 * 60 * 1000)) {
+          console.log(`Skipping notification for user ${user.id} - Already notified recently.`);
+          continue;
       }
 
       let notificationsToSend: any[] = [];
@@ -185,6 +193,7 @@ serve(async (req) => {
       }
 
       // 5. Send separate notifications
+      let notificationsSentForThisUser = 0;
       for (const token of fcmTokens) {
         for (const notif of notificationsToSend) {
             const uniqueTag = Math.floor(Math.random() * 100000000).toString();
@@ -228,10 +237,19 @@ serve(async (req) => {
         
             if (fcmResponse.ok) {
               notificationsSent++;
+              notificationsSentForThisUser++;
             } else {
               console.error(`Failed to send FCM to user ${user.id}:`, await fcmResponse.text());
             }
         }
+      }
+      
+      // Update last_notified_at in metadata to throttle further notifications in this hour
+      if (notificationsSentForThisUser > 0) {
+           await supabaseClient.auth.admin.updateUserById(user.id, {
+               user_metadata: { last_notified_at: new Date().toISOString() }
+           });
+           console.log(`Updated last_notified_at for user ${user.id}`);
       }
     }
 
