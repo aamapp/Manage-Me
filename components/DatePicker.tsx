@@ -89,18 +89,18 @@ export const DatePicker: React.FC<DatePickerProps> = ({ value, onChange, placeho
 
   return (
     <div className="relative w-full" ref={containerRef}>
+      {label && <label className="text-xs font-bold text-slate-500 uppercase mb-1 block" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>{label}</label>}
       <div 
         onClick={() => setIsOpen(!isOpen)}
-        className={`w-full px-4 pb-2.5 pt-4 bg-white border border-slate-200 rounded-xl font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 flex items-center justify-between cursor-pointer transition-all ${isOpen ? 'ring-2 ring-indigo-500 border-indigo-500' : ''}`}
+        className={`w-full px-4 py-3 bg-white border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 flex items-center justify-between cursor-pointer transition-all ${isOpen ? 'ring-2 ring-indigo-500 border-indigo-500' : ''}`}
         style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
       >
-        <span className="text-sm">{value ? new Date(value).toLocaleDateString('bn-BD') : ''}</span>
+        <span className="text-sm">{value ? new Date(value).toLocaleDateString('bn-BD') : (placeholder || '')}</span>
         <CalendarIcon size={18} className="text-slate-400" />
       </div>
-      {label && <label className={`absolute text-sm font-bold duration-300 transform z-10 origin-[0] bg-white px-2 left-2 cursor-pointer pointer-events-none ${value || isOpen ? '-translate-y-4 scale-[0.80] top-2' : 'top-1/2 -translate-y-1/2 scale-100'} ${isOpen ? 'text-indigo-600' : 'text-slate-500'}`} style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>{label}</label>}
 
       {isOpen && (
-        <div className={`absolute bottom-full mb-2 w-64 bg-white border border-slate-100 rounded-2xl shadow-2xll z-[150] p-4 animate-in fade-in slide-in-from-bottom-2 duration-200 origin-bottom ${align === 'right' ? 'right-0' : 'left-0'}`}>
+        <div className={`absolute top-full mt-2 w-64 bg-white border border-slate-100 rounded-2xl shadow-2xl z-[150] p-4 animate-in fade-in slide-in-from-top-2 duration-200 origin-top ${align === 'right' ? 'right-0' : 'left-0'}`}>
           <div className="flex items-center justify-between mb-4">
             <button type="button" onClick={() => changeMonth(-1)} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 transition-colors">
               <ChevronLeft size={18} />

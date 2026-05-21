@@ -1300,14 +1300,14 @@ export const Projects: React.FC = () => {
                     </div>
                   )}
 
-                  <div className="relative">
-                    <input type="text" id="project_name_input" value={newProject.name} onChange={e => setNewProject({...newProject, name: e.target.value})} className="block px-4 pb-2.5 pt-4 w-full text-sm font-bold text-slate-800 bg-white rounded-xl border border-slate-200 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 peer transition-colors" placeholder=" " style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }} />
-                    <label htmlFor="project_name_input" className="absolute text-sm font-bold text-slate-500 duration-300 transform -translate-y-4 scale-[0.80] top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-focus:text-indigo-600 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-[0.80] peer-focus:-translate-y-4 left-2 cursor-text" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>প্রজেক্ট নাম</label>
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">প্রজেক্ট নাম</label>
+                    <input type="text" id="project_name_input" value={newProject.name} onChange={e => setNewProject({...newProject, name: e.target.value})} className="block px-4 py-3 w-full text-sm font-bold text-slate-800 bg-white rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors" placeholder="প্রজেক্ট নাম লিখুন..." style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }} />
                   </div>
 
                   <div className="relative" ref={clientInputRef}>
-                    <input type="text" id="client_input" value={clientSearch} onFocus={() => setShowClientSuggestions(true)} onChange={e => {setClientSearch(e.target.value); setShowClientSuggestions(true);}} className="block px-4 pb-2.5 pt-4 w-full text-sm font-bold text-slate-800 bg-white rounded-xl border border-slate-200 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 peer transition-colors" placeholder=" " style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }} autoComplete="off" />
-                    <label htmlFor="client_input" className="absolute text-sm font-bold text-slate-500 duration-300 transform -translate-y-4 scale-[0.80] top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-focus:text-indigo-600 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-[0.80] peer-focus:-translate-y-4 left-2 cursor-text" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>ক্লায়েন্ট</label>
+                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">ক্লায়েন্ট</label>
+                    <input type="text" id="client_input" value={clientSearch} onFocus={() => setShowClientSuggestions(true)} onChange={e => {setClientSearch(e.target.value); setShowClientSuggestions(true);}} className="block px-4 py-3 w-full text-sm font-bold text-slate-800 bg-white rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors" placeholder="ক্লায়েন্টের নাম" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }} autoComplete="off" />
                     
                     {showClientSuggestions && (clientSearch || clientSuggestions.length > 0) && (
                       <div className="absolute top-full mt-1 w-full bg-white border border-slate-100 rounded-xl shadow-2xl max-h-40 overflow-y-auto z-[60]">
@@ -1334,24 +1334,24 @@ export const Projects: React.FC = () => {
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="relative">
+                      <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">বাজেট ({currency})</label>
                       <div 
                         onClick={() => openKeypad('total')}
-                        className={`keypad-trigger relative w-full px-4 pb-2.5 pt-4 bg-white border border-slate-200 rounded-xl font-bold text-slate-800 active:bg-slate-50 transition-colors flex items-center justify-between cursor-pointer ${(showKeypad && activeAmountField === 'total') ? 'ring-2 ring-indigo-500 border-indigo-500' : ''}`}
+                        className={`keypad-trigger relative w-full px-4 py-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-800 active:bg-slate-50 transition-colors flex items-center justify-between cursor-pointer ${(showKeypad && activeAmountField === 'total') ? 'ring-2 ring-indigo-500 border-indigo-500' : ''}`}
                       >
                          <span className="text-sm">{newProject.totalamount || ((showKeypad && activeAmountField === 'total') ? '0' : '')}</span>
                          <Calculator size={18} className="text-slate-400" />
                       </div>
-                      <label className={`absolute text-sm font-bold duration-300 transform z-10 origin-[0] bg-white px-2 left-2 cursor-pointer pointer-events-none ${(newProject.totalamount || (showKeypad && activeAmountField === 'total')) ? '-translate-y-4 scale-[0.80] top-2' : 'top-1/2 -translate-y-1/2 scale-100'} ${(showKeypad && activeAmountField === 'total') ? 'text-indigo-600' : 'text-slate-500'}`} style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>বাজেট ({currency})</label>
                     </div>
                     <div className="relative">
+                      <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">পরিশোধ ({currency})</label>
                       <div 
                         onClick={() => openKeypad('paid')}
-                        className={`keypad-trigger relative w-full px-4 pb-2.5 pt-4 bg-white border border-slate-200 rounded-xl font-bold text-emerald-600 active:bg-slate-50 transition-colors flex items-center justify-between cursor-pointer ${(showKeypad && activeAmountField === 'paid') ? 'ring-2 ring-indigo-500 border-indigo-500' : ''}`}
+                        className={`keypad-trigger relative w-full px-4 py-3 bg-white border border-slate-200 rounded-xl font-bold text-emerald-600 active:bg-slate-50 transition-colors flex items-center justify-between cursor-pointer ${(showKeypad && activeAmountField === 'paid') ? 'ring-2 ring-indigo-500 border-indigo-500' : ''}`}
                       >
                          <span className="text-sm">{newProject.paidamount || ((showKeypad && activeAmountField === 'paid') ? '0' : '')}</span>
                          <Calculator size={18} className="text-slate-400" />
                       </div>
-                      <label className={`absolute text-sm font-bold duration-300 transform z-10 origin-[0] bg-white px-2 left-2 cursor-pointer pointer-events-none ${(newProject.paidamount || (showKeypad && activeAmountField === 'paid')) ? '-translate-y-4 scale-[0.80] top-2' : 'top-1/2 -translate-y-1/2 scale-100'} ${(showKeypad && activeAmountField === 'paid') ? 'text-indigo-600' : 'text-slate-500'}`} style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>পরিশোধ ({currency})</label>
                     </div>
                   </div>
 

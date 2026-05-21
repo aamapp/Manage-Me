@@ -869,12 +869,14 @@ export const Expenses: React.FC = () => {
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
-                    <DatePicker 
-                      label="তারিখ"
-                      value={newExpense.date}
-                      onChange={(date) => setNewExpense({...newExpense, date: date})}
-                      placeholder="তারিখ"
-                    />
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">তারিখ</label>
+                      <DatePicker 
+                        value={newExpense.date}
+                        onChange={(date) => setNewExpense({...newExpense, date: date})}
+                        placeholder="তারিখ"
+                      />
+                    </div>
                     
                     {/* Category Input with Suggestions */}
                     <div className="relative" ref={categoryInputRef}>

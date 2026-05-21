@@ -894,6 +894,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               language: profile?.language || metadata?.language || 'bn',
               currency: profile?.currency || metadata?.currency || '৳',
               role: metadata?.role || 'user',
+              reminder_times: profile?.reminder_times || metadata?.reminder_times || ['09:00', '15:00', '21:00'],
               createdat: profile?.createdat || session.user.created_at
            };
            
@@ -973,6 +974,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 language: metadata?.language || 'bn',
                 currency: metadata?.currency || '৳',
                 role: metadata?.role || 'user',
+                reminder_times: metadata?.reminder_times || ['09:00', '15:00', '21:00'],
                 createdat: session.user.created_at
             };
             setUser(user ? user : initialUser);
@@ -1000,6 +1002,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                          language: profile.language || metadata?.language || 'bn',
                          currency: profile.currency || metadata?.currency || '৳',
                          role: metadata?.role || 'user',
+                         reminder_times: profile.reminder_times || metadata?.reminder_times || ['09:00', '15:00', '21:00'],
                          createdat: profile.createdat || session.user.created_at
                      });
                  }

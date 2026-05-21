@@ -856,15 +856,17 @@ export const Income: React.FC = () => {
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
-                    <DatePicker 
-                      label="তারিখ"
-                      value={newPayment.date}
-                      onChange={(date) => setNewPayment({...newPayment, date: date})}
-                      placeholder="তারিখ"
-                    />
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">তারিখ</label>
+                      <DatePicker 
+                        value={newPayment.date}
+                        onChange={(date) => setNewPayment({...newPayment, date: date})}
+                        placeholder="তারিখ"
+                      />
+                    </div>
                     <div>
                       <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">পদ্ধতি</label>
-                      <select value={newPayment.method} onChange={e => setNewPayment({...newPayment, method: e.target.value})} className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500">
+                      <select value={newPayment.method} onChange={e => setNewPayment({...newPayment, method: e.target.value})} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500">
                         <option value="বিকাশ">বিকাশ</option>
                         <option value="নগদ">নগদ</option>
                         <option value="রকেট">রকেট</option>
