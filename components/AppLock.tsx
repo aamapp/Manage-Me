@@ -93,11 +93,23 @@ export const AppLock: React.FC<AppLockProps> = ({ mode, onSuccess, onCancel, sav
       {mode === 'unlock' && !savedPin ? (
         // Fingerprint only UI
         <div className="flex flex-col items-center mt-8">
-          <div className="w-24 h-24 rounded-full bg-slate-800 flex items-center justify-center text-emerald-400 mb-6 relative">
-            <div className="absolute inset-0 bg-emerald-400/20 rounded-full animate-ping"></div>
+          <div 
+            onClick={() => {
+              try {
+                if ((window as any).AndroidBridge) {
+                  (window as any).AndroidBridge.requestFingerprintAuth();
+                } else {
+                  console.log("AndroidBridge not found. Fingerprint invoked in dev.");
+                  onSuccess('fingerprint'); // allow bypass in dev if no pin
+                }
+              } catch(e) {}
+            }}
+            className="w-24 h-24 rounded-full bg-slate-800 flex items-center justify-center text-emerald-400 mb-6 relative cursor-pointer hover:bg-slate-700 active:scale-95 transition-all"
+          >
+            <div className="absolute inset-0 bg-emerald-400/20 rounded-full animate-ping pointer-events-none"></div>
             <Fingerprint size={48} />
           </div>
-          <button
+          <button 
             onClick={() => {
               try {
                 if ((window as any).AndroidBridge) {

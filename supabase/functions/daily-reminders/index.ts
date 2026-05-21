@@ -246,8 +246,10 @@ serve(async (req) => {
       
       // Update last_notified_at in metadata to throttle further notifications in this hour
       if (notificationsSentForThisUser > 0) {
+           const { data: { user: authUser } } = await supabaseClient.auth.admin.getUserById(user.id);
+           const currentMeta = authUser?.user_metadata || {};
            await supabaseClient.auth.admin.updateUserById(user.id, {
-               user_metadata: { last_notified_at: new Date().toISOString() }
+               user_metadata: { ...currentMeta, last_notified_at: new Date().toISOString() }
            });
            console.log(`Updated last_notified_at for user ${user.id}`);
       }

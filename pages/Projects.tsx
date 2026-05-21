@@ -34,6 +34,18 @@ export const Projects: React.FC = () => {
   
   // Added 'Due' to the type for local filtering
   const [filter, setFilter] = useState<ProjectStatus | 'All' | 'Due'>('All');
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const filterRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
+        setIsFilterOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
   
   // New state for Client Filtering
   const [clientFilter, setClientFilter] = useState<string | null>(null);
@@ -817,19 +829,45 @@ export const Projects: React.FC = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <div className="relative">
-          <select 
-            value={filter}
-            onChange={(e) => setFilter(e.target.value as any)}
-            className="appearance-none bg-white border border-slate-200 text-slate-700 py-2.5 pl-4 pr-10 rounded-2xl text-xs font-bold shadow-sm outline-none focus:border-indigo-500 h-full"
+        <div className="relative" ref={filterRef}>
+          <div 
+            onClick={() => setIsFilterOpen(!isFilterOpen)}
+            className={`cursor-pointer bg-white border ${isFilterOpen ? 'border-indigo-500 ring-2 ring-indigo-500/20' : 'border-slate-200'} text-slate-700 py-2.5 pl-4 pr-10 rounded-2xl text-xs font-bold shadow-sm h-full flex items-center gap-2 transition-all`}
           >
-            <option value="All">সবগুলো</option>
-            <option value="Due">বকেয়া প্রজেক্ট</option>
-            {Object.entries(PROJECT_STATUS_LABELS).map(([key, label]) => (
-              <option key={key} value={key}>{label}</option>
-            ))}
-          </select>
-          <Filter size={14} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <span className="truncate max-w-[100px]">
+              {filter === 'All' ? 'সবগুলো' : filter === 'Due' ? 'বকেয়া প্রজেক্ট' : PROJECT_STATUS_LABELS[filter as ProjectStatus]}
+            </span>
+            <Filter size={14} className={`absolute right-3.5 text-slate-400 transition-transform ${isFilterOpen ? 'text-indigo-500' : ''}`} />
+          </div>
+
+          {isFilterOpen && (
+            <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-100 rounded-2xl shadow-2xl z-[150] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 origin-top-right">
+              <div className="p-1.5 flex flex-col gap-1 text-sm font-bold">
+                <button
+                  onClick={() => { setFilter('All'); setIsFilterOpen(false); }}
+                  className={`w-full text-left px-3 py-2.5 rounded-xl transition-colors ${filter === 'All' ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-50 text-slate-600'}`}
+                >
+                  সবগুলো
+                </button>
+                <button
+                  onClick={() => { setFilter('Due'); setIsFilterOpen(false); }}
+                  className={`w-full text-left px-3 py-2.5 rounded-xl transition-colors ${filter === 'Due' ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-50 text-slate-600'}`}
+                >
+                  বকেয়া প্রজেক্ট
+                </button>
+                <div className="h-px bg-slate-100 my-1 mx-2" />
+                {Object.entries(PROJECT_STATUS_LABELS).map(([key, label]) => (
+                  <button
+                    key={key}
+                    onClick={() => { setFilter(key as any); setIsFilterOpen(false); }}
+                    className={`w-full text-left px-3 py-2.5 rounded-xl transition-colors ${filter === key ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-50 text-slate-600'}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

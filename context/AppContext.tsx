@@ -904,7 +904,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
            setUser(null);
         }
       } catch (err: any) {
-        console.error("Session Init Error:", err);
+        if (!err.message?.includes('Lock broken')) {
+          console.error("Session Init Error:", err);
+        }
         if (err.message?.includes('Refresh Token Not Found') || 
             err.message?.includes('Invalid Refresh Token') ||
             err.message?.includes('refresh_token_not_found') ||
