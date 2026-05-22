@@ -25,8 +25,8 @@ export const AppLogo: React.FC<AppLogoProps> = ({
       <defs>
         {variant === 'color' && (
           <linearGradient id={gradientId} x1="0" y1="1" x2="1" y2="0">
-            <stop offset="0%" stopColor="#0052ff" />
-            <stop offset="100%" stopColor="#00d2ff" />
+            <stop offset="0%" stopColor="#4f46e5" />
+            <stop offset="100%" stopColor="#4f46e5" />
           </linearGradient>
         )}
       </defs>
