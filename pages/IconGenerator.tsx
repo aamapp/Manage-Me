@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { ArrowLeft, Download, Image as ImageIcon, Loader2, Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import html2canvas from 'html2canvas';
+import { AppLogo } from '@/components/AppLogo';
 
 export const IconGenerator: React.FC = () => {
   const [isCapturing, setIsCapturing] = useState(false);
@@ -76,23 +77,16 @@ export const IconGenerator: React.FC = () => {
                   position: 'absolute',
                   left: '-9999px',
                   top: '0',
-                  overflow: 'hidden'
+                  overflow: 'hidden',
+                  padding: '160px'
                 }}
               >
-                <span style={{ 
-                  color: 'white', 
-                  fontSize: '650px', 
-                  fontWeight: '900', 
-                  fontFamily: 'system-ui, -apple-system, sans-serif',
-                  display: 'block',
-                  transform: 'translateY(-20px)', // Nudge up to compensate for font baseline
-                  textAlign: 'center'
-                }}>M</span>
+                <AppLogo variant="white" size="100%" />
               </div>
 
               {/* Preview Version */}
-              <div className="w-64 h-64 bg-[#6366f1] rounded-[22%] shadow-2xl flex items-center justify-center border-4 border-white overflow-hidden">
-                <span className="text-white text-[160px] font-black select-none transform -translate-y-1">M</span>
+              <div className="w-64 h-64 bg-[#6366f1] rounded-[22%] shadow-2xl flex items-center justify-center p-11 border-4 border-white overflow-hidden">
+                <AppLogo variant="white" size="100%" />
               </div>
             </div>
 

@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { APP_NAME } from '../constants';
 import { Mail, Lock, Music, Eye, EyeOff, ArrowLeft, Send, Loader2 } from 'lucide-react';
+import { AppLogo } from '../components/AppLogo';
 
 interface LoginProps {
   onLogin: (email: string, password?: string) => Promise<void>;
@@ -37,8 +38,8 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onResetPassword, onGoToSi
       {/* Brand Header */}
       <div className="bg-indigo-700 p-8 pt-12 pb-16 rounded-b-[3rem] shadow-xl text-center relative overflow-hidden">
         <div className="relative z-10 flex flex-col items-center max-w-md mx-auto">
-            <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-indigo-700 font-black text-3xl mb-4 shadow-lg">
-              M
+            <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center p-2 text-indigo-700 font-black text-3xl mb-4 shadow-lg">
+              <AppLogo variant="color" size="100%" />
             </div>
             <h1 className="text-3xl font-black text-white tracking-tight mb-2">{APP_NAME}</h1>
             <p className="text-indigo-200 text-sm font-medium">অডিও প্রজেক্ট ম্যানেজমেন্ট অ্যাপ</p>

@@ -5,6 +5,7 @@ import { Layout } from '@/components/Layout';
 import { Toast } from '@/components/Toast';
 import { AppLock } from '@/components/AppLock'; 
 import { ScrollToTop } from '@/components/ScrollToTop';
+import { AppLogo } from '@/components/AppLogo';
 import { AppProvider, useAppContext } from '@/context/AppContext';
 import { supabase, isConfigured } from '@/lib/supabase';
 import { requestNotificationPermission, setupOnMessageListener } from '@/lib/firebase';
@@ -173,9 +174,11 @@ const AppContent: React.FC = () => {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50/90 backdrop-blur-sm animate-in fade-in duration-300">
         <div className="flex flex-col items-center justify-center gap-6">
-          <div className="premium-loader-container !w-16 !h-16">
+          <div className="premium-loader-container !w-16 !h-16 p-3.5">
             <div className="premium-loader-ring"></div>
-            <span className="premium-loader-text text-4xl">M</span>
+            <div className="premium-loader-text w-full h-full flex items-center justify-center">
+              <AppLogo variant="color" size="100%" />
+            </div>
           </div>
           <div className="flex flex-col items-center gap-1">
              <p className="text-slate-600 font-medium text-lg tracking-wide animate-pulse">অ্যাপ চালু হচ্ছে...</p>
@@ -217,9 +220,11 @@ const AppContent: React.FC = () => {
       <Suspense fallback={
         <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50/90 backdrop-blur-md animate-in fade-in duration-200">
           <div className="flex flex-col items-center justify-center gap-4">
-            <div className="premium-loader-container !w-14 !h-14">
+            <div className="premium-loader-container !w-14 !h-14 p-3 font-normal">
               <div className="premium-loader-ring"></div>
-              <span className="premium-loader-text text-3xl">M</span>
+              <div className="premium-loader-text w-full h-full flex items-center justify-center">
+                <AppLogo variant="color" size="100%" />
+              </div>
             </div>
             <p className="text-indigo-600 font-bold tracking-widest text-[10px] uppercase animate-pulse">লোড হচ্ছে...</p>
           </div>
