@@ -5,6 +5,7 @@ import { APP_NAME } from '../constants';
 import { useAppContext } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
 import { AppLock } from '@/components/AppLock';
+import { ConfirmModal } from '@/components/ConfirmModal';
 
 export const Settings: React.FC = () => {
   const { user, setUser, showToast, appPin, setAppPin, isOnline, isFingerprintEnabled, setIsFingerprintEnabled } = useAppContext();
@@ -26,6 +27,7 @@ export const Settings: React.FC = () => {
   
   // 'setup' means setting a new pin, 'disable' means verifying pin to turn it off
   const [pinAction, setPinAction] = useState<'setup' | 'disable' | null>(null);
+  const [showClearCacheModal, setShowClearCacheModal] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -411,13 +413,7 @@ export const Settings: React.FC = () => {
              {/* Clear Cache Utility */}
              <div className="pt-6 mt-6 border-t border-slate-100">
                 <button 
-                  onClick={() => {
-                    if (window.confirm('আপনি কি অ্যাপের ক্যাশ ক্লিয়ার করতে চান? এটি আপনাকে লগআউট করে দিবে এবং সব তথ্য নতুন করে লোড হবে।')) {
-                      localStorage.clear();
-                      sessionStorage.clear();
-                      window.location.reload();
-                    }
-                  }}
+                  onClick={() => setShowClearCacheModal(true)}
                   className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-red-50 text-red-600 rounded-xl font-bold text-sm hover:bg-red-100 transition-colors"
                 >
                   <Trash2 size={16} />
@@ -439,6 +435,22 @@ export const Settings: React.FC = () => {
             onCancel={() => setPinAction(null)}
           />
       )}
+
+      {/* Clear Cache Premium Confirmation Modal */}
+      <ConfirmModal 
+        isOpen={showClearCacheModal}
+        onClose={() => setShowClearCacheModal(false)}
+        onConfirm={() => {
+          localStorage.clear();
+          sessionStorage.clear();
+          window.location.reload();
+        }}
+        title="ক্যাশ ক্লিয়ার করুন"
+        message="আপনি কি অ্যাপের ক্যাশ ক্লিয়ার করতে চান? এটি আপনাকে লগআউট করে দিবে এবং সব তথ্য নতুন করে লোড হবে।"
+        confirmText="ক্লিয়ার করুন"
+        cancelText="বাতিল"
+        type="danger"
+      />
     </div>
   );
 };
