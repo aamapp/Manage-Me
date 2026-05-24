@@ -31,17 +31,26 @@ serve(async (req) => {
     const DUE_IMG = 'https://qlmdoatgvovggvgzhwoy.supabase.co/storage/v1/object/public/notification-images/DUE_IMG.png';
     const INCOME_IMG = 'https://qlmdoatgvovggvgzhwoy.supabase.co/storage/v1/object/public/notification-images/INCOME_IMG.png';
     const DUE_PERSON_IMG = 'https://qlmdoatgvovggvgzhwoy.supabase.co/storage/v1/object/public/notification-images/DENA_PAWNA_IMG.png';
+    const BACKUP_IMG = 'https://qlmdoatgvovggvgzhwoy.supabase.co/storage/v1/object/public/notification-images/BACKUP_IMG.png'; // আপনার তৈরি করা ব্যাকআপ নির্দেশনা ইমেজটির URL এখানে বসাতে পারেন
 
     // Check if it's a Supabase Database Webhook Payload
     if (payload.type && payload.record && payload.table) {
       if (payload.table === 'projects') {
         userId = payload.record.userid || payload.record.userId;
         if (payload.type === 'INSERT') {
-          notificationsToSend.push({
-            title: `নতুন প্রজেক্ট: ${payload.record.name}`,
-            body: `প্রজেক্টটির স্ট্যাটাস এখন ${payload.record.status || 'Pending'}।`,
-            imageUrl: (payload.record.status || '').toLowerCase() === 'pending' ? PENDING_IMG : INCOME_IMG
-          });
+          if (payload.record.status === 'Completed') {
+            notificationsToSend.push({
+              title: `🎉 প্রজেক্ট সম্পন্ন: ${payload.record.name}`,
+              body: `অভিনন্দন! আপনার প্রজেক্টটি সফলভাবে সম্পন্ন হয়েছে। জরুরি সুরক্ষার্থে এই প্রজেক্টের ব্যাকআপ ফাইলটি দ্রুত ব্যাকআপ রাখুন! 💾`,
+              imageUrl: BACKUP_IMG
+            });
+          } else {
+            notificationsToSend.push({
+              title: `নতুন প্রজেক্ট: ${payload.record.name}`,
+              body: `প্রজেক্টটির স্ট্যাটাস এখন ${payload.record.status || 'Pending'}।`,
+              imageUrl: (payload.record.status || '').toLowerCase() === 'pending' ? PENDING_IMG : INCOME_IMG
+            });
+          }
           if (payload.record.dueamount > 0) {
             notificationsToSend.push({
               title: `বকেয়া আপডেট: ${payload.record.name}`,
@@ -61,10 +70,28 @@ serve(async (req) => {
           }
 
           if (statusChanged) {
+            let customTitle = `স্ট্যাটাস আপডেট: ${payload.record.name}`;
+            let customBody = `প্রজেক্টটির স্ট্যাটাস এখন ${payload.record.status}।`;
+            let img = INCOME_IMG;
+
+            if (payload.record.status === 'Completed') {
+              customTitle = `🎉 প্রজেক্ট সম্পন্ন: ${payload.record.name}`;
+              customBody = `অভিনন্দন! আপনার এই প্রজেক্টটি সফলভাবে সম্পন্ন করা হয়েছে। কোনো ফাইল হারানোর ঝুঁকি এড়াতে সুরক্ষার্থে প্রজেক্টটি দ্রুত ব্যাকআপ রাখুন! 💾`;
+              img = BACKUP_IMG;
+            } else if (payload.record.status === 'In Progress') {
+              customTitle = `⚡ চলমান প্রজেক্ট: ${payload.record.name}`;
+              customBody = `প্রজেক্টটির কাজ এখন চালু বা চলমান (In Progress) অবস্থায় আছে। 💪`;
+              img = PENDING_IMG;
+            } else if (payload.record.status === 'Pending') {
+              customTitle = `⏳ পেন্ডিং প্রজেক্ট: ${payload.record.name}`;
+              customBody = `প্রজেক্টটির স্ট্যাটাস এখন পেন্ডিং (Pending) রাখা হয়েছে।`;
+              img = PENDING_IMG;
+            }
+
             notificationsToSend.push({
-              title: `স্ট্যাটাস আপডেট: ${payload.record.name}`,
-              body: `প্রজেক্টটির স্ট্যাটাস এখন ${payload.record.status}।`,
-              imageUrl: (payload.record.status || '').toLowerCase() === 'pending' ? PENDING_IMG : INCOME_IMG
+              title: customTitle,
+              body: customBody,
+              imageUrl: img
             });
           }
           if (dueChanged) {
@@ -226,7 +253,8 @@ serve(async (req) => {
               },
               notification: {
                 requireInteraction: true,
-                sound: "default"
+                sound: "default",
+                image: notif.imageUrl || ""
               }
             },
             // Optional data payload

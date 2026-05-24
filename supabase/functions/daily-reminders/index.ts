@@ -214,6 +214,16 @@ serve(async (req) => {
                     image: notif.imageUrl || ""
                   }
                 },
+                webpush: {
+                  headers: {
+                    Urgency: "high",
+                  },
+                  notification: {
+                    requireInteraction: true,
+                    sound: "default",
+                    image: notif.imageUrl || ""
+                  }
+                },
                 data: {
                   title: notif.title,
                   body: notif.body,
