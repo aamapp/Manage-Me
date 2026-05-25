@@ -16,12 +16,9 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] Received background message ', payload);
   const notificationTitle = payload.notification?.title || 'নতুন আপডেট';
-  const imageUrl = payload.notification?.image || payload.data?.image || '';
-  
   const notificationOptions = {
     body: payload.notification?.body || '',
-    icon: '/icon.png',
-    image: imageUrl || undefined
+    icon: '/icon.png' // Or whatever icon path
   };
 
   self.registration.showNotification(notificationTitle, notificationOptions);

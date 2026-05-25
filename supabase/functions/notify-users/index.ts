@@ -242,9 +242,16 @@ serve(async (req) => {
             android: {
               priority: "high",
               notification: {
-                channel_id: "fcm_default_channel",
-                sound: "default",
+                channel_id: "custom_sound_channel",
+                sound: "reminder",
                 image: notif.imageUrl || ""
+              }
+            },
+            apns: {
+              payload: {
+                aps: {
+                  sound: "reminder"
+                }
               }
             },
             webpush: {
@@ -253,8 +260,7 @@ serve(async (req) => {
               },
               notification: {
                 requireInteraction: true,
-                sound: "default",
-                image: notif.imageUrl || ""
+                sound: "default"
               }
             },
             // Optional data payload
@@ -263,7 +269,8 @@ serve(async (req) => {
               body: notif.body,
               click_action: "FLUTTER_NOTIFICATION_CLICK",
               notification_id: uniqueId,
-              channel_id: "fcm_default_channel",
+              channel_id: "custom_sound_channel",
+              sound: "reminder",
               image: notif.imageUrl || ""
             }
           }

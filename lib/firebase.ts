@@ -136,13 +136,11 @@ export const setupOnMessageListener = () => {
     console.log('Message received. ', payload);
     // You can show a custom toast or UI notification here
     if (payload.notification) {
-      const imageUrl = payload.notification.image || (payload.data && payload.data.image);
       // Example: Using browser's native notification if app is in foreground
       new Notification(payload.notification.title || 'New Notification', {
         body: payload.notification.body,
-        icon: '/icon.png',
-        image: imageUrl || undefined
-      } as NotificationOptions);
+        icon: '/icon.png'
+      });
     }
   });
 };
