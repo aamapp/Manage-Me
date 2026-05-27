@@ -12,23 +12,18 @@ import { NumericKeypad } from '@/components/NumericKeypad';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { DatePicker } from '@/components/DatePicker';
 import { DuePerson, DueTransaction } from '../types';
+import { Savings } from './Savings';
+import { PiggyBank } from 'lucide-react';
 
 export const Expenses: React.FC = () => {
   // Use cached expenses from AppContext
   const { user, showToast, adminSelectedUserId, expenses, setExpenses, refreshData, isOnline } = useAppContext();
   const location = useLocation();
+  const [activeSubTab, setActiveSubTab] = useState<'expenses' | 'dues' | 'savings'>('expenses');
   const [isModalOpen, setModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'expenses' | 'dues'>('expenses');
 
-  useEffect(() => {
-    const searchParams = new URLSearchParams(location.search);
-    const viewId = searchParams.get('view');
-    if (viewId) {
-      setActiveTab('dues');
-    }
-  }, [location.search]);
   
   // New states for Edit/Delete menu
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
@@ -452,36 +447,47 @@ export const Expenses: React.FC = () => {
   };
 
   return (
-    <div className="space-y-3">
-      {/* Sub-Navigation Tabs */}
-      <div className="flex bg-slate-100 p-1 rounded-2xl w-full md:w-fit mx-auto lg:mx-0">
+    <div className="space-y-4">
+      {/* Sub-tab Navigation */}
+      <div className="bg-slate-100 p-1 rounded-2xl flex max-w-md mx-auto shadow-sm sticky top-0 bg-white/80 backdrop-blur z-20">
         <button
-          onClick={() => setActiveTab('expenses')}
-          className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-xl text-sm font-bold transition-all ${
-            activeTab === 'expenses'
-              ? 'bg-white text-rose-600 shadow-sm'
+          onClick={() => setActiveSubTab('expenses')}
+          className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+            activeSubTab === 'expenses'
+              ? 'bg-white text-rose-600 shadow-sm animate-out'
               : 'text-slate-500 hover:text-slate-700'
           }`}
         >
-          <Receipt size={18} /> খরচের হিসাব
+          <Receipt size={16} />
+          <span>খরচ ট্র্যাকার</span>
         </button>
         <button
-          onClick={() => setActiveTab('dues')}
-          className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-xl text-sm font-bold transition-all ${
-            activeTab === 'dues'
+          onClick={() => setActiveSubTab('dues')}
+          className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+            activeSubTab === 'dues'
+              ? 'bg-white text-indigo-600 shadow-sm'
+              : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <ArrowRightLeft size={16} />
+          <span>লেনা দেনা</span>
+        </button>
+        <button
+          onClick={() => setActiveSubTab('savings')}
+          className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+            activeSubTab === 'savings'
               ? 'bg-white text-emerald-600 shadow-sm'
               : 'text-slate-500 hover:text-slate-700'
           }`}
         >
-          <ArrowRightLeft size={18} /> দেনা পাওনা
+          <PiggyBank size={16} />
+          <span>সঞ্চয়</span>
         </button>
       </div>
 
-      {activeTab === 'dues' ? (
-        <DuesManager />
-      ) : (
-        <>
-          <div className="flex items-start justify-between">
+      {activeSubTab === 'expenses' && (
+        <div className="space-y-3">
+      <div className="flex items-start justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-bold text-slate-800">
@@ -669,7 +675,7 @@ export const Expenses: React.FC = () => {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 pl-2">
-                      <span className={`font-black text-rose-600 ${isGeneratingPDF ? 'text-xl' : 'text-base'} mr-1 whitespace-nowrap`}>{user?.currency || '৳'} {expense.amount.toLocaleString('bn-BD')}</span>
+                      <span className={`font-black text-rose-600 ${isGeneratingPDF ? 'text-sm' : 'text-sm'} mr-1 whitespace-nowrap`}>{user?.currency || '৳'} {expense.amount.toLocaleString('bn-BD')}</span>
                       
                       {!isGeneratingPDF && (
                         <div className="relative action-menu-container">
@@ -732,8 +738,6 @@ export const Expenses: React.FC = () => {
           )}
         </div>
       </div>
-      </>
-      )}
 
       <ConfirmModal 
         isOpen={showDeleteModal}
@@ -927,6 +931,20 @@ export const Expenses: React.FC = () => {
             />
         </div>,
         document.body
+      )}
+      </div>
+      )}
+
+      {activeSubTab === 'dues' && (
+        <div className="animate-in fade-in duration-300">
+          <DuesManager />
+        </div>
+      )}
+
+      {activeSubTab === 'savings' && (
+        <div className="animate-in fade-in duration-300 animate-out">
+          <Savings />
+        </div>
       )}
     </div>
   );

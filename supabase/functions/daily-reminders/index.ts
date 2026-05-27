@@ -275,16 +275,9 @@ serve(async (req) => {
                 android: {
                   priority: "high",
                   notification: {
-                    channel_id: "custom_sound_channel",
-                    sound: "reminder",
+                    channel_id: "fcm_default_channel",
+                    sound: "default",
                     image: notif.imageUrl || ""
-                  }
-                },
-                apns: {
-                  payload: {
-                    aps: {
-                      sound: "reminder"
-                    }
                   }
                 },
                 data: {
@@ -292,8 +285,7 @@ serve(async (req) => {
                   body: notif.body,
                   click_action: "FLUTTER_NOTIFICATION_CLICK",
                   notification_id: uniqueTag,
-                  channel_id: "custom_sound_channel",
-                  sound: "reminder",
+                  channel_id: "fcm_default_channel",
                   image: notif.imageUrl || ""
                 }
               }

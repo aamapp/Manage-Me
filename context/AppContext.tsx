@@ -473,30 +473,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           lastUpdated: Date.now()
         }));
 
-        // Filter Visible State based on Selection
-        if (adminSelectedUserId) {
-            const userProjects = pData.filter(p => p.userid === adminSelectedUserId);
-            const userExpenses = eData.filter(e => e.userid === adminSelectedUserId);
-            const userGhazals = gData.filter(g => g.userid === adminSelectedUserId);
-            const userShopping = sData.filter(s => s.userid === adminSelectedUserId);
-            const userDuePersons = dData.filter(d => d.userid === adminSelectedUserId);
+        // Filter Visible State based on Selection (Default to Admin's own user.id if no user is specifically selected)
+        const effectiveUserId = adminSelectedUserId || user?.id;
+        if (effectiveUserId) {
+            const userProjects = pData.filter(p => p.userid === effectiveUserId);
+            const userExpenses = eData.filter(e => e.userid === effectiveUserId);
+            const userGhazals = gData.filter(g => g.userid === effectiveUserId);
+            const userShopping = sData.filter(s => s.userid === effectiveUserId);
+            const userDuePersons = dData.filter(d => d.userid === effectiveUserId);
 
             setProjects(userProjects.filter(p => !p.notes?.startsWith('[TRASH]')));
             setTrashedProjects(userProjects.filter(p => p.notes?.startsWith('[TRASH]')));
-            setClients(cData.filter(c => c.userid === adminSelectedUserId));
-            setIncomeRecords(iData.filter(i => i.userid === adminSelectedUserId));
-            setExpenses(userExpenses.filter(e => !e.notes?.startsWith('[TRASH]')));
-            setTrashedExpenses(userExpenses.filter(e => e.notes?.startsWith('[TRASH]')));
             setGhazalNotes(userGhazals.filter(g => !g.lyrics?.startsWith('[TRASH]')));
             setTrashedGhazalNotes(userGhazals.filter(g => g.lyrics?.startsWith('[TRASH]')));
             setShoppingLists(userShopping.filter(s => !s.title?.startsWith('[TRASH]')));
             setTrashedShoppingLists(userShopping.filter(s => s.title?.startsWith('[TRASH]')));
             setDuePersons(userDuePersons.filter(d => !d.name.startsWith('[TRASH]')));
             setTrashedDuePersons(userDuePersons.filter(d => d.name.startsWith('[TRASH]')));
-            setClients(cData.filter(c => c.userid === adminSelectedUserId && !c.contact?.startsWith('[TRASH]')));
-            setTrashedClients(cData.filter(c => c.userid === adminSelectedUserId && c.contact?.startsWith('[TRASH]')));
+            setClients(cData.filter(c => c.userid === effectiveUserId && !c.contact?.startsWith('[TRASH]')));
+            setTrashedClients(cData.filter(c => c.userid === effectiveUserId && c.contact?.startsWith('[TRASH]')));
             setIncomeRecords(iData.filter(i => {
-              if (i.userid !== adminSelectedUserId) return false;
+              if (i.userid !== effectiveUserId) return false;
               const isProjectTrashed = pData.find(p => p.id === i.projectid)?.notes?.startsWith('[TRASH]');
               const isClientTrashed = cData.find(c => c.name === i.clientname)?.contact?.startsWith('[TRASH]');
               return !isProjectTrashed && !isClientTrashed;
@@ -504,7 +501,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setExpenses(userExpenses.filter(e => !e.notes?.startsWith('[TRASH]')));
             setTrashedExpenses(userExpenses.filter(e => e.notes?.startsWith('[TRASH]')));
         } else {
-            // If no user selected, show NOTHING in the main views (forces selection from list)
+            // Keep arrays empty if somehow user context resolves to null
             setProjects([]);
             setTrashedProjects([]);
             setClients([]);
@@ -784,16 +781,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Effect to re-filter data when Admin selection changes without re-fetching
   useEffect(() => {
     if (user?.role === 'admin') {
-        if (adminSelectedUserId) {
-            const userProjects = allProjects.filter(p => p.userid === adminSelectedUserId);
+        const effectiveUserId = adminSelectedUserId || user?.id;
+        if (effectiveUserId) {
+            const userProjects = allProjects.filter(p => p.userid === effectiveUserId);
             setProjects(userProjects.filter(p => !p.notes?.startsWith('[TRASH]')));
             setTrashedProjects(userProjects.filter(p => p.notes?.startsWith('[TRASH]')));
-            setClients(allClients.filter(c => c.userid === adminSelectedUserId));
-            setIncomeRecords(allIncomeRecords.filter(i => i.userid === adminSelectedUserId));
-            setExpenses(allExpenses.filter(e => e.userid === adminSelectedUserId && !e.notes?.startsWith('[TRASH]')));
-            setTrashedExpenses(allExpenses.filter(e => e.userid === adminSelectedUserId && e.notes?.startsWith('[TRASH]')));
-            setShoppingLists(allShoppingLists.filter(s => s.userid === adminSelectedUserId && !s.title?.startsWith('[TRASH]')));
-            setTrashedShoppingLists(allShoppingLists.filter(s => s.userid === adminSelectedUserId && s.title?.startsWith('[TRASH]')));
+            setClients(allClients.filter(c => c.userid === effectiveUserId));
+            setIncomeRecords(allIncomeRecords.filter(i => i.userid === effectiveUserId));
+            setExpenses(allExpenses.filter(e => e.userid === effectiveUserId && !e.notes?.startsWith('[TRASH]')));
+            setTrashedExpenses(allExpenses.filter(e => e.userid === effectiveUserId && e.notes?.startsWith('[TRASH]')));
+            setShoppingLists(allShoppingLists.filter(s => s.userid === effectiveUserId && !s.title?.startsWith('[TRASH]')));
+            setTrashedShoppingLists(allShoppingLists.filter(s => s.userid === effectiveUserId && s.title?.startsWith('[TRASH]')));
         } else {
             setProjects([]);
             setTrashedProjects([]);
@@ -803,7 +801,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setShoppingLists([]);
         }
     }
-  }, [adminSelectedUserId, allProjects, allClients, allIncomeRecords, allExpenses, allShoppingLists, user?.role]);
+  }, [adminSelectedUserId, allProjects, allClients, allIncomeRecords, allExpenses, allShoppingLists, user?.role, user?.id]);
 
   useEffect(() => {
     let mounted = true;

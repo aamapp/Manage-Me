@@ -28,6 +28,8 @@ import {
   ShoppingBag,
   Bot,
   Bell,
+  ArrowRightLeft,
+  PiggyBank,
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { APP_NAME } from "@/constants";
@@ -157,6 +159,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
 
   // Secondary items for "More" Menu Drawer
   const SECONDARY_NAV = [
+    ...(isAdmin ? [{
+      name: "অ্যাডমিন প্যানেল",
+      path: "/admin-users",
+      icon: <UserCog size={20} />,
+      desc: "ইউজার তালিকা ও ড্যাশবোর্ড ভিউ",
+    }] : []),
     {
       name: "এআই অ্যাসিস্ট্যান্ট",
       path: "/ai-assistant",
@@ -426,7 +434,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
         <header className="fixed top-0 inset-x-0 h-16 bg-white/90 backdrop-blur-md border-b border-slate-200/80 flex lg:hidden items-center justify-between px-5 z-40 max-w-[100vw] shadow-sm transition-all duration-200">
           <div className="flex items-center gap-2">
             {/* Show Back Button for Admin if User Selected */}
-            {isAdmin && adminSelectedUserId ? (
+            {isAdmin && adminSelectedUserId && adminSelectedUserId !== user.id ? (
               <button
                 onClick={handleBackToUsers}
                 className="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center text-slate-600 active:scale-95 transition-transform"
@@ -464,7 +472,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
               className="flex items-center cursor-pointer active:scale-95 transition-transform"
               onClick={() => handleNavigate("/profile")}
             >
-              {isAdmin && adminSelectedUserId && (
+              {isAdmin && adminSelectedUserId && adminSelectedUserId !== user.id && (
                 <span className="text-[10px] font-bold bg-indigo-50 text-indigo-600 px-2 py-1 rounded-md border border-indigo-100 mr-2">
                   User View
                 </span>
@@ -503,16 +511,16 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
         </div>
       </main>
 
-      {/* Fixed Bottom Navigation Bar - Hide if Admin is on User List page or on Desktop */}
-      {(!isAdmin || adminSelectedUserId) && !isFullScreenPage && (
+      {/* Fixed Bottom Navigation Bar - Hide on Desktop or Full Screen pages */}
+      {!isFullScreenPage && (
         <div className="fixed bottom-0 inset-x-0 z-50 bg-white border-t border-slate-100 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] pb-safe lg:hidden">
-          <nav className="flex justify-between items-center px-6 h-[60px] w-full max-w-lg mx-auto">
+          <nav className="flex justify-between items-center px-4 h-[60px] w-full max-w-lg mx-auto">
             {PRIMARY_NAV.map((item) => {
               const isActive = location.pathname === item.path;
               return (
                 <button
                   key={item.path}
-                  onClick={() => handleNavigate(item.path)}
+                   onClick={() => handleNavigate(item.path)}
                   className={`
                       flex flex-col items-center justify-center w-full h-full gap-1 transition-colors duration-200
                       ${isActive ? "text-indigo-600" : "text-slate-400 hover:text-slate-600"}
