@@ -186,11 +186,15 @@ export const Expenses: React.FC = () => {
   });
 
   const [newIncome, setNewIncome] = useState<any>({
-    projectid: '',
+    projectid: null,
+    projectname: '',
+    clientname: '',
     amount: 0,
     date: new Date().toLocaleDateString('en-CA'),
     method: 'বিকাশ'
   });
+
+  const [formErrors, setFormErrors] = useState<any>({});
 
   // Bangla Formatter helpers
   const toBanglaNumbers = (num: string | number): string => {
@@ -276,6 +280,7 @@ export const Expenses: React.FC = () => {
     const label = EXPENSE_CATEGORY_LABELS[category] || category;
     setNewExpense({ ...newExpense, category: label });
     setShowCategorySuggestions(false);
+    setFormErrors((prev: any) => ({ ...prev, category: null }));
   };
 
   // Filter projects for suggestions
@@ -292,6 +297,7 @@ export const Expenses: React.FC = () => {
     setNewIncome({ ...newIncome, projectid: project.id });
     setSelectedProjectDue(project.dueamount);
     setShowProjectSuggestions(false);
+    setFormErrors((prev: any) => ({ ...prev, project: null }));
   };
 
   const handlePeriodOptionSelect = (option: 'date' | 'month' | 'year' | 'custom') => {
@@ -338,9 +344,10 @@ export const Expenses: React.FC = () => {
     setProjectSearch('');
     setSelectedProjectId(null);
     setSelectedProjectDue(0);
+    setFormErrors({});
 
     setNewExpense({ category: '', date: localToday, amount: 0, notes: '' });
-    setNewIncome({ projectid: '', amount: 0, date: localToday, method: 'বিকাশ' });
+    setNewIncome({ projectid: null, projectname: '', clientname: '', amount: 0, date: localToday, method: 'বিকাশ' });
     
     setModalOpen(true);
   };
@@ -349,6 +356,7 @@ export const Expenses: React.FC = () => {
     setIsEditing(true);
     setTxModalType(tx.type);
     setActiveMenuId(null);
+    setFormErrors({});
 
     // Extract raw date YYYY-MM-DD from maybe full ISO string
     const rawDate = tx.date.substring(0, 10);
@@ -363,14 +371,13 @@ export const Expenses: React.FC = () => {
       });
     } else {
       setActiveIncomeId(tx.id);
-      setSelectedProjectId(tx.rawItem.projectid);
-      setProjectSearch(tx.rawItem.projectname || '');
+      setSelectedProjectId(null);
+      setProjectSearch('');
       
-      const proj = projects.find(p => p.id === tx.rawItem.projectid);
-      if (proj) setSelectedProjectDue(proj.dueamount);
-
       setNewIncome({
-        projectid: tx.rawItem.projectid,
+        projectid: null,
+        projectname: tx.rawItem.projectname || '',
+        clientname: tx.rawItem.clientname || '',
         amount: tx.amount,
         date: rawDate,
         method: tx.rawItem.method || 'বিকাশ'
@@ -391,6 +398,38 @@ export const Expenses: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+
+    // Custom Smart Validation
+    const errors: any = {};
+    if (txModalType === 'expense') {
+      if (!newExpense.notes || !newExpense.notes.trim()) {
+        errors.notes = 'বিবরণ দেওয়া আবশ্যক';
+      }
+      
+      const parsedAmount = Number(safeEval(newExpense.amount)) || 0;
+      if (parsedAmount <= 0) {
+        errors.amount = 'সঠিক পরিমাণ দিন (০ থেকে বেশি)';
+      }
+      
+      if (!newExpense.category || !newExpense.category.trim()) {
+        errors.category = 'ক্যাটাগরি দেওয়া আবশ্যক';
+      }
+    } else {
+      if (!newIncome.projectname || !newIncome.projectname.trim()) {
+        errors.projectname = 'প্রজেক্ট নম্বর / নাম দেওয়া আবশ্যক';
+      }
+      
+      const parsedAmount = Number(safeEval(newIncome.amount)) || 0;
+      if (parsedAmount <= 0) {
+        errors.amount = 'সঠিক আয়ের পরিমাণ দিন (০ থেকে বেশি)';
+      }
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      showToast('দয়া করে সব প্রয়োজনীয় ফিল্ড সঠিকভাবে পূরণ করুন', 'error');
+      return;
+    }
     
     setIsSubmitting(true);
     window.dispatchEvent(new CustomEvent('app:processing', { detail: { show: true, message: 'তথ্য সংরক্ষণ করা হচ্ছে...' } }));
@@ -411,9 +450,6 @@ export const Expenses: React.FC = () => {
 
     try {
       if (txModalType === 'expense') {
-        if (!newExpense.amount || !newExpense.category) {
-          throw new Error('দয়া করে সঠিক পরিমাণ এবং ক্যাটাগরি দিন');
-        }
         const parsedAmount = Number(safeEval(newExpense.amount)) || 0;
         let dateToSave = newExpense.date;
         
@@ -449,10 +485,7 @@ export const Expenses: React.FC = () => {
           showToast('খরচ সফলভাবে সেভ হয়েছে', 'success');
         }
       } else {
-        // Saving Income
-        if (!selectedProjectId) {
-          throw new Error('দয়া করে একটি প্রজেক্ট সিলেক্ট করুন');
-        }
+        // Saving Income (Direct / Standalone)
         const parsedAmount = Number(safeEval(newIncome.amount)) || 0;
         let dateToSave = newIncome.date;
         
@@ -462,13 +495,11 @@ export const Expenses: React.FC = () => {
           dateToSave = new Date(`${dateToSave}T${currentTimeAtNoon}`).toISOString();
         }
 
-        const selectedProject = projects.find(p => p.id === selectedProjectId);
-
         if (isEditing && activeIncomeId) {
-          const oldPayment = incomeRecords.find(p => p.id === activeIncomeId);
-          const delta = parsedAmount - (oldPayment?.amount || 0);
-
           let query = supabase.from('income_records').update({
+            projectid: null,
+            projectname: newIncome.projectname,
+            clientname: newIncome.clientname || '',
             amount: parsedAmount,
             date: dateToSave,
             method: newIncome.method
@@ -480,19 +511,12 @@ export const Expenses: React.FC = () => {
           const { error: updErr } = await query;
           if (updErr) throw updErr;
 
-          if (selectedProject) {
-            const newPaid = selectedProject.paidamount + delta;
-            await supabase.from('projects').update({
-              paidamount: newPaid,
-              dueamount: Math.max(0, selectedProject.totalamount - newPaid)
-            }).eq('id', selectedProjectId);
-          }
           showToast('আয় রেকর্ড আপডেট করা হয়েছে', 'success');
         } else {
           const { error: insErr } = await supabase.from('income_records').insert({
-            projectid: selectedProjectId,
-            projectname: selectedProject?.name,
-            clientname: selectedProject?.clientname,
+            projectid: null,
+            projectname: newIncome.projectname,
+            clientname: newIncome.clientname || '',
             amount: parsedAmount,
             date: dateToSave,
             method: newIncome.method,
@@ -500,13 +524,6 @@ export const Expenses: React.FC = () => {
           });
           if (insErr) throw insErr;
 
-          if (selectedProject) {
-            const newPaid = selectedProject.paidamount + parsedAmount;
-            await supabase.from('projects').update({
-              paidamount: newPaid,
-              dueamount: Math.max(0, selectedProject.totalamount - newPaid)
-            }).eq('id', selectedProjectId);
-          }
           showToast('নতুন পেমেন্ট রেকর্ড করা হয়েছে', 'success');
         }
       }
@@ -594,6 +611,7 @@ export const Expenses: React.FC = () => {
     // Filter Incomes
     const filteredIncomes = incomeRecords.filter(item => {
       if (item.userid !== targetUserId) return false;
+      if (item.projectid) return false;
       const d = new Date(item.date);
       if (isNaN(d.getTime())) return false;
 
@@ -664,8 +682,19 @@ export const Expenses: React.FC = () => {
     // Add Incomes
     incomeRecords.forEach(i => {
       if (i.userid !== targetUserId) return;
+      if (i.projectid) return; // SKIP project-linked incomes!
 
-      const titleVal = i.projectname || i.clientname || 'আয় রেকর্ড';
+      let titleVal = '';
+      if (i.projectname && i.clientname) {
+        titleVal = `${i.projectname} - ${i.clientname}`;
+      } else if (i.projectname) {
+        titleVal = i.projectname;
+      } else if (i.clientname) {
+        titleVal = i.clientname;
+      } else {
+        titleVal = 'আয় রেকর্ড';
+      }
+      
       const methodLabel = i.method || 'বিকাশ';
 
       // Date Range Filter
@@ -1790,25 +1819,31 @@ export const Expenses: React.FC = () => {
                     <div className="bg-slate-100 p-1 rounded-2xl flex items-center justify-between select-none">
                       <button
                         type="button"
-                        onClick={() => setTxModalType('expense')}
+                        onClick={() => {
+                          setTxModalType('expense');
+                          setFormErrors({});
+                        }}
                         className={`flex-1 text-center py-2.5 text-xs font-bold rounded-xl transition-all ${
                           txModalType === 'expense'
                             ? 'bg-rose-500 text-white shadow-xs'
                             : 'text-slate-500 hover:text-slate-700'
                         }`}
                       >
-                        ব্যয় (-)
+                        ব্যয়
                       </button>
                       <button
                         type="button"
-                        onClick={() => setTxModalType('income')}
+                        onClick={() => {
+                          setTxModalType('income');
+                          setFormErrors({});
+                        }}
                         className={`flex-1 text-center py-2.5 text-xs font-bold rounded-xl transition-all ${
                           txModalType === 'income'
                             ? 'bg-emerald-600 text-white shadow-xs'
                             : 'text-slate-500 hover:text-slate-700'
                         }`}
                       >
-                        আয় (+)
+                        আয়
                       </button>
                     </div>
                   )}
@@ -1818,7 +1853,25 @@ export const Expenses: React.FC = () => {
                     <>
                       <div>
                         <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">বিবরণ</label>
-                        <input required type="text" value={newExpense.notes} onChange={e => setNewExpense({...newExpense, notes: e.target.value})} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-rose-500 outline-none text-sm" placeholder="কিসের জন্য খরচ?" />
+                        <input 
+                          type="text" 
+                          value={newExpense.notes} 
+                          onChange={e => {
+                            setNewExpense({...newExpense, notes: e.target.value});
+                            if (formErrors.notes) setFormErrors({...formErrors, notes: null});
+                          }} 
+                          className={`w-full px-3 py-3 bg-slate-50 border rounded-xl font-bold text-slate-800 outline-none text-sm transition-all focus:ring-2 ${
+                            formErrors.notes 
+                              ? 'border-rose-500 focus:ring-rose-200 bg-rose-50/20' 
+                              : 'border-slate-200 focus:ring-rose-500 focus:border-rose-500'
+                          }`} 
+                          placeholder="কিসের জন্য খরচ?" 
+                        />
+                        {formErrors.notes && (
+                          <p className="text-xs font-semibold text-rose-500 mt-1 flex items-center gap-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                            <AlertCircle size={14} className="shrink-0" /> {formErrors.notes}
+                          </p>
+                        )}
                       </div>
 
                       <div>
@@ -1826,12 +1879,24 @@ export const Expenses: React.FC = () => {
                             পরিমাণ ({user?.currency})
                         </label>
                         <div 
-                          onClick={() => setShowKeypad(true)}
-                          className="keypad-trigger w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-black text-xl text-rose-600 active:bg-slate-100 transition-colors flex items-center justify-between cursor-pointer"
+                          onClick={() => {
+                            setShowKeypad(true);
+                            if (formErrors.amount) setFormErrors({...formErrors, amount: null});
+                          }}
+                          className={`keypad-trigger w-full px-3 py-3 bg-slate-50 border rounded-xl font-black text-xl transition-all flex items-center justify-between cursor-pointer ${
+                            formErrors.amount 
+                              ? 'border-rose-500 text-rose-600 bg-rose-50/20' 
+                              : 'border-slate-200 text-rose-600 active:bg-slate-100'
+                          }`}
                         >
                            <span>{newExpense.amount || 0}</span>
                            <Calculator size={18} className="text-slate-500" />
                         </div>
+                        {formErrors.amount && (
+                          <p className="text-xs font-semibold text-rose-500 mt-1 flex items-center gap-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                            <AlertCircle size={14} className="shrink-0" /> {formErrors.amount}
+                          </p>
+                        )}
                       </div>
 
                       <div className="grid grid-cols-2 gap-3">
@@ -1850,15 +1915,27 @@ export const Expenses: React.FC = () => {
                           <input 
                             type="text"
                             value={newExpense.category}
-                            onFocus={() => setShowCategorySuggestions(true)}
+                            onFocus={() => {
+                              setShowCategorySuggestions(true);
+                              if (formErrors.category) setFormErrors({...formErrors, category: null});
+                            }}
                             onChange={e => {
                               setNewExpense({...newExpense, category: e.target.value});
                               setShowCategorySuggestions(true);
+                              if (formErrors.category) setFormErrors({...formErrors, category: null});
                             }}
-                            className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none focus:ring-2 focus:ring-rose-500"
+                            className={`w-full px-3 py-3 bg-white border rounded-xl font-bold text-sm text-slate-800 outline-none transition-all focus:ring-2 ${
+                              formErrors.category 
+                                ? 'border-rose-500 focus:ring-rose-200 bg-rose-50/20' 
+                                : 'border-slate-200 focus:ring-rose-500 focus:border-rose-500'
+                            }`}
                             placeholder="ক্যাটাগরি..."
-                            required
                           />
+                          {formErrors.category && (
+                            <p className="text-xs font-semibold text-rose-500 mt-1 flex items-center gap-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                              <AlertCircle size={14} className="shrink-0" /> {formErrors.category}
+                            </p>
+                          )}
                           
                           {showCategorySuggestions && (newExpense.category || filteredSuggestions.length > 0) && (
                             <div className="absolute top-full right-0 left-0 mt-1 w-full bg-white border border-slate-100 rounded-xl shadow-2xl max-h-40 overflow-y-auto z-[60]">
@@ -1885,42 +1962,41 @@ export const Expenses: React.FC = () => {
                   ) : (
                     /* Income Specific Fields */
                     <>
-                      {/* Searchable Project Picker */}
-                      <div className="relative" ref={projectInputRef}>
-                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">সংশ্লিষ্ট প্রজেক্ট</label>
+                      {/* Project Number / Name Text Input */}
+                      <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">প্রজেক্ট নম্বর / নাম</label>
                         <input 
                           type="text"
-                          value={projectSearch}
-                          onFocus={() => !isEditing && setShowProjectSuggestions(true)}
+                          value={newIncome.projectname || ''}
                           onChange={e => {
-                            setProjectSearch(e.target.value);
-                            setShowProjectSuggestions(true);
+                            setNewIncome({...newIncome, projectname: e.target.value});
+                            if (formErrors.projectname) setFormErrors({...formErrors, projectname: null});
                           }}
-                          className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-slate-50 disabled:text-slate-400"
-                          placeholder={isEditing ? "প্রজেক্ট পরিবর্তনযোগ্য নয়" : "প্রজেক্টের নাম লিখে খুঁজুন..."}
-                          required
-                          disabled={isEditing}
+                          className={`w-full px-3 py-3 bg-white border rounded-xl font-bold text-sm text-slate-800 outline-none transition-all focus:ring-2 ${
+                            formErrors.projectname 
+                              ? 'border-rose-500 focus:ring-rose-200 bg-rose-50/20' 
+                              : 'border-slate-200 focus:ring-emerald-500 focus:border-emerald-500'
+                          }`}
+                          placeholder="প্রজেক্ট নম্বর বা নাম লিখুন..."
                         />
-                        
-                        {showProjectSuggestions && filteredProjects.length > 0 && (
-                          <div className="absolute top-full right-0 left-0 mt-1 w-full bg-white border border-slate-100 rounded-xl shadow-2xl max-h-40 overflow-y-auto z-[60]">
-                            {filteredProjects.map((proj) => (
-                              <div key={proj.id} onClick={() => handleSelectProject(proj)} className="px-4 py-3 border-b border-slate-50 hover:bg-emerald-50 text-xs cursor-pointer transition-colors text-slate-700">
-                                <p className="font-bold text-slate-800">{proj.name}</p>
-                                {proj.clientname && <p className="text-[10px] text-slate-400">ক্লায়েন্ট: {proj.clientname}</p>}
-                              </div>
-                            ))}
-                          </div>
+                        {formErrors.projectname && (
+                          <p className="text-xs font-semibold text-rose-500 mt-1 flex items-center gap-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                            <AlertCircle size={14} className="shrink-0" /> {formErrors.projectname}
+                          </p>
                         )}
                       </div>
 
-                      {/* Remaining Balance Info Card */}
-                      {selectedProjectId && (
-                        <div className="bg-emerald-50/50 border border-emerald-100 p-3.5 rounded-2xl flex items-center justify-between text-xs font-bold text-emerald-800 animate-in fade-in duration-200 select-none">
-                          <span>প্রজেক্টের বকেয়া পরিমাণ:</span>
-                          <span className="font-mono text-emerald-600">৳ {toBanglaNumbers(selectedProjectDue.toLocaleString('bn-BD'))}</span>
-                        </div>
-                      )}
+                      {/* Optional Title / Description Input */}
+                      <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">অপশনাল টাইটেল / বিবরণ</label>
+                        <input 
+                          type="text"
+                          value={newIncome.clientname || ''}
+                          onChange={e => setNewIncome({...newIncome, clientname: e.target.value})}
+                          className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none transition-all focus:ring-2 focus:ring-emerald-500"
+                          placeholder="আয়ের অপশনাল টাইটেল বা বিবরণ..."
+                        />
+                      </div>
 
                       {/* Payment Method Select Buttons */}
                       <div>
@@ -1949,12 +2025,24 @@ export const Expenses: React.FC = () => {
                             সংগৃহীত পরিমাণ ({user?.currency})
                         </label>
                         <div 
-                          onClick={() => setShowKeypad(true)}
-                          className="keypad-trigger w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-black text-xl text-emerald-600 active:bg-slate-100 transition-colors flex items-center justify-between cursor-pointer"
+                          onClick={() => {
+                            setShowKeypad(true);
+                            if (formErrors.amount) setFormErrors({...formErrors, amount: null});
+                          }}
+                          className={`keypad-trigger w-full px-3 py-3 bg-slate-50 border rounded-xl font-black text-xl transition-all flex items-center justify-between cursor-pointer ${
+                            formErrors.amount 
+                              ? 'border-rose-500 text-emerald-600 bg-rose-50/20' 
+                              : 'border-slate-200 text-emerald-600 active:bg-slate-100'
+                          }`}
                         >
                            <span>{newIncome.amount || 0}</span>
                            <Calculator size={18} className="text-slate-500" />
                         </div>
+                        {formErrors.amount && (
+                          <p className="text-xs font-semibold text-rose-500 mt-1 flex items-center gap-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                            <AlertCircle size={14} className="shrink-0" /> {formErrors.amount}
+                          </p>
+                        )}
                       </div>
 
                       {/* Date Picker */}
