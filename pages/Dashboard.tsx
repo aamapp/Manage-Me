@@ -1,3 +1,4 @@
+
 import React, { useMemo } from 'react';
 import { useNavigate } from "react-router-dom";
 import { 
@@ -11,9 +12,11 @@ import {
   Music,
   LayoutDashboard,
   AlertCircle,
-  Users
+  Users,
+  TrendingUp,
+  TrendingDown
 } from 'lucide-react';
-import { StatCard } from '../components/StatCard';
+import { StatCard } from '@/components/StatCard';
 import { useAppContext } from '../context/AppContext';
 
 export const Dashboard: React.FC = () => {
@@ -21,13 +24,17 @@ export const Dashboard: React.FC = () => {
   const { projects, incomeRecords, user } = useAppContext();
   const currency = user?.currency || '৳';
 
-  // Calculate dynamic stats
+  const [isMounted, setIsMounted] = React.useState(false);
+  React.useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // Calculate Stats
   const totalCollected = incomeRecords.reduce((acc, curr) => acc + (curr.amount || 0), 0);
   const totalBudget = projects.reduce((acc, curr) => acc + (curr.totalamount || 0), 0);
   const totalDue = projects.reduce((acc, curr) => acc + (curr.dueamount || 0), 0);
   const totalProjects = projects.length;
 
-  // Last 6 months Income aggregation
   const chartData = useMemo(() => {
     const monthNames = ['জানু', 'ফেব্রু', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্টে', 'অক্টো', 'নভে', 'ডিসে'];
     const result = [];
@@ -35,9 +42,11 @@ export const Dashboard: React.FC = () => {
     
     // Generate last 6 months
     for (let i = 5; i >= 0; i--) {
+      // Calculate target month and year correctly
       let targetMonthIndex = now.getMonth() - i;
       let targetYear = now.getFullYear();
       
+      // Handle year wrap-around (e.g. if now is Jan, prev months are last year)
       if (targetMonthIndex < 0) {
         targetMonthIndex += 12;
         targetYear -= 1;
@@ -45,9 +54,10 @@ export const Dashboard: React.FC = () => {
 
       const monthlySum = incomeRecords.filter(record => {
         if (!record.date) return false;
+        // Parse "YYYY-MM-DD" directly to avoid timezone issues with new Date()
         const [yearStr, monthStr] = record.date.split('-');
         const recYear = parseInt(yearStr);
-        const recMonthIndex = parseInt(monthStr) - 1;
+        const recMonthIndex = parseInt(monthStr) - 1; // 0-indexed for comparison
         
         return recMonthIndex === targetMonthIndex && recYear === targetYear;
       }).reduce((sum, rec) => sum + (rec.amount || 0), 0);
@@ -62,40 +72,75 @@ export const Dashboard: React.FC = () => {
 
   const hasChartData = chartData.some(d => d.income > 0);
 
-  // Status counters
-  const pendingCount = projects.filter(p => p.status === 'Pending').length;
-  const inProgressCount = projects.filter(p => p.status === 'In Progress').length;
-  const completedCount = projects.filter(p => p.status === 'Completed').length;
+  const currentMonthIncome = chartData[5]?.income || 0;
+  const prevMonthIncome = chartData[4]?.income || 0;
+  let percentageChange = 0;
+  if (prevMonthIncome === 0) {
+    if (currentMonthIncome > 0) percentageChange = 100;
+  } else {
+    percentageChange = Math.round(((currentMonthIncome - prevMonthIncome) / prevMonthIncome) * 100);
+  }
+  const isPositive = percentageChange >= 0;
+  const changeColor = isPositive ? "text-emerald-600" : "text-rose-600";
+  const changeIcon = isPositive ? "▲" : "▼";
+  const changeSign = isPositive ? "+" : "";
+  const badgeTheme = isPositive ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-600";
+  const outerTheme = isPositive ? "bg-emerald-50/50 border-emerald-100" : "bg-rose-50/50 border-rose-100";
+  const currentMonthName = chartData[5]?.name || "বর্তমান";
 
+  // Helpers for trend calculations
+  const isCurrentMonth = (dateStr: string | undefined | null) => {
+    if (!dateStr) return false;
+    const [yearStr, monthStr] = dateStr.split('T')[0].split('-');
+    const now = new Date();
+    return parseInt(monthStr) - 1 === now.getMonth() && parseInt(yearStr) === now.getFullYear();
+  }
+
+  const isLastMonth = (dateStr: string | undefined | null) => {
+    if (!dateStr) return false;
+    const [yearStr, monthStr] = dateStr.split('T')[0].split('-');
+    const now = new Date();
+    let currentMonth = now.getMonth();
+    let currentYear = now.getFullYear();
+    let lastMonthIndex = currentMonth === 0 ? 11 : currentMonth - 1;
+    let lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+    return parseInt(monthStr) - 1 === lastMonthIndex && parseInt(yearStr) === lastMonthYear;
+  }
+
+  // Calculate Budget Trend
+  const currentMonthBudget = projects.filter(p => isCurrentMonth(p.createdat)).reduce((acc, curr) => acc + (curr.totalamount || 0), 0);
+  const lastMonthBudget = projects.filter(p => isLastMonth(p.createdat)).reduce((acc, curr) => acc + (curr.totalamount || 0), 0);
+  let budgetPct = 0;
+  if (lastMonthBudget === 0) {
+      budgetPct = currentMonthBudget > 0 ? 100 : 0;
+  } else {
+      budgetPct = Math.round(((currentMonthBudget - lastMonthBudget) / lastMonthBudget) * 1000) / 10;
+  }
+
+  // Calculate Projects Trend
+  const currentMonthProjectsCount = projects.filter(p => isCurrentMonth(p.createdat)).length;
+
+  // Calculate Due Trend
+  const currentMonthDue = projects.filter(p => isCurrentMonth(p.createdat)).reduce((acc, curr) => acc + (curr.dueamount || 0), 0);
+  const lastMonthDue = projects.filter(p => isLastMonth(p.createdat)).reduce((acc, curr) => acc + (curr.dueamount || 0), 0);
+  let duePct = 0;
+  if (lastMonthDue === 0) {
+       duePct = currentMonthDue > 0 ? 100 : 0;
+  } else {
+       duePct = Math.round(((currentMonthDue - lastMonthDue) / lastMonthDue) * 1000) / 10;
+  }
+
+  // Added 'key' to identify status for filtering
   const statusSummary = [
-    { 
-      key: 'Pending', 
-      label: 'পেন্ডিং', 
-      count: pendingCount, 
-      stroke: '#F97316', // Orange
-      textColor: 'text-amber-500',
-    },
-    { 
-      key: 'In Progress', 
-      label: 'চলমান', 
-      count: inProgressCount, 
-      stroke: '#3b82f6', // Blue
-      textColor: 'text-blue-500',
-    },
-    { 
-      key: 'Completed', 
-      label: 'সম্পন্ন', 
-      count: completedCount, 
-      stroke: '#10b981', // Green
-      textColor: 'text-emerald-500',
-    },
+    { key: 'Pending', label: 'পেন্ডিং', count: projects.filter(p => p.status === 'Pending').length, textColor: 'text-amber-500' },
+    { key: 'In Progress', label: 'চলমান', count: projects.filter(p => p.status === 'In Progress').length, textColor: 'text-blue-500' },
+    { key: 'Completed', label: 'সম্পন্ন', count: projects.filter(p => p.status === 'Completed').length, textColor: 'text-emerald-500' },
   ];
 
-  const recentProjects = [...projects]
-    .sort((a, b) => (b.createdat || '').localeCompare(a.createdat || ''))
-    .slice(0, 5);
+  const recentProjects = [...projects].sort((a, b) => b.createdat.localeCompare(a.createdat)).slice(0, 5);
 
   const handleDueClick = () => {
+    // Navigate to projects page with a state to trigger the 'Due' filter
     navigate('/projects', { state: { filter: 'Due' } });
   };
 
@@ -104,22 +149,17 @@ export const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="space-y-3.5 w-full max-w-full pt-1 pb-8 px-1 select-none" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
-      
-      {/* 1. Quad Metrics Cards Grid - Dual-ring hover shadows */}
-      <div className="grid grid-cols-2 gap-3">
+    <div className="space-y-4 w-full max-w-full pt-1 pb-4 px-1">
+      {/* Stats Grid - Responsive columns */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
+        {/* Row 1 */}
         <StatCard 
           title="মোট বাজেট" 
           value={totalBudget} 
           isCurrency={true} 
           icon={<Briefcase />} 
           color="indigo" 
-          trend={{
-            value: "21.7%",
-            label: "এই মাসে",
-            isPositive: false,
-            colorClass: "text-rose-500"
-          }}
+          trend={{ value: Math.abs(budgetPct), label: "এই মাসে", isPositive: budgetPct >= 0 }}
         />
         
         <StatCard 
@@ -128,24 +168,20 @@ export const Dashboard: React.FC = () => {
           isCurrency={true} 
           icon={<Wallet />} 
           color="emerald" 
-          trend={{
-            value: "155%",
-            label: "এই মাসে",
-            isPositive: true,
-            colorClass: "text-emerald-500"
-          }}
+          trend={{ value: Math.abs(percentageChange), label: "এই মাসে", isPositive: isPositive }}
         />
 
+        {/* Row 2 */}
         <StatCard 
           title="মোট প্রজেক্ট" 
           value={totalProjects} 
           icon={<LayoutDashboard />} 
           color="blue" 
-          trend={{
-            value: "12%",
-            label: "টি নতুন",
-            isPositive: true,
-            colorClass: "text-blue-500"
+          trend={{ 
+             value: Math.abs(currentMonthProjectsCount), 
+             label: "টি নতুন", 
+             isPositive: currentMonthProjectsCount >= 0,
+             colorClass: 'text-blue-500'
           }}
         />
         
@@ -156,200 +192,195 @@ export const Dashboard: React.FC = () => {
           icon={<AlertCircle />} 
           color="rose" 
           onClick={handleDueClick}
-          trend={{
-            value: "115.4%",
-            label: "এই মাসে",
-            isPositive: false,
-            colorClass: "text-rose-500"
-          }}
+          trend={{ value: Math.abs(duePct), label: "এই মাসে", isPositive: duePct < 0 /* lower due is positive */ }}
         />
       </div>
 
-      {/* 2. Monthly Income Graph Section - Shorter height & compact headers */}
-      <div className="bg-white p-4 rounded-3xl border border-slate-100/90 shadow-sm w-full overflow-hidden">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-indigo-50/50 text-indigo-600 flex items-center justify-center shrink-0">
-              <Wallet size={16} />
-            </div>
-            <div className="flex flex-col">
-              <span className="font-extrabold text-slate-800 text-xs sm:text-sm leading-tight">মাসিক আয়</span>
-              <span className="bg-emerald-50 text-emerald-600 text-[9px] font-bold px-1.5 py-0.5 mt-0.5 rounded-full flex items-center gap-0.5 scale-95 origin-left">
-                গত মাসের তুলনায় ▲ +155%
-              </span>
-            </div>
-          </div>
-          <button 
-            onClick={() => navigate('/reports')}
-            className="w-9 h-9 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center active:scale-95 hover:bg-indigo-100/70 transition-all shadow-sm"
-          >
-            <ArrowUpRight size={16} />
-          </button>
-        </div>
-        
-        {/* Shorter Height (h-[125px]) for compact fit */}
-        <div className="h-[125px] w-full -ml-3">
-          {!hasChartData ? (
-            <div className="h-full w-full flex flex-col items-center justify-center text-slate-300 gap-1.5 border border-dashed border-slate-100 rounded-3xl ml-2">
-              <Wallet size={24} className="opacity-45 text-slate-400" />
-              <p className="text-[10px] text-center px-4 font-bold text-slate-400">আয় বা পেমেন্ট রেকর্ড থাকলে চার্ট দেখা যাবে</p>
-            </div>
-          ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 5, right: 0, left: -10, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorIncomeG" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.18}/>
-                    <stop offset="95%" stopColor="#4f46e5" stopOpacity={0.01}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis 
-                  dataKey="name" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{fill: '#94a3b8', fontSize: 9, fontWeight: 700}} 
-                  dy={6}
-                />
-                <YAxis 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{fill: '#94a3b8', fontSize: 9, fontWeight: 600}}
-                />
-                <Tooltip 
-                  cursor={{stroke: '#cbd5e1', strokeWidth: 1.5, strokeDasharray: '4 4'}}
-                  contentStyle={{ 
-                    borderRadius: '16px', 
-                    border: '1px solid #f1f5f9', 
-                    boxShadow: '0 10px 25px -5px rgb(0 0 0 / 0.05)',
-                    fontSize: '11px',
-                    fontWeight: 'bold',
-                    fontFamily: 'system-ui',
-                    padding: '8px 12px'
-                  }}
-                  formatter={(value: number) => [`${currency} ${value.toLocaleString('en-US')}`, '']}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="income" 
-                  stroke="#4f46e5" 
-                  strokeWidth={3}
-                  fillOpacity={1} 
-                  fill="url(#colorIncomeG)" 
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-      </div>
-
-      {/* 3. Radial circular status gauges */}
-      <div className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm">
-        <h3 className="font-extrabold text-slate-800 text-xs sm:text-sm mb-2.5">প্রজেক্ট স্ট্যাটাস</h3>
-        
-        <div className="grid grid-cols-3 gap-1 py-0.5">
-          {statusSummary.map((status) => {
-            const percent = totalProjects > 0 ? (status.count / totalProjects) * 100 : 0;
-            const radius = 30; // Shrunk from 35 for compaction
-            const circumference = 2 * Math.PI * radius;
-            const strokeDashoffset = circumference - (Math.max(5, percent) / 100) * circumference;
-
-            return (
-              <div 
-                key={status.key} 
-                onClick={() => handleStatusClick(status.key)}
-                className="flex flex-col items-center justify-center cursor-pointer group active:scale-95 transition-all text-center"
-              >
-                {/* Decreased visual dimension of circular container */}
-                <div className="relative w-[74px] h-[74px] sm:w-[84px] sm:h-[84px] flex items-center justify-center">
-                  <svg className="w-full h-full transform -rotate-90" viewBox="0 0 86 86">
-                    {/* Ring background circle */}
-                    <circle
-                      cx="43"
-                      cy="43"
-                      r={radius}
-                      className="text-slate-100/90"
-                      strokeWidth="4.5"
-                      stroke="currentColor"
-                      fill="transparent"
-                    />
-                    {/* Dynamic colored arc progress representation */}
-                    <circle
-                      cx="43"
-                      cy="43"
-                      r={radius}
-                      stroke={status.stroke}
-                      strokeWidth="5.5"
-                      strokeDasharray={circumference}
-                      strokeDashoffset={strokeDashoffset}
-                      strokeLinecap="round"
-                      fill="transparent"
-                      className="transition-all duration-1000 ease-out"
-                    />
-                  </svg>
-                  {/* Absolute visual content in inner circle */}
-                  <div className="absolute inset-0 flex flex-col items-center justify-center text-center mt-0.5">
-                    <span className={`text-[9px] sm:text-[10px] font-bold ${status.textColor} leading-none mb-0.5 shadow-none`}>
-                      {status.label}
-                    </span>
-                    <span className="text-[17px] sm:text-lg font-black text-slate-800 leading-none">
-                      {status.count}
+      {/* Middle Section - Chart and Status Summary */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-5">
+        {/* Chart Section - Takes 2 columns on desktop */}
+        <div className="lg:col-span-2 bg-white p-4 lg:p-5 rounded-[20px] lg:rounded-3xl border border-slate-100 shadow-sm w-full overflow-hidden flex flex-col justify-between">
+          <div className="flex items-center justify-between gap-1.5 sm:gap-4 mb-3">
+            <div className="flex items-center gap-2 sm:gap-3 lg:gap-4 w-full">
+              <div className="bg-indigo-50 p-2 sm:p-2.5 rounded-xl text-indigo-600 shrink-0">
+                <Wallet size={18} className="sm:w-5 sm:h-5 md:w-[22px] md:h-[22px]" />
+              </div>
+                  <div className="shrink-0 hidden sm:flex flex-col justify-center">
+                     <h3 className="font-black text-slate-800 text-sm sm:text-base md:text-lg lg:text-xl leading-none" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>মাসিক আয়</h3>
+                     <p className="text-[10px] sm:text-[11px] md:text-[13px] text-slate-400 font-bold mt-1.5 whitespace-nowrap text-ellipsis overflow-hidden uppercase tracking-wider" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>গত ৬ মাসের আয়ের হিসাব</p>
+                  </div>
+                  <div className="shrink-0 flex sm:hidden flex-col justify-center">
+                     <h3 className="font-black text-slate-800 text-sm leading-none" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>মাসিক আয়</h3>
+                  </div>
+              
+              <div className={`flex border rounded-[12px] lg:rounded-xl p-1 sm:p-1.5 pr-2 sm:pr-3 lg:pr-4 items-center gap-1 sm:gap-2.5 w-max shrink-0 sm:ml-2 ${outerTheme}`}>
+                <div className={`${badgeTheme} p-1 sm:p-1.5 lg:p-1.5 rounded-lg lg:rounded-[10px] shrink-0`}>
+                  {isPositive ? <TrendingUp size={12} className="sm:w-3.5 sm:h-3.5 lg:w-4 lg:h-4" /> : <TrendingDown size={12} className="sm:w-3.5 sm:h-3.5 lg:w-4 lg:h-4" />}
+                </div>
+                <div className="flex flex-col justify-center">
+                  <div className="flex items-center gap-1 sm:gap-1.5">
+                    <span className="text-slate-800 text-[9px] sm:text-[11px] lg:text-[12px] font-bold whitespace-nowrap">গত মাসের তুলনায়</span>
+                    <span className={`${changeColor} text-[9px] sm:text-[11px] lg:text-[12px] font-extrabold flex items-center whitespace-nowrap`}>
+                      {changeIcon} {changeSign}{percentageChange}%
                     </span>
                   </div>
+                  <span className="text-slate-400 text-[8px] sm:text-[9px] lg:text-[10px] font-semibold leading-tight whitespace-nowrap hidden sm:block">{currentMonthName} মাস পর্যন্ত</span>
                 </div>
               </div>
-            );
-          })}
+            </div>
+
+            <button 
+              onClick={() => navigate('/reports')}
+              className="text-indigo-600 bg-indigo-50 p-2 sm:p-2.5 rounded-xl hover:bg-indigo-100 active:scale-90 transition-all font-bold shrink-0 ml-auto"
+            >
+              <ArrowUpRight size={18} className="sm:w-4 sm:h-4 lg:w-5 lg:h-5" />
+            </button>
+          </div>
+          
+          <div className="h-32 w-full -ml-2 lg:h-40 z-10 focus:outline-none [&_*]:outline-none">
+            {!isMounted ? null : !hasChartData ? (
+              <div className="h-full w-full flex flex-col items-center justify-center text-slate-300 gap-3 border-2 border-dashed border-slate-100 rounded-2xl ml-2">
+                <Wallet size={32} className="opacity-50" />
+                <p className="text-xs text-center px-4 font-medium">পেমেন্ট রেকর্ড থাকলে চার্ট দেখা যাবে</p>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} debounce={50}>
+                <AreaChart data={chartData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#818cf8" stopOpacity={0.4}/>
+                      <stop offset="95%" stopColor="#818cf8" stopOpacity={0.0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                  <XAxis 
+                    dataKey="name" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{fill: '#94a3b8', fontSize: 11, fontWeight: 600}} 
+                    dy={10}
+                  />
+                  <YAxis 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{fill: '#94a3b8', fontSize: 11, fontWeight: 500}}
+                  />
+                  <Tooltip 
+                    cursor={{stroke: '#cbd5e1', strokeWidth: 1.5, strokeDasharray: '4 4'}}
+                    contentStyle={{ 
+                      borderRadius: '16px', 
+                      border: 'none', 
+                      boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                      padding: '12px 16px'
+                    }}
+                    formatter={(value: number) => [`${currency} ${value.toLocaleString('en-US')}`, '']}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="income" 
+                    stroke="#6366f1" 
+                    strokeWidth={3}
+                    fillOpacity={1} 
+                    fill="url(#colorIncome)" 
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+
+        {/* Project Status Summary - Takes 1 column on desktop */}
+        <div className="bg-white p-4 lg:p-5 rounded-[20px] lg:rounded-3xl border border-slate-100 shadow-sm flex flex-col">
+          <h3 className="font-black text-slate-800 mb-5 text-[15px] lg:text-base leading-none" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>প্রজেক্ট স্ট্যাটাস</h3>
+          <div className="flex flex-row justify-between items-center flex-1 lg:px-2">
+            {statusSummary.map((status) => {
+              const radius = 44;
+              const circumference = 2 * Math.PI * radius;
+              const offset = totalProjects > 0 ? circumference - (status.count / totalProjects) * circumference : circumference;
+              
+              return (
+                <div 
+                    key={status.key} 
+                    onClick={() => handleStatusClick(status.key)}
+                    className="cursor-pointer group flex flex-col items-center transition-transform hover:scale-105 active:scale-95"
+                >
+                  <div className="relative flex flex-col items-center justify-center w-[80px] h-[80px] sm:w-[90px] sm:h-[90px]">
+                    <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full transform -rotate-90 drop-shadow-sm">
+                      <circle cx="50" cy="50" r={radius} stroke="#e2e8f0" strokeWidth="5" fill="transparent" />
+                      <circle 
+                         cx="50" cy="50" r={radius} 
+                         stroke="currentColor" 
+                         strokeWidth="5" 
+                         fill="transparent" 
+                         strokeDasharray={circumference} 
+                         strokeDashoffset={offset} 
+                         strokeLinecap="round" 
+                         className={`${status.textColor} transition-all duration-1000 ease-out`} 
+                      />
+                    </svg>
+                    <div className="flex flex-col items-center justify-center z-10 pt-1">
+                      <span className={`text-[12px] font-medium ${status.textColor} mt-1`}>{status.label}</span>
+                      <span className="text-[22px] font-extrabold text-slate-800 leading-tight mt-0.5">{status.count}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 
-      {/* 4. Recent Projects matching List aesthetics */}
-      <div className="pb-6">
-        <div className="flex items-center justify-between mb-3 px-1">
-          <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse"></span>
-            <h3 className="font-extrabold text-slate-800 text-xs sm:text-sm">সাম্প্রতিক প্রজেক্ট</h3>
-          </div>
+      {/* Recent Projects List (Cards) */}
+      <div className="pb-2">
+        <div className="flex items-center justify-between mb-4 px-1">
+          <h3 className="font-black text-slate-900 text-base lg:text-lg relative pl-3 leading-none" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+              <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-indigo-600"></span>
+              সাম্প্রতিক প্রজেক্ট
+          </h3>
           <button 
             onClick={() => navigate('/projects')}
-            className="text-indigo-600 text-[10px] sm:text-[11px] font-bold bg-indigo-50/70 hover:bg-indigo-100 border border-indigo-100/20 px-3 py-1 rounded-full transition-all active:scale-95 shadow-sm"
+            className="text-indigo-600 text-[10px] font-black bg-indigo-50 px-4 py-1.5 rounded-full hover:bg-indigo-100 transition-all uppercase tracking-wider"
+            style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
           >
             সব দেখুন
           </button>
         </div>
         
         {recentProjects.length === 0 ? (
-          <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm text-center text-slate-400">
-              <Inbox size={28} className="mx-auto mb-1.5 opacity-25 text-indigo-500" />
-              <p className="text-xs font-bold text-slate-400">কোনো প্রজেক্ট এখনো তৈরি হয়নি</p>
+          <div className="bg-white p-12 rounded-3xl border border-slate-100 text-center text-slate-400">
+              <Inbox size={40} className="mx-auto mb-3 opacity-20" />
+              <p className="text-sm font-bold">কোনো প্রজেক্ট নেই</p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {recentProjects.map(p => (
               <div 
                 key={p.id} 
                 onClick={() => navigate('/projects')}
-                className="bg-white p-3 rounded-2xl border border-slate-100 shadow-[0_2px_10px_rgba(0,0,0,0.015)] active:scale-[0.98] transition-all flex items-center justify-between hover:shadow-md hover:border-slate-200/80 cursor-pointer group"
+                className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm hover:shadow-md hover:border-indigo-100 active:scale-[0.98] transition-all flex items-center justify-between group cursor-pointer"
               >
-                <div className="flex items-center gap-2.5 flex-1 min-w-0 mr-2.5">
-                   <div className="w-9 h-9 rounded-xl bg-indigo-50/60 text-indigo-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                     <Music size={16} strokeWidth={2.5} />
+                <div className="flex items-center gap-3 flex-1 min-w-0 mr-2">
+                   {/* Smart Icon */}
+                   <div className="w-9 h-9 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                     <Music size={18} />
                    </div>
                    
-                   <div className="min-w-0 flex-1 text-left">
-                      <div className="flex items-center gap-1.5 mb-0.5">
-                         <h4 className="font-extrabold text-slate-800 text-[12px] sm:text-[13px] truncate leading-tight group-hover:text-indigo-600 transition-colors">{p.name}</h4>
-                         <span className={`w-1.5 h-1.5 rounded-full ring-2 ring-white shrink-0 ${p.status === 'Completed' ? 'bg-emerald-500' : p.status === 'In Progress' ? 'bg-blue-500' : 'bg-amber-500'}`}></span>
+                   <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-0.5">
+                         <h4 className="font-bold text-slate-800 text-xs truncate leading-none" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>{p.name}</h4>
+                         <span className={`w-1.5 h-1.5 rounded-full ring-1 ring-white shrink-0 ${p.status === 'Completed' ? 'bg-emerald-500' : p.status === 'In Progress' ? 'bg-blue-500' : 'bg-amber-500'}`}></span>
                       </div>
-                      <p className="text-[10px] text-slate-500 truncate font-semibold flex items-center gap-1 leading-none">
-                         <Users size={10} className="text-slate-400" /> {p.clientname}
+                      <p className="text-[10px] text-slate-400 truncate font-bold flex items-center gap-1 mt-1">
+                         <Users size={10} /> {p.clientname}
                       </p>
                    </div>
                 </div>
                 
                 <div className="text-right whitespace-nowrap">
-                  <p className="font-extrabold text-slate-800 text-[12px] sm:text-[13px] leading-tight">{currency} {p.totalamount?.toLocaleString('en-US')}</p>
-                  <p className="text-[8px] text-slate-400 mt-1 font-bold bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded inline-block">
+                  <p className="font-black text-slate-900 text-sm leading-none" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>{currency} {p.totalamount.toLocaleString('en-US')}</p>
+                  <p className="text-[9px] text-slate-400 mt-1 font-black bg-slate-50 px-1.5 py-0.5 rounded inline-block uppercase tracking-tight">
                     {p.deadline ? p.deadline : 'No Date'}
                   </p>
                 </div>

@@ -3,17 +3,49 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 
+window.addEventListener('error', (event) => {
+  const msg = event.message || '';
+  if (
+    msg.includes('Lock broken') || 
+    msg.includes('Failed to fetch') || 
+    msg.includes('Load failed') ||
+    msg.includes('NetworkError') ||
+    msg.includes('steal')
+  ) {
+    event.preventDefault();
+  }
+});
+
+const isLockOrFetchError = (err: any): boolean => {
+  if (!err) return false;
+  const msg = typeof err === 'string' 
+    ? err 
+    : (err.message || err.toString() || '');
+  return (
+    msg.includes('Lock broken') || 
+    msg.includes('Failed to fetch') ||
+    msg.includes('NetworkError') ||
+    msg.includes('steal') ||
+    msg.includes('Load failed')
+  );
+};
+
 window.addEventListener('unhandledrejection', (event) => {
-  if (event.reason?.message?.includes('Lock broken')) {
+  if (event.reason?.message?.includes('Lock broken') || isLockOrFetchError(event.reason)) {
     event.preventDefault();
   }
 });
 
 const originalConsoleError = console.error;
-console.error = (...args) => {
-  if (typeof args[0] === 'string' && args[0].includes('Lock broken')) return;
-  if (args[0] instanceof Error && args[0].message.includes('Lock broken')) return;
+console.error = (...args: any[]) => {
+  if (args.some(arg => isLockOrFetchError(arg))) return;
   originalConsoleError(...args);
+};
+
+const originalConsoleWarn = console.warn;
+console.warn = (...args: any[]) => {
+  if (args.some(arg => isLockOrFetchError(arg))) return;
+  originalConsoleWarn(...args);
 };
 
 const rootElement = document.getElementById('root');

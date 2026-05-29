@@ -253,7 +253,8 @@ serve(async (req) => {
               },
               notification: {
                 requireInteraction: true,
-                sound: "default"
+                sound: "default",
+                image: notif.imageUrl || ""
               }
             },
             // Optional data payload
@@ -263,7 +264,8 @@ serve(async (req) => {
               click_action: "FLUTTER_NOTIFICATION_CLICK",
               notification_id: uniqueId,
               channel_id: "fcm_default_channel",
-              image: notif.imageUrl || ""
+              image: notif.imageUrl || "",
+              tts_text: notif.body
             }
           }
         };

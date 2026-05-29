@@ -28,8 +28,6 @@ import {
   ShoppingBag,
   Bot,
   Bell,
-  ArrowRightLeft,
-  PiggyBank,
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { APP_NAME } from "@/constants";
@@ -75,6 +73,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   const isAiAssistant = location.pathname === "/ai-assistant";
   const isNotifications = location.pathname === "/notifications";
   const isFullScreenPage = isAiAssistant || isNotifications;
+  const isExpensesPage = location.pathname === "/expenses";
 
   const handleNavigate = (path: string) => {
     setMoreMenuOpen(false);
@@ -159,12 +158,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
 
   // Secondary items for "More" Menu Drawer
   const SECONDARY_NAV = [
-    ...(isAdmin ? [{
-      name: "অ্যাডমিন প্যানেল",
-      path: "/admin-users",
-      icon: <UserCog size={20} />,
-      desc: "ইউজার তালিকা ও ড্যাশবোর্ড ভিউ",
-    }] : []),
     {
       name: "এআই অ্যাসিস্ট্যান্ট",
       path: "/ai-assistant",
@@ -295,7 +288,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans w-full overflow-x-hidden selection:bg-indigo-100 selection:text-indigo-700 flex flex-col lg:flex-row">
+    <div className="min-h-screen bg-[#fafbfd] font-sans w-full overflow-x-hidden selection:bg-indigo-100 selection:text-indigo-700 flex flex-col lg:flex-row">
       {/* Desktop Sidebar - Visible only on LG screens */}
       <aside className="hidden lg:flex flex-col w-72 bg-white border-r border-slate-200 h-screen lg:fixed lg:top-0 lg:left-0 z-50">
         <div className="p-6 border-b border-slate-100">
@@ -430,11 +423,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
       </aside>
 
       {/* Mobile Header (App Bar) - Fixed to ensure it stays on top */}
-      {!isFullScreenPage && (
+      {!isFullScreenPage && !isExpensesPage && (
         <header className="fixed top-0 inset-x-0 h-16 bg-white/90 backdrop-blur-md border-b border-slate-200/80 flex lg:hidden items-center justify-between px-5 z-40 max-w-[100vw] shadow-sm transition-all duration-200">
           <div className="flex items-center gap-2">
             {/* Show Back Button for Admin if User Selected */}
-            {isAdmin && adminSelectedUserId && adminSelectedUserId !== user.id ? (
+            {isAdmin && adminSelectedUserId ? (
               <button
                 onClick={handleBackToUsers}
                 className="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center text-slate-600 active:scale-95 transition-transform"
@@ -472,7 +465,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
               className="flex items-center cursor-pointer active:scale-95 transition-transform"
               onClick={() => handleNavigate("/profile")}
             >
-              {isAdmin && adminSelectedUserId && adminSelectedUserId !== user.id && (
+              {isAdmin && adminSelectedUserId && (
                 <span className="text-[10px] font-bold bg-indigo-50 text-indigo-600 px-2 py-1 rounded-md border border-indigo-100 mr-2">
                   User View
                 </span>
@@ -501,7 +494,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
 
       {/* Main Content Area */}
       <main
-        className={`flex-1 ${isFullScreenPage ? "p-0" : "pt-[68px] lg:pt-8 pb-[72px] lg:pb-8 px-3 lg:px-8"} animate-in fade-in duration-300 w-full max-w-[100vw] lg:max-w-none overflow-x-hidden lg:ml-72`}
+        className={`flex-1 ${
+          isFullScreenPage
+            ? "p-0"
+            : isExpensesPage
+            ? "pt-3 lg:pt-8 pb-[72px] lg:pb-8 px-3 lg:px-8"
+            : "pt-[68px] lg:pt-8 pb-[72px] lg:pb-8 px-3 lg:px-8"
+        } animate-in fade-in duration-300 w-full max-w-[100vw] lg:max-w-none overflow-x-hidden lg:ml-72`}
       >
         <div
           className={`max-w-7xl mx-auto w-full ${isFullScreenPage ? "h-[100dvh] lg:h-auto" : ""}`}
@@ -511,16 +510,16 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
         </div>
       </main>
 
-      {/* Fixed Bottom Navigation Bar - Hide on Desktop or Full Screen pages */}
-      {!isFullScreenPage && (
+      {/* Fixed Bottom Navigation Bar - Hide if Admin is on User List page or on Desktop */}
+      {(!isAdmin || adminSelectedUserId) && !isFullScreenPage && (
         <div className="fixed bottom-0 inset-x-0 z-50 bg-white border-t border-slate-100 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] pb-safe lg:hidden">
-          <nav className="flex justify-between items-center px-4 h-[60px] w-full max-w-lg mx-auto">
+          <nav className="flex justify-between items-center px-6 h-[60px] w-full max-w-lg mx-auto">
             {PRIMARY_NAV.map((item) => {
               const isActive = location.pathname === item.path;
               return (
                 <button
                   key={item.path}
-                   onClick={() => handleNavigate(item.path)}
+                  onClick={() => handleNavigate(item.path)}
                   className={`
                       flex flex-col items-center justify-center w-full h-full gap-1 transition-colors duration-200
                       ${isActive ? "text-indigo-600" : "text-slate-400 hover:text-slate-600"}

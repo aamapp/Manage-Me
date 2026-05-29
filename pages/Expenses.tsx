@@ -1,7 +1,8 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Receipt, Plus, Search, Tag, X, ShoppingCart, Loader2, Trash2, MoreVertical, Pencil, SquarePen, Calculator, CalendarDays, Download, Filter, Music, Share2, ExternalLink, Copy, AlertCircle, Banknote, ArrowRightLeft, ArrowDown, ArrowUp, Users, MapPin, Phone, User as UserIcon, Calendar, ImagePlus, DollarSign, FileText, ArrowLeft } from 'lucide-react';
+import { Receipt, Plus, Search, Tag, X, ShoppingCart, Loader2, Trash2, MoreVertical, Pencil, SquarePen, Calculator, CalendarDays, Download, Filter, Music, Share2, ExternalLink, Copy, AlertCircle, Banknote, ArrowRightLeft, ArrowDown, ArrowUp, Users, MapPin, Phone, User as UserIcon, Calendar, ImagePlus, DollarSign, FileText, ArrowLeft, ArrowUpDown, TrendingUp, ListChecks, Check, Network, Shapes } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useLocation } from 'react-router-dom';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
@@ -12,35 +13,160 @@ import { NumericKeypad } from '@/components/NumericKeypad';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { DatePicker } from '@/components/DatePicker';
 import { DuePerson, DueTransaction } from '../types';
-import { Savings } from './Savings';
-import { PiggyBank } from 'lucide-react';
 
 export const Expenses: React.FC = () => {
-  // Use cached expenses from AppContext
-  const { user, showToast, adminSelectedUserId, expenses, setExpenses, refreshData, isOnline } = useAppContext();
+  // Use cached expenses and incomes from AppContext
+  const { user, showToast, adminSelectedUserId, expenses, setExpenses, refreshData, isOnline, incomeRecords, projects } = useAppContext();
   const location = useLocation();
-  const [activeSubTab, setActiveSubTab] = useState<'expenses' | 'dues' | 'savings'>('expenses');
   const [isModalOpen, setModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeTab, setActiveTab] = useState<'expenses' | 'dues' | 'savings' | 'reports' | 'budgets'>('expenses');
 
+  // Floating Action Button visibility based on scroll direction (optimized with direct DOM ref to run at 60fps without React lagging)
+  const fabRef = useRef<HTMLButtonElement>(null);
+  const isFabVisibleRef = useRef(true);
+  const lastScrollY = useRef(0);
+
+  const setFabVisibleDirectly = (visible: boolean) => {
+    if (isFabVisibleRef.current === visible) return;
+    isFabVisibleRef.current = visible;
+    
+    const el = fabRef.current;
+    if (!el) return;
+    
+    if (visible) {
+      el.style.opacity = '1';
+      el.style.transform = 'translateY(0) scale(1)';
+      el.style.pointerEvents = 'auto';
+    } else {
+      el.style.opacity = '0';
+      el.style.transform = 'translateY(32px) scale(0.9)';
+      el.style.pointerEvents = 'none';
+    }
+  };
+
+  useEffect(() => {
+    lastScrollY.current = window.scrollY;
+    let lastTouchY = 0;
+    
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      const diffScrollY = currentScrollY - lastScrollY.current;
+      
+      if (diffScrollY > 0) {
+        setFabVisibleDirectly(false);
+      } else if (diffScrollY < 0) {
+        setFabVisibleDirectly(true);
+      }
+      
+      // Always show when close to the top
+      if (currentScrollY < 30) {
+        setFabVisibleDirectly(true);
+      }
+      
+      lastScrollY.current = currentScrollY;
+    };
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches && e.touches.length > 0) {
+        lastTouchY = e.touches[0].clientY;
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!e.touches || e.touches.length === 0) return;
+      
+      const currentY = e.touches[0].clientY;
+      const diffY = currentY - lastTouchY;
+      
+      // finger moved UP (scrolling DOWN) -> Hide FAB instantly
+      if (diffY < 0) {
+        setFabVisibleDirectly(false);
+      } 
+      // finger moved DOWN (scrolling UP) -> Show FAB instantly
+      else if (diffY > 0) {
+        setFabVisibleDirectly(true);
+      }
+      
+      lastTouchY = currentY;
+      
+      // Always show when close to the top
+      if (window.scrollY < 30) {
+        setFabVisibleDirectly(true);
+      }
+    };
+
+    const handleWheel = (e: WheelEvent) => {
+      if (e.deltaY > 0) {
+        setFabVisibleDirectly(false);
+      } else if (e.deltaY < 0) {
+        setFabVisibleDirectly(true);
+      }
+      
+      // Always show when close to the top
+      if (window.scrollY < 30) {
+        setFabVisibleDirectly(true);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('touchstart', handleTouchStart, { passive: true });
+    window.addEventListener('touchmove', handleTouchMove, { passive: true });
+    window.addEventListener('wheel', handleWheel, { passive: true });
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('touchstart', handleTouchStart);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('wheel', handleWheel);
+    };
+  }, []);
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const viewId = searchParams.get('view');
+    if (viewId) {
+      setActiveTab('dues');
+    }
+  }, [location.search]);
   
-  // New states for Edit/Delete menu
+  // Stats view period filter ("today", "month", "total")
+  const [statsFilter, setStatsFilter] = useState<'today' | 'month' | 'total'>('month');
+  // List filter ("all" | "income" | "expense")
+  const [listFilter, setListFilter] = useState<'all' | 'income' | 'expense'>('all');
+
+  // New states for Unified Modal (Income vs Expense)
+  const [txModalType, setTxModalType] = useState<'expense' | 'income'>('expense');
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [activeExpenseId, setActiveExpenseId] = useState<string | null>(null);
-  
-  // Delete Modal
+  const [activeIncomeId, setActiveIncomeId] = useState<string | null>(null);
+
+  // Searchable suggestions for projects (when adding income)
+  const [projectSearch, setProjectSearch] = useState('');
+  const [showProjectSuggestions, setShowProjectSuggestions] = useState(false);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [selectedProjectDue, setSelectedProjectDue] = useState<number>(0);
+  const projectInputRef = useRef<HTMLDivElement>(null);
+
+  // Unified Deletion states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [expenseToDelete, setExpenseToDelete] = useState<{id: string, userid: string} | null>(null);
+  const [txToDelete, setTxToDelete] = useState<{ id: string; type: 'expense' | 'income'; userid: string; title: string; amount: number } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  
+
   // Keypad State
   const [showKeypad, setShowKeypad] = useState(false);
 
   // Date Range State
   const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' });
   const [showDateFilter, setShowDateFilter] = useState(false);
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [selectedPeriodOption, setSelectedPeriodOption] = useState<'date' | 'month' | 'year' | 'custom' | ''>('');
+  const [modalSubView, setModalSubView] = useState<'main' | 'date' | 'month' | 'year'>('main');
+  const [tempCustomDates, setTempCustomDates] = useState<{ start: string; end: string }>({ start: '', end: '' });
+  const [isStartDatePickerOpen, setIsStartDatePickerOpen] = useState(false);
+  const [isEndDatePickerOpen, setIsEndDatePickerOpen] = useState(false);
 
   // PDF Generation State
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
@@ -51,7 +177,7 @@ export const Expenses: React.FC = () => {
   // Category input suggestion states
   const [showCategorySuggestions, setShowCategorySuggestions] = useState(false);
   const categoryInputRef = useRef<HTMLDivElement>(null);
-  
+
   const [newExpense, setNewExpense] = useState<any>({
     category: '',
     date: new Date().toLocaleDateString('en-CA'),
@@ -59,17 +185,78 @@ export const Expenses: React.FC = () => {
     notes: ''
   });
 
-  // Removed fetchExpenses() logic because it is now handled globally in AppContext
+  const [newIncome, setNewIncome] = useState<any>({
+    projectid: '',
+    amount: 0,
+    date: new Date().toLocaleDateString('en-CA'),
+    method: 'বিকাশ'
+  });
 
-  // Click outside to close suggestions and menus
+  // Bangla Formatter helpers
+  const toBanglaNumbers = (num: string | number): string => {
+    const banglaDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+    return String(num).replace(/[0-9]/g, (digit) => banglaDigits[parseInt(digit)]);
+  };
+
+  const formatDateToBangla = (dateStr: string): string => {
+    if (!dateStr) return '';
+    try {
+      const dateObj = new Date(dateStr);
+      if (isNaN(dateObj.getTime())) return dateStr;
+      
+      const day = dateObj.getDate();
+      const monthIdx = dateObj.getMonth();
+      const year = dateObj.getFullYear();
+      
+      const banglaMonths = [
+        'জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
+        'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'
+      ];
+      
+      return `${toBanglaNumbers(day)} ${banglaMonths[monthIdx]}, ${toBanglaNumbers(year)}`;
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const formatTimeToBangla = (dateStr: string): string => {
+    if (!dateStr) return '';
+    try {
+      const dateObj = new Date(dateStr);
+      if (isNaN(dateObj.getTime())) return '';
+      
+      let hours = dateObj.getHours();
+      const minutes = dateObj.getMinutes();
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      
+      hours = hours % 12;
+      hours = hours ? hours : 12;
+      
+      const minutesStr = minutes < 10 ? '0' + minutes : minutes;
+      
+      return `${toBanglaNumbers(hours)}:${toBanglaNumbers(minutesStr)} ${ampm}`;
+    } catch {
+      return '';
+    }
+  };
+
+  const getCurrentBengaliMonthName = (): string => {
+    const banglaMonths = [
+      'জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
+      'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'
+    ];
+    return banglaMonths[new Date().getMonth()];
+  };
+
+  // Click outside suggestions
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      // Close Category Suggestions
       if (categoryInputRef.current && !categoryInputRef.current.contains(event.target as Node)) {
         setShowCategorySuggestions(false);
       }
-      
-      // Close Action Menu
+      if (projectInputRef.current && !projectInputRef.current.contains(event.target as Node)) {
+        setShowProjectSuggestions(false);
+      }
       if (activeMenuId && !(event.target as Element).closest('.action-menu-container')) {
         setActiveMenuId(null);
       }
@@ -78,25 +265,64 @@ export const Expenses: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [activeMenuId]);
 
-  // Derive unique categories from existing expenses for suggestions
+  // Unique categories for suggestions
   const uniqueCategories = Array.from(new Set(expenses.map((e: any) => e.category as string).filter(Boolean))) as string[];
-  
   const allSuggestions: string[] = uniqueCategories;
-
   const filteredSuggestions = allSuggestions.filter(c => 
     (EXPENSE_CATEGORY_LABELS[c] || c).toLowerCase().includes((newExpense.category || '').toLowerCase())
   );
 
   const handleSelectCategory = (category: string) => {
-    // Use localized label if available, otherwise use the category key itself
     const label = EXPENSE_CATEGORY_LABELS[category] || category;
     setNewExpense({ ...newExpense, category: label });
     setShowCategorySuggestions(false);
   };
 
+  // Filter projects for suggestions
+  const filteredProjects = useMemo(() => {
+    return projects.filter(p => 
+      p.name.toLowerCase().includes(projectSearch.toLowerCase()) ||
+      (p.clientname || '').toLowerCase().includes(projectSearch.toLowerCase())
+    );
+  }, [projects, projectSearch]);
+
+  const handleSelectProject = (project: any) => {
+    setSelectedProjectId(project.id);
+    setProjectSearch(project.name);
+    setNewIncome({ ...newIncome, projectid: project.id });
+    setSelectedProjectDue(project.dueamount);
+    setShowProjectSuggestions(false);
+  };
+
+  const handlePeriodOptionSelect = (option: 'date' | 'month' | 'year' | 'custom') => {
+    setSelectedPeriodOption(option);
+    
+    const now = new Date();
+    const yStr = now.getFullYear();
+    const mStr = String(now.getMonth() + 1).padStart(2, '0');
+    const dStr = String(now.getDate()).padStart(2, '0');
+    const todayStr = `${yStr}-${mStr}-${dStr}`;
+
+    if (option === 'date') {
+      setDateRange({ start: todayStr, end: todayStr });
+      setShowDateFilter(false);
+    } else if (option === 'month') {
+      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+      setDateRange({ start: `${yStr}-${mStr}-01`, end: `${yStr}-${mStr}-${lastDay}` });
+      setShowDateFilter(false);
+    } else if (option === 'year') {
+      setDateRange({ start: `${yStr}-01-01`, end: `${yStr}-12-31` });
+      setShowDateFilter(false);
+    } else if (option === 'custom') {
+      setShowDateFilter(true);
+    }
+    
+    setShowFilterModal(false);
+  };
+
   const handleOpenAddModal = () => {
     if (!isOnline) {
-      showToast('অফলাইনে নতুন খরচ যোগ করা যাবে না', 'error');
+      showToast('অফলাইনে নতুন লেনদেন যোগ করা যাবে না', 'error');
       return;
     }
     const now = new Date();
@@ -107,22 +333,50 @@ export const Expenses: React.FC = () => {
     
     setIsEditing(false);
     setActiveExpenseId(null);
+    setActiveIncomeId(null);
+    setTxModalType('expense'); // Default to Expense
+    setProjectSearch('');
+    setSelectedProjectId(null);
+    setSelectedProjectDue(0);
+
     setNewExpense({ category: '', date: localToday, amount: 0, notes: '' });
+    setNewIncome({ projectid: '', amount: 0, date: localToday, method: 'বিকাশ' });
+    
     setModalOpen(true);
   };
 
-  const handleOpenEditModal = (expense: any) => {
+  const handleOpenEditUnified = (tx: any) => {
     setIsEditing(true);
-    setActiveExpenseId(expense.id);
-    setNewExpense({
-      // Use localized label for input field when editing
-      category: EXPENSE_CATEGORY_LABELS[expense.category] || expense.category,
-      date: expense.date,
-      amount: expense.amount,
-      notes: expense.notes
-    });
-    setModalOpen(true);
+    setTxModalType(tx.type);
     setActiveMenuId(null);
+
+    // Extract raw date YYYY-MM-DD from maybe full ISO string
+    const rawDate = tx.date.substring(0, 10);
+
+    if (tx.type === 'expense') {
+      setActiveExpenseId(tx.id);
+      setNewExpense({
+        category: EXPENSE_CATEGORY_LABELS[tx.rawItem.category] || tx.rawItem.category,
+        date: rawDate,
+        amount: tx.amount,
+        notes: tx.title
+      });
+    } else {
+      setActiveIncomeId(tx.id);
+      setSelectedProjectId(tx.rawItem.projectid);
+      setProjectSearch(tx.rawItem.projectname || '');
+      
+      const proj = projects.find(p => p.id === tx.rawItem.projectid);
+      if (proj) setSelectedProjectDue(proj.dueamount);
+
+      setNewIncome({
+        projectid: tx.rawItem.projectid,
+        amount: tx.amount,
+        date: rawDate,
+        method: tx.rawItem.method || 'বিকাশ'
+      });
+    }
+    setModalOpen(true);
   };
 
   const safeEval = (val: any) => {
@@ -136,13 +390,10 @@ export const Expenses: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newExpense.amount || !newExpense.category || !user) return;
+    if (!user) return;
     
     setIsSubmitting(true);
-    window.dispatchEvent(new CustomEvent('app:processing', { detail: { show: true, message: 'খরচ সংরক্ষণ করা হচ্ছে...' } }));
-    
-    // Evaluate possible math expressions
-    const parsedAmount = Number(safeEval(newExpense.amount)) || 0;
+    window.dispatchEvent(new CustomEvent('app:processing', { detail: { show: true, message: 'তথ্য সংরক্ষণ করা হচ্ছে...' } }));
     
     const now = new Date();
     const y = now.getFullYear();
@@ -156,116 +407,326 @@ export const Expenses: React.FC = () => {
     const currentTimeAtNoon = '12:00:00';
     const currentTimeNow = `${hh}:${mm}:${ss}`;
     
-    let dateToSave = newExpense.date;
-    
-    // Use selected user ID if admin is viewing a specific user, otherwise current user ID
     const targetUserId = (user.role === 'admin' && adminSelectedUserId) ? adminSelectedUserId : user.id;
 
     try {
-      if (isEditing && activeExpenseId) {
-        if (dateToSave === localToday) {
-           dateToSave = new Date(`${dateToSave}T${currentTimeNow}`).toISOString();
-        } else if (dateToSave && dateToSave.length === 10) {
-           dateToSave = new Date(`${dateToSave}T${currentTimeAtNoon}`).toISOString();
+      if (txModalType === 'expense') {
+        if (!newExpense.amount || !newExpense.category) {
+          throw new Error('দয়া করে সঠিক পরিমাণ এবং ক্যাটাগরি দিন');
         }
-
-        let query = supabase.from('expenses').update({
-          category: newExpense.category,
-          amount: parsedAmount,
-          date: dateToSave,
-          notes: newExpense.notes
-        }).eq('id', activeExpenseId);
+        const parsedAmount = Number(safeEval(newExpense.amount)) || 0;
+        let dateToSave = newExpense.date;
         
-        // If not admin, restrict to own records
-        if (user.role !== 'admin') {
-            query = query.eq('userid', user.id);
-        }
-
-        const { error } = await query;
-        if (error) throw error;
-        showToast('খরচ আপডেট হয়েছে', 'success');
-      } else {
         if (dateToSave === localToday) {
-           dateToSave = new Date(`${dateToSave}T${currentTimeNow}`).toISOString();
+          dateToSave = new Date(`${dateToSave}T${currentTimeNow}`).toISOString();
         } else if (dateToSave && dateToSave.length === 10) {
-           dateToSave = new Date(`${dateToSave}T${currentTimeAtNoon}`).toISOString();
+          dateToSave = new Date(`${dateToSave}T${currentTimeAtNoon}`).toISOString();
         }
 
-        // Insert new expense
-        const { error } = await supabase.from('expenses').insert({
-          category: newExpense.category,
-          amount: parsedAmount,
-          date: dateToSave,
-          notes: newExpense.notes,
-          userid: targetUserId
-        });
+        if (isEditing && activeExpenseId) {
+          let query = supabase.from('expenses').update({
+            category: newExpense.category,
+            amount: parsedAmount,
+            date: dateToSave,
+            notes: newExpense.notes
+          }).eq('id', activeExpenseId);
+          
+          if (user.role !== 'admin') {
+            query = query.eq('userid', user.id);
+          }
+          const { error } = await query;
+          if (error) throw error;
+          showToast('খরচ আপডেট হয়েছে', 'success');
+        } else {
+          const { error } = await supabase.from('expenses').insert({
+            category: newExpense.category,
+            amount: parsedAmount,
+            date: dateToSave,
+            notes: newExpense.notes,
+            userid: targetUserId
+          });
+          if (error) throw error;
+          showToast('খরচ সফলভাবে সেভ হয়েছে', 'success');
+        }
+      } else {
+        // Saving Income
+        if (!selectedProjectId) {
+          throw new Error('দয়া করে একটি প্রজেক্ট সিলেক্ট করুন');
+        }
+        const parsedAmount = Number(safeEval(newIncome.amount)) || 0;
+        let dateToSave = newIncome.date;
+        
+        if (dateToSave === localToday) {
+          dateToSave = new Date(`${dateToSave}T${currentTimeNow}`).toISOString();
+        } else if (dateToSave && dateToSave.length === 10) {
+          dateToSave = new Date(`${dateToSave}T${currentTimeAtNoon}`).toISOString();
+        }
 
-        if (error) throw error;
-        showToast('খরচ সফলভাবে সেভ হয়েছে', 'success');
+        const selectedProject = projects.find(p => p.id === selectedProjectId);
+
+        if (isEditing && activeIncomeId) {
+          const oldPayment = incomeRecords.find(p => p.id === activeIncomeId);
+          const delta = parsedAmount - (oldPayment?.amount || 0);
+
+          let query = supabase.from('income_records').update({
+            amount: parsedAmount,
+            date: dateToSave,
+            method: newIncome.method
+          }).eq('id', activeIncomeId);
+
+          if (user.role !== 'admin') {
+            query = query.eq('userid', user.id);
+          }
+          const { error: updErr } = await query;
+          if (updErr) throw updErr;
+
+          if (selectedProject) {
+            const newPaid = selectedProject.paidamount + delta;
+            await supabase.from('projects').update({
+              paidamount: newPaid,
+              dueamount: Math.max(0, selectedProject.totalamount - newPaid)
+            }).eq('id', selectedProjectId);
+          }
+          showToast('আয় রেকর্ড আপডেট করা হয়েছে', 'success');
+        } else {
+          const { error: insErr } = await supabase.from('income_records').insert({
+            projectid: selectedProjectId,
+            projectname: selectedProject?.name,
+            clientname: selectedProject?.clientname,
+            amount: parsedAmount,
+            date: dateToSave,
+            method: newIncome.method,
+            userid: targetUserId
+          });
+          if (insErr) throw insErr;
+
+          if (selectedProject) {
+            const newPaid = selectedProject.paidamount + parsedAmount;
+            await supabase.from('projects').update({
+              paidamount: newPaid,
+              dueamount: Math.max(0, selectedProject.totalamount - newPaid)
+            }).eq('id', selectedProjectId);
+          }
+          showToast('নতুন পেমেন্ট রেকর্ড করা হয়েছে', 'success');
+        }
       }
       
       setModalOpen(false);
-      await refreshData(); // Refresh global context
-      if (!isEditing) {
-        setNewExpense({ category: '', date: new Date().toLocaleDateString('en-CA'), amount: 0, notes: '' });
-      }
+      await refreshData();
     } catch (error: any) {
-      showToast(`সমস্যা: ${error.message}`);
+      showToast(error.message, 'error');
     } finally {
       setIsSubmitting(false);
       window.dispatchEvent(new CustomEvent('app:processing', { detail: { show: false } }));
     }
   };
 
-  const initiateDelete = (id: string, userid: string) => {
-    setExpenseToDelete({id, userid});
+  const initiateDeleteUnified = (tx: any) => {
+    setTxToDelete({
+      id: tx.id,
+      type: tx.type,
+      userid: tx.rawItem.userid,
+      title: tx.title,
+      amount: tx.amount
+    });
     setShowDeleteModal(true);
     setActiveMenuId(null);
   };
 
   const handleConfirmDelete = async () => {
-    if (!expenseToDelete) return;
+    if (!txToDelete) return;
     setIsDeleting(true);
     try {
-      const expense = expenses.find(e => e.id === expenseToDelete.id);
-      if (!expense) throw new Error('Expense not found');
+      if (txToDelete.type === 'expense') {
+        const expenseObj = expenses.find(e => e.id === txToDelete.id);
+        if (expenseObj) {
+          const { error } = await supabase
+            .from('expenses')
+            .update({ notes: `[TRASH] ${expenseObj.notes || ''}`.trim() })
+            .eq('id', txToDelete.id);
+          if (error) throw error;
+        }
+        showToast('খরচটি রিসাইকেল বিনে পাঠানো হয়েছে', 'success');
+      } else {
+        // Delete Income
+        let query = supabase.from('income_records').delete().eq('id', txToDelete.id);
+        if (user?.role !== 'admin') {
+          query = query.eq('userid', user?.id);
+        }
+        const { error } = await query;
+        if (error) throw error;
 
-      const { error } = await supabase
-        .from('expenses')
-        .update({ notes: `[TRASH] ${expense.notes || ''}`.trim() })
-        .eq('id', expenseToDelete.id);
-      
-      if (error) throw error;
-      showToast('খরচটি রিসাইকেল বিনে পাঠানো হয়েছে', 'success');
+        // Restore project balance
+        const incomeObj = incomeRecords.find(i => i.id === txToDelete.id);
+        if (incomeObj) {
+          const pId = incomeObj.projectid;
+          const targetProj = projects.find(p => p.id === pId);
+          if (targetProj) {
+            const newPaid = Math.max(0, targetProj.paidamount - txToDelete.amount);
+            await supabase.from('projects').update({
+              paidamount: newPaid,
+              dueamount: targetProj.totalamount - newPaid
+            }).eq('id', targetProj.id);
+          }
+        }
+        showToast('পেমেন্ট রেকর্ড ডিলিট করা হয়েছে', 'success');
+      }
       await refreshData();
       setShowDeleteModal(false);
     } catch(err: any) {
       showToast(err.message);
     } finally {
       setIsDeleting(false);
-      setExpenseToDelete(null);
+      setTxToDelete(null);
     }
   };
 
-  const filteredExpenses = React.useMemo(() => expenses.filter(e => {
-    let matchesFilter = true;
+  // 1. Compute Unified Stats (Today / Current Month / Total)
+  // Matching upper statistics card counts exactly
+  const stats = useMemo(() => {
+    const now = new Date();
+    const localTodayStr = now.toLocaleDateString('en-CA');
+    const currentMonthIdx = now.getMonth();
+    const currentYear = now.getFullYear();
 
-    // Check Date Range Filter
-    if (dateRange.start && e.date) {
-        if (e.date < dateRange.start) matchesFilter = false;
+    const targetUserId = (user?.role === 'admin' && adminSelectedUserId) ? adminSelectedUserId : user?.id;
+
+    // Filter Incomes
+    const filteredIncomes = incomeRecords.filter(item => {
+      if (item.userid !== targetUserId) return false;
+      const d = new Date(item.date);
+      if (isNaN(d.getTime())) return false;
+
+      if (statsFilter === 'today') {
+        return d.toLocaleDateString('en-CA') === localTodayStr;
+      } else if (statsFilter === 'month') {
+        return d.getMonth() === currentMonthIdx && d.getFullYear() === currentYear;
+      }
+      return true;
+    });
+
+    // Filter Expenses
+    const filteredExp = expenses.filter(item => {
+      if (item.userid !== targetUserId) return false;
+      const d = new Date(item.date);
+      if (isNaN(d.getTime())) return false;
+
+      if (statsFilter === 'today') {
+        return d.toLocaleDateString('en-CA') === localTodayStr;
+      } else if (statsFilter === 'month') {
+        return d.getMonth() === currentMonthIdx && d.getFullYear() === currentYear;
+      }
+      return true;
+    });
+
+    const incomeSum = filteredIncomes.reduce((s, i) => s + i.amount, 0);
+    const expenseSum = filteredExp.reduce((s, e) => s + e.amount, 0);
+
+    return {
+      income: incomeSum,
+      expense: expenseSum,
+      balance: incomeSum - expenseSum
+    };
+  }, [expenses, incomeRecords, statsFilter, user, adminSelectedUserId]);
+
+  // 2. Compute Filtered Ledger Transactions (With combined Search & Range Filters)
+  const unifiedTransactions = useMemo(() => {
+    const combined: any[] = [];
+    const targetUserId = (user?.role === 'admin' && adminSelectedUserId) ? adminSelectedUserId : user?.id;
+
+    // Add expenses
+    expenses.forEach(e => {
+      if (e.userid !== targetUserId) return;
+      
+      const categoryLabel = EXPENSE_CATEGORY_LABELS[e.category] || e.category;
+      const notesVal = e.notes || '';
+
+      // Date Range Filter
+      if (dateRange.start && e.date && e.date < dateRange.start) return;
+      if (dateRange.end && e.date && e.date > dateRange.end) return;
+
+      // Search Bar Filter
+      const matchesSearch = notesVal.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            categoryLabel.toLowerCase().includes(searchTerm.toLowerCase());
+      if (searchTerm && !matchesSearch) return;
+
+      combined.push({
+        id: e.id,
+        type: 'expense',
+        title: notesVal || categoryLabel,
+        category: categoryLabel,
+        amount: e.amount,
+        date: e.date,
+        rawItem: e
+      });
+    });
+
+    // Add Incomes
+    incomeRecords.forEach(i => {
+      if (i.userid !== targetUserId) return;
+
+      const titleVal = i.projectname || i.clientname || 'আয় রেকর্ড';
+      const methodLabel = i.method || 'বিকাশ';
+
+      // Date Range Filter
+      if (dateRange.start && i.date && i.date < dateRange.start) return;
+      if (dateRange.end && i.date && i.date > dateRange.end) return;
+
+      // Search Bar Filter
+      const matchesSearch = titleVal.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            methodLabel.toLowerCase().includes(searchTerm.toLowerCase());
+      if (searchTerm && !matchesSearch) return;
+
+      combined.push({
+        id: i.id,
+        type: 'income',
+        title: titleVal,
+        category: methodLabel,
+        amount: i.amount,
+        date: i.date,
+        rawItem: i
+      });
+    });
+
+    // Filtering tabs ("সব" | "আয়" | "ব্যয়")
+    let filtered = combined;
+    if (listFilter === 'income') {
+      filtered = combined.filter(t => t.type === 'income');
+    } else if (listFilter === 'expense') {
+      filtered = combined.filter(t => t.type === 'expense');
     }
-    if (dateRange.end && e.date) {
-        if (e.date > dateRange.end) matchesFilter = false;
-    }
 
-    const matchesSearch = (e.notes || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          (e.category || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          (EXPENSE_CATEGORY_LABELS[e.category] || '').toLowerCase().includes(searchTerm.toLowerCase());
-    
-    return matchesFilter && matchesSearch;
-  }), [expenses, dateRange, searchTerm]);
+    // Sort descending by date
+    return filtered.sort((a, b) => b.date.localeCompare(a.date));
+  }, [expenses, incomeRecords, dateRange, searchTerm, listFilter, user, adminSelectedUserId]);
 
-  const totalExpenseFiltered = React.useMemo(() => filteredExpenses.reduce((acc, curr) => acc + curr.amount, 0), [filteredExpenses]);
+  const totalExpenseFiltered = useMemo(() => {
+    return unifiedTransactions.filter(t => t.type === 'expense').reduce((acc, curr) => acc + curr.amount, 0);
+  }, [unifiedTransactions]);
+
+  // Group by Day for the listing headers
+  const groupedTransactions = useMemo(() => {
+    const groups: { [d: string]: any[] } = {};
+    unifiedTransactions.forEach(t => {
+      const dLabel = t.date.substring(0, 10);
+      if (!groups[dLabel]) groups[dLabel] = [];
+      groups[dLabel].push(t);
+    });
+
+    const sortedDates = Object.keys(groups).sort((a, b) => b.localeCompare(a));
+    return sortedDates.map(dStr => {
+      const list = groups[dStr];
+      const incSum = list.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+      const expSum = list.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+
+      return {
+        date: dStr,
+        transactions: list,
+        incomeTotal: incSum,
+        expenseTotal: expSum
+      };
+    });
+  }, [unifiedTransactions]);
 
   const handleDownloadPDF = async () => {
     if (!listRef.current) return;
@@ -447,306 +908,773 @@ export const Expenses: React.FC = () => {
   };
 
   return (
-    <div className="space-y-4">
-      {/* Sub-tab Navigation */}
-      <div className="bg-slate-100 p-1 rounded-2xl flex max-w-md mx-auto shadow-sm sticky top-0 bg-white/80 backdrop-blur z-20">
-        <button
-          onClick={() => setActiveSubTab('expenses')}
-          className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
-            activeSubTab === 'expenses'
-              ? 'bg-white text-rose-600 shadow-sm animate-out'
-              : 'text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          <Receipt size={16} />
-          <span>খরচ ট্র্যাকার</span>
-        </button>
-        <button
-          onClick={() => setActiveSubTab('dues')}
-          className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
-            activeSubTab === 'dues'
-              ? 'bg-white text-indigo-600 shadow-sm'
-              : 'text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          <ArrowRightLeft size={16} />
-          <span>লেনা দেনা</span>
-        </button>
-        <button
-          onClick={() => setActiveSubTab('savings')}
-          className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
-            activeSubTab === 'savings'
-              ? 'bg-white text-emerald-600 shadow-sm'
-              : 'text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          <PiggyBank size={16} />
-          <span>সঞ্চয়</span>
-        </button>
-      </div>
-
-      {activeSubTab === 'expenses' && (
-        <div className="space-y-3">
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold text-slate-800">
-               {user?.role === 'admin' ? (adminSelectedUserId ? 'ইউজার খরচ' : 'খরচসমূহ (অ্যাডমিন ভিউ)') : 'খরচসমূহ'}
-            </h1>
-            <button 
-              onClick={() => setShowDateFilter(!showDateFilter)}
-              className={`p-1.5 rounded-lg transition-all ${showDateFilter || dateRange.start || dateRange.end ? 'bg-rose-100 text-rose-600' : 'bg-slate-100 text-slate-500'}`}
+    <div className="space-y-3 animate-in fade-in duration-300">
+      {/* 5-Icon Navigation Tabs */}
+      <div className="bg-white py-0.5 px-1 text-slate-800 w-full max-w-lg mx-auto mb-1.5 select-none">
+        <div className="flex items-center justify-around w-full gap-0.5">
+          {/* Tab 1: Expenses / Dashboard / লেনদেন */}
+          <button
+            onClick={() => setActiveTab('expenses')}
+            title="লেনদেন / ড্যাশবোর্ড"
+            className="flex flex-col items-center flex-1 cursor-pointer group focus:outline-none"
+          >
+            <div
+              className={`w-[28px] h-[28px] rounded-[8px] flex items-center justify-center transition-all border relative ${
+                activeTab === 'expenses'
+                  ? 'border-[#1a73e8] text-[#1a73e8] bg-white shadow-sm'
+                  : 'border-[#cdd5de] text-[#8e9aa8] hover:border-slate-300 hover:text-slate-600 bg-white'
+              }`}
             >
-              <CalendarDays size={18} />
-            </button>
-          </div>
-          <p className="text-xs text-slate-500 font-medium">মোট খরচ: <span className="text-rose-600 font-bold">{user?.currency || '৳'} {totalExpenseFiltered.toLocaleString('bn-BD')}</span></p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <button 
-            onClick={handleDownloadPDF}
-            className="bg-emerald-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-emerald-200 active:scale-90 transition-transform"
-          >
-            <Download size={22} />
-          </button>
-          <button 
-            onClick={handleOpenAddModal}
-            className="bg-rose-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-rose-200 active:scale-90 transition-transform"
-          >
-            <Plus size={24} />
-          </button>
-        </div>
-      </div>
-
-      {/* Date Range Filter UI */}
-      {showDateFilter && (
-        <div className="bg-white border border-slate-100 p-3 rounded-2xl shadow-sm space-y-3 animate-in fade-in slide-in-from-top-2">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-              <Filter size={14} className="text-rose-500" /> তারিখ অনুযায়ী ফিল্টার
-            </h3>
-            {(dateRange.start || dateRange.end) && (
-              <button 
-                onClick={() => setDateRange({ start: '', end: '' })}
-                className="text-[10px] font-bold text-rose-500 bg-rose-50 px-2 py-1 rounded-lg"
-              >
-                রিসেট
-              </button>
+              <ArrowRightLeft size={13} />
+            </div>
+            {activeTab === 'expenses' ? (
+              <div className="w-4 h-[2px] bg-[#1a73e8] rounded-full mt-0.5 animate-in fade-in zoom-in-95 duration-200" />
+            ) : (
+              <div className="w-4 h-[2px] bg-transparent rounded-full mt-0.5" />
             )}
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <DatePicker 
-              label="শুরু"
-              value={dateRange.start}
-              onChange={(date) => setDateRange({ ...dateRange, start: date })}
-              placeholder="শুরু তারিখ"
-            />
-            <DatePicker 
-              label="শেষ"
-              value={dateRange.end}
-              onChange={(date) => setDateRange({ ...dateRange, end: date })}
-              placeholder="শেষ তারিখ"
-              align="right"
-            />
-          </div>
-        </div>
-      )}
+          </button>
 
-      <div className="bg-white px-4 py-2.5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-2">
-        <Search size={18} className="text-slate-400" />
-        <input 
-          type="text" 
-          placeholder="বিবরণ বা ক্যাটাগরি দিয়ে খুঁজুন..." 
-          className="w-full bg-transparent outline-none text-sm font-bold text-slate-800 placeholder:text-slate-400" 
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+          {/* Tab 2: Dues / লেনা-দেনা */}
+          <button
+            onClick={() => setActiveTab('dues')}
+            title="লেনা-দেনা / দেনা-পাওনা"
+            className="flex flex-col items-center flex-1 cursor-pointer group focus:outline-none"
+          >
+            <div
+              className={`w-[28px] h-[28px] rounded-[8px] flex items-center justify-center transition-all border relative ${
+                activeTab === 'dues'
+                  ? 'border-[#1a73e8] text-[#1a73e8] bg-white shadow-sm'
+                  : 'border-[#cdd5de] text-[#8e9aa8] hover:border-slate-300 hover:text-slate-600 bg-white'
+              }`}
+            >
+              <ArrowUpDown size={13} />
+            </div>
+            {activeTab === 'dues' ? (
+              <div className="w-4 h-[2px] bg-[#1a73e8] rounded-full mt-0.5 animate-in fade-in zoom-in-95 duration-200" />
+            ) : (
+              <div className="w-4 h-[2px] bg-transparent rounded-full mt-0.5" />
+            )}
+          </button>
+
+          {/* Tab 3: Savings / সঞ্চয় ও লক্ষ্য */}
+          <button
+            onClick={() => setActiveTab('savings')}
+            title="সঞ্চয় ও লক্ষ্য"
+            className="flex flex-col items-center flex-1 cursor-pointer group focus:outline-none"
+          >
+            <div
+              className={`w-[28px] h-[28px] rounded-[8px] flex items-center justify-center transition-all border relative ${
+                activeTab === 'savings'
+                  ? 'border-[#1a73e8] text-[#1a73e8] bg-white shadow-sm'
+                  : 'border-[#cdd5de] text-[#8e9aa8] hover:border-slate-300 hover:text-slate-600 bg-white'
+              }`}
+            >
+              <Plus size={13} />
+            </div>
+            {activeTab === 'savings' ? (
+              <div className="w-4 h-[2px] bg-[#1a73e8] rounded-full mt-0.5 animate-in fade-in zoom-in-95 duration-200" />
+            ) : (
+              <div className="w-4 h-[2px] bg-transparent rounded-full mt-0.5" />
+            )}
+          </button>
+
+          {/* Tab 4: Reports / রিপোর্ট ও চার্ট */}
+          <button
+            onClick={() => setActiveTab('reports')}
+            title="রিপোর্ট ও চার্ট"
+            className="flex flex-col items-center flex-1 cursor-pointer group focus:outline-none"
+          >
+            <div
+              className={`w-[28px] h-[28px] rounded-[8px] flex items-center justify-center transition-all border relative ${
+                activeTab === 'reports'
+                  ? 'border-[#1a73e8] text-[#1a73e8] bg-white shadow-sm'
+                  : 'border-[#cdd5de] text-[#8e9aa8] hover:border-slate-300 hover:text-slate-600 bg-white'
+              }`}
+            >
+              <TrendingUp size={13} />
+            </div>
+            {activeTab === 'reports' ? (
+              <div className="w-4 h-[2px] bg-[#1a73e8] rounded-full mt-0.5 animate-in fade-in zoom-in-95 duration-200" />
+            ) : (
+              <div className="w-4 h-[2px] bg-transparent rounded-full mt-0.5" />
+            )}
+          </button>
+
+          {/* Tab 5: Budgets / টাস্ক ও বাজেট */}
+          <button
+            onClick={() => setActiveTab('budgets')}
+            title="টাস্ক ও বাজেট"
+            className="flex flex-col items-center flex-1 cursor-pointer group focus:outline-none"
+          >
+            <div
+              className={`w-[28px] h-[28px] rounded-[8px] flex items-center justify-center transition-all border relative ${
+                activeTab === 'budgets'
+                  ? 'border-[#1a73e8] text-[#1a73e8] bg-white shadow-sm'
+                  : 'border-[#cdd5de] text-[#8e9aa8] hover:border-slate-300 hover:text-slate-600 bg-white'
+              }`}
+            >
+              <ListChecks size={13} />
+            </div>
+            {activeTab === 'budgets' ? (
+              <div className="w-4 h-[2px] bg-[#1a73e8] rounded-full mt-0.5 animate-in fade-in zoom-in-95 duration-200" />
+            ) : (
+              <div className="w-4 h-[2px] bg-transparent rounded-full mt-0.5" />
+            )}
+          </button>
+        </div>
       </div>
 
-      {/* Report Content Area (for PDF) */}
-      <div id="pdf-container" ref={listRef} className={`${isGeneratingPDF ? 'block' : 'space-y-4 rounded-xl sm:rounded-2xl'} px-1 sm:px-2 py-4 bg-white`}>
-        
-        {isGeneratingPDF && (
-          <div id="pdf-header" className="mb-8 border-b border-slate-200 pb-6 flex justify-between items-start">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-sm">
-                <Music size={28} strokeWidth={2.5} />
-              </div>
-              <div className="flex flex-col justify-center">
-                <h1 className="text-3xl font-black text-slate-900 leading-none mb-1.5 tracking-tight pdf-exact-text" style={{ lineHeight: '1' }}>Manage-Me</h1>
-                <h2 className="text-[10px] font-bold text-indigo-600 tracking-[0.2em] uppercase leading-none pdf-exact-text" style={{ lineHeight: '1' }}>Professional Studio Manager</h2>
-              </div>
-            </div>
-
-            <div className="text-right flex flex-col justify-center">
-              <h2 className="text-xl font-black text-slate-800 mb-2 pdf-exact-text" style={{ lineHeight: '1.2' }}>খরচ রিপোর্ট</h2>
-              <p className="text-xs font-bold text-slate-500 mb-1 pdf-exact-text" style={{ lineHeight: '1.2' }}>তারিখ: {new Date().toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-              <p className="text-xs font-bold text-slate-500 pdf-exact-text" style={{ lineHeight: '1.2' }}>সময়: {new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' })}</p>
-            </div>
-          </div>
-        )}
-
-        {/* PDF Only Summary Section */}
-        {isGeneratingPDF && (
-          <div id="pdf-stats" className="mb-8 flex flex-col gap-6">
-            <div className="flex gap-6">
-              <div className="flex-1 bg-white border border-rose-100 rounded-[2rem] p-6 shadow-sm">
-                <p className="text-sm font-bold text-rose-500 mb-2">মোট খরচ</p>
-                <p className="text-3xl font-black text-rose-700">{user?.currency || '৳'} {totalExpenseFiltered.toLocaleString('bn-BD')}</p>
-              </div>
-              <div className="flex-1 bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm">
-                <p className="text-sm font-bold text-slate-400 mb-2">মোট রেকর্ড</p>
-                <p className="text-3xl font-black text-slate-700">{filteredExpenses.length} টি</p>
-              </div>
-              <div className="flex-1 bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm">
-                <p className="text-sm font-bold text-slate-400 mb-2">সময়কাল</p>
-                <p className="text-xl font-black text-slate-700 mt-1">
-                  {dateRange.start || dateRange.end ? (
-                    <>
-                      {dateRange.start ? new Date(dateRange.start).toLocaleDateString('bn-BD') : 'শুরু'}
-                      {' - '}
-                      {dateRange.end ? new Date(dateRange.end).toLocaleDateString('bn-BD') : 'বর্তমান'}
-                    </>
-                  ) : 'সকল সময়'}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Original Summary Cards (Hidden in PDF) */}
-        {!isGeneratingPDF && (
-          <div className="grid grid-cols-3 gap-2 mb-4">
-             <div className="bg-rose-50 border border-rose-100 p-3 rounded-2xl shadow-sm">
-                <p className="text-[10px] font-bold text-rose-400 uppercase leading-none mb-2">মোট খরচ</p>
-                <p className="text-sm md:text-base font-black text-rose-700 leading-none truncate">{user?.currency || '৳'} {totalExpenseFiltered.toLocaleString('bn-BD')}</p>
-             </div>
-             <div className="bg-white border border-slate-100 p-3 rounded-2xl shadow-sm">
-                <p className="text-[10px] font-bold text-slate-400 uppercase leading-none mb-2">মোট রেকর্ড</p>
-                <p className="text-sm md:text-base font-black text-slate-700 leading-none truncate">{filteredExpenses.length} টি</p>
-             </div>
-             <div className="bg-white border border-slate-100 p-3 rounded-2xl shadow-sm">
-                <p className="text-[10px] font-bold text-slate-400 uppercase leading-none mb-2">সময়কাল</p>
-                <p className="text-xs font-black text-slate-700 leading-none truncate">
-                  {dateRange.start || dateRange.end ? (
-                    <>
-                      {dateRange.start ? new Date(dateRange.start).toLocaleDateString('bn-BD') : 'শুরু'} 
-                      {' - '} 
-                      {dateRange.end ? new Date(dateRange.end).toLocaleDateString('bn-BD') : 'বর্তমান'}
-                    </>
-                  ) : 'সকল সময়'}
-                </p>
-             </div>
-          </div>
-        )}
-
-        <div 
-          id="expenses-list-container"
-          className={isGeneratingPDF ? "block w-full pb-12" : "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pb-20"}
-        >
-          {filteredExpenses.length === 0 ? (
-            <div className="col-span-full py-20 text-center text-slate-400">
-              <ShoppingCart size={48} className="mx-auto mb-4 opacity-20" />
-              <p className="text-sm font-medium">কোনো খরচ নেই</p>
-            </div>
-          ) : (
-            filteredExpenses.map((expense) => (
-              <div 
-                key={expense.id} 
-                className={isGeneratingPDF ? 'expense-card-pdf' : ''}
-                style={isGeneratingPDF ? { 
-                  breakInside: 'avoid', 
-                  pageBreakInside: 'avoid',
-                  width: '100%',
-                  display: 'block',
-                  paddingBottom: '20px',
-                  marginBottom: '0'
-                } : {}}
+      {activeTab === 'dues' ? (
+        <DuesManager />
+      ) : activeTab === 'savings' ? (
+        <SavingsManager />
+      ) : activeTab === 'reports' ? (
+        <ExpenseCategoryReports expenses={expenses} user={user} />
+      ) : activeTab === 'budgets' ? (
+        <BudgetsAndTasksManager expenses={expenses} user={user} />
+      ) : (
+        <>
+          {/* Dynamic Period Stats Card - Unifying Income and Expense */}
+          <div className="bg-[#fafbfd] border border-[#e2e7ec]/80 py-3 px-4 rounded-[12px] shadow-[0_2px_8px_rgba(0,0,0,0.02)] w-full max-w-lg mx-auto mb-4 select-none">
+            {/* Period Segment Tabs matching the image */}
+            <div className="bg-[#f3f5f8] rounded-full flex items-stretch justify-between w-full mb-3 select-none overflow-hidden h-[42px] border border-[#e2e7ec]/60">
+              <button
+                type="button"
+                onClick={() => setStatsFilter('today')}
+                className={`flex-1 text-center text-[15px] sm:text-[16px] font-medium transition-all h-full ${
+                  statsFilter === 'today'
+                    ? 'bg-[#1e75eb] text-white rounded-l-full'
+                    : 'text-[#111827] hover:text-black bg-transparent'
+                }`}
               >
-                <div className={`bg-white rounded-2xl border border-slate-100 shadow-sm relative ${isGeneratingPDF ? '' : 'animate-in slide-in-from-bottom-2 duration-300'}`}>
-                  <div className={`${isGeneratingPDF ? 'px-6 py-6' : 'p-4'} flex items-center justify-between`}>
-                    <div className={`flex items-center ${isGeneratingPDF ? 'gap-4' : 'gap-3'} overflow-hidden`}>
-                      <div className={`${isGeneratingPDF ? 'w-14 h-14 rounded-2xl' : 'w-10 h-10 rounded-xl'} bg-rose-50 text-rose-600 flex items-center justify-center shrink-0`}>
-                        <Tag size={isGeneratingPDF ? 28 : 18} />
-                      </div>
-                      <div className="min-w-0">
-                        <h3 className={`font-bold text-slate-800 ${isGeneratingPDF ? 'text-lg mb-1.5' : 'text-sm'} truncate`}>{expense.notes}</h3>
-                        <p className={`${isGeneratingPDF ? 'text-sm' : 'text-xs'} text-slate-500 font-medium`}>{EXPENSE_CATEGORY_LABELS[expense.category] || expense.category} • {expense.date}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 pl-2">
-                      <span className={`font-black text-rose-600 ${isGeneratingPDF ? 'text-sm' : 'text-sm'} mr-1 whitespace-nowrap`}>{user?.currency || '৳'} {expense.amount.toLocaleString('bn-BD')}</span>
-                      
-                      {!isGeneratingPDF && (
-                        <div className="relative action-menu-container">
-                            <button 
-                              onClick={(e) => {
-                                  e.stopPropagation();
-                                  setActiveMenuId(activeMenuId === expense.id ? null : expense.id);
-                              }}
-                              className={`p-2 -mr-2 rounded-full transition-colors ${activeMenuId === expense.id ? 'bg-rose-50 text-rose-600' : 'text-slate-300 hover:text-rose-600 active:bg-slate-50'}`}
-                            >
-                              <MoreVertical size={20} />
-                            </button>
-  
-                            {activeMenuId === expense.id && (
-                                <div className="absolute right-0 top-full mt-1 w-36 bg-white rounded-xl shadow-xl border border-slate-100 z-20 flex flex-col py-1.5 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
-                                    <button 
-                                        onClick={(e) => { 
-                                          e.stopPropagation(); 
-                                          if (!isOnline) {
-                                            showToast('অফলাইনে খরচ এডিট করা যাবে না', 'error');
-                                            return;
-                                          }
-                                          handleOpenEditModal(expense); 
-                                        }}
-                                        disabled={!isOnline}
-                                        className={`w-full px-4 py-3 text-left text-sm font-bold flex items-center gap-3 transition-colors
-                                          ${!isOnline ? 'text-slate-300 cursor-not-allowed' : 'text-slate-700 hover:bg-slate-50'}
-                                        `}
-                                        style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
-                                    >
-                                        <SquarePen size={18} className={!isOnline ? 'text-slate-300' : 'text-slate-500'} /> এডিট
-                                    </button>
-                                    <div className="h-px bg-slate-50 w-full"></div>
-                                    <button 
-                                        onClick={(e) => { 
-                                          e.stopPropagation(); 
-                                          if (!isOnline) {
-                                            showToast('অফলাইনে খরচ ডিলিট করা যাবে না', 'error');
-                                            return;
-                                          }
-                                          initiateDelete(expense.id, expense.userid); 
-                                        }}
-                                        disabled={!isOnline}
-                                        className={`w-full px-4 py-3 text-left text-sm font-bold flex items-center gap-3 transition-colors
-                                          ${!isOnline ? 'text-slate-300 cursor-not-allowed' : 'text-rose-500 hover:bg-rose-50'}
-                                        `}
-                                        style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
-                                    >
-                                        <Trash2 size={18} className={!isOnline ? 'text-slate-300' : 'text-rose-500'} /> ডিলিট
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                আজ
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatsFilter('month')}
+                className={`flex-1 text-center text-[15px] sm:text-[16px] font-medium transition-all h-full ${
+                  statsFilter === 'month'
+                    ? 'bg-[#1e75eb] text-white'
+                    : 'text-[#111827] hover:text-black bg-transparent'
+                }`}
+              >
+                {getCurrentBengaliMonthName()}
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatsFilter('total')}
+                className={`flex-1 text-center text-[15px] sm:text-[16px] font-medium transition-all h-full ${
+                  statsFilter === 'total'
+                    ? 'bg-[#1e75eb] text-white rounded-r-full'
+                    : 'text-[#111827] hover:text-black bg-transparent'
+                }`}
+              >
+                মোট
+              </button>
+            </div>
+
+            {/* Income, Expense, Net Counts */}
+            <div className="grid grid-cols-3 gap-2 text-center">
+               <div className="flex flex-col items-center justify-center">
+                <p className="text-[12px] font-medium text-[#50AD54] mb-0.5">আয়</p>
+                <p className="text-sm sm:text-base md:text-[16px] font-medium text-[#50AD54] truncate">
+                  ৳ {toBanglaNumbers(stats.income.toLocaleString('bn-BD'))}
+                </p>
+              </div>
+              <div className="flex flex-col items-center justify-center">
+                <p className="text-[12px] font-medium text-[#db4437] mb-0.5">ব্যয়</p>
+                <p className="text-sm sm:text-base md:text-[16px] font-medium text-[#db4437] truncate">
+                  ৳ {toBanglaNumbers(stats.expense.toLocaleString('bn-BD'))}
+                </p>
+              </div>
+              <div className="flex flex-col items-center justify-center">
+                <p className="text-[12px] font-medium text-[#1a73e8] mb-0.5">ব্যালেন্স</p>
+                <p className="text-sm sm:text-base md:text-[16px] font-medium text-[#1a73e8] truncate">
+                  ৳ {toBanglaNumbers(stats.balance.toLocaleString('bn-BD'))}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Date Range Filter Panel */}
+          {showDateFilter && (
+            <div className="bg-white border border-slate-100 p-3 rounded-[10px] shadow-sm space-y-3 animate-in fade-in slide-in-from-top-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                   <Filter size={14} className="text-rose-500" /> তারিখ ফিল্টার
+                </h3>
+                {(dateRange.start || dateRange.end) && (
+                  <button 
+                    onClick={() => setDateRange({ start: '', end: '' })}
+                    className="text-[10px] font-bold text-rose-500 bg-rose-50 px-2 py-1 rounded-lg"
+                  >
+                    রিসেট
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <DatePicker 
+                  label="শুরু"
+                  value={dateRange.start}
+                  onChange={(date) => setDateRange({ ...dateRange, start: date })}
+                  placeholder="শুরু তারিখ"
+                />
+                <DatePicker 
+                  label="শেষ"
+                  value={dateRange.end}
+                  onChange={(date) => setDateRange({ ...dateRange, end: date })}
+                  placeholder="শেষ তারিখ"
+                  align="right"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Search Inputs & Category Option Filters (Combining both) */}
+          <div className="space-y-2.5 w-full max-w-lg mx-auto">
+            {searchTerm && (
+              <div className="bg-white px-4 py-3 rounded-[10px] border border-slate-200/80 shadow-xs flex items-center gap-2">
+                <Search size={18} className="text-slate-400" />
+                <input 
+                  type="text" 
+                  placeholder="বিবরণ বা ক্যাটাগরি দিয়ে খুঁজুন..." 
+                  className="w-full bg-transparent outline-none text-sm font-bold text-slate-800 placeholder:text-slate-400" 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+            )}
+
+            {/* Gray filter bar stretching across exactly like the image */}
+            <div className="bg-[#f0f3f6] rounded-[8px] p-[3px] flex items-center justify-between w-full select-none border border-slate-100">
+              {/* Left filter segment items */}
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setListFilter('all')}
+                  className={`px-[26px] py-1.5 text-[14px] font-medium rounded-[6px] transition-all ${
+                    listFilter === 'all'
+                      ? 'bg-[#e2edfc] text-[#1a73e8]'
+                      : 'text-[#8e9aa8] hover:text-slate-700'
+                  }`}
+                >
+                  সব
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setListFilter('income')}
+                  className={`px-[26px] py-1.5 text-[14px] font-medium rounded-[6px] transition-all ${
+                    listFilter === 'income'
+                      ? 'bg-[#e2fced] text-[#50AD54]'
+                      : 'text-[#8e9aa8] hover:text-slate-700'
+                  }`}
+                >
+                  আয়
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setListFilter('expense')}
+                  className={`px-[26px] py-1.5 text-[14px] font-medium rounded-[6px] transition-all ${
+                    listFilter === 'expense'
+                      ? 'bg-[#fcedeb] text-[#db4437]'
+                      : 'text-[#8e9aa8] hover:text-slate-700'
+                  }`}
+                >
+                  ব্যয়
+                </button>
+              </div>
+
+              {/* Right icon buttons matching the screenshot (CalendarSearch, Shapes, MoreVertical) */}
+              <div className="flex items-center gap-4 px-3">
+                <button 
+                  onClick={() => {
+                    // Reset date filter if already active
+                    if (dateRange.start || dateRange.end || showDateFilter) {
+                      setDateRange({ start: '', end: '' });
+                      setShowDateFilter(false);
+                      setSelectedPeriodOption('');
+                      return;
+                    }
+
+                    setModalSubView('main');
+                    setTempCustomDates({
+                      start: dateRange.start || new Date().toISOString().split('T')[0],
+                      end: dateRange.end || new Date().toISOString().split('T')[0]
+                    });
+                    
+                    // Determine which period option is currently active based on real dateRange
+                    if (!dateRange.start && !dateRange.end) {
+                      setSelectedPeriodOption('');
+                    } else {
+                      const start = dateRange.start;
+                      const end = dateRange.end;
+                      if (start && end) {
+                        const startParts = start.split('-');
+                        const endParts = end.split('-');
+                        if (startParts[1] === '01' && startParts[2] === '01' && endParts[1] === '12' && endParts[2] === '31') {
+                          setSelectedPeriodOption('year');
+                        } else if (startParts[2] === '01') {
+                          const y = parseInt(startParts[0]);
+                          const m = parseInt(startParts[1]);
+                          const lastDay = new Date(y, m, 0).getDate();
+                          if (parseInt(endParts[2]) === lastDay && startParts[1] === endParts[1] && startParts[0] === endParts[0]) {
+                            setSelectedPeriodOption('month');
+                          } else {
+                            setSelectedPeriodOption('custom');
+                          }
+                        } else {
+                          setSelectedPeriodOption('custom');
+                        }
+                      } else {
+                        setSelectedPeriodOption('custom');
+                      }
+                    }
+                    
+                    setShowFilterModal(true);
+                  }}
+                  className={`transition-colors shrink-0 ${showDateFilter || dateRange.start || dateRange.end ? 'text-[#1a73e8]' : 'text-[#8e9aa8] md:hover:text-slate-700'}`}
+                  title="তারিখ ফিল্টার"
+                >
+                  <CalendarDays size={19} />
+                </button>
+                
+                <button 
+                  onClick={() => {
+                    const searchBox = prompt("খুঁজতে টাইপ করুন:");
+                    if (searchBox !== null) setSearchTerm(searchBox);
+                  }}
+                  className={`transition-colors shrink-0 ${searchTerm ? 'text-[#1a73e8]' : 'text-[#8e9aa8] md:hover:text-slate-700'}`}
+                  title="অনুসন্ধান"
+                >
+                  <Shapes size={19} />
+                </button>
+
+                <button 
+                  onClick={handleDownloadPDF}
+                  className="text-[#8e9aa8] md:hover:text-slate-700 transition-[#1a73e8] transition-colors shrink-0 active:scale-95"
+                  title="মেনু / ডাউনলোড"
+                >
+                  <MoreVertical size={19} />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Report Capture Container (supports PDF generation) */}
+          <div id="pdf-container" ref={listRef} className={`${isGeneratingPDF ? 'block bg-white p-4' : 'space-y-4 bg-transparent'} w-full max-w-lg mx-auto`}>
+            {isGeneratingPDF && (
+              <div id="pdf-header" className="mb-6 border-b border-slate-200 pb-4 flex justify-between items-start">
+                <div>
+                  <h1 className="text-2xl font-black text-slate-900 mb-1">{APP_NAME}</h1>
+                  <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">Professional Transact Ledger</p>
+                </div>
+                <div className="text-right">
+                  <h2 className="text-base font-bold text-slate-800">লেনদেন রিপোর্ট</h2>
+                  <p className="text-[10px] text-slate-500">তৈরি হয়েছে: {new Date().toLocaleDateString('bn-BD')}</p>
                 </div>
               </div>
-            ))
+            )}
+
+            {isGeneratingPDF && (
+              <div id="pdf-stats" className="mb-6 grid grid-cols-3 gap-3">
+                <div className="bg-slate-50 p-4 rounded-2xl border text-center">
+                  <p className="text-xs text-slate-400 font-bold mb-1">মোট আয়</p>
+                  <p className="text-lg font-black text-emerald-600">{user?.currency || '৳'} {stats.income.toLocaleString('bn-BD')}</p>
+                </div>
+                <div className="bg-slate-50 p-4 rounded-2xl border text-center">
+                  <p className="text-xs text-slate-400 font-bold mb-1">মোট ব্যয়</p>
+                  <p className="text-lg font-black text-rose-500">{user?.currency || '৳'} {stats.expense.toLocaleString('bn-BD')}</p>
+                </div>
+                <div className="bg-slate-50 p-4 rounded-2xl border text-center">
+                  <p className="text-xs text-slate-400 font-bold mb-1">ব্যালেন্স</p>
+                  <p className="text-lg font-black text-blue-600">{user?.currency || '৳'} {stats.balance.toLocaleString('bn-BD')}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Combined Grouped Transaction Ledger View */}
+            <div id="expenses-list-container" className="space-y-4">
+              {groupedTransactions.length === 0 ? (
+                <div className="py-16 text-center text-slate-400 bg-slate-50/50 rounded-2xl border border-slate-100 border-dashed">
+                  <Receipt size={40} className="mx-auto mb-3 opacity-20" />
+                  <p className="text-xs font-semibold">কোনো লেনদেন পাওয়া যায়নি</p>
+                </div>
+              ) : (
+                groupedTransactions.map((group) => (
+                  <div key={group.date} className="space-y-2.5 animate-in fade-in duration-200">
+                    
+                    {/* Day Date Indicator Header */}
+                    <div className={`flex items-center justify-between py-2 ${isGeneratingPDF ? 'bg-white' : 'bg-transparent'} select-none`}>
+                      <span className="text-[12px] sm:text-[13px] font-medium text-slate-400 whitespace-nowrap">
+                        {formatDateToBangla(group.date)}
+                      </span>
+                      {/* Solid indicator line spanning from date to total indicator block */}
+                      <div className="flex-1 mx-3 border-b border-solid border-slate-200/60"></div>
+                      <div className="flex items-center gap-3 text-[12px] sm:text-[13px] font-medium text-slate-400 whitespace-nowrap">
+                        <span>মোট</span>
+                        <span className="text-[#50AD54] font-medium text-[12px] sm:text-[13px]">
+                           {toBanglaNumbers(group.incomeTotal)}
+                        </span>
+                        <span className="text-[#db4437] font-medium text-[12px] sm:text-[13px]">
+                           {toBanglaNumbers(group.expenseTotal)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Day Ledger Items Container */}
+                    <div className="space-y-2.5">
+                       {group.transactions.map((tx) => {
+                         const isIncome = tx.type === 'income';
+                         return (
+                           <div 
+                             key={tx.id} 
+                             className={`group relative rounded-[12px] px-4 py-2.5 sm:py-3 flex items-center justify-between gap-3 transition-all shadow-[0_2px_6px_rgba(0,0,0,0.015)] border ${
+                               isIncome 
+                                 ? 'bg-[#f2f7f3] border-[#d1f2d9]/15' 
+                                 : 'bg-[#fff5f5] border-[#fbdbda]/15'
+                             }`}
+                           >
+                             {/* Left side: Title and circular badge with Time detail */}
+                             <div className="flex flex-col min-w-0 justify-center">
+                               <h3 className="font-normal text-slate-800 text-[14.5px] sm:text-[15px] leading-snug truncate">
+                                 {tx.title}
+                               </h3>
+                               <div className="flex items-center gap-1.5 mt-1 select-none">
+                                 <span className={`w-[18px] h-[18px] rounded-full flex items-center justify-center font-bold text-[9px] sm:text-[10px] shrink-0 ${
+                                   isIncome
+                                     ? 'bg-[#e6f4ea] text-[#50AD54]'
+                                     : 'bg-[#fce8e6] text-[#db4437]'
+                                 }`}>
+                                   {isIncome ? '+' : '-'}
+                                 </span>
+                                 <span className="text-[10.5px] sm:text-[11px] font-medium text-slate-400">
+                                   {formatTimeToBangla(tx.rawItem.date)}
+                                 </span>
+                               </div>
+                             </div>
+
+                             {/* Right side: Amount and Menu vertically centered */}
+                             <div className="flex items-center gap-2.5 shrink-0 my-auto">
+                               <span className={`font-medium text-[15px] sm:text-[16px] whitespace-nowrap ${
+                                 isIncome ? 'text-[#50AD54]' : 'text-[#db4437]'
+                               }`}>
+                                 {toBanglaNumbers(tx.amount.toLocaleString('bn-BD'))}
+                               </span>
+
+                               {!isGeneratingPDF && (
+                                 <div className="relative action-menu-container shrink-0">
+                                   <button 
+                                     onClick={(e) => {
+                                       e.stopPropagation();
+                                       setActiveMenuId(activeMenuId === tx.id ? null : tx.id);
+                                     }}
+                                     className={`p-1 rounded-lg transition-colors ${activeMenuId === tx.id ? 'bg-slate-100/60 text-slate-800' : 'text-slate-300 hover:text-slate-600'}`}
+                                   >
+                                     <MoreVertical size={16} />
+                                   </button>
+
+                                   {activeMenuId === tx.id && (
+                                     <div className="absolute right-0 top-full mt-1.5 w-32 bg-white rounded-xl shadow-xl border border-slate-100 z-20 flex flex-col py-1 animate-in fade-in zoom-in-95 duration-150 origin-top-right">
+                                       <button 
+                                         onClick={(e) => { 
+                                           e.stopPropagation(); 
+                                           if (!isOnline) {
+                                             showToast('অফলাইনে রেকর্ড করা যাবে না', 'error');
+                                             return;
+                                           }
+                                           handleOpenEditUnified(tx); 
+                                         }}
+                                         disabled={!isOnline}
+                                         className="w-full px-3 py-2.5 text-left text-xs font-bold flex items-center gap-2 border-b border-slate-50/50 hover:bg-slate-50 text-slate-700"
+                                       >
+                                         <Pencil size={13} className="text-slate-500" /> এডিট
+                                       </button>
+                                       <button 
+                                         onClick={(e) => { 
+                                           e.stopPropagation(); 
+                                           if (!isOnline) {
+                                             showToast('অফলাইনে রেকর্ড ডিলিট করা যাবে না', 'error');
+                                             return;
+                                           }
+                                           initiateDeleteUnified(tx); 
+                                         }}
+                                         disabled={!isOnline}
+                                         className="w-full px-3 py-2.5 text-left text-xs font-bold flex items-center gap-2 hover:bg-rose-50/50 text-rose-500"
+                                       >
+                                         <Trash2 size={13} className="text-rose-500" /> ডিলিট
+                                       </button>
+                                     </div>
+                                   )}
+                                 </div>
+                                )}
+                             </div>
+                           </div>
+                         );
+                       })}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Sticky Floating Action Button on Bottom Right */}
+          {!isGeneratingPDF && (
+            <button 
+              ref={fabRef}
+              onClick={handleOpenAddModal}
+              className="fixed bottom-[76px] lg:bottom-8 right-5 lg:right-8 bg-[#1a73e8] hover:bg-blue-700 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg shadow-blue-200 active:scale-95 transition-all duration-[150ms] ease-out z-40 pointer-events-auto opacity-100 scale-100 translate-y-0"
+              style={{
+                willChange: 'transform, opacity',
+              }}
+              title="নতুন লেনদেন"
+            >
+              <Plus size={28} />
+            </button>
           )}
-        </div>
-      </div>
+        </>
+      )}
 
       <ConfirmModal 
         isOpen={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}
         onConfirm={handleConfirmDelete}
-        title="খরচ ডিলিট"
-        message="আপনি কি এই খরচের রেকর্ডটি মুছে ফেলতে চান?"
+        title={txToDelete?.type === 'expense' ? 'খরচ ডিলিট' : 'পেমেন্ট ডিলিট'}
+        message={
+          txToDelete?.type === 'expense' 
+            ? `আপনি কি"${txToDelete?.title}" খরচের রেকর্ডটি মুছে ফেলতে চান? এটি রিসাইকেল বিনে স্থানান্তরিত হবে।` 
+            : `আপনি কি "${txToDelete?.title}" পেমেন্টের রেকর্ডটি মুছে ফেলতে চান? এটি সংশ্লিষ্ট প্রজেক্ট ব্যালেন্স পুনর্নির্মাণ করবে।`
+        }
         isProcessing={isDeleting}
       />
+
+      {/* Date Filter Selection Modal */}
+      {showFilterModal && (
+        <div 
+          onClick={() => {
+            setIsStartDatePickerOpen(false);
+            setIsEndDatePickerOpen(false);
+            setShowFilterModal(false);
+          }}
+          className="fixed inset-0 z-[2000] bg-black/60 backdrop-blur-[2px] overflow-y-auto flex items-start sm:items-center justify-center p-4 animate-in fade-in duration-300"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-[28px] w-full max-w-[305px] p-5 shadow-2xl flex flex-col items-center animate-in zoom-in-95 duration-200 select-none border border-slate-100 my-auto"
+          >
+            {/* Conditional Rendering based on active subView */}
+            {modalSubView === 'main' && (
+              <div className="w-full animate-in fade-in duration-150">
+                {/* Modal Title matching Bangladesh "নির্বাচন করুন" */}
+                <h3 className="text-[20px] font-black text-slate-800 mb-5 text-center tracking-tight">
+                  নির্বাচন করুন
+                </h3>
+
+                {/* Vertical Stack of Styled Buttons following design/color in screenshot */}
+                <div className="w-full space-y-3">
+                  <button
+                    type="button"
+                    onClick={() => setModalSubView('date')}
+                    className={`w-full h-[51px] rounded-2xl text-[15px] font-medium transition-all duration-200 active:scale-[0.98] ${
+                      selectedPeriodOption === 'custom'
+                        ? 'bg-gradient-to-r from-[#1e75eb] to-[#155fc4] text-white shadow-lg shadow-blue-500/20'
+                        : 'bg-[#f3f5f8] hover:bg-[#eef1f6] text-[#1f2937]'
+                    }`}
+                  >
+                    তারিখ অনুযায়ী
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setModalSubView('month')}
+                    className={`w-full h-[51px] rounded-2xl text-[15px] font-medium transition-all duration-200 active:scale-[0.98] ${
+                      selectedPeriodOption === 'month'
+                        ? 'bg-gradient-to-r from-[#1e75eb] to-[#155fc4] text-white shadow-lg shadow-blue-500/20'
+                        : 'bg-[#f3f5f8] hover:bg-[#eef1f6] text-[#1f2937]'
+                    }`}
+                  >
+                    মাস অনুযায়ী
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setModalSubView('year')}
+                    className={`w-full h-[51px] rounded-2xl text-[15px] font-medium transition-all duration-200 active:scale-[0.98] ${
+                      selectedPeriodOption === 'year'
+                        ? 'bg-gradient-to-r from-[#1e75eb] to-[#155fc4] text-white shadow-lg shadow-blue-500/15'
+                        : 'bg-[#f3f5f8] hover:bg-[#eef1f6] text-[#1f2937]'
+                    }`}
+                  >
+                    বছর অনুযায়ী
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {modalSubView === 'date' && (
+              <div className="w-full animate-in fade-in slide-in-from-right-3 duration-200">
+                {/* Back button + Header */}
+                <div className="flex items-center gap-3 mb-5 w-full">
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      setIsStartDatePickerOpen(false);
+                      setIsEndDatePickerOpen(false);
+                      setModalSubView('main');
+                    }}
+                    className="p-1.5 hover:bg-slate-100 rounded-full transition-colors text-slate-500 shrink-0"
+                  >
+                    <ArrowLeft size={18} />
+                  </button>
+                  <span className="text-[17px] font-bold text-slate-800">তারিখ নির্বাচন করুন</span>
+                </div>
+
+                {/* Form inputs */}
+                <div className={`w-full space-y-4 transition-all duration-300 ${(isStartDatePickerOpen || isEndDatePickerOpen) ? 'pb-[260px]' : ''}`}>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold text-slate-500">শুরুর তারিখ</label>
+                    <DatePicker 
+                      value={tempCustomDates.start} 
+                      onChange={(date) => setTempCustomDates({ ...tempCustomDates, start: date })}
+                      placeholder="শুরুর তারিখ"
+                      onOpenChange={(open) => setIsStartDatePickerOpen(open)}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold text-slate-500">শেষের তারিখ</label>
+                    <DatePicker 
+                      value={tempCustomDates.end} 
+                      onChange={(date) => setTempCustomDates({ ...tempCustomDates, end: date })}
+                      placeholder="শেষের তারিখ"
+                      align="right"
+                      onOpenChange={(open) => setIsEndDatePickerOpen(open)}
+                    />
+                  </div>
+                  
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDateRange({ start: tempCustomDates.start, end: tempCustomDates.end });
+                      setSelectedPeriodOption('custom');
+                      setShowDateFilter(true);
+                      setShowFilterModal(false);
+                      setIsStartDatePickerOpen(false);
+                      setIsEndDatePickerOpen(false);
+                    }}
+                    className="w-full h-[52px] mt-4 bg-gradient-to-r from-[#1e75eb] to-[#155fc4] text-white rounded-2xl font-bold hover:opacity-95 text-[16px] transition-all shadow-lg shadow-blue-500/15"
+                  >
+                    নিশ্চিত করুন
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {modalSubView === 'month' && (
+              <div className="w-full animate-in fade-in slide-in-from-right-3 duration-200">
+                {/* Back button + Header */}
+                <div className="flex items-center gap-3 mb-5 w-full">
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      setIsStartDatePickerOpen(false);
+                      setIsEndDatePickerOpen(false);
+                      setModalSubView('main');
+                    }}
+                    className="p-1.5 hover:bg-slate-100 rounded-full transition-colors text-slate-500 shrink-0"
+                  >
+                    <ArrowLeft size={18} />
+                  </button>
+                  <span className="text-[17px] font-bold text-slate-800">চলতি বছরের মাসসমূহ</span>
+                </div>
+
+                {/* 12 Months Grid */}
+                <div className="grid grid-cols-3 gap-2 w-full max-h-[350px] overflow-y-auto pr-0.5">
+                  {[
+                    'জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
+                    'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'
+                  ].map((mName, idx) => {
+                    const currentYearValue = new Date().getFullYear();
+                    const mNumStr = String(idx + 1).padStart(2, '0');
+                    const lastDayOfM = new Date(currentYearValue, idx + 1, 0).getDate();
+                    const startVal = `${currentYearValue}-${mNumStr}-01`;
+                    const endVal = `${currentYearValue}-${mNumStr}-${lastDayOfM}`;
+                    const isActiveM = dateRange.start === startVal && dateRange.end === endVal;
+
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          setDateRange({ start: startVal, end: endVal });
+                          setSelectedPeriodOption('month');
+                          setShowDateFilter(false);
+                          setShowFilterModal(false);
+                        }}
+                        className={`py-3 rounded-xl text-[13px] font-bold transition-all duration-150 active:scale-95 text-center ${
+                          isActiveM 
+                            ? 'bg-gradient-to-r from-[#1e75eb] to-[#155fc4] text-white shadow-md shadow-blue-500/15'
+                            : 'bg-[#f3f5f8] hover:bg-[#eef1f6] text-[#1f2937]'
+                        }`}
+                      >
+                        {mName}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {modalSubView === 'year' && (
+              <div className="w-full animate-in fade-in slide-in-from-right-3 duration-200">
+                {/* Back button + Header */}
+                <div className="flex items-center gap-3 mb-5 w-full">
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      setIsStartDatePickerOpen(false);
+                      setIsEndDatePickerOpen(false);
+                      setModalSubView('main');
+                    }}
+                    className="p-1.5 hover:bg-slate-100 rounded-full transition-colors text-slate-500 shrink-0"
+                  >
+                    <ArrowLeft size={18} />
+                  </button>
+                  <span className="text-[17px] font-bold text-slate-800">সাল নির্বাচন করুন</span>
+                </div>
+
+                {/* Years Stack */}
+                <div className="flex flex-col gap-2.5 w-full max-h-[350px] overflow-y-auto pr-0.5">
+                  {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map((yearValue) => {
+                    const startVal = `${yearValue}-01-01`;
+                    const endVal = `${yearValue}-12-31`;
+                    const isActiveY = dateRange.start === startVal && dateRange.end === endVal;
+
+                    return (
+                      <button
+                        key={yearValue}
+                        type="button"
+                        onClick={() => {
+                          setDateRange({ start: startVal, end: endVal });
+                          setSelectedPeriodOption('year');
+                          setShowDateFilter(false);
+                          setShowFilterModal(false);
+                        }}
+                        className={`w-full py-3.5 rounded-2xl text-[15px] font-bold transition-all duration-150 active:scale-95 text-center ${
+                          isActiveY 
+                            ? 'bg-gradient-to-r from-[#1e75eb] to-[#155fc4] text-white shadow-md shadow-blue-500/15'
+                            : 'bg-[#f3f5f8] hover:bg-[#eef1f6] text-[#1f2937]'
+                        }`}
+                      >
+                        {toBanglaNumbers(yearValue)}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* PDF Preview Modal */}
       {pdfPreviewUrl && (
@@ -840,11 +1768,14 @@ export const Expenses: React.FC = () => {
           </div>
         </div>
       )}
+
       {isModalOpen && createPortal(
         <div className="fixed inset-0 z-[1000] bg-white flex flex-col h-[100dvh] animate-in fade-in duration-200">
             <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
               <h2 className="text-base font-bold text-slate-800">
-                {isEditing ? 'খরচ এডিট' : 'নতুন খরচ'}
+                {isEditing 
+                  ? (txModalType === 'expense' ? 'খরচ এডিট' : 'পেমেন্ট এডিট') 
+                  : (txModalType === 'expense' ? 'নতুন খরচ' : 'নতুন পেমেন্ট')}
               </h2>
               <button disabled={isSubmitting} onClick={() => setModalOpen(false)} className="p-2 bg-slate-50 rounded-full text-slate-500 hover:bg-slate-100 transition-colors">
                 <X size={20} />
@@ -854,97 +1785,212 @@ export const Expenses: React.FC = () => {
             <div className="flex-1 overflow-y-auto">
                 <form onSubmit={handleSubmit} className="px-4 pt-3 pb-24 space-y-4">
                   
-                  <div>
-                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">বিবরণ</label>
-                    <input required type="text" value={newExpense.notes} onChange={e => setNewExpense({...newExpense, notes: e.target.value})} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-rose-500 outline-none text-sm" placeholder="কিসের জন্য খরচ?" />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
-                        পরিমাণ ({user?.currency})
-                    </label>
-                    <div 
-                      onClick={() => setShowKeypad(true)}
-                      className="keypad-trigger w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-black text-xl text-rose-600 active:bg-slate-100 transition-colors flex items-center justify-between cursor-pointer"
-                    >
-                       <span>{newExpense.amount || 0}</span>
-                       <Calculator size={18} className="text-slate-400" />
+                  {/* Transaction Type Slider Segment (ONLY visible on Adding) */}
+                  {!isEditing && (
+                    <div className="bg-slate-100 p-1 rounded-2xl flex items-center justify-between select-none">
+                      <button
+                        type="button"
+                        onClick={() => setTxModalType('expense')}
+                        className={`flex-1 text-center py-2.5 text-xs font-bold rounded-xl transition-all ${
+                          txModalType === 'expense'
+                            ? 'bg-rose-500 text-white shadow-xs'
+                            : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                      >
+                        ব্যয় (-)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTxModalType('income')}
+                        className={`flex-1 text-center py-2.5 text-xs font-bold rounded-xl transition-all ${
+                          txModalType === 'income'
+                            ? 'bg-emerald-600 text-white shadow-xs'
+                            : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                      >
+                        আয় (+)
+                      </button>
                     </div>
-                  </div>
+                  )}
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">তারিখ</label>
-                      <DatePicker 
-                        value={newExpense.date}
-                        onChange={(date) => setNewExpense({...newExpense, date: date})}
-                        placeholder="তারিখ"
-                      />
-                    </div>
-                    
-                    {/* Category Input with Suggestions */}
-                    <div className="relative" ref={categoryInputRef}>
-                      <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">ক্যাটাগরি</label>
-                      <input 
-                        type="text"
-                        value={newExpense.category}
-                        onFocus={() => setShowCategorySuggestions(true)}
-                        onChange={e => {
-                          setNewExpense({...newExpense, category: e.target.value});
-                          setShowCategorySuggestions(true);
-                        }}
-                        className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none focus:ring-2 focus:ring-rose-500"
-                        placeholder="ক্যাটাগরি লিখুন..."
-                        required
-                      />
-                      
-                      {showCategorySuggestions && (newExpense.category || filteredSuggestions.length > 0) && (
-                        <div className="absolute top-full right-0 left-0 mt-1 w-full bg-white border border-slate-100 rounded-xl shadow-2xl max-h-40 overflow-y-auto z-[60]">
-                          {filteredSuggestions.map((cat, idx) => (
-                            <div key={idx} onClick={() => handleSelectCategory(cat)} className="px-4 py-3 border-b border-slate-50 hover:bg-rose-50 font-medium text-sm cursor-pointer transition-colors text-slate-700">
-                              {EXPENSE_CATEGORY_LABELS[cat] || cat}
-                            </div>
-                          ))}
-                          {!filteredSuggestions.some(c => (EXPENSE_CATEGORY_LABELS[c] || c).toLowerCase() === (newExpense.category || '').toLowerCase()) && newExpense.category && (
-                            <div className="px-4 py-3 bg-emerald-50 text-emerald-700 text-xs font-bold border-t">
-                              + নতুন ক্যাটাগরি হিসেবে যোগ হবে
+                  {txModalType === 'expense' ? (
+                    /* Expense Specific Fields */
+                    <>
+                      <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">বিবরণ</label>
+                        <input required type="text" value={newExpense.notes} onChange={e => setNewExpense({...newExpense, notes: e.target.value})} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-rose-500 outline-none text-sm" placeholder="কিসের জন্য খরচ?" />
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
+                            পরিমাণ ({user?.currency})
+                        </label>
+                        <div 
+                          onClick={() => setShowKeypad(true)}
+                          className="keypad-trigger w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-black text-xl text-rose-600 active:bg-slate-100 transition-colors flex items-center justify-between cursor-pointer"
+                        >
+                           <span>{newExpense.amount || 0}</span>
+                           <Calculator size={18} className="text-slate-500" />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">তারিখ</label>
+                          <DatePicker 
+                            value={newExpense.date}
+                            onChange={(date) => setNewExpense({...newExpense, date: date})}
+                            placeholder="তারিখ"
+                          />
+                        </div>
+                        
+                        {/* Category Input with Suggestions */}
+                        <div className="relative" ref={categoryInputRef}>
+                          <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">ক্যাটাগরি</label>
+                          <input 
+                            type="text"
+                            value={newExpense.category}
+                            onFocus={() => setShowCategorySuggestions(true)}
+                            onChange={e => {
+                              setNewExpense({...newExpense, category: e.target.value});
+                              setShowCategorySuggestions(true);
+                            }}
+                            className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none focus:ring-2 focus:ring-rose-500"
+                            placeholder="ক্যাটাগরি..."
+                            required
+                          />
+                          
+                          {showCategorySuggestions && (newExpense.category || filteredSuggestions.length > 0) && (
+                            <div className="absolute top-full right-0 left-0 mt-1 w-full bg-white border border-slate-100 rounded-xl shadow-2xl max-h-40 overflow-y-auto z-[60]">
+                              {filteredSuggestions.map((cat, idx) => (
+                                <div key={idx} onClick={() => handleSelectCategory(cat)} className="px-4 py-3 border-b border-slate-50 hover:bg-rose-50 font-medium text-xs cursor-pointer transition-colors text-slate-700">
+                                  {EXPENSE_CATEGORY_LABELS[cat] || cat}
+                                </div>
+                              ))}
+                              {!filteredSuggestions.some(c => (EXPENSE_CATEGORY_LABELS[c] || c).toLowerCase() === (newExpense.category || '').toLowerCase()) && newExpense.category && (
+                                <div className="px-4 py-2 bg-rose-50 text-rose-700 text-[10px] font-bold border-t">
+                                  + নতুন ক্যাটাগরি হিসেবে যোগ হবে
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
-                      )}
-                    </div>
-                  </div>
+                      </div>
 
-                  <button type="submit" disabled={isSubmitting} className="w-full bg-rose-600 text-white py-4 rounded-2xl font-bold text-base shadow-lg shadow-rose-200 active:scale-95 transition-transform flex items-center justify-center gap-2 mt-4">
-                    {isSubmitting ? <Loader2 className="animate-spin" /> : <Receipt />}
-                    খরচ সেভ করুন
-                  </button>
+                      <button type="submit" disabled={isSubmitting} className="w-full bg-rose-600 text-white py-4 rounded-2xl font-bold text-base shadow-lg shadow-rose-200 active:scale-95 transition-transform flex items-center justify-center gap-2 mt-4">
+                        {isSubmitting ? <Loader2 className="animate-spin" /> : <Receipt />}
+                        খরচ সেভ করুন
+                      </button>
+                    </>
+                  ) : (
+                    /* Income Specific Fields */
+                    <>
+                      {/* Searchable Project Picker */}
+                      <div className="relative" ref={projectInputRef}>
+                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">সংশ্লিষ্ট প্রজেক্ট</label>
+                        <input 
+                          type="text"
+                          value={projectSearch}
+                          onFocus={() => !isEditing && setShowProjectSuggestions(true)}
+                          onChange={e => {
+                            setProjectSearch(e.target.value);
+                            setShowProjectSuggestions(true);
+                          }}
+                          className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-slate-50 disabled:text-slate-400"
+                          placeholder={isEditing ? "প্রজেক্ট পরিবর্তনযোগ্য নয়" : "প্রজেক্টের নাম লিখে খুঁজুন..."}
+                          required
+                          disabled={isEditing}
+                        />
+                        
+                        {showProjectSuggestions && filteredProjects.length > 0 && (
+                          <div className="absolute top-full right-0 left-0 mt-1 w-full bg-white border border-slate-100 rounded-xl shadow-2xl max-h-40 overflow-y-auto z-[60]">
+                            {filteredProjects.map((proj) => (
+                              <div key={proj.id} onClick={() => handleSelectProject(proj)} className="px-4 py-3 border-b border-slate-50 hover:bg-emerald-50 text-xs cursor-pointer transition-colors text-slate-700">
+                                <p className="font-bold text-slate-800">{proj.name}</p>
+                                {proj.clientname && <p className="text-[10px] text-slate-400">ক্লায়েন্ট: {proj.clientname}</p>}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Remaining Balance Info Card */}
+                      {selectedProjectId && (
+                        <div className="bg-emerald-50/50 border border-emerald-100 p-3.5 rounded-2xl flex items-center justify-between text-xs font-bold text-emerald-800 animate-in fade-in duration-200 select-none">
+                          <span>প্রজেক্টের বকেয়া পরিমাণ:</span>
+                          <span className="font-mono text-emerald-600">৳ {toBanglaNumbers(selectedProjectDue.toLocaleString('bn-BD'))}</span>
+                        </div>
+                      )}
+
+                      {/* Payment Method Select Buttons */}
+                      <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">পেমেন্ট মেথড</label>
+                        <div className="grid grid-cols-5 gap-1.5 select-none">
+                          {['বিকাশ', 'নগদ', 'রকেট', 'ব্যাংক', 'ক্যাশ'].map((method) => (
+                            <button
+                              key={method}
+                              type="button"
+                              onClick={() => setNewIncome({ ...newIncome, method })}
+                              className={`py-2 text-center text-xs font-bold rounded-xl transition-all border ${
+                                newIncome.method === method
+                                  ? 'bg-emerald-600 border-emerald-600 text-white shadow-xs'
+                                  : 'bg-slate-50 border-slate-100 text-slate-500 hover:text-slate-700 hover:bg-slate-100/50'
+                              }`}
+                            >
+                              {method}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Transaction Amount Picker */}
+                      <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
+                            সংগৃহীত পরিমাণ ({user?.currency})
+                        </label>
+                        <div 
+                          onClick={() => setShowKeypad(true)}
+                          className="keypad-trigger w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-black text-xl text-emerald-600 active:bg-slate-100 transition-colors flex items-center justify-between cursor-pointer"
+                        >
+                           <span>{newIncome.amount || 0}</span>
+                           <Calculator size={18} className="text-slate-500" />
+                        </div>
+                      </div>
+
+                      {/* Date Picker */}
+                      <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">তারিখ</label>
+                        <DatePicker 
+                          value={newIncome.date}
+                          onChange={(date) => setNewIncome({...newIncome, date: date})}
+                          placeholder="সংগ্রহের তারিখ"
+                        />
+                      </div>
+
+                      <button type="submit" disabled={isSubmitting} className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold text-base shadow-lg shadow-emerald-200 active:scale-95 transition-transform flex items-center justify-center gap-2 mt-4">
+                        {isSubmitting ? <Loader2 className="animate-spin" /> : <Receipt />}
+                        আয় সেভ করুন
+                      </button>
+                    </>
+                  )}
                 </form>
             </div>
             
             <NumericKeypad 
               isOpen={showKeypad}
               onClose={() => setShowKeypad(false)}
-              onValueChange={(val) => setNewExpense({...newExpense, amount: val})}
-              initialValue={newExpense.amount}
-              title="খরচের পরিমাণ"
+              onValueChange={(val) => {
+                if (txModalType === 'expense') {
+                  setNewExpense({...newExpense, amount: val});
+                } else {
+                  setNewIncome({...newIncome, amount: val});
+                }
+              }}
+              initialValue={txModalType === 'expense' ? newExpense.amount : newIncome.amount}
+              title={txModalType === 'expense' ? "খরচের পরিমাণ" : "আয়ের পরিমাণ"}
             />
         </div>,
         document.body
-      )}
-      </div>
-      )}
-
-      {activeSubTab === 'dues' && (
-        <div className="animate-in fade-in duration-300">
-          <DuesManager />
-        </div>
-      )}
-
-      {activeSubTab === 'savings' && (
-        <div className="animate-in fade-in duration-300 animate-out">
-          <Savings />
-        </div>
       )}
     </div>
   );
@@ -1622,6 +2668,871 @@ const DuesManager: React.FC = () => {
                 </form>
               </div>
             </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ==========================================
+// 3. SAVINGS & GOALS TRACKER VIEW
+// ==========================================
+
+interface SavingsGoal {
+  id: string;
+  title: string;
+  category: string;
+  targetAmount: number;
+  currentAmount: number;
+  deadline: string;
+  notes?: string;
+  createdAt: string;
+  history: { id: string; amount: number; type: 'deposit' | 'withdraw'; date: string; notes?: string }[];
+}
+
+const SavingsManager: React.FC = () => {
+  const { user, showToast } = useAppContext();
+  const userId = user?.id || 'default';
+  
+  const [goals, setGoals] = useState<SavingsGoal[]>(() => {
+    const cached = localStorage.getItem(`savings_goals_${userId}`);
+    return cached ? JSON.parse(cached) : [
+      {
+        id: 'default-1',
+        title: 'ভবিষ্যত সঞ্চয়',
+        category: 'জরুরি তহবিল',
+        targetAmount: 50000,
+        currentAmount: 15000,
+        deadline: '2026-12-31',
+        notes: 'জরুরি যেকোনো প্রয়োজনের জন্য ফান্ড',
+        createdAt: '2026-05-01',
+        history: [
+          { id: 'h-1', amount: 10000, type: 'deposit', date: '2026-05-01', notes: 'প্রাথমিক সঞ্চয়' },
+          { id: 'h-2', amount: 5000, type: 'deposit', date: '2026-05-15', notes: 'মে মাসের কিস্তি' }
+        ]
+      }
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem(`savings_goals_${userId}`, JSON.stringify(goals));
+  }, [goals, userId]);
+
+  const [isAddModalOpen, setAddModalOpen] = useState(false);
+  const [isTxModalOpen, setTxModalOpen] = useState(false);
+  const [selectedGoal, setSelectedGoal] = useState<SavingsGoal | null>(null);
+  const [txType, setTxType] = useState<'deposit' | 'withdraw'>('deposit');
+  
+  // New Goal Fields
+  const [title, setTitle] = useState('');
+  const [category, setCategory] = useState('');
+  const [targetAmount, setTargetAmount] = useState('');
+  const [currentAmount, setCurrentAmount] = useState('');
+  const [deadline, setDeadline] = useState(new Date().toISOString().split('T')[0]);
+  const [notes, setNotes] = useState('');
+
+  // Tx Fields
+  const [txAmount, setTxAmount] = useState('');
+  const [txNotes, setTxNotes] = useState('');
+
+  const handleCreateGoal = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title || !targetAmount) return;
+
+    const newGoal: SavingsGoal = {
+      id: crypto.randomUUID(),
+      title,
+      category: category || 'অন্যান্য',
+      targetAmount: Number(targetAmount),
+      currentAmount: Number(currentAmount) || 0,
+      deadline,
+      notes,
+      createdAt: new Date().toISOString().split('T')[0],
+      history: currentAmount && Number(currentAmount) > 0 ? [
+        {
+          id: crypto.randomUUID(),
+          amount: Number(currentAmount),
+          type: 'deposit',
+          date: new Date().toISOString().split('T')[0],
+          notes: 'প্রাথমিক সঞ্চয়'
+        }
+      ] : []
+    };
+
+    setGoals([newGoal, ...goals]);
+    showToast('নতুন সঞ্চয় লক্ষ্য তৈরি হয়েছে!', 'success');
+    resetForm();
+    setAddModalOpen(false);
+  };
+
+  const resetForm = () => {
+    setTitle('');
+    setCategory('');
+    setTargetAmount('');
+    setCurrentAmount('');
+    setDeadline(new Date().toISOString().split('T')[0]);
+    setNotes('');
+  };
+
+  const handleSavingsTransaction = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedGoal || !txAmount) return;
+
+    const amountNum = Number(txAmount);
+    let updatedCurrent = selectedGoal.currentAmount;
+
+    if (txType === 'deposit') {
+      updatedCurrent += amountNum;
+    } else {
+      if (amountNum > selectedGoal.currentAmount) {
+        showToast('সঞ্চয়ের চেয়ে বেশি টাকা তোলা যাবে না!', 'error');
+        return;
+      }
+      updatedCurrent -= amountNum;
+    }
+
+    const newTx = {
+      id: crypto.randomUUID(),
+      amount: amountNum,
+      type: txType,
+      date: new Date().toISOString().split('T')[0],
+      notes: txNotes
+    };
+
+    const updated = goals.map(g => {
+      if (g.id === selectedGoal.id) {
+        return {
+          ...g,
+          currentAmount: updatedCurrent,
+          history: [newTx, ...g.history]
+        };
+      }
+      return g;
+    });
+
+    setGoals(updated);
+    showToast(txType === 'deposit' ? 'টাকা সফলভাবে জমা হয়েছে' : 'টাকা সফলভাবে তোলা হয়েছে', 'success');
+    setTxAmount('');
+    setTxNotes('');
+    setTxModalOpen(false);
+    setSelectedGoal(null);
+  };
+
+  const handleDeleteGoal = (goalId: string) => {
+    if (window.confirm('আপনি কি এই সঞ্চয় লক্ষ্যটি মুছে ফেলতে চান?')) {
+      setGoals(goals.filter(g => g.id !== goalId));
+      showToast('সঞ্চয় লক্ষ্য মুছে ফেলা হয়েছে', 'success');
+    }
+  };
+
+  const currency = user?.currency || '৳';
+
+  return (
+    <div className="space-y-4 animate-in fade-in duration-300">
+      {/* Top Header Card */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-slate-800">সঞ্চয় ও লক্ষ্য</h2>
+          <p className="text-xs text-slate-500 font-medium">আপনার ভবিষ্যতের জন্য সুনির্দিষ্ট সঞ্চয় পরিকল্পনা গড়ে তুলুন</p>
+        </div>
+        <button
+          onClick={() => { resetForm(); setAddModalOpen(true); }}
+          className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm active:scale-95 transition-transform"
+        >
+          <Plus size={16} /> লক্ষ্য যোগ করুন
+        </button>
+      </div>
+
+      {/* Grid of Goals */}
+      {goals.length === 0 ? (
+        <div className="bg-white border border-slate-100 p-10 rounded-2xl text-center text-slate-400">
+          <p className="text-sm font-medium">কোনো সঞ্চয় লক্ষ্য তৈরি করা হয়নি এখনও।</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {goals.map(goal => {
+            const percent = Math.min(Math.round((goal.currentAmount / goal.targetAmount) * 100), 100);
+            return (
+              <div key={goal.id} className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm space-y-3 relative overflow-hidden text-left">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <span className="text-[10px] font-bold bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full border border-indigo-100">
+                      {goal.category}
+                    </span>
+                    <h3 className="text-base font-black text-slate-800 mt-1.5">{goal.title}</h3>
+                    {goal.notes && <p className="text-xs text-slate-400 font-medium mt-0.5">{goal.notes}</p>}
+                  </div>
+                  <button
+                    onClick={() => handleDeleteGoal(goal.id)}
+                    className="p-1.5 bg-rose-50 text-rose-500 rounded-lg shrink-0 hover:bg-rose-100 transition-colors"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="space-y-1">
+                  <div className="flex justify-between items-baseline text-xs">
+                    <span className="text-slate-500 font-medium">অগ্রগতি</span>
+                    <span className="text-indigo-600 font-black">{percent}%</span>
+                  </div>
+                  <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                    <div
+                      className="bg-indigo-600 h-full rounded-full transition-all duration-500"
+                      style={{ width: `${percent}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Amount details */}
+                <div className="grid grid-cols-2 gap-2 text-xs py-1">
+                  <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                    <span className="text-slate-400 font-bold block text-[9px] uppercase">বর্তমান সঞ্চয়</span>
+                    <span className="text-sm font-black text-emerald-600 mt-0.5 block">{currency} {goal.currentAmount.toLocaleString('bn-BD')}</span>
+                  </div>
+                  <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                    <span className="text-slate-400 font-bold block text-[9px] uppercase">টার্গেট লক্ষ্য</span>
+                    <span className="text-sm font-black text-slate-700 mt-0.5 block">{currency} {goal.targetAmount.toLocaleString('bn-BD')}</span>
+                  </div>
+                </div>
+
+                {/* Action Controls & Date */}
+                <div className="flex justify-between items-center pt-1.5 border-t border-slate-50">
+                  <span className="text-[10px] text-slate-400 font-black">টার্গেট ডেট: {goal.deadline}</span>
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={() => {
+                        setSelectedGoal(goal);
+                        setTxType('deposit');
+                        setTxModalOpen(true);
+                      }}
+                      className="px-3 py-1.5 bg-emerald-500 text-white rounded-lg text-[10px] font-black hover:bg-emerald-600 active:scale-95 transition-all shadow-sm"
+                    >
+                      টাকা জমা
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedGoal(goal);
+                        setTxType('withdraw');
+                        setTxModalOpen(true);
+                      }}
+                      className="px-3 py-1.5 bg-rose-500 text-white rounded-lg text-[10px] font-black hover:bg-rose-600 active:scale-95 transition-all shadow-sm"
+                    >
+                      উত্তোলন
+                    </button>
+                  </div>
+                </div>
+
+                {/* History list preview */}
+                {goal.history && goal.history.length > 0 && (
+                  <div className="space-y-1.5 mt-2.5 pt-2 border-t border-slate-100">
+                    <span className="text-[9px] font-bold text-slate-400 block uppercase">শেষ লেনদেন সমূহ</span>
+                    <div className="divide-y divide-slate-50 max-h-24 overflow-y-auto pr-1">
+                      {goal.history.slice(0, 3).map(h => (
+                        <div key={h.id} className="flex justify-between py-1 text-[10px]">
+                          <span className={`font-medium ${h.type === 'deposit' ? 'text-emerald-600' : 'text-rose-500'}`}>
+                            {h.type === 'deposit' ? 'মেলালেন +' : 'তুললেন -'} {currency}{h.amount} <span className="text-slate-400">({h.notes || 'কোনো নোট নেই'})</span>
+                          </span>
+                          <span className="text-slate-400 font-medium">{h.date}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Add Goal Modal */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-sm p-5 shadow-2xl relative text-left">
+            <h3 className="text-base font-bold text-slate-800 text-center mb-4">নতুন সঞ্চয় লক্ষ্য তৈরি</h3>
+            <form onSubmit={handleCreateGoal} className="space-y-3.5">
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">লক্ষে্যর নাম</label>
+                <input required type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="যেমন: নতুন ল্যাপটপ কেনা" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-800 text-xs" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">খাত / ক্যাটাগরি</label>
+                  <input type="text" value={category} onChange={e => setCategory(e.target.value)} placeholder="যেমন: ডিভাইস" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-800 text-xs" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">লক্ষ্য তারিখ</label>
+                  <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-800 text-xs" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">টার্গেট পরিমাণ</label>
+                  <input required type="number" value={targetAmount} onChange={e => setTargetAmount(e.target.value)} placeholder="টার্গেট টাকা" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-800 text-xs" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">প্রাথমিক জমা</label>
+                  <input type="number" value={currentAmount} onChange={e => setCurrentAmount(e.target.value)} placeholder="প্রাথমিক টাকা" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-800 text-xs" />
+                </div>
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">বিবরণ (ঐচ্ছিক)</label>
+                <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="সংক্ষিপ্ত বর্ণনা..." className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-800 text-xs h-20 resize-none" />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button type="button" onClick={() => setAddModalOpen(false)} className="flex-1 py-3.5 bg-slate-100 text-slate-500 font-bold text-xs rounded-xl hover:bg-slate-200 transition-colors">বাতিল</button>
+                <button type="submit" className="flex-1 py-3.5 bg-indigo-600 text-white font-bold text-xs rounded-xl hover:bg-slate-800 transition-colors shadow-sm animate-pulse-once">তৈরি করুন</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Transaction Deposit/Withdrawal Modal */}
+      {isTxModalOpen && selectedGoal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-sm p-5 shadow-2xl relative text-left">
+            <h3 className="text-base font-bold text-slate-800 text-center mb-2">
+              {txType === 'deposit' ? 'সঞ্চয় জমা করুন' : 'সঞ্চয় উত্তোলন করুন'}
+            </h3>
+            <p className="text-xs text-slate-400 text-center mb-4">লক্ষ্য: {selectedGoal.title}</p>
+            <form onSubmit={handleSavingsTransaction} className="space-y-3.5">
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase">টাকার পরিমাণ</label>
+                <input required type="number" value={txAmount} onChange={e => setTxAmount(e.target.value)} placeholder="টাকা টাইপ করুন" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-black text-slate-800 text-base" />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase">নোট বা মন্তব্য</label>
+                <input type="text" value={txNotes} onChange={e => setTxNotes(e.target.value)} placeholder="যেমন: মে মাসের বোনাস" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-800 text-xs" />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button type="button" onClick={() => { setTxAmount(''); setTxNotes(''); setTxModalOpen(false); }} className="flex-1 py-3 bg-slate-100 text-slate-500 font-bold text-xs rounded-xl hover:bg-slate-200 transition-colors">বাতিল</button>
+                <button type="submit" className={`flex-1 py-3 text-white font-bold text-xs rounded-xl transition-colors shadow-sm ${txType === 'deposit' ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-rose-500 hover:bg-rose-600'}`}>
+                  {txType === 'deposit' ? 'জমা করুন' : 'উত্তোলন করুন'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ==========================================
+// 4. REPORTS & ANALYSIS VIEW (CATEGORY-WISE)
+// ==========================================
+
+const ExpenseCategoryReports: React.FC<{ expenses: any[]; user: any }> = ({ expenses, user }) => {
+  const [reportRange, setReportRange] = useState<'weekly' | 'monthly' | 'all'>('monthly');
+  const currency = user?.currency || '৳';
+
+  const finalExpenses = useMemo(() => {
+    const now = new Date();
+    return expenses.filter(e => {
+      const expenseDate = new Date(e.date);
+      if (reportRange === 'weekly') {
+        const diff = now.getTime() - expenseDate.getTime();
+        return diff <= 7 * 24 * 60 * 60 * 1000;
+      }
+      if (reportRange === 'monthly') {
+        const diff = now.getTime() - expenseDate.getTime();
+        return diff <= 30 * 24 * 60 * 60 * 1000;
+      }
+      return true;
+    });
+  }, [expenses, reportRange]);
+
+  const categoryTotals = useMemo(() => {
+    const totals: { [key: string]: number } = {};
+    finalExpenses.forEach(e => {
+      totals[e.category] = (totals[e.category] || 0) + e.amount;
+    });
+    
+    const sorted = Object.entries(totals).map(([category, amount]) => {
+      return {
+        name: EXPENSE_CATEGORY_LABELS[category] || category,
+        amount,
+      };
+    }).sort((a, b) => b.amount - a.amount);
+
+    const totalCost = sorted.reduce((sum, item) => sum + item.amount, 0);
+
+    return sorted.map(item => ({
+      ...item,
+      percentage: totalCost > 0 ? Math.round((item.amount / totalCost) * 100) : 0,
+    }));
+  }, [finalExpenses]);
+
+  const totalFilteredExpense = useMemo(() => {
+    return categoryTotals.reduce((sum, item) => sum + item.amount, 0);
+  }, [categoryTotals]);
+
+  const COLORS = ['#4f46e5', '#f43f5e', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#14b8a6'];
+
+  return (
+    <div className="space-y-4 animate-in fade-in duration-300">
+      <div className="flex flex-col gap-1.5 md:flex-row md:items-center md:justify-between text-left">
+        <div>
+          <h2 className="text-lg font-bold text-slate-800">খরচের ক্যাটাগরিভিত্তিক রিপোর্ট</h2>
+          <p className="text-xs text-slate-500 font-medium">আপনার কোন খাতগুলোতে সবচেয়ে বেশি খরচ হচ্ছে তার বিশ্লেষণ</p>
+        </div>
+        
+        <div className="flex bg-slate-100 p-1 rounded-xl w-fit self-start md:self-auto select-none mt-1">
+          <button
+            onClick={() => setReportRange('weekly')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              reportRange === 'weekly' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            সাপ্তাহিক
+          </button>
+          <button
+            onClick={() => setReportRange('monthly')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              reportRange === 'monthly' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            মাসিক
+          </button>
+          <button
+            onClick={() => setReportRange('all')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              reportRange === 'all' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            সকল সময়
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-5 shadow-sm text-center">
+        <span className="text-xs text-indigo-700 font-bold tracking-wider block uppercase">
+          {reportRange === 'weekly' ? 'গত ৭ দিনের মোট খরচ' : reportRange === 'monthly' ? 'গত ৩০ দিনের মোট খরচ' : 'সর্বমোট ব্যয়িত অর্থ'}
+        </span>
+        <h3 className="text-3xl font-black text-indigo-900 mt-1">
+          {currency} {totalFilteredExpense.toLocaleString('bn-BD')}
+        </h3>
+        <span className="text-[10px] text-indigo-600 font-medium mt-1 inline-block bg-white/60 px-2 py-0.5 rounded-full">
+          মোট খরচের ক্যাটাগরি রেকর্ড: {categoryTotals.length} টি
+        </span>
+      </div>
+
+      {categoryTotals.length === 0 ? (
+        <div className="bg-white p-12 text-center rounded-2xl shadow-sm border border-slate-100 text-slate-400 font-medium">
+          কোনো খরচের হদিস পাওয়া যায়নি এই সময়কালে।
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm space-y-4 text-left">
+            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5 border-b border-slate-50 pb-2.5">
+              <span className="w-1.5 h-4 bg-indigo-600 rounded-full"></span> ক্যাটাগরি শেয়ার (অংশ)
+            </h3>
+            <div className="space-y-3.5 max-h-72 overflow-y-auto pr-1">
+              {categoryTotals.map((item, idx) => (
+                <div key={idx} className="space-y-1 text-left">
+                  <div className="flex justify-between items-baseline text-xs font-bold text-slate-700">
+                    <span className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: COLORS[idx % COLORS.length] }}></span>
+                      {item.name}
+                    </span>
+                    <span className="text-slate-500 font-medium text-right">{currency} {item.amount.toLocaleString('bn-BD')} ({item.percentage}%)</span>
+                  </div>
+                  <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-300"
+                      style={{ width: `${item.percentage}%`, backgroundColor: COLORS[idx % COLORS.length] }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm flex flex-col justify-between text-left">
+            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5 border-b border-slate-50 pb-2.5 mb-4">
+              <span className="w-1.5 h-4 bg-rose-500 rounded-full"></span> গ্রাফিক্যাল ক্যাটাগরি বিশ্লেষণ
+            </h3>
+            
+            <div className="h-52 w-full flex items-center justify-center relative">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} debounce={30}>
+                <PieChart>
+                  <Pie
+                    data={categoryTotals}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={45}
+                    outerRadius={65}
+                    paddingAngle={3}
+                    dataKey="amount"
+                  >
+                    {categoryTotals.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <RechartsTooltip
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 10px rgba(0,0,0,0.06)', fontSize: '11px', fontWeight: 'bold' }}
+                    formatter={(val: number) => [`${currency} ${val.toLocaleString('bn-BD')}`, 'টাকা']}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+              
+              <div className="absolute flex flex-col items-center justify-center">
+                <span className="text-[10px] text-slate-400 font-black uppercase">খাত অংশ</span>
+                <span className="text-xs font-bold text-slate-600">{categoryTotals.length} টি</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-1.5 text-[9px] font-bold text-slate-500 pt-3 border-t border-slate-100 mt-2">
+              {categoryTotals.slice(0, 6).map((item, index) => (
+                <div key={index} className="flex items-center gap-1.5 truncate">
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: COLORS[index % COLORS.length] }}></span>
+                  <span className="truncate">{item.name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ==========================================
+// 5. TASK CHECKLIST & BUDGET TRACKER VIEW
+// ==========================================
+
+interface TodoTask {
+  id: string;
+  title: string;
+  amount?: number;
+  dueDate: string;
+  completed: boolean;
+  createdAt: string;
+}
+
+interface BudgetLimit {
+  category: string;
+  limitAmount: number;
+}
+
+const BudgetsAndTasksManager: React.FC<{ expenses: any[]; user: any }> = ({ expenses, user }) => {
+  const { showToast } = useAppContext();
+  const userId = user?.id || 'default';
+  const currency = user?.currency || '৳';
+
+  const [budgets, setBudgets] = useState<BudgetLimit[]>(() => {
+    const cached = localStorage.getItem(`budget_limits_${userId}`);
+    return cached ? JSON.parse(cached) : [
+      { category: 'বাজার', limitAmount: 10000 },
+      { category: 'যাতায়াত', limitAmount: 2000 },
+      { category: 'ওষুধ', limitAmount: 3000 }
+    ];
+  });
+
+  const [tasks, setTasks] = useState<TodoTask[]>(() => {
+    const cached = localStorage.getItem(`budget_tasks_${userId}`);
+    return cached ? JSON.parse(cached) : [
+      { id: 't-1', title: 'চলতি মাসের বিদ্যুৎ বিল পরিশোধ করা', amount: 1200, dueDate: new Date().toISOString().split('T')[0], completed: false, createdAt: new Date().toISOString().split('T')[0] },
+      { id: 't-2', title: 'ইন্টারনেট বিল পরিশোধ করা', amount: 500, dueDate: new Date().toISOString().split('T')[0], completed: true, createdAt: new Date().toISOString().split('T')[0] }
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem(`budget_limits_${userId}`, JSON.stringify(budgets));
+  }, [budgets, userId]);
+
+  useEffect(() => {
+    localStorage.setItem(`budget_tasks_${userId}`, JSON.stringify(tasks));
+  }, [tasks, userId]);
+
+  const [activeSubTab, setActiveSubTab] = useState<'budget' | 'checklist'>('budget');
+  
+  const [isBudgetModalOpen, setBudgetModalOpen] = useState(false);
+  const [isTaskModalOpen, setTaskModalOpen] = useState(false);
+  
+  const [budCategory, setBudCategory] = useState('');
+  const [budLimit, setBudLimit] = useState('');
+
+  const [taskTitle, setTaskTitle] = useState('');
+  const [taskAmount, setTaskAmount] = useState('');
+  const [taskDate, setTaskDate] = useState(new Date().toISOString().split('T')[0]);
+
+  const actualCurrentMonthExpenses = useMemo(() => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    const grouped: { [key: string]: number } = {};
+    expenses.forEach(e => {
+      const expenseDate = new Date(e.date);
+      if (expenseDate.getMonth() === currentMonth && expenseDate.getFullYear() === currentYear) {
+         grouped[e.category] = (grouped[e.category] || 0) + e.amount;
+      }
+    });
+    return grouped;
+  }, [expenses]);
+
+  const handleSaveBudget = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!budCategory || !budLimit) return;
+
+    const limitNum = Number(budLimit);
+    const existingIdx = budgets.findIndex(b => b.category.toLowerCase() === budCategory.toLowerCase());
+
+    if (existingIdx !== -1) {
+      const updated = [...budgets];
+      updated[existingIdx].limitAmount = limitNum;
+      setBudgets(updated);
+    } else {
+      setBudgets([...budgets, { category: budCategory, limitAmount: limitNum }]);
+    }
+
+    showToast('বাজেট লিমিট সেভ হয়েছে!', 'success');
+    setBudCategory('');
+    setBudLimit('');
+    setBudgetModalOpen(false);
+  };
+
+  const handleDeleteBudget = (category: string) => {
+    if (window.confirm(`${category} খাতের budget লিমিট অপসারণ করতে চান?`)) {
+      setBudgets(budgets.filter(b => b.category !== category));
+      showToast('বাজেট অপসারণ করা হয়েছে', 'success');
+    }
+  };
+
+  const handleAddTask = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!taskTitle) return;
+
+    const newTask: TodoTask = {
+      id: crypto.randomUUID(),
+      title: taskTitle,
+      amount: taskAmount ? Number(taskAmount) : undefined,
+      dueDate: taskDate,
+      completed: false,
+      createdAt: new Date().toISOString().split('T')[0]
+    };
+
+    setTasks([newTask, ...tasks]);
+    showToast('চেকলিস্টে নতুন কাজ যোগ হয়েছে!', 'success');
+    setTaskTitle('');
+    setTaskAmount('');
+    setTaskDate(new Date().toISOString().split('T')[0]);
+    setTaskModalOpen(false);
+  };
+
+  const toggleTaskCompleted = (taskId: string) => {
+    setTasks(tasks.map(t => t.id === taskId ? { ...t, completed: !t.completed } : t));
+    showToast('কাজের অবস্থা আপডেট হয়েছে!', 'success');
+  };
+
+  const handleDeleteTask = (taskId: string) => {
+    setTasks(tasks.filter(t => t.id !== taskId));
+    showToast('কাজ ডিলিট হয়েছে', 'success');
+  };
+
+  return (
+    <div className="space-y-4 animate-in fade-in duration-300">
+      <div className="flex justify-between items-center bg-slate-100 p-1 rounded-2xl w-full max-w-sm mx-auto select-none border border-slate-200">
+        <button
+          onClick={() => setActiveSubTab('budget')}
+          className={`flex-1 py-2 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 ${
+            activeSubTab === 'budget' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <Receipt size={14} /> বাজেট সীমানা
+        </button>
+        <button
+          onClick={() => setActiveSubTab('checklist')}
+          className={`flex-1 py-2 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 ${
+            activeSubTab === 'checklist' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <ListChecks size={14} /> খরচ চেকলিস্ট
+        </button>
+      </div>
+
+      {activeSubTab === 'budget' ? (
+        <div className="space-y-4">
+          <div className="flex justify-between items-center mb-1 text-left">
+            <div>
+              <h3 className="text-base font-bold text-slate-800">বাজেট লিমিট</h3>
+              <p className="text-xs text-slate-400 font-medium">প্রতি মাসের খরচ নিয়ন্ত্রণে রাখতে খাতের বাজেট সেট করুন</p>
+            </div>
+            <button
+              onClick={() => { setBudCategory(''); setBudLimit(''); setBudgetModalOpen(true); }}
+              className="bg-indigo-600 text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow-sm active:scale-95 transition-transform shrink-0 flex items-center gap-1"
+            >
+              <Plus size={14} /> বাজেট সেট
+            </button>
+          </div>
+
+          {budgets.length === 0 ? (
+            <div className="bg-white border p-10 rounded-2xl text-center text-slate-400">
+              কোনো খাতের বাজেট সেট করা হয়নি এখনও।
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {budgets.map((bud, idx) => {
+                const actual = actualCurrentMonthExpenses[bud.category] || 0;
+                const ratio = Math.min(Math.round((actual / bud.limitAmount) * 100), 200);
+                
+                let badgeText = 'বাজেট ঠিক আছে';
+                let alertColor = 'bg-emerald-50 border-emerald-100 text-emerald-600';
+
+                if (ratio >= 100) {
+                  badgeText = 'বাজেট ওভার!';
+                  alertColor = 'bg-rose-50 border-rose-100 text-rose-600';
+                } else if (ratio >= 80) {
+                  badgeText = 'সীমার কাছাকাছি!';
+                  alertColor = 'bg-amber-50 border-amber-100 text-amber-600';
+                }
+
+                return (
+                  <div key={idx} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-3 relative overflow-hidden text-left">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h4 className="text-sm font-black text-slate-800">{EXPENSE_CATEGORY_LABELS[bud.category] || bud.category}</h4>
+                        <span className={`text-[9px] font-bold mt-1 inline-block px-2 py-0.5 rounded-full border ${alertColor}`}>
+                          {badgeText} ({ratio}%)
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteBudget(bud.category)}
+                        className="p-1 text-slate-300 hover:text-rose-500 rounded-lg transition-colors"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs font-medium">
+                        <span className="text-slate-400">ব্যয়িত: {currency} {actual.toLocaleString('bn-BD')}</span>
+                        <span className="text-slate-500">বাজেট: {currency} {bud.limitAmount.toLocaleString('bn-BD')}</span>
+                      </div>
+                      <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-300`}
+                          style={{ width: `${Math.min(ratio, 100)}%`, backgroundColor: ratio >= 100 ? '#e11d48' : ratio >= 80 ? '#f59e0b' : '#10b981' }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="flex justify-between items-center mb-1 text-left">
+            <div>
+              <h3 className="text-base font-bold text-slate-800">খরচের চেকলিস্ট</h3>
+              <p className="text-xs text-slate-400 font-medium">প্রয়োজনীয় খরচের বা গুরুত্বপূর্ণ কাজের চেকলিস্ট তৈরি ও ট্র্যাকিং করুন</p>
+            </div>
+            <button
+              onClick={() => { setTaskTitle(''); setTaskAmount(''); setTaskModalOpen(true); }}
+              className="bg-indigo-600 text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow-sm active:scale-95 transition-transform shrink-0 flex items-center gap-1"
+            >
+              <Plus size={14} /> কাজ যোগ
+            </button>
+          </div>
+
+          {tasks.length === 0 ? (
+            <div className="bg-white border p-10 rounded-2xl text-center text-slate-400">
+               কোনো খরচের কাজ যোগ করা হয়নি এখনও।
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+              {tasks.map(task => (
+                <div
+                  key={task.id}
+                  className={`p-3 rounded-2xl border flex items-center justify-between gap-3 shadow-sm transition-all text-left ${
+                    task.completed ? 'bg-slate-50/50 border-slate-100 opacity-60' : 'bg-white border-slate-100 hover:border-indigo-100'
+                  }`}
+                >
+                  <div className="flex items-start gap-3 min-w-0">
+                    <button
+                      onClick={() => toggleTaskCompleted(task.id)}
+                      className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
+                        task.completed ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-300 hover:border-indigo-500'
+                      }`}
+                    >
+                      {task.completed && <Check size={14} strokeWidth={3} />}
+                    </button>
+                    <div className="min-w-0 text-left">
+                      <h4 className={`text-xs font-bold leading-tight ${task.completed ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
+                        {task.title}
+                      </h4>
+                      <div className="flex items-center gap-2 mt-1 text-[9px] font-bold text-slate-400">
+                        <span>মেয়াদ: {task.dueDate}</span>
+                        {task.amount && <span>• প্রাক্কলিত: {currency} {task.amount.toLocaleString('bn-BD')}</span>}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleDeleteTask(task.id)}
+                    className="p-1.5 text-slate-300 hover:text-rose-500 rounded-lg shrink-0 transition-colors"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Budget Limit Set Modals */}
+      {isBudgetModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-sm p-5 shadow-2xl relative text-left">
+            <h3 className="text-base font-bold text-slate-800 text-center mb-4">ঋণ বা খরচের বাজেট লিমিট</h3>
+            <form onSubmit={handleSaveBudget} className="space-y-4">
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase">খাত / ক্যাটাগরি</label>
+                <input required type="text" value={budCategory} onChange={e => setBudCategory(e.target.value)} placeholder="যেমন: বাজার, যাতায়াত" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-800 text-xs" />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase">বাজেট পরিমাণ</label>
+                <input required type="number" value={budLimit} onChange={e => setBudLimit(e.target.value)} placeholder="সর্বোচ্চ টাকা লিমিট" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-black text-slate-800 text-base" />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button type="button" onClick={() => setBudgetModalOpen(false)} className="flex-1 py-3 bg-slate-100 text-slate-500 font-bold text-xs rounded-xl hover:bg-slate-200 transition-colors">বাতিল</button>
+                <button type="submit" className="flex-1 py-3 bg-indigo-600 text-white font-bold text-xs rounded-xl hover:bg-indigo-700 transition-colors shadow-sm">বাজেট সেভ</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Checklist Tasks Set Modal */}
+      {isTaskModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-sm p-5 shadow-2xl relative text-left">
+            <h3 className="text-base font-bold text-slate-800 text-center mb-4">নতুন খরচ বা ডিল যোগ</h3>
+            <form onSubmit={handleAddTask} className="space-y-3.5">
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase">কাজের নাম</label>
+                <input required type="text" value={taskTitle} onChange={e => setTaskTitle(e.target.value)} placeholder="যেমন: বাড়ি ভাড়া পরিশোধ করা" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-800 text-xs" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase">সম্ভাব্য খরচ</label>
+                  <input type="number" value={taskAmount} onChange={e => setTaskAmount(e.target.value)} placeholder="ঐচ্ছিক" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-800 text-xs" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase">টার্গেট ডেট</label>
+                  <input required type="date" value={taskDate} onChange={e => setTaskDate(e.target.value)} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-800 text-xs" />
+                </div>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button type="button" onClick={() => setTaskModalOpen(false)} className="flex-1 py-3 bg-slate-100 text-slate-500 font-bold text-xs rounded-xl hover:bg-slate-200 transition-colors">বাতিল</button>
+                <button type="submit" className="flex-1 py-3 bg-indigo-600 text-white font-bold text-xs rounded-xl hover:bg-indigo-700 transition-colors shadow-sm">কাজ যোগ</button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

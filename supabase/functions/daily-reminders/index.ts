@@ -20,41 +20,6 @@ serve(async (req) => {
   }
 
   try {
-    // Detect manual test run from request body (e.g. Supabase dashboard's default {"name": "Functions"})
-    let isTestRun = false;
-    let bodyText = "";
-    try {
-      const clonedReq = req.clone();
-      bodyText = await clonedReq.text();
-      console.log(`Raw request body received: "${bodyText}"`);
-    } catch (e: any) {
-      console.log("Could not read request body:", e.message);
-    }
-
-    if (bodyText) {
-      try {
-        const bodyObj = JSON.parse(bodyText);
-        if (bodyObj && (
-          bodyObj.name === "Functions" || 
-          bodyObj.name === "test" || 
-          bodyObj.name === "manual" || 
-          bodyObj.test === true || 
-          bodyObj.manual === true
-        )) {
-          isTestRun = true;
-        }
-      } catch (_) {
-        const cleanBody = bodyText.trim().toLowerCase();
-        if (cleanBody.includes("test") || cleanBody.includes("manual") || cleanBody.includes("functions")) {
-          isTestRun = true;
-        }
-      }
-    }
-
-    if (isTestRun) {
-      console.log("🔔 [TEST RUN] Detected manual test run. Timing filters and recent notification throttling will be bypassed.");
-    }
-
     // 1. Initialize Supabase Client with Service Role Key to bypass RLS
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -73,24 +38,7 @@ serve(async (req) => {
 
     if (profileError) throw profileError
 
-    console.log(`Found ${profiles?.length || 0} users with FCM tokens in database.`);
-
-    // If it's a test run, print detailed logs for FCM tokens found
-    if (isTestRun) {
-      console.log("=============================================================");
-      console.log("=== [TEST RUN] ACTIVE USER DEVICE TOKENS FOR TRACKING ===");
-      for (const user of profiles || []) {
-        const rawFcmToken = user.fcm_token || "";
-        const fcmTokens = Array.from(new Set(rawFcmToken.split(',').map((t: string) => t.trim()).filter(Boolean)));
-        if (fcmTokens.length > 0) {
-          console.log(`User ID: ${user.id} | Name: ${user.name || 'N/A'}`);
-          fcmTokens.forEach((token, index) => {
-            console.log(`   ├─ Token [${index + 1}]: ${token}`);
-          });
-        }
-      }
-      console.log("=============================================================");
-    }
+    console.log(`Found ${profiles?.length || 0} users with FCM tokens.`);
     
     // Get current hour in BD timezone (Asia/Dhaka) assuming target users are in BD
     const currentHourBD = parseInt(
@@ -142,53 +90,39 @@ serve(async (req) => {
       const fcmTokens = Array.from(new Set(rawFcmToken.split(',').map((t: string) => t.trim()).filter(Boolean)));
       if (fcmTokens.length === 0) continue;
 
-      // Only apply timing constraints and recent notification filters if it is NOT a test run
-      if (!isTestRun) {
-        // Use default target hours since custom settings were removed
-        const userTimes = ['09:00', '15:00', '21:00'];
-        
-        let isTargetHour = false;
-        for (const t of userTimes) {
-            const tHour = parseInt(t.split(':')[0], 10);
-            if (currentHourBD === tHour) {
-                isTargetHour = true;
-                break;
-            }
-        }
+      // Use default target hours since custom settings were removed
+      const userTimes = ['09:00', '15:00', '21:00'];
+      
+      let isTargetHour = false;
+      for (const t of userTimes) {
+          const tHour = parseInt(t.split(':')[0], 10);
+          if (currentHourBD === tHour) {
+              isTargetHour = true;
+              break;
+          }
+      }
 
-        // If this is not the user's preferred target hour, skip sending
-        if (!isTargetHour) {
-            console.log(`Skipping notification for user ${user.id} - Not a target hour.`);
-            continue; 
-        }
+      // If this is not the user's preferred target hour, skip sending
+      if (!isTargetHour) {
+          console.log(`Skipping notification for user ${user.id} - Not a target hour.`);
+          continue; 
+      }
 
-        // Check last notified time to prevent sending multiple times in the same hour block
-        // Important if Cron runs more frequently than 1 hour (e.g. every 10 mins)
-        const { data: { user: authUser } } = await supabaseClient.auth.admin.getUserById(user.id);
-        const lastNotifiedAtStr = authUser?.user_metadata?.last_notified_at;
-        const lastNotifiedAt = lastNotifiedAtStr ? new Date(lastNotifiedAtStr) : null;
-        const now = new Date();
-        
-        // If notified in the last 2 hours, skip
-        if (lastNotifiedAt && (now.getTime() - lastNotifiedAt.getTime() < 2 * 60 * 60 * 1000)) {
-            console.log(`Skipping notification for user ${user.id} - Already notified recently.`);
-            continue;
-        }
-      } else {
-        console.log(`[TEST RUN] Bypassing timing filters, schedules, and recent notification throttling for user ${user.id}`);
+      // Check last notified time to prevent sending multiple times in the same hour block
+      // Important if Cron runs more frequently than 1 hour (e.g. every 10 mins)
+      const { data: { user: authUser } } = await supabaseClient.auth.admin.getUserById(user.id);
+      const lastNotifiedAtStr = authUser?.user_metadata?.last_notified_at;
+      const lastNotifiedAt = lastNotifiedAtStr ? new Date(lastNotifiedAtStr) : null;
+      const now = new Date();
+      
+      // If notified in the last 2 hours, skip
+      if (lastNotifiedAt && (now.getTime() - lastNotifiedAt.getTime() < 2 * 60 * 60 * 1000)) {
+          console.log(`Skipping notification for user ${user.id} - Already notified recently.`);
+          continue;
       }
 
       let notificationsToSend: any[] = [];
       let borrowedAmount = 0;
-
-      // If it's a test run, always append a mock/test notification verifying thatFcm delivers properly
-      if (isTestRun) {
-        notificationsToSend.push({
-          title: "টেস্ট নোটিফিকেশন 🧪",
-          body: `হ্যালো ${user.name || 'ইউজার'}, এই নোটিফিকেশনটি Supabase ড্যাশবোর্ড থেকে পাঠানো একটি ম্যানুয়াল টেস্ট মেসেজ!`,
-          imageUrl: "https://qlmdoatgvovggvgzhwoy.supabase.co/storage/v1/object/public/notification-images/TEST_IMG.png"
-        });
-      }
 
       // --- Check 1: Projects with Due Amount
       const { data: dueProjects } = await supabaseClient
@@ -280,13 +214,24 @@ serve(async (req) => {
                     image: notif.imageUrl || ""
                   }
                 },
+                webpush: {
+                  headers: {
+                    Urgency: "high",
+                  },
+                  notification: {
+                    requireInteraction: true,
+                    sound: "default",
+                    image: notif.imageUrl || ""
+                  }
+                },
                 data: {
                   title: notif.title,
                   body: notif.body,
                   click_action: "FLUTTER_NOTIFICATION_CLICK",
                   notification_id: uniqueTag,
                   channel_id: "fcm_default_channel",
-                  image: notif.imageUrl || ""
+                  image: notif.imageUrl || "",
+                  tts_text: notif.body
                 }
               }
             };
@@ -304,17 +249,14 @@ serve(async (req) => {
             if (fcmResponse.ok) {
               notificationsSent++;
               notificationsSentForThisUser++;
-              if (isTestRun) {
-                console.log(`[TEST RUN] Sent FCM notification successfully to user ${user.id}. Title: "${notif.title}"`);
-              }
             } else {
               console.error(`Failed to send FCM to user ${user.id}:`, await fcmResponse.text());
             }
         }
       }
       
-      // Update last_notified_at in metadata to throttle further notifications in this hour: ONLY for real runs, to avoid locking them out after a test run
-      if (notificationsSentForThisUser > 0 && !isTestRun) {
+      // Update last_notified_at in metadata to throttle further notifications in this hour
+      if (notificationsSentForThisUser > 0) {
            const { data: { user: authUser } } = await supabaseClient.auth.admin.getUserById(user.id);
            const currentMeta = authUser?.user_metadata || {};
            await supabaseClient.auth.admin.updateUserById(user.id, {

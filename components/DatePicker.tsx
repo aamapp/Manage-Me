@@ -8,10 +8,19 @@ interface DatePickerProps {
   placeholder?: string;
   label?: string;
   align?: 'left' | 'right';
+  onOpenChange?: (open: boolean) => void;
 }
 
-export const DatePicker: React.FC<DatePickerProps> = ({ value, onChange, placeholder, label, align = 'left' }) => {
-  const [isOpen, setIsOpen] = useState(false);
+export const DatePicker: React.FC<DatePickerProps> = ({ value, onChange, placeholder, label, align = 'left', onOpenChange }) => {
+  const [isOpen, setIsOpenState] = useState(false);
+  
+  const setIsOpen = (open: boolean) => {
+    setIsOpenState(open);
+    if (onOpenChange) {
+      onOpenChange(open);
+    }
+  };
+
   const [viewDate, setViewDate] = useState(value ? new Date(value) : new Date());
   const containerRef = useRef<HTMLDivElement>(null);
 

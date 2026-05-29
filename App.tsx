@@ -16,9 +16,6 @@ import { Projects } from '@/pages/Projects';
 import { Clients } from '@/pages/Clients';
 import { Income } from '@/pages/Income';
 import { Expenses } from '@/pages/Expenses';
-import { Debts } from '@/pages/Debts';
-import { Savings } from '@/pages/Savings';
-import { MenuPage } from '@/pages/MenuPage';
 import { Categories } from '@/pages/Categories';
 import { Reports } from '@/pages/Reports';
 import { Settings } from '@/pages/Settings';
@@ -236,7 +233,7 @@ const AppContent: React.FC = () => {
         <Routes>
           <Route 
             path="/login" 
-            element={!user ? <Login onLogin={handleLogin} onResetPassword={handleResetPassword} onGoToSignup={() => window.location.hash = '/signup'} /> : <Navigate to="/dashboard" replace />} 
+            element={!user ? <Login onLogin={handleLogin} onResetPassword={handleResetPassword} onGoToSignup={() => window.location.hash = '/signup'} /> : <Navigate to={user.role === 'admin' ? "/admin-users" : "/dashboard"} replace />} 
           />
           <Route 
             path="/signup" 
@@ -258,9 +255,6 @@ const AppContent: React.FC = () => {
                     <Route path="/clients" element={<Clients />} />
                     <Route path="/income" element={<Income />} />
                     <Route path="/expenses" element={<Expenses />} />
-                    <Route path="/debts" element={<Debts />} />
-                    <Route path="/savings" element={<Savings />} />
-                    <Route path="/menu" element={<MenuPage />} />
                     <Route path="/categories" element={<Categories />} />
                     <Route path="/reports" element={<Reports />} />
                     <Route path="/settings" element={<Settings />} />
@@ -272,7 +266,7 @@ const AppContent: React.FC = () => {
                     <Route path="/trash" element={<Trash />} />
                     <Route path="/projects-backup" element={<ProjectsBackup />} />
                     {/* Default Route Logic */}
-                    <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                    <Route path="*" element={<Navigate to={user.role === 'admin' ? "/admin-users" : "/dashboard"} replace />} />
                   </Routes>
                 </Layout>
               ) : (
