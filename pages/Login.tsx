@@ -17,10 +17,13 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onResetPassword, onGoToSi
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
-    await onLogin(email, password);
+    const data = new FormData(e.currentTarget);
+    const formEmail = (data.get('email') as string) || email;
+    const formPassword = (data.get('password') as string) || password;
+    await onLogin(formEmail, formPassword);
     setIsLoading(false);
   };
 
@@ -68,9 +71,11 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onResetPassword, onGoToSi
                     </div>
                     <input 
                       type="email" 
+                      name="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="name@example.com" 
+                      autoComplete="username email"
                       className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 font-medium"
                       required
                     />
@@ -94,9 +99,11 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onResetPassword, onGoToSi
                     </div>
                     <input 
                       type={showPassword ? "text" : "password"} 
+                      name="password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••" 
+                      autoComplete="current-password"
                       className="w-full pl-11 pr-12 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 font-medium"
                       required
                     />

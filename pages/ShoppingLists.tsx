@@ -22,6 +22,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useAppContext } from '@/context/AppContext';
 import { ShoppingList, ShoppingItem } from '@/types';
 import { supabase } from '@/lib/supabase';
+import { ConfirmModal } from '@/components/ConfirmModal';
 
 const ShoppingLists: React.FC = () => {
   const { 
@@ -50,6 +51,10 @@ const ShoppingLists: React.FC = () => {
   const [itemName, setItemName] = useState('');
   const [itemQuantity, setItemQuantity] = useState('');
   const [itemPrice, setItemPrice] = useState('');
+
+  // Delete States
+  const [listToDeleteId, setListToDeleteId] = useState<string | null>(null);
+  const [itemToDeleteId, setItemToDeleteId] = useState<string | null>(null);
 
   const filteredLists = useMemo(() => {
     return shoppingLists.filter(list => 
@@ -132,25 +137,27 @@ const ShoppingLists: React.FC = () => {
     }
   };
 
-  const handleDeleteList = async (id: string, e: React.MouseEvent) => {
+  const handleDeleteList = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!isOnline) {
       showToast('অফলাইনে ফর্দ ডিলিট করা সম্ভব নয়।', 'info');
       return;
     }
+    setListToDeleteId(id);
+  };
 
-    if (!window.confirm('আপনি কি নিশ্চিতভাবে এই ফর্দটি ডিলিট করতে চান?')) return;
-
+  const handleConfirmDeleteList = async () => {
+    if (!listToDeleteId) return;
     window.dispatchEvent(new CustomEvent('app:processing', { detail: { show: true, message: 'ফর্দ ডিলিট করা হচ্ছে...' } }));
     try {
       // Soft delete by prefixing title with [TRASH]
-      const listToDelete = shoppingLists.find(l => l.id === id);
+      const listToDelete = shoppingLists.find(l => l.id === listToDeleteId);
       if (!listToDelete) return;
 
       const { error } = await supabase
         .from('shopping_lists')
         .update({ title: `[TRASH]${listToDelete.title}` })
-        .eq('id', id);
+        .eq('id', listToDeleteId);
 
       if (error) throw error;
       showToast('ফর্দ ডিলিট করা হয়েছে।', 'success');
@@ -160,6 +167,7 @@ const ShoppingLists: React.FC = () => {
       showToast(`এরর: ${error.message}`);
     } finally {
       window.dispatchEvent(new CustomEvent('app:processing', { detail: { show: false } }));
+      setListToDeleteId(null);
     }
   };
 
@@ -276,17 +284,20 @@ const ShoppingLists: React.FC = () => {
     }
   };
 
-  const handleDeleteItem = async (itemId: string) => {
+  const handleDeleteItem = (itemId: string) => {
     if (!selectedList || !isOnline) {
       if (!isOnline) showToast('অফলাইনে আইটেম ডিলিট করা সম্ভব নয়।', 'info');
       return;
     }
+    setItemToDeleteId(itemId);
+  };
 
-    if (!window.confirm('আপনি কি নিশ্চিতভাবে এই আইটেমটি ডিলিট করতে চান?')) return;
+  const handleConfirmDeleteItem = async () => {
+    if (!selectedList || !itemToDeleteId) return;
 
     window.dispatchEvent(new CustomEvent('app:processing', { detail: { show: true, message: 'আইটেম ডিলিট করা হচ্ছে...' } }));
     try {
-      const updatedItems = selectedList.items.filter(item => item.id !== itemId);
+      const updatedItems = selectedList.items.filter(item => item.id !== itemToDeleteId);
       const totalamount = updatedItems.reduce((sum, item) => sum + (item.price || 0), 0);
 
       const { error } = await supabase
@@ -305,6 +316,7 @@ const ShoppingLists: React.FC = () => {
       showToast(`এরর: ${error.message}`);
     } finally {
       window.dispatchEvent(new CustomEvent('app:processing', { detail: { show: false } }));
+      setItemToDeleteId(null);
     }
   };
 
@@ -566,7 +578,7 @@ const ShoppingLists: React.FC = () => {
                 </div>
                 <div className="text-right ml-4">
                   <p className="text-lg font-bold text-blue-600">৳{list.totalamount.toLocaleString()}</p>
-                  <div className="flex items-center justify-end gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex items-center justify-end gap-1 mt-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                     <button 
                       onClick={(e) => handleOpenEditModal(list, e)}
                       className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
@@ -670,6 +682,22 @@ const ShoppingLists: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
+
+      <ConfirmModal
+        isOpen={!!listToDeleteId}
+        onClose={() => setListToDeleteId(null)}
+        onConfirm={handleConfirmDeleteList}
+        title="ফর্দ ডিলিট"
+        message="আপনি কি নিশ্চিতভাবে এই ফর্দটি ডিলিট করতে চান?"
+      />
+
+      <ConfirmModal
+        isOpen={!!itemToDeleteId}
+        onClose={() => setItemToDeleteId(null)}
+        onConfirm={handleConfirmDeleteItem}
+        title="আইটেম ডিলিট"
+        message="আপনি কি নিশ্চিতভাবে এই আইটেমটি ডিলিট করতে চান?"
+      />
     </div>
   );
 };

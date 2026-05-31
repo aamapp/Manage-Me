@@ -233,7 +233,11 @@ export const Settings: React.FC = () => {
         {/* Profile Header */}
         <div className="p-6 border-b flex items-center gap-5 bg-slate-50/50">
           <div className="relative group">
-            <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-white shadow-lg bg-indigo-100 flex items-center justify-center relative">
+            <div 
+              onClick={() => !isUploading && isOnline && fileInputRef.current?.click()}
+              className="w-20 h-20 rounded-full overflow-hidden border-4 border-white shadow-lg bg-indigo-100 flex items-center justify-center relative cursor-pointer active:scale-95 transition-all"
+              title="ছবি পরিবর্তন করুন"
+            >
                {user.avatar_url ? (
                  <img 
                    key={user.avatar_url}
@@ -250,19 +254,27 @@ export const Settings: React.FC = () => {
                  </div>
                )}
             </div>
-            <label 
+            <button 
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!isUploading && isOnline) {
+                  fileInputRef.current?.click();
+                }
+              }}
               className={`absolute bottom-0 right-0 bg-indigo-600 text-white p-2 rounded-full shadow-md transition-transform z-20 ${isUploading || !isOnline ? 'opacity-50 pointer-events-none cursor-not-allowed' : 'hover:bg-indigo-700 active:scale-90 cursor-pointer'}`}
+              title="ছবি পরিবর্তন করুন"
             >
               <Camera size={14} />
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                className="hidden" 
-                accept="image/*" 
-                onChange={handleImageUpload} 
-                disabled={isUploading || !isOnline} 
-              />
-            </label>
+            </button>
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              className="hidden" 
+              accept="image/*" 
+              onChange={handleImageUpload} 
+              disabled={isUploading || !isOnline} 
+            />
           </div>
           <div>
             <h3 className="text-lg font-bold text-slate-800">{formData.name || 'ইউজার'}</h3>

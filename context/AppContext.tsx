@@ -976,7 +976,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 reminder_times: metadata?.reminder_times || ['09:00', '15:00', '21:00'],
                 createdat: session.user.created_at
             };
-            setUser(user ? user : initialUser);
+            setUser(initialUser);
 
             // Background Sync with Profile Table (Source of Truth)
             supabase.from('profiles')

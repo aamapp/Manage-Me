@@ -12,7 +12,7 @@ import { supabase } from '../lib/supabase';
 import { NumericKeypad } from '@/components/NumericKeypad';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { DatePicker } from '@/components/DatePicker';
-import { DuePerson, DueTransaction } from '../types';
+import { DuePerson, DueTransaction, BudgetLimit, BudgetTransaction, TodoTask } from '../types';
 
 export const Expenses: React.FC = () => {
   // Use cached expenses and incomes from AppContext
@@ -21,7 +21,7 @@ export const Expenses: React.FC = () => {
   const [isModalOpen, setModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'expenses' | 'dues' | 'savings' | 'reports' | 'budgets'>('expenses');
+  const [activeTab, setActiveTab] = useState<'expenses' | 'dues' | 'budget' | 'savings' | 'reports' | 'tasks'>('expenses');
 
   // Floating Action Button visibility based on scroll direction (optimized with direct DOM ref to run at 60fps without React lagging)
   const fabRef = useRef<HTMLButtonElement>(null);
@@ -938,7 +938,7 @@ export const Expenses: React.FC = () => {
 
   return (
     <div className="space-y-3 animate-in fade-in duration-300">
-      {/* 5-Icon Navigation Tabs */}
+      {/* 6-Icon Navigation Tabs */}
       <div className="bg-white py-0.5 px-1 text-slate-800 w-full max-w-lg mx-auto mb-1.5 select-none">
         <div className="flex items-center justify-around w-full gap-0.5">
           {/* Tab 1: Expenses / Dashboard / লেনদেন */}
@@ -985,7 +985,29 @@ export const Expenses: React.FC = () => {
             )}
           </button>
 
-          {/* Tab 3: Savings / সঞ্চয় ও লক্ষ্য */}
+          {/* Tab 3: Budget / বাজেট */}
+          <button
+            onClick={() => setActiveTab('budget')}
+            title="বাজেট"
+            className="flex flex-col items-center flex-1 cursor-pointer group focus:outline-none"
+          >
+            <div
+              className={`w-[28px] h-[28px] rounded-[8px] flex items-center justify-center transition-all border relative ${
+                activeTab === 'budget'
+                  ? 'border-[#1a73e8] text-[#1a73e8] bg-white shadow-sm'
+                  : 'border-[#cdd5de] text-[#8e9aa8] hover:border-slate-300 hover:text-slate-600 bg-white'
+              }`}
+            >
+              <Receipt size={13} />
+            </div>
+            {activeTab === 'budget' ? (
+              <div className="w-4 h-[2px] bg-[#1a73e8] rounded-full mt-0.5 animate-in fade-in zoom-in-95 duration-200" />
+            ) : (
+              <div className="w-4 h-[2px] bg-transparent rounded-full mt-0.5" />
+            )}
+          </button>
+
+          {/* Tab 4: Savings / সঞ্চয় ও লক্ষ্য */}
           <button
             onClick={() => setActiveTab('savings')}
             title="সঞ্চয় ও লক্ষ্য"
@@ -1007,7 +1029,7 @@ export const Expenses: React.FC = () => {
             )}
           </button>
 
-          {/* Tab 4: Reports / রিপোর্ট ও চার্ট */}
+          {/* Tab 5: Reports / রিপোর্ট ও চার্ট */}
           <button
             onClick={() => setActiveTab('reports')}
             title="রিপোর্ট ও চার্ট"
@@ -1029,22 +1051,22 @@ export const Expenses: React.FC = () => {
             )}
           </button>
 
-          {/* Tab 5: Budgets / টাস্ক ও বাজেট */}
+          {/* Tab 6: Tasks / টাস্ক */}
           <button
-            onClick={() => setActiveTab('budgets')}
-            title="টাস্ক ও বাজেট"
+            onClick={() => setActiveTab('tasks')}
+            title="টাস্ক"
             className="flex flex-col items-center flex-1 cursor-pointer group focus:outline-none"
           >
             <div
               className={`w-[28px] h-[28px] rounded-[8px] flex items-center justify-center transition-all border relative ${
-                activeTab === 'budgets'
+                activeTab === 'tasks'
                   ? 'border-[#1a73e8] text-[#1a73e8] bg-white shadow-sm'
                   : 'border-[#cdd5de] text-[#8e9aa8] hover:border-slate-300 hover:text-slate-600 bg-white'
               }`}
             >
               <ListChecks size={13} />
             </div>
-            {activeTab === 'budgets' ? (
+            {activeTab === 'tasks' ? (
               <div className="w-4 h-[2px] bg-[#1a73e8] rounded-full mt-0.5 animate-in fade-in zoom-in-95 duration-200" />
             ) : (
               <div className="w-4 h-[2px] bg-transparent rounded-full mt-0.5" />
@@ -1055,12 +1077,14 @@ export const Expenses: React.FC = () => {
 
       {activeTab === 'dues' ? (
         <DuesManager />
+      ) : activeTab === 'budget' ? (
+        <BudgetManager expenses={expenses} user={user} />
       ) : activeTab === 'savings' ? (
         <SavingsManager />
       ) : activeTab === 'reports' ? (
         <ExpenseCategoryReports expenses={expenses} user={user} />
-      ) : activeTab === 'budgets' ? (
-        <BudgetsAndTasksManager expenses={expenses} user={user} />
+      ) : activeTab === 'tasks' ? (
+        <TasksManager expenses={expenses} user={user} />
       ) : (
         <>
           {/* Dynamic Period Stats Card - Unifying Income and Expense */}
@@ -2810,6 +2834,7 @@ const SavingsManager: React.FC = () => {
   const [isTxModalOpen, setTxModalOpen] = useState(false);
   const [selectedGoal, setSelectedGoal] = useState<SavingsGoal | null>(null);
   const [txType, setTxType] = useState<'deposit' | 'withdraw'>('deposit');
+  const [goalToDelete, setGoalToDelete] = useState<string | null>(null);
   
   // New Goal Fields
   const [title, setTitle] = useState('');
@@ -2907,9 +2932,14 @@ const SavingsManager: React.FC = () => {
   };
 
   const handleDeleteGoal = (goalId: string) => {
-    if (window.confirm('আপনি কি এই সঞ্চয় লক্ষ্যটি মুছে ফেলতে চান?')) {
-      setGoals(goals.filter(g => g.id !== goalId));
+    setGoalToDelete(goalId);
+  };
+
+  const handleConfirmDeleteGoal = () => {
+    if (goalToDelete) {
+      setGoals(goals.filter(g => g.id !== goalToDelete));
       showToast('সঞ্চয় লক্ষ্য মুছে ফেলা হয়েছে', 'success');
+      setGoalToDelete(null);
     }
   };
 
@@ -3103,6 +3133,16 @@ const SavingsManager: React.FC = () => {
           </div>
         </div>
       )}
+
+      {goalToDelete && (
+        <ConfirmModal
+          isOpen={!!goalToDelete}
+          onClose={() => setGoalToDelete(null)}
+          onConfirm={handleConfirmDeleteGoal}
+          title="লক্ষ্য ডিলিট"
+          message="আপনি কি এই সঞ্চয় লক্ষ্যটি মুছে ফেলতে চান?"
+        />
+      )}
     </div>
   );
 };
@@ -3198,7 +3238,7 @@ const ExpenseCategoryReports: React.FC<{ expenses: any[]; user: any }> = ({ expe
         <span className="text-xs text-indigo-700 font-bold tracking-wider block uppercase">
           {reportRange === 'weekly' ? 'গত ৭ দিনের মোট খরচ' : reportRange === 'monthly' ? 'গত ৩০ দিনের মোট খরচ' : 'সর্বমোট ব্যয়িত অর্থ'}
         </span>
-        <h3 className="text-3xl font-black text-indigo-900 mt-1">
+        <h3 className="text-3xl font-black text-indigo-900 mt-1 font-mono">
           {currency} {totalFilteredExpense.toLocaleString('bn-BD')}
         </h3>
         <span className="text-[10px] text-indigo-600 font-medium mt-1 inline-block bg-white/60 px-2 py-0.5 rounded-full">
@@ -3216,7 +3256,7 @@ const ExpenseCategoryReports: React.FC<{ expenses: any[]; user: any }> = ({ expe
             <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5 border-b border-slate-50 pb-2.5">
               <span className="w-1.5 h-4 bg-indigo-600 rounded-full"></span> ক্যাটাগরি শেয়ার (অংশ)
             </h3>
-            <div className="space-y-3.5 max-h-72 overflow-y-auto pr-1">
+            <div className="space-y-3.5 max-h-72 overflow-y-auto pr-1 font-mono">
               {categoryTotals.map((item, idx) => (
                 <div key={idx} className="space-y-1 text-left">
                   <div className="flex justify-between items-baseline text-xs font-bold text-slate-700">
@@ -3267,7 +3307,7 @@ const ExpenseCategoryReports: React.FC<{ expenses: any[]; user: any }> = ({ expe
               
               <div className="absolute flex flex-col items-center justify-center">
                 <span className="text-[10px] text-slate-400 font-black uppercase">খাত অংশ</span>
-                <span className="text-xs font-bold text-slate-600">{categoryTotals.length} টি</span>
+                <span className="text-xs font-bold text-slate-600 font-mono">{categoryTotals.length} টি</span>
               </div>
             </div>
 
@@ -3286,25 +3326,12 @@ const ExpenseCategoryReports: React.FC<{ expenses: any[]; user: any }> = ({ expe
   );
 };
 
-// ==========================================
-// 5. TASK CHECKLIST & BUDGET TRACKER VIEW
-// ==========================================
+// Budget interfaces are imported from /types.ts
 
-interface TodoTask {
-  id: string;
-  title: string;
-  amount?: number;
-  dueDate: string;
-  completed: boolean;
-  createdAt: string;
-}
-
-interface BudgetLimit {
-  category: string;
-  limitAmount: number;
-}
-
-const BudgetsAndTasksManager: React.FC<{ expenses: any[]; user: any }> = ({ expenses, user }) => {
+// ------------------------------------------
+// BUDGET MANAGER PAGE/TAB
+// ------------------------------------------
+const BudgetManager: React.FC<{ expenses: any[]; user: any }> = ({ expenses, user }) => {
   const { showToast } = useAppContext();
   const userId = user?.id || 'default';
   const currency = user?.currency || '৳';
@@ -3312,17 +3339,9 @@ const BudgetsAndTasksManager: React.FC<{ expenses: any[]; user: any }> = ({ expe
   const [budgets, setBudgets] = useState<BudgetLimit[]>(() => {
     const cached = localStorage.getItem(`budget_limits_${userId}`);
     return cached ? JSON.parse(cached) : [
-      { category: 'বাজার', limitAmount: 10000 },
-      { category: 'যাতায়াত', limitAmount: 2000 },
-      { category: 'ওষুধ', limitAmount: 3000 }
-    ];
-  });
-
-  const [tasks, setTasks] = useState<TodoTask[]>(() => {
-    const cached = localStorage.getItem(`budget_tasks_${userId}`);
-    return cached ? JSON.parse(cached) : [
-      { id: 't-1', title: 'চলতি মাসের বিদ্যুৎ বিল পরিশোধ করা', amount: 1200, dueDate: new Date().toISOString().split('T')[0], completed: false, createdAt: new Date().toISOString().split('T')[0] },
-      { id: 't-2', title: 'ইন্টারনেট বিল পরিশোধ করা', amount: 500, dueDate: new Date().toISOString().split('T')[0], completed: true, createdAt: new Date().toISOString().split('T')[0] }
+      { category: 'বাজার', limitAmount: 10000, transactions: [] },
+      { category: 'যাতায়াত', limitAmount: 2000, transactions: [] },
+      { category: 'ওষুধ', limitAmount: 3000, transactions: [] }
     ];
   });
 
@@ -3330,22 +3349,153 @@ const BudgetsAndTasksManager: React.FC<{ expenses: any[]; user: any }> = ({ expe
     localStorage.setItem(`budget_limits_${userId}`, JSON.stringify(budgets));
   }, [budgets, userId]);
 
-  useEffect(() => {
-    localStorage.setItem(`budget_tasks_${userId}`, JSON.stringify(tasks));
-  }, [tasks, userId]);
+  const [activeView, setActiveView] = useState<'list' | 'details'>('list');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
-  const [activeSubTab, setActiveSubTab] = useState<'budget' | 'checklist'>('budget');
-  
+  // States for budget creation/limit setting
   const [isBudgetModalOpen, setBudgetModalOpen] = useState(false);
-  const [isTaskModalOpen, setTaskModalOpen] = useState(false);
-  
   const [budCategory, setBudCategory] = useState('');
   const [budLimit, setBudLimit] = useState('');
+  const [budgetToDelete, setBudgetToDelete] = useState<string | null>(null);
+  const [txToDeleteId, setTxToDeleteId] = useState<string | null>(null);
 
-  const [taskTitle, setTaskTitle] = useState('');
-  const [taskAmount, setTaskAmount] = useState('');
-  const [taskDate, setTaskDate] = useState(new Date().toISOString().split('T')[0]);
+  // States for budget sub-transactions (like Dues)
+  const [isTxModalOpen, setIsTxModalOpen] = useState(false);
+  const [txType, setTxType] = useState<'add' | 'spend'>('spend');
+  const [txAmount, setTxAmount] = useState('');
+  const [txDescription, setTxDescription] = useState('');
+  const [txDate, setTxDate] = useState(new Date().toISOString().split('T')[0]);
+  const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
 
+  // Floating Action Button visibility based on scroll direction (optimized with direct DOM ref to run at 60fps without React lagging)
+  const budgetFabRef = useRef<HTMLButtonElement>(null);
+  const isBudgetFabVisibleRef = useRef(true);
+  const lastBudgetScrollY = useRef(0);
+
+  const setBudgetFabVisibleDirectly = (visible: boolean) => {
+    if (isBudgetFabVisibleRef.current === visible) return;
+    isBudgetFabVisibleRef.current = visible;
+    
+    const el = budgetFabRef.current;
+    if (!el) return;
+    
+    if (visible) {
+      el.style.opacity = '1';
+      el.style.transform = 'translateY(0) scale(1)';
+      el.style.pointerEvents = 'auto';
+    } else {
+      el.style.opacity = '0';
+      el.style.transform = 'translateY(32px) scale(0.9)';
+      el.style.pointerEvents = 'none';
+    }
+  };
+
+  useEffect(() => {
+    // Reset FAB visibility to visible on mount/view change
+    isBudgetFabVisibleRef.current = true;
+    if (budgetFabRef.current) {
+      budgetFabRef.current.style.opacity = '1';
+      budgetFabRef.current.style.transform = 'translateY(0) scale(1)';
+      budgetFabRef.current.style.pointerEvents = 'auto';
+    }
+
+    lastBudgetScrollY.current = window.scrollY;
+    let lastBudgetTouchY = 0;
+    
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      const diffScrollY = currentScrollY - lastBudgetScrollY.current;
+      
+      if (diffScrollY > 0) {
+        setBudgetFabVisibleDirectly(false);
+      } else if (diffScrollY < 0) {
+        setBudgetFabVisibleDirectly(true);
+      }
+      
+      // Always show when close to the top
+      if (currentScrollY < 30) {
+        setBudgetFabVisibleDirectly(true);
+      }
+      
+      lastBudgetScrollY.current = currentScrollY;
+    };
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches && e.touches.length > 0) {
+        lastBudgetTouchY = e.touches[0].clientY;
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!e.touches || e.touches.length === 0) return;
+      
+      const currentY = e.touches[0].clientY;
+      const diffY = currentY - lastBudgetTouchY;
+      
+      // finger moved UP (scrolling DOWN) -> Hide FAB instantly
+      if (diffY < 0) {
+        setBudgetFabVisibleDirectly(false);
+      } 
+      // finger moved DOWN (scrolling UP) -> Show FAB instantly
+      else if (diffY > 0) {
+        setBudgetFabVisibleDirectly(true);
+      }
+      
+      lastBudgetTouchY = currentY;
+      
+      // Always show when close to the top
+      if (window.scrollY < 30) {
+        setBudgetFabVisibleDirectly(true);
+      }
+    };
+
+    const handleWheel = (e: WheelEvent) => {
+      if (e.deltaY > 0) {
+        setBudgetFabVisibleDirectly(false);
+      } else if (e.deltaY < 0) {
+        setBudgetFabVisibleDirectly(true);
+      }
+      
+      // Always show when close to the top
+      if (window.scrollY < 30) {
+        setBudgetFabVisibleDirectly(true);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('touchstart', handleTouchStart, { passive: true });
+    window.addEventListener('touchmove', handleTouchMove, { passive: true });
+    window.addEventListener('wheel', handleWheel, { passive: true });
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('touchstart', handleTouchStart);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('wheel', handleWheel);
+    };
+  }, [activeView]);
+
+  const toBanglaNumbers = (num: string | number): string => {
+    const banglaDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+    return String(num).replace(/[0-9]/g, (digit) => banglaDigits[parseInt(digit)]);
+  };
+
+  const getCurrentBengaliMonthAndYear = (): string => {
+    const now = new Date();
+    const banglaMonths = [
+      'জানুয়ারী', 'ফেব্রুয়ারী', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
+      'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'
+    ];
+    return `${banglaMonths[now.getMonth()]} ${toBanglaNumbers(now.getFullYear())}`;
+  };
+
+  // Helper: Find budget object for selected category
+  const budgetObj = useMemo(() => {
+    if (!selectedCategory) return null;
+    return budgets.find(b => b.category.toLowerCase() === selectedCategory.toLowerCase()) || null;
+  }, [budgets, selectedCategory]);
+
+  // Sub-transaction calculation for ALL budgets to display in the list view
   const actualCurrentMonthExpenses = useMemo(() => {
     const now = new Date();
     const currentMonth = now.getMonth();
@@ -3358,8 +3508,55 @@ const BudgetsAndTasksManager: React.FC<{ expenses: any[]; user: any }> = ({ expe
          grouped[e.category] = (grouped[e.category] || 0) + e.amount;
       }
     });
+
+    // Add custom spend transactions for each budget category
+    budgets.forEach(bud => {
+      const customSpent = (bud.transactions || [])
+        .filter(t => {
+          const d = new Date(t.date);
+          return t.type === 'spend' &&
+                 d.getMonth() === currentMonth &&
+                 d.getFullYear() === currentYear;
+        })
+        .reduce((sum, t) => sum + t.amount, 0);
+
+      grouped[bud.category] = (grouped[bud.category] || 0) + customSpent;
+    });
+
     return grouped;
-  }, [expenses]);
+  }, [expenses, budgets]);
+
+  // Adjust budgets limits to include any custom allocations
+  const currentBudgetsLimits = useMemo(() => {
+    const lims: { [key: string]: number } = {};
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    budgets.forEach(bud => {
+      const customAddSum = (bud.transactions || [])
+        .filter(t => {
+          const d = new Date(t.date);
+          return t.type === 'add' &&
+                 d.getMonth() === currentMonth &&
+                 d.getFullYear() === currentYear;
+        })
+        .reduce((sum, t) => sum + t.amount, 0);
+
+      lims[bud.category] = bud.limitAmount + customAddSum;
+    });
+    return lims;
+  }, [budgets]);
+
+  const totalCurrentSpent = useMemo(() => {
+    return Object.values(actualCurrentMonthExpenses).reduce((sum, val) => sum + val, 0);
+  }, [actualCurrentMonthExpenses]);
+
+  const totalCurrentBudget = useMemo(() => {
+    return Object.values(currentBudgetsLimits).reduce((sum, val) => sum + val, 0);
+  }, [currentBudgetsLimits]);
+
+  const overallRatio = totalCurrentBudget > 0 ? Math.min(Math.round((totalCurrentSpent / totalCurrentBudget) * 100), 100) : 0;
 
   const handleSaveBudget = (e: React.FormEvent) => {
     e.preventDefault();
@@ -3373,7 +3570,7 @@ const BudgetsAndTasksManager: React.FC<{ expenses: any[]; user: any }> = ({ expe
       updated[existingIdx].limitAmount = limitNum;
       setBudgets(updated);
     } else {
-      setBudgets([...budgets, { category: budCategory, limitAmount: limitNum }]);
+      setBudgets([...budgets, { category: budCategory, limitAmount: limitNum, transactions: [] }]);
     }
 
     showToast('বাজেট লিমিট সেভ হয়েছে!', 'success');
@@ -3383,10 +3580,574 @@ const BudgetsAndTasksManager: React.FC<{ expenses: any[]; user: any }> = ({ expe
   };
 
   const handleDeleteBudget = (category: string) => {
-    if (window.confirm(`${category} খাতের budget লিমিট অপসারণ করতে চান?`)) {
-      setBudgets(budgets.filter(b => b.category !== category));
+    setBudgetToDelete(category);
+  };
+
+  const handleConfirmDeleteBudget = () => {
+    if (budgetToDelete) {
+      setBudgets(budgets.filter(b => b.category !== budgetToDelete));
       showToast('বাজেট অপসারণ করা হয়েছে', 'success');
+      if (selectedCategory?.toLowerCase() === budgetToDelete.toLowerCase()) {
+        setSelectedCategory(null);
+        setActiveView('list');
+      }
+      setBudgetToDelete(null);
     }
+  };
+
+  const resetTxForm = () => {
+    setEditingTransactionId(null);
+    setTxType('spend');
+    setTxAmount('');
+    setTxDescription('');
+    setTxDate(new Date().toISOString().split('T')[0]);
+  };
+
+  const handleOpenEditTx = (tx: any) => {
+    setEditingTransactionId(tx.id);
+    setTxType(tx.type);
+    setTxAmount(tx.amount.toString());
+    setTxDescription(tx.description);
+    setTxDate(tx.date);
+    setIsTxModalOpen(true);
+  };
+
+  const handleDeleteBudgetTransaction = (txId: string) => {
+    setTxToDeleteId(txId);
+  };
+
+  const handleConfirmDeleteBudgetTransaction = () => {
+    if (!selectedCategory || !txToDeleteId) return;
+    const updatedBudgets = budgets.map(b => {
+      if (b.category.toLowerCase() === selectedCategory.toLowerCase()) {
+        return {
+          ...b,
+          transactions: (b.transactions || []).filter(t => t.id !== txToDeleteId)
+        };
+      }
+      return b;
+    });
+    setBudgets(updatedBudgets);
+    showToast('লেনদেনটি মুছে ফেলা হয়েছে', 'success');
+    setTxToDeleteId(null);
+  };
+
+  const handleSaveTx = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCategory || !txAmount) return;
+
+    const amountNum = Number(txAmount);
+    const updatedBudgets = budgets.map(b => {
+      if (b.category.toLowerCase() === selectedCategory.toLowerCase()) {
+        const txs = b.transactions || [];
+        if (editingTransactionId) {
+          // Edit existing
+          return {
+            ...b,
+            transactions: txs.map(t => t.id === editingTransactionId
+              ? { ...t, type: txType, amount: amountNum, description: txDescription, date: txDate }
+              : t
+            )
+          };
+        } else {
+          // Add new
+          const newTx: BudgetTransaction = {
+            id: crypto.randomUUID(),
+            type: txType,
+            amount: amountNum,
+            description: txDescription || (txType === 'add' ? 'অগ্রিম বরাদ্দ বৃদ্ধি' : 'সরাসরি ব্যয়'),
+            date: txDate
+          };
+          return {
+            ...b,
+            transactions: [newTx, ...txs]
+          };
+        }
+      }
+      return b;
+    });
+
+    setBudgets(updatedBudgets);
+    showToast(editingTransactionId ? 'লেনদেন আপডেট করা হয়েছে' : 'বাজেট লেনদেন যোগ করা হয়েছে', 'success');
+    resetTxForm();
+    setIsTxModalOpen(false);
+  };
+
+  // Preparation of Details View combined history
+  const matchedExpenses = useMemo(() => {
+    if (!selectedCategory) return [];
+    return expenses.filter(e => e.category.toLowerCase() === selectedCategory.toLowerCase());
+  }, [expenses, selectedCategory]);
+
+  const mappedMatched = useMemo(() => {
+    return matchedExpenses.map(e => ({
+      id: e.id || `exp-${e.created_at || Math.random()}`,
+      type: 'spend' as const,
+      amount: e.amount,
+      description: e.notes || 'সরাসরি ব্যয় (ড্যাশবোর্ড)',
+      date: e.date,
+      isExternal: true
+    }));
+  }, [matchedExpenses]);
+
+  const mappedCustom = useMemo(() => {
+    if (!budgetObj) return [];
+    return (budgetObj.transactions || []).map(t => ({
+      ...t,
+      isExternal: false
+    }));
+  }, [budgetObj]);
+
+  const combinedHistory = useMemo(() => {
+    const combined = [...mappedCustom, ...mappedMatched];
+    return combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [mappedCustom, mappedMatched]);
+
+  const detailSpent = actualCurrentMonthExpenses[selectedCategory || ''] || 0;
+  const detailBudget = currentBudgetsLimits[selectedCategory || ''] || 0;
+
+  if (activeView === 'details' && selectedCategory) {
+    const remainingBudgetLeft = detailBudget - detailSpent;
+    const ratio = detailBudget > 0 ? Math.min(Math.round((detailSpent / detailBudget) * 100), 200) : 0;
+
+    let badgeText = 'বাজেট ঠিক আছে';
+    let alertColor = 'bg-emerald-50 border-emerald-100 text-emerald-600';
+
+    if (ratio >= 100) {
+      badgeText = 'বাজেট ওভার!';
+      alertColor = 'bg-rose-50 border-rose-100 text-[#e11d48]';
+    } else if (ratio >= 80) {
+      badgeText = 'সীমার কাছাকাছি!';
+      alertColor = 'bg-amber-50 border-amber-100 text-[#f59e0b]';
+    }
+
+    return (
+      <div className="space-y-4 animate-in fade-in duration-300 pb-20">
+        {/* Back Button Header */}
+        <div className="flex items-center gap-4 bg-white p-3 rounded-2xl border border-slate-100 shadow-sm w-full max-w-lg mx-auto">
+          <button
+            onClick={() => {
+              setActiveView('list');
+              setSelectedCategory(null);
+            }}
+            className="p-2 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
+          >
+            <ArrowLeft size={20} className="text-slate-700" />
+          </button>
+          <div className="text-left">
+            <h2 className="text-base font-bold text-slate-800">বাজেট বিবরণ</h2>
+            <p className="text-[10px] text-slate-400 font-semibold">খরচ ও বরাদ্দের বিস্তারিত বিবরণ</p>
+          </div>
+        </div>
+
+        {/* Budget Detailed Progress Banner */}
+        <div className="bg-white border border-[#e2e7ec]/80 p-5 rounded-3xl shadow-[0_4px_16px_rgba(0,0,0,0.03)] w-full max-w-lg mx-auto text-left">
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <h3 className="text-lg font-extrabold text-[#111827] tracking-tight">
+                {EXPENSE_CATEGORY_LABELS[selectedCategory] || selectedCategory}
+              </h3>
+              <span className={`text-[10px] font-bold mt-1 inline-block px-2.5 py-0.5 rounded-full border ${alertColor}`}>
+                {badgeText} ({toBanglaNumbers(ratio)}%)
+              </span>
+            </div>
+            <button
+              onClick={() => handleDeleteBudget(selectedCategory)}
+              className="p-2 text-slate-300 hover:text-rose-500 rounded-full hover:bg-slate-50 transition-colors"
+              title="বাজেট ক্যাটাগরি মুছুন"
+            >
+              <Trash2 size={18} />
+            </button>
+          </div>
+
+          <div className="space-y-3.5">
+            <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden flex items-center">
+              <div
+                className="h-full rounded-full transition-all duration-300"
+                style={{
+                  width: `${Math.min(ratio, 100)}%`,
+                  backgroundColor: ratio >= 100 ? '#e11d48' : ratio >= 80 ? '#f59e0b' : '#10b981'
+                }}
+              />
+            </div>
+            <div className="flex justify-between items-center text-xs font-bold text-slate-400">
+              <span>ব্যয়িত: {currency} {toBanglaNumbers(detailSpent.toLocaleString('bn-BD'))}</span>
+              <span>বাজেট: {currency} {toBanglaNumbers(detailBudget.toLocaleString('bn-BD'))}</span>
+            </div>
+
+            {/* Remaining budget notification box */}
+            <div className={`p-3 rounded-2xl flex items-center justify-between border ${remainingBudgetLeft >= 0 ? 'bg-emerald-50/50 border-emerald-100' : 'bg-rose-50/50 border-rose-100'}`}>
+              <div className="flex items-center gap-2 font-bold text-xs">
+                {remainingBudgetLeft >= 0 ? (
+                  <>
+                    <ArrowDown size={14} className="text-emerald-600 animate-bounce" />
+                    <span className="text-emerald-700">অবশিষ্ট বাজেট</span>
+                  </>
+                ) : (
+                  <>
+                    <ArrowUp size={14} className="text-rose-600 animate-bounce" />
+                    <span className="text-rose-700">অতিরিক্ত ব্যয়</span>
+                  </>
+                )}
+              </div>
+              <div className={`text-sm font-black ${remainingBudgetLeft >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                {currency} {toBanglaNumbers(Math.abs(remainingBudgetLeft).toLocaleString('bn-BD'))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Transaction log/Ledger */}
+        <div className="w-full max-w-lg mx-auto">
+          <div className="flex justify-between items-center px-1 mb-2.5 text-left">
+            <div>
+              <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">লেনদেনের ইতিহাস</h3>
+              <p className="text-[10px] text-slate-400 font-semibold">বরাদ্দ ও ব্যয়ের সমন্বিত তালিকা</p>
+            </div>
+          </div>
+
+          {combinedHistory.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-slate-100 p-8 text-center text-slate-400 select-none">
+              <p className="text-xs font-bold text-slate-500">কোনো লেনদেন রেকর্ড নেই</p>
+              <p className="text-[9px] text-slate-400 mt-0.5">নিচের + বাটনে চাপ দিয়ে বরাদ্দ বা ব্যয় যোগ করুন</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {combinedHistory.map((item) => {
+                const isAdd = item.type === 'add';
+                return (
+                  <div
+                    key={item.id}
+                    className={`p-3 rounded-2xl flex items-center justify-between border shadow-sm text-left transition-all relative ${
+                      isAdd ? 'bg-emerald-50/50 border-emerald-100' : 'bg-rose-50/30 border-rose-100/55'
+                    }`}
+                  >
+                    <div className="flex gap-2.5 min-w-0 items-start">
+                      <div className={`p-1.5 rounded-full shrink-0 mt-0.5 ${isAdd ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-500'}`}>
+                        {isAdd ? <ArrowDown size={14} /> : <ArrowUp size={14} />}
+                      </div>
+                      <div className="min-w-0 text-left">
+                        <div className="flex items-center gap-1.5">
+                          <h4 className="text-xs font-bold text-slate-800 leading-tight truncate">
+                            {item.description}
+                          </h4>
+                          <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-md ${
+                            item.isExternal 
+                              ? 'bg-slate-100 text-slate-500' 
+                              : isAdd 
+                                ? 'bg-emerald-100 text-emerald-700' 
+                                : 'bg-rose-100 text-rose-700'
+                          }`}>
+                            {item.isExternal ? 'ড্যাশবোর্ড' : isAdd ? 'বরাদ্দ' : 'সরাসরি'}
+                          </span>
+                        </div>
+                        <p className="text-[9px] font-semibold text-slate-400 mt-1">{toBanglaNumbers(item.date)}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2.5 shrink-0">
+                      <span className={`text-xs font-black select-none ${isAdd ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        {isAdd ? '+' : '-'} {currency}{toBanglaNumbers(item.amount.toLocaleString('bn-BD'))}
+                      </span>
+                      {!item.isExternal && (
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleOpenEditTx(item)}
+                            className="p-1 text-slate-400 hover:text-[#1a73e8] rounded-md hover:bg-slate-50 cursor-pointer"
+                            title="এডিট"
+                          >
+                            <Pencil size={12} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteBudgetTransaction(item.id)}
+                            className="p-1 text-slate-400 hover:text-rose-500 rounded-md hover:bg-slate-50 cursor-pointer"
+                            title="মুছে ফেলুন"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Floating action button inside detailed view */}
+        <button
+          ref={budgetFabRef}
+          onClick={() => { resetTxForm(); setIsTxModalOpen(true); }}
+          className="fixed bottom-[76px] lg:bottom-8 right-5 lg:right-8 bg-[#10b981] hover:bg-emerald-600 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg shadow-emerald-100 active:scale-95 transition-all duration-[150ms] ease-out z-40 cursor-pointer pointer-events-auto opacity-100 scale-100 translate-y-0"
+          style={{
+            willChange: 'transform, opacity',
+          }}
+          title="বাজেট লেনদেন যোগ করুন"
+        >
+          <Plus size={28} />
+        </button>
+
+        {/* Add/Edit Sub-Transaction Modal inside detailed view */}
+        {isTxModalOpen && (
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative text-left animate-in zoom-in-95 duration-150">
+              <h3 className="text-sm font-bold text-slate-800 text-center mb-1">বাজেট লেনদেন লগার</h3>
+              <p className="text-[10px] text-slate-400 text-center mb-5 font-semibold">বরাদ্দ বৃদ্ধি বা খরচের বিবরণ সেভ করুন</p>
+              
+              <form onSubmit={handleSaveTx} className="space-y-4">
+                {/* Transaction Type Selection Selector Toggle */}
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 block mb-2">লেনদেনের ধরণ</label>
+                  <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-xl">
+                    <button
+                      type="button"
+                      onClick={() => setTxType('spend')}
+                      className={`py-2 text-center text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                        txType === 'spend'
+                          ? 'bg-rose-500 text-white shadow-xs'
+                          : 'text-slate-600 hover:bg-slate-200/50'
+                      }`}
+                    >
+                      ব্যয় (Spend)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTxType('add')}
+                      className={`py-2 text-center text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                        txType === 'add'
+                          ? 'bg-emerald-500 text-white shadow-xs'
+                          : 'text-slate-600 hover:bg-slate-200/50'
+                      }`}
+                    >
+                      বরাদ্দ (Add Budget)
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 block mb-1">বিবরণ বা নাম</label>
+                  <input required type="text" value={txDescription} onChange={e => setTxDescription(e.target.value)} placeholder="যেমন: সপ্তাহিক তরকারি বাজার, বাড়তি টাকা" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-[#1a73e8] font-bold text-slate-800 text-xs" />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 block mb-1">টাকার পরিমাণ</label>
+                    <input required type="number" value={txAmount} onChange={e => setTxAmount(e.target.value)} placeholder="টাকা" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-[#1a73e8] font-black text-slate-800 text-base" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 block mb-1">তারিখ</label>
+                    <input required type="date" value={txDate} onChange={e => setTxDate(e.target.value)} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-[#1a73e8] font-bold text-slate-800 text-xs" />
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button type="button" onClick={() => setIsTxModalOpen(false)} className="flex-1 py-3 bg-slate-100 text-slate-500 font-bold text-xs rounded-xl hover:bg-slate-200 transition-colors">বাতিল</button>
+                  <button type="submit" className="flex-1 py-3 bg-[#1a73e8] text-white font-bold text-xs rounded-xl hover:bg-blue-700 transition-colors shadow-sm">নিশ্চিত করুন</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // --- Normal List View ---
+  return (
+    <div className="space-y-4 animate-in fade-in duration-300 pb-20">
+      {/* Budget Overview Card */}
+      <div className="bg-white border border-[#e2e7ec]/80 p-5 rounded-3xl shadow-[0_4px_16px_rgba(0,0,0,0.03)] w-full max-w-lg mx-auto">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-extrabold text-[#111827] tracking-tight">বাজেট ম্যানেজমেন্ট</h3>
+          <span className="text-xs font-bold text-blue-600 flex items-center gap-1.5 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-100">
+            <CalendarDays size={14} />
+            {getCurrentBengaliMonthAndYear()}
+          </span>
+        </div>
+        <div className="space-y-3">
+          <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden flex items-center">
+            <div
+              className="h-full rounded-full transition-all duration-300 bg-[#1a73e8]"
+              style={{ width: `${overallRatio}%` }}
+            />
+          </div>
+          <div className="flex justify-between items-center text-xs font-bold text-slate-400 font-mono">
+            <span>মোট খরচ: {currency} {toBanglaNumbers(totalCurrentSpent.toLocaleString('bn-BD'))}</span>
+            <span className="text-[#1a73e8] font-black">{toBanglaNumbers(overallRatio)}%</span>
+            <span>মোট বাজেট: {currency} {toBanglaNumbers(totalCurrentBudget.toLocaleString('bn-BD'))}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="w-full max-w-lg mx-auto px-1">
+        {budgets.length === 0 ? (
+          /* Image Accurate Beautiful Empty State */
+          <div className="flex flex-col items-center justify-center py-20 text-slate-400 select-none">
+            <div className="w-20 h-20 bg-slate-50 border border-slate-100 rounded-full flex items-center justify-center mb-4 shadow-xs">
+              <Receipt size={32} className="text-slate-300" />
+            </div>
+            <p className="text-sm font-bold text-slate-500">কোন বাজেট নেই</p>
+            <p className="text-[11px] text-slate-400 font-bold mt-1">নিচের + বাটনে ক্লিক করে বাজেট যোগ করুন</p>
+          </div>
+        ) : (
+          <div className="space-y-3.5">
+            <div className="flex justify-between items-center px-1">
+              <h3 className="text-sm font-bold text-slate-800 border-l-4 border-indigo-500 pl-2">বাজেট লিমিট তালিকা</h3>
+              <span className="text-[10px] font-bold text-slate-400">সব খাতের বাজেট সম্বলিত তালিকা</span>
+            </div>
+            <div className="grid grid-cols-1 gap-3.5">
+              {budgets.map((bud, idx) => {
+                const actual = actualCurrentMonthExpenses[bud.category] || 0;
+                const limitWithAllocations = currentBudgetsLimits[bud.category] || bud.limitAmount;
+                const ratio = limitWithAllocations > 0 ? Math.min(Math.round((actual / limitWithAllocations) * 100), 200) : 0;
+                
+                let badgeText = 'বাজেট ঠিক আছে';
+                let alertColor = 'bg-emerald-50 border-emerald-100 text-emerald-600';
+
+                if (ratio >= 100) {
+                  badgeText = 'বাজেট ওভার!';
+                  alertColor = 'bg-rose-50 border-rose-100 text-rose-600';
+                } else if (ratio >= 80) {
+                  badgeText = 'সীমার কাছাকাছি!';
+                  alertColor = 'bg-amber-50 border-amber-100 text-[#f59e0b]';
+                }
+
+                return (
+                  <div
+                    key={idx}
+                    onClick={() => {
+                      setSelectedCategory(bud.category);
+                      setActiveView('details');
+                    }}
+                    className="bg-white p-5 rounded-2xl border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.01)] space-y-3.5 relative overflow-hidden text-left hover:shadow-md transition-shadow duration-300 cursor-pointer"
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h4 className="text-sm font-black text-slate-800">{EXPENSE_CATEGORY_LABELS[bud.category] || bud.category}</h4>
+                        <span className={`text-[9px] font-bold mt-1.5 inline-block px-2 py-0.5 rounded-full border ${alertColor}`}>
+                          {badgeText} ({toBanglaNumbers(ratio)}%)
+                        </span>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteBudget(bud.category);
+                        }}
+                        className="p-1 text-slate-300 hover:text-rose-500 rounded-lg transition-colors cursor-pointer"
+                        title="মুছে ফেলুন"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between text-xs font-bold text-slate-500">
+                        <span>ব্যয়িত: {currency} {toBanglaNumbers(actual.toLocaleString('bn-BD'))}</span>
+                        <span>বাজেট: {currency} {toBanglaNumbers(limitWithAllocations.toLocaleString('bn-BD'))}</span>
+                      </div>
+                      <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-300`}
+                          style={{ width: `${Math.min(ratio, 100)}%`, backgroundColor: ratio >= 100 ? '#e11d48' : ratio >= 80 ? '#f59e0b' : '#10b981' }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Floating Action Button (Screenshot Accurate Layout) */}
+      <button
+        ref={budgetFabRef}
+        onClick={() => { setBudCategory(''); setBudLimit(''); setBudgetModalOpen(true); }}
+        className="fixed bottom-[76px] lg:bottom-8 right-5 lg:right-8 bg-[#1a73e8] hover:bg-blue-700 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg shadow-blue-200 active:scale-95 transition-all duration-[150ms] ease-out z-40 cursor-pointer pointer-events-auto opacity-100 scale-100 translate-y-0"
+        style={{
+          willChange: 'transform, opacity',
+        }}
+        title="বাজেট সেট করুন"
+      >
+        <Plus size={28} />
+      </button>
+
+      {/* Budget Limit Set Modal */}
+      {isBudgetModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative text-left animate-in zoom-in-95 duration-150">
+            <h3 className="text-base font-bold text-slate-800 text-center mb-4">ঋণ বা খরচের বাজেট লিমিট</h3>
+            <form onSubmit={handleSaveBudget} className="space-y-4">
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 block mb-1">খাত / ক্যাটাগরি</label>
+                <input required type="text" value={budCategory} onChange={e => setBudCategory(e.target.value)} placeholder="যেমন: বাজার, যাতায়াত" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-[#1a73e8] font-bold text-slate-800 text-xs" />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 block mb-1">বাজেট পরিমাণ</label>
+                <input required type="number" value={budLimit} onChange={e => setBudLimit(e.target.value)} placeholder="সর্বোচ্চ টাকা লিমিট" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-[#1a73e8] font-black text-slate-800 text-base" />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button type="button" onClick={() => setBudgetModalOpen(false)} className="flex-1 py-3 bg-slate-100 text-slate-500 font-bold text-xs rounded-xl hover:bg-slate-200 transition-colors">বাতিল</button>
+                <button type="submit" className="flex-1 py-3 bg-[#1a73e8] text-white font-bold text-xs rounded-xl hover:bg-blue-700 transition-colors shadow-sm">বাজেট সেভ</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {budgetToDelete && (
+        <ConfirmModal
+          isOpen={!!budgetToDelete}
+          onClose={() => setBudgetToDelete(null)}
+          onConfirm={handleConfirmDeleteBudget}
+          title="বাজেট ডিলিট"
+          message={`আপনি কি "${EXPENSE_CATEGORY_LABELS[budgetToDelete] || budgetToDelete}" খাতের বাজেট লিমিট অপসারণ করতে চান?`}
+        />
+      )}
+
+      {txToDeleteId && (
+        <ConfirmModal
+          isOpen={!!txToDeleteId}
+          onClose={() => setTxToDeleteId(null)}
+          onConfirm={handleConfirmDeleteBudgetTransaction}
+          title="লেনদেন ডিলিট"
+          message="আপনি কি এই লেনদেনটি মুছে ফেলতে চান?"
+        />
+      )}
+    </div>
+  );
+};
+
+// ------------------------------------------
+// TASKS MANAGER / CHECKLIST PAGE/TAB
+// ------------------------------------------
+const TasksManager: React.FC<{ expenses: any[]; user: any }> = ({ expenses, user }) => {
+  const { showToast } = useAppContext();
+  const userId = user?.id || 'default';
+  const currency = user?.currency || '৳';
+
+  const [tasks, setTasks] = useState<TodoTask[]>(() => {
+    const cached = localStorage.getItem(`budget_tasks_${userId}`);
+    return cached ? JSON.parse(cached) : [
+      { id: 't-1', title: 'চলতি মাসের বিদ্যুৎ বিল পরিশোধ করা', amount: 1200, dueDate: new Date().toISOString().split('T')[0], completed: false, createdAt: new Date().toISOString().split('T')[0] },
+      { id: 't-2', title: 'ইন্টারনেট বিল পরিশোধ করা', amount: 500, dueDate: new Date().toISOString().split('T')[0], completed: true, createdAt: new Date().toISOString().split('T')[0] }
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem(`budget_tasks_${userId}`, JSON.stringify(tasks));
+  }, [tasks, userId]);
+
+  const [isTaskModalOpen, setTaskModalOpen] = useState(false);
+  const [taskTitle, setTaskTitle] = useState('');
+  const [taskAmount, setTaskAmount] = useState('');
+  const [taskDate, setTaskDate] = useState(new Date().toISOString().split('T')[0]);
+
+  const toBanglaNumbers = (num: string | number): string => {
+    const banglaDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+    return String(num).replace(/[0-9]/g, (digit) => banglaDigits[parseInt(digit)]);
   };
 
   const handleAddTask = (e: React.FormEvent) => {
@@ -3421,203 +4182,96 @@ const BudgetsAndTasksManager: React.FC<{ expenses: any[]; user: any }> = ({ expe
   };
 
   return (
-    <div className="space-y-4 animate-in fade-in duration-300">
-      <div className="flex justify-between items-center bg-slate-100 p-1 rounded-2xl w-full max-w-sm mx-auto select-none border border-slate-200">
-        <button
-          onClick={() => setActiveSubTab('budget')}
-          className={`flex-1 py-2 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 ${
-            activeSubTab === 'budget' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          <Receipt size={14} /> বাজেট সীমানা
-        </button>
-        <button
-          onClick={() => setActiveSubTab('checklist')}
-          className={`flex-1 py-2 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 ${
-            activeSubTab === 'checklist' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          <ListChecks size={14} /> খরচ চেকলিস্ট
-        </button>
+    <div className="space-y-4 animate-in fade-in duration-300 pb-20">
+      <div className="flex justify-between items-center mb-1 text-left w-full max-w-lg mx-auto px-1">
+        <div>
+          <h3 className="text-base font-bold text-slate-800">খরচের চেকলিস্ট</h3>
+          <p className="text-xs text-slate-400 font-medium">প্রয়োজনীয় খরচের বা গুরুত্বপূর্ণ কাজের চেকলিস্ট তৈরি ও ট্র্যাকিং করুন</p>
+        </div>
       </div>
 
-      {activeSubTab === 'budget' ? (
-        <div className="space-y-4">
-          <div className="flex justify-between items-center mb-1 text-left">
-            <div>
-              <h3 className="text-base font-bold text-slate-800">বাজেট লিমিট</h3>
-              <p className="text-xs text-slate-400 font-medium">প্রতি মাসের খরচ নিয়ন্ত্রণে রাখতে খাতের বাজেট সেট করুন</p>
+      <div className="w-full max-w-lg mx-auto">
+        {tasks.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-slate-400 select-none">
+            <div className="w-20 h-20 bg-slate-50 border border-slate-100 rounded-full flex items-center justify-center mb-4 shadow-xs">
+              <ListChecks size={32} className="text-slate-300" />
             </div>
-            <button
-              onClick={() => { setBudCategory(''); setBudLimit(''); setBudgetModalOpen(true); }}
-              className="bg-indigo-600 text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow-sm active:scale-95 transition-transform shrink-0 flex items-center gap-1"
-            >
-              <Plus size={14} /> বাজেট সেট
-            </button>
+            <p className="text-sm font-bold text-slate-500">কোনো কাজ বা ডিল নেই</p>
+            <p className="text-[11px] text-slate-400 font-semibold mt-1">নিচের + বাটনে ক্লিক করে কাজ যোগ করুন</p>
           </div>
-
-          {budgets.length === 0 ? (
-            <div className="bg-white border p-10 rounded-2xl text-center text-slate-400">
-              কোনো খাতের বাজেট সেট করা হয়নি এখনও।
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {budgets.map((bud, idx) => {
-                const actual = actualCurrentMonthExpenses[bud.category] || 0;
-                const ratio = Math.min(Math.round((actual / bud.limitAmount) * 100), 200);
-                
-                let badgeText = 'বাজেট ঠিক আছে';
-                let alertColor = 'bg-emerald-50 border-emerald-100 text-emerald-600';
-
-                if (ratio >= 100) {
-                  badgeText = 'বাজেট ওভার!';
-                  alertColor = 'bg-rose-50 border-rose-100 text-rose-600';
-                } else if (ratio >= 80) {
-                  badgeText = 'সীমার কাছাকাছি!';
-                  alertColor = 'bg-amber-50 border-amber-100 text-amber-600';
-                }
-
-                return (
-                  <div key={idx} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-3 relative overflow-hidden text-left">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h4 className="text-sm font-black text-slate-800">{EXPENSE_CATEGORY_LABELS[bud.category] || bud.category}</h4>
-                        <span className={`text-[9px] font-bold mt-1 inline-block px-2 py-0.5 rounded-full border ${alertColor}`}>
-                          {badgeText} ({ratio}%)
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => handleDeleteBudget(bud.category)}
-                        className="p-1 text-slate-300 hover:text-rose-500 rounded-lg transition-colors"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-xs font-medium">
-                        <span className="text-slate-400">ব্যয়িত: {currency} {actual.toLocaleString('bn-BD')}</span>
-                        <span className="text-slate-500">বাজেট: {currency} {bud.limitAmount.toLocaleString('bn-BD')}</span>
-                      </div>
-                      <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all duration-300`}
-                          style={{ width: `${Math.min(ratio, 100)}%`, backgroundColor: ratio >= 100 ? '#e11d48' : ratio >= 80 ? '#f59e0b' : '#10b981' }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <div className="flex justify-between items-center mb-1 text-left">
-            <div>
-              <h3 className="text-base font-bold text-slate-800">খরচের চেকলিস্ট</h3>
-              <p className="text-xs text-slate-400 font-medium">প্রয়োজনীয় খরচের বা গুরুত্বপূর্ণ কাজের চেকলিস্ট তৈরি ও ট্র্যাকিং করুন</p>
-            </div>
-            <button
-              onClick={() => { setTaskTitle(''); setTaskAmount(''); setTaskModalOpen(true); }}
-              className="bg-indigo-600 text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow-sm active:scale-95 transition-transform shrink-0 flex items-center gap-1"
-            >
-              <Plus size={14} /> কাজ যোগ
-            </button>
-          </div>
-
-          {tasks.length === 0 ? (
-            <div className="bg-white border p-10 rounded-2xl text-center text-slate-400">
-               কোনো খরচের কাজ যোগ করা হয়নি এখনও।
-            </div>
-          ) : (
-            <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
-              {tasks.map(task => (
-                <div
-                  key={task.id}
-                  className={`p-3 rounded-2xl border flex items-center justify-between gap-3 shadow-sm transition-all text-left ${
-                    task.completed ? 'bg-slate-50/50 border-slate-100 opacity-60' : 'bg-white border-slate-100 hover:border-indigo-100'
-                  }`}
-                >
-                  <div className="flex items-start gap-3 min-w-0">
-                    <button
-                      onClick={() => toggleTaskCompleted(task.id)}
-                      className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
-                        task.completed ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-300 hover:border-indigo-500'
-                      }`}
-                    >
-                      {task.completed && <Check size={14} strokeWidth={3} />}
-                    </button>
-                    <div className="min-w-0 text-left">
-                      <h4 className={`text-xs font-bold leading-tight ${task.completed ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
-                        {task.title}
-                      </h4>
-                      <div className="flex items-center gap-2 mt-1 text-[9px] font-bold text-slate-400">
-                        <span>মেয়াদ: {task.dueDate}</span>
-                        {task.amount && <span>• প্রাক্কলিত: {currency} {task.amount.toLocaleString('bn-BD')}</span>}
-                      </div>
-                    </div>
-                  </div>
+        ) : (
+          <div className="space-y-2.5">
+            {tasks.map(task => (
+              <div
+                key={task.id}
+                className={`p-4 rounded-2xl border flex items-center justify-between gap-3 shadow-xs transition-all text-left ${
+                  task.completed ? 'bg-slate-50/50 border-slate-100 opacity-60' : 'bg-white border-slate-100 hover:border-indigo-100 hover:shadow-xs'
+                }`}
+              >
+                <div className="flex items-start gap-3 min-w-0">
                   <button
-                    onClick={() => handleDeleteTask(task.id)}
-                    className="p-1.5 text-slate-300 hover:text-rose-500 rounded-lg shrink-0 transition-colors"
+                    onClick={() => toggleTaskCompleted(task.id)}
+                    className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 mt-0.5 transition-colors cursor-pointer ${
+                      task.completed ? 'bg-[#1a73e8] border-[#1a73e8] text-white' : 'border-slate-300 hover:border-[#1a73e8]'
+                    }`}
                   >
-                    <Trash2 size={16} />
+                    {task.completed && <Check size={14} strokeWidth={3} />}
                   </button>
+                  <div className="min-w-0 text-left">
+                    <h4 className={`text-xs font-bold leading-tight ${task.completed ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
+                      {task.title}
+                    </h4>
+                    <div className="flex items-center gap-2 mt-1 text-[9px] font-bold text-slate-400">
+                      <span>মেয়াদ: {toBanglaNumbers(task.dueDate)}</span>
+                      {task.amount && <span>• প্রাক্কলিত: {currency} {toBanglaNumbers(task.amount.toLocaleString('bn-BD'))}</span>}
+                    </div>
+                  </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Budget Limit Set Modals */}
-      {isBudgetModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-sm p-5 shadow-2xl relative text-left">
-            <h3 className="text-base font-bold text-slate-800 text-center mb-4">ঋণ বা খরচের বাজেট লিমিট</h3>
-            <form onSubmit={handleSaveBudget} className="space-y-4">
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase">খাত / ক্যাটাগরি</label>
-                <input required type="text" value={budCategory} onChange={e => setBudCategory(e.target.value)} placeholder="যেমন: বাজার, যাতায়াত" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-800 text-xs" />
+                <button
+                  onClick={() => handleDeleteTask(task.id)}
+                  className="p-1.5 text-slate-300 hover:text-rose-500 rounded-lg shrink-0 transition-colors cursor-pointer"
+                  title="মুছে ফেলুন"
+                >
+                  <Trash2 size={16} />
+                </button>
               </div>
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase">বাজেট পরিমাণ</label>
-                <input required type="number" value={budLimit} onChange={e => setBudLimit(e.target.value)} placeholder="সর্বোচ্চ টাকা লিমিট" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-black text-slate-800 text-base" />
-              </div>
-              <div className="flex gap-2 pt-2">
-                <button type="button" onClick={() => setBudgetModalOpen(false)} className="flex-1 py-3 bg-slate-100 text-slate-500 font-bold text-xs rounded-xl hover:bg-slate-200 transition-colors">বাতিল</button>
-                <button type="submit" className="flex-1 py-3 bg-indigo-600 text-white font-bold text-xs rounded-xl hover:bg-indigo-700 transition-colors shadow-sm">বাজেট সেভ</button>
-              </div>
-            </form>
+            ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
+
+      {/* Sticky Floating Action Button */}
+      <button
+        onClick={() => { setTaskTitle(''); setTaskAmount(''); setTaskModalOpen(true); }}
+        className="fixed bottom-[76px] lg:bottom-8 right-5 lg:right-8 bg-[#1a73e8] hover:bg-blue-700 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg shadow-blue-200 active:scale-95 transition-all duration-[150ms] ease-out z-40 cursor-pointer"
+        title="নতুন কাজ যোগ করুন"
+      >
+        <Plus size={28} />
+      </button>
 
       {/* Checklist Tasks Set Modal */}
       {isTaskModalOpen && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-sm p-5 shadow-2xl relative text-left">
+          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative text-left animate-in zoom-in-95 duration-150">
             <h3 className="text-base font-bold text-slate-800 text-center mb-4">নতুন খরচ বা ডিল যোগ</h3>
             <form onSubmit={handleAddTask} className="space-y-3.5">
               <div>
-                <label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase">কাজের নাম</label>
-                <input required type="text" value={taskTitle} onChange={e => setTaskTitle(e.target.value)} placeholder="যেমন: বাড়ি ভাড়া পরিশোধ করা" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-800 text-xs" />
+                <label className="text-[10px] font-bold text-slate-400 block mb-1">কাজের নাম</label>
+                <input required type="text" value={taskTitle} onChange={e => setTaskTitle(e.target.value)} placeholder="যেমন: বাড়ি ভাড়া পরিশোধ করা" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-[#1a73e8] font-bold text-slate-800 text-xs" />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase">সম্ভাব্য খরচ</label>
-                  <input type="number" value={taskAmount} onChange={e => setTaskAmount(e.target.value)} placeholder="ঐচ্ছিক" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-800 text-xs" />
+                  <label className="text-[10px] font-bold text-slate-400 block mb-1">সম্ভাব্য খরচ</label>
+                  <input type="number" value={taskAmount} onChange={e => setTaskAmount(e.target.value)} placeholder="ঐচ্ছিক" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-[#1a73e8] font-bold text-slate-800 text-xs" />
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase">টার্গেট ডেট</label>
-                  <input required type="date" value={taskDate} onChange={e => setTaskDate(e.target.value)} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-800 text-xs" />
+                  <label className="text-[10px] font-bold text-slate-400 block mb-1">টার্গেট ডেট</label>
+                  <input required type="date" value={taskDate} onChange={e => setTaskDate(e.target.value)} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-[#1a73e8] font-bold text-slate-800 text-xs" />
                 </div>
               </div>
               <div className="flex gap-2 pt-2">
                 <button type="button" onClick={() => setTaskModalOpen(false)} className="flex-1 py-3 bg-slate-100 text-slate-500 font-bold text-xs rounded-xl hover:bg-slate-200 transition-colors">বাতিল</button>
-                <button type="submit" className="flex-1 py-3 bg-indigo-600 text-white font-bold text-xs rounded-xl hover:bg-indigo-700 transition-colors shadow-sm">কাজ যোগ</button>
+                <button type="submit" className="flex-1 py-3 bg-[#1a73e8] text-white font-bold text-xs rounded-xl hover:bg-blue-700 transition-colors shadow-sm">কাজ যোগ</button>
               </div>
             </form>
           </div>
