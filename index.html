@@ -82,6 +82,76 @@
 </head>
 <body>
     <div id="root"></div>
+    <script>
+      (function() {
+        let startY = 0;
+        
+        document.addEventListener('touchstart', function(e) {
+          if (e.touches.length === 1) {
+            startY = e.touches[0].clientY;
+          }
+        }, { passive: false });
+
+        document.addEventListener('touchmove', function(e) {
+          if (e.touches.length === 1) {
+            const clientY = e.touches[0].clientY;
+            const deltaY = clientY - startY;
+
+            if (deltaY > 0) {
+              // User is pulling down
+              // Find if there is any active scrollable container that is scrolled down
+              let target = e.target;
+              let canScrollUp = false;
+
+              while (target && target !== document.body && target !== document.documentElement) {
+                const overflow = window.getComputedStyle(target).overflowY;
+                if ((overflow === 'auto' || overflow === 'scroll') && target.scrollTop > 0) {
+                  canScrollUp = true;
+                  break;
+                }
+                const parent = target.parentNode;
+                if (parent && parent instanceof Element) {
+                  target = parent;
+                } else {
+                  break;
+                }
+              }
+
+              // If we are at the very top of the window, and no child container can scroll up,
+              // then prevent the browser's/WebView's pull-to-refresh / rubber-band bounce.
+              if (window.scrollY === 0 && !canScrollUp) {
+                e.preventDefault();
+              }
+            } else if (deltaY < 0) {
+              // User is pulling up
+              // Check if we are at the bottom of the window
+              const maxWindowScroll = document.documentElement.scrollHeight - window.innerHeight;
+              let target = e.target;
+              let canScrollDown = false;
+
+              while (target && target !== document.body && target !== document.documentElement) {
+                const overflow = window.getComputedStyle(target).overflowY;
+                const scrollRange = target.scrollHeight - target.clientHeight;
+                if ((overflow === 'auto' || overflow === 'scroll') && target.scrollTop < scrollRange) {
+                  canScrollDown = true;
+                  break;
+                }
+                const parent = target.parentNode;
+                if (parent && parent instanceof Element) {
+                  target = parent;
+                } else {
+                  break;
+                }
+              }
+
+              if (window.scrollY >= maxWindowScroll - 1 && !canScrollDown) {
+                e.preventDefault();
+              }
+            }
+          }
+        }, { passive: false });
+      })();
+    </script>
 <script type="module" src="/index.tsx"></script>
 </body>
 </html>
