@@ -1,20 +1,28 @@
 
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Users, Plus, Search, Phone, MoreHorizontal, X, Pencil, Trash2, Loader2, ChevronRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { CURRENCY } from '../constants';
 import { Client } from '../types';
 import { useAppContext } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
+import { ConfirmModal } from '@/components/ConfirmModal';
 
 export const Clients: React.FC = () => {
-  const { clients, projects, setClients, user, refreshData, showToast } = useAppContext();
+  const { clients, projects, setClients, user, refreshData, showToast, isOnline } = useAppContext();
+  const navigate = useNavigate();
   const [isModalOpen, setModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [activeClientId, setActiveClientId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  
+  // Delete Modal State
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [clientToDelete, setClientToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   const [newClient, setNewClient] = useState<Partial<Client>>({
     name: '',
@@ -41,37 +49,67 @@ export const Clients: React.FC = () => {
     return { totalProjects, totalEarnings };
   };
 
-  const handleDeleteClient = async (id: string) => {
-    if (!user) return;
-    if (window.confirm('আপনি কি নিশ্চিত? ক্লায়েন্ট ডিলিট করলে ডাটাবেস থেকে মুছে যাবে।')) {
-      setIsDeleting(id);
-      setActiveMenuId(null);
-      try {
-        const { error } = await supabase
-          .from('clients')
-          .delete()
-          .eq('id', id)
+  const initiateDelete = (id: string) => {
+    setClientToDelete(id);
+    setShowDeleteModal(true);
+    setActiveMenuId(null);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!user || !clientToDelete) return;
+    setIsDeleting(true);
+    try {
+      const client = clients.find(c => c.id === clientToDelete);
+      if (!client) throw new Error('Client not found');
+
+      // Move client to trash
+      const newContact = `[TRASH] ${client.contact || ''}`.trim();
+      const { error: clientError } = await supabase
+        .from('clients')
+        .update({ contact: newContact })
+        .eq('id', clientToDelete)
+        .eq('userid', user.id);
+      
+      if (clientError) throw clientError;
+
+      // Move all projects of this client to trash
+      const clientProjects = projects.filter(p => p.clientname === client.name);
+      for (const project of clientProjects) {
+        const newNotes = `[TRASH] ${project.notes || ''}`.trim();
+        await supabase
+          .from('projects')
+          .update({ notes: newNotes })
+          .eq('id', project.id)
           .eq('userid', user.id);
-        
-        if (error) throw error;
-        
-        showToast('ক্লায়েন্ট ডিলিট করা হয়েছে', 'success');
-        await refreshData();
-      } catch (err: any) {
-        showToast(`সমস্যা: ${err.message}`);
-      } finally {
-        setIsDeleting(null);
       }
+      
+      showToast('ক্লায়েন্ট রিসাইকেল বিনে পাঠানো হয়েছে', 'success');
+      await refreshData();
+      setShowDeleteModal(false);
+    } catch (err: any) {
+      showToast(`সমস্যা: ${err.message}`);
+      setShowDeleteModal(false);
+    } finally {
+      setIsDeleting(false);
+      setClientToDelete(null);
     }
   };
 
   const handleOpenAddModal = () => {
+    if (!isOnline) {
+      showToast('অফলাইনে নতুন ক্লায়েন্ট যোগ করা যাবে না', 'error');
+      return;
+    }
     setIsEditing(false);
     setNewClient({ name: '', contact: '' });
     setModalOpen(true);
   };
 
   const handleOpenEditModal = (client: Client) => {
+    if (!isOnline) {
+      showToast('অফলাইনে ক্লায়েন্ট এডিট করা যাবে না', 'error');
+      return;
+    }
     setIsEditing(true);
     setActiveClientId(client.id);
     setNewClient({ name: client.name, contact: client.contact });
@@ -83,6 +121,7 @@ export const Clients: React.FC = () => {
     e.preventDefault();
     if (!newClient.name || !user) return;
     setIsSubmitting(true);
+    window.dispatchEvent(new CustomEvent('app:processing', { detail: { show: true, message: 'ক্লায়েন্ট সংরক্ষণ করা হচ্ছে...' } }));
     
     try {
       if (isEditing && activeClientId) {
@@ -126,7 +165,12 @@ export const Clients: React.FC = () => {
       showToast(err.message);
     } finally {
       setIsSubmitting(false);
+      window.dispatchEvent(new CustomEvent('app:processing', { detail: { show: false } }));
     }
+  };
+
+  const handleViewClientProjects = (clientName: string) => {
+    navigate('/projects', { state: { clientFilter: clientName } });
   };
 
   const filteredClients = clients.filter(c => 
@@ -142,7 +186,8 @@ export const Clients: React.FC = () => {
         </div>
         <button 
           onClick={handleOpenAddModal}
-          className="bg-indigo-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-indigo-200 active:scale-90 transition-transform"
+          disabled={!isOnline}
+          className={`bg-indigo-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-indigo-200 active:scale-90 transition-transform ${!isOnline ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
           <Plus size={24} />
         </button>
@@ -159,9 +204,9 @@ export const Clients: React.FC = () => {
         />
       </div>
 
-      <div className="space-y-3 pb-20">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pb-20">
         {filteredClients.length === 0 ? (
-          <div className="py-20 text-center text-slate-400">
+          <div className="col-span-full py-20 text-center text-slate-400">
             <Users size={48} className="mx-auto mb-4 opacity-20" />
             <p className="text-sm font-medium">কোনো ক্লায়েন্ট নেই</p>
           </div>
@@ -179,7 +224,6 @@ export const Clients: React.FC = () => {
                     </div>
                     <div>
                       <h3 className="font-bold text-slate-800 text-base">{client.name}</h3>
-                      {/* Removed contact display */}
                     </div>
                   </div>
                   
@@ -205,11 +249,20 @@ export const Clients: React.FC = () => {
                               </button>
                               <div className="h-px bg-slate-50 w-full my-0.5"></div>
                               <button 
-                                  onClick={(e) => { e.stopPropagation(); handleDeleteClient(client.id); }}
-                                  className="w-full px-4 py-2.5 text-left text-xs font-bold text-rose-500 hover:bg-rose-50 flex items-center gap-2 transition-colors"
+                                  onClick={(e) => { 
+                                    e.stopPropagation(); 
+                                    if (!isOnline) {
+                                      showToast('অফলাইনে ক্লায়েন্ট ডিলিট করা যাবে না', 'error');
+                                      return;
+                                    }
+                                    initiateDelete(client.id); 
+                                  }}
+                                  disabled={!isOnline}
+                                  className={`w-full px-4 py-2.5 text-left text-xs font-bold flex items-center gap-2 transition-colors
+                                    ${!isOnline ? 'text-slate-300 cursor-not-allowed' : 'text-rose-500 hover:bg-rose-50'}
+                                  `}
                               >
-                                  {isDeleting === client.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} 
-                                  ডিলিট
+                                  <Trash2 size={14} /> ডিলিট
                               </button>
                           </div>
                       )}
@@ -217,8 +270,14 @@ export const Clients: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 mt-4 bg-slate-50 p-3 rounded-xl">
-                  <div className="text-center border-r border-slate-200">
-                    <p className="text-[10px] text-slate-400 font-bold uppercase mb-0.5">প্রজেক্ট</p>
+                  {/* Clickable Projects Stat */}
+                  <div 
+                    onClick={() => handleViewClientProjects(client.name)}
+                    className="text-center border-r border-slate-200 cursor-pointer active:opacity-60 transition-opacity"
+                  >
+                    <p className="text-[10px] text-slate-400 font-bold uppercase mb-0.5 flex items-center justify-center gap-1">
+                      প্রজেক্ট <ChevronRight size={10} />
+                    </p>
                     <p className="font-bold text-slate-800 text-base">{stats.totalProjects} টি</p>
                   </div>
                   <div className="text-center">
@@ -232,9 +291,18 @@ export const Clients: React.FC = () => {
         )}
       </div>
 
-      {/* Full Screen Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-[100] bg-white flex flex-col animate-in slide-in-from-bottom duration-300">
+      <ConfirmModal 
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleConfirmDelete}
+        title="ক্লায়েন্ট ডিলিট"
+        message="আপনি কি নিশ্চিত? ক্লায়েন্ট ডিলিট করলে ডাটাবেস থেকে মুছে যাবে এবং পুনরুদ্ধার করা যাবে না।"
+        isProcessing={isDeleting}
+      />
+
+      {/* Full Screen Modal with Portal */}
+      {isModalOpen && createPortal(
+        <div className="fixed inset-0 z-[1000] bg-white flex flex-col h-[100dvh] animate-in fade-in duration-200">
             {/* Header */}
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-10">
               <h2 className="text-xl font-bold text-slate-800">
@@ -261,7 +329,8 @@ export const Clients: React.FC = () => {
                   </button>
                 </form>
             </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
