@@ -1,70 +1,104 @@
 
 import React from 'react';
 import { useAppContext } from '../context/AppContext';
+import { MoreVertical, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
 interface StatCardProps {
   title: string;
   value: string | number;
   icon: React.ReactNode;
   isCurrency?: boolean;
-  variant?: 'primary' | 'default' | 'success' | 'warning' | 'info';
+  color: 'indigo' | 'emerald' | 'rose' | 'blue' | 'amber' | 'purple';
+  onClick?: () => void;
+  trend?: {
+    value: number | string;
+    label: string;
+    isPositive: boolean;
+    colorClass?: string;
+  }
 }
 
-export const StatCard: React.FC<StatCardProps> = ({ title, value, icon, isCurrency, variant = 'default' }) => {
+export const StatCard: React.FC<StatCardProps> = ({ title, value, icon, isCurrency, color, onClick, trend }) => {
   const { user } = useAppContext();
   const currency = user?.currency || '৳';
   
   const numValue = typeof value === 'string' ? parseFloat(value) : value;
   const safeValue = isNaN(numValue as number) ? 0 : numValue;
 
-  if (variant === 'primary') {
-    return (
-      <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-2xl p-4 shadow-lg shadow-indigo-200 text-white flex flex-col justify-between h-24">
-        <div className="absolute -right-4 -top-4 bg-white/10 w-24 h-24 rounded-full blur-2xl"></div>
-        
-        <div className="flex justify-between items-start z-10">
-          <p className="text-indigo-100 text-xs font-bold uppercase tracking-wider">{title}</p>
-          <div className="bg-white/20 p-1.5 rounded-lg backdrop-blur-sm">
-            {React.cloneElement(icon as React.ReactElement<any>, { size: 16, color: 'white' })}
-          </div>
-        </div>
-        
-        <div className="z-10">
-          <h3 className="text-xl font-bold tracking-tight">
-            {isCurrency ? (
-              <>
-                <span className="text-base font-bold opacity-80 mr-1">{currency}</span>
-                {Number(safeValue).toLocaleString('bn-BD')}
-              </>
-            ) : safeValue}
-          </h3>
-        </div>
-      </div>
-    );
-  }
-
-  const variantStyles = {
-    default: { bg: 'bg-white', text: 'text-slate-800', border: 'border-slate-100', iconBg: 'bg-slate-50', iconColor: 'text-slate-500' },
-    success: { bg: 'bg-white', text: 'text-slate-800', border: 'border-emerald-100', iconBg: 'bg-emerald-50', iconColor: 'text-emerald-500' },
-    warning: { bg: 'bg-white', text: 'text-slate-800', border: 'border-amber-100', iconBg: 'bg-amber-50', iconColor: 'text-amber-500' },
-    info: { bg: 'bg-white', text: 'text-slate-800', border: 'border-blue-100', iconBg: 'bg-blue-50', iconColor: 'text-blue-500' }
-  };
-
-  const style = variantStyles[variant] || variantStyles.default;
+  // Premium Color Themes
+  const themes = {
+    indigo: { 
+      iconBg: 'bg-indigo-50 text-indigo-600', 
+      ring: 'group-hover:ring-indigo-100',
+    },
+    emerald: { 
+      iconBg: 'bg-emerald-50 text-emerald-600', 
+      ring: 'group-hover:ring-emerald-100',
+    },
+    rose: { 
+      iconBg: 'bg-rose-50 text-rose-600', 
+      ring: 'group-hover:ring-rose-100',
+    },
+    blue: { 
+      iconBg: 'bg-blue-50 text-blue-600', 
+      ring: 'group-hover:ring-blue-100',
+    },
+    amber: { 
+      iconBg: 'bg-amber-50 text-amber-600', 
+      ring: 'group-hover:ring-amber-100',
+    },
+    purple: { 
+      iconBg: 'bg-purple-50 text-purple-600', 
+      ring: 'group-hover:ring-purple-100',
+    },
+  }[color];
 
   return (
-    <div className={`${style.bg} border ${style.border} rounded-2xl p-3 shadow-sm flex flex-col justify-between h-24`}>
-      <div className="flex justify-between items-start">
-        <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">{title}</p>
-        <div className={`${style.iconBg} ${style.iconColor} p-1.5 rounded-lg`}>
-          {React.cloneElement(icon as React.ReactElement<any>, { size: 16 })}
+    <div 
+      onClick={onClick}
+      className={`
+        relative bg-white rounded-2xl p-3.5 sm:p-4
+        border border-slate-100 shadow-[0_2px_15px_-4px_rgba(0,0,0,0.05)] 
+        flex flex-col group transition-all duration-300
+        ${onClick ? 'cursor-pointer active:scale-95 hover:shadow-lg hover:border-transparent hover:ring-2 ' + themes.ring : ''}
+      `}
+    >
+        <div className="flex justify-between items-center w-full">
+            <div className="flex flex-col min-w-0 pr-2">
+                <p className="text-slate-500 text-[14px] font-semibold tracking-wide mb-1" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>{title}</p>
+        
+                <h3 className="text-[17px] sm:text-[19px] font-black text-slate-800 tracking-tight leading-none truncate">
+                    {isCurrency ? (
+                        <span className="flex items-baseline gap-1">
+                            <span className="text-[14px] font-bold text-slate-400">{currency}</span>
+                            <span className="truncate">{Number(safeValue).toLocaleString('en-US')}</span>
+                        </span>
+                    ) : (
+                        <span className="truncate">{Number(safeValue).toLocaleString('en-US')}</span>
+                    )}
+                </h3>
+            </div>
+            
+            <div className={`w-[36px] h-[36px] rounded-lg ${themes?.iconBg} flex items-center justify-center shrink-0`}>
+                {React.cloneElement(icon as React.ReactElement<any>, { size: 18, strokeWidth: 2.5 })}
+            </div>
         </div>
-      </div>
-      <div>
-         <h3 className={`text-xl font-bold ${style.text} tracking-tight`}>
-          {isCurrency ? `${currency} ${Number(safeValue).toLocaleString('bn-BD')}` : safeValue}
-        </h3>
-      </div>
+
+        {trend && (
+           <div className="flex items-center gap-1 mt-3">
+             <div className={`${trend.colorClass || (trend.isPositive ? 'text-emerald-500' : 'text-rose-500')} flex items-center gap-0.5 font-bold text-[12px] sm:text-[13px]`}>
+               {trend.isPositive ? (
+                  <ArrowUpRight size={14} strokeWidth={3} />
+               ) : (
+                  <ArrowDownRight size={14} strokeWidth={3} />
+               )}
+               <span className="tracking-tight">
+                  {trend.value}{typeof trend.value === 'number' && '%'}
+               </span>
+             </div>
+             <span className="text-[12px] sm:text-[13px] font-medium text-slate-500" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>{trend.label}</span>
+           </div>
+        )}
     </div>
   );
 };
