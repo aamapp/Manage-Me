@@ -128,3 +128,26 @@ export interface AppNotification {
   userid: string;
   actionUrl?: string;
 }
+
+export interface BudgetTransaction {
+  id: string;
+  type: 'add' | 'spend';
+  amount: number;
+  description: string;
+  date: string;
+}
+
+export interface BudgetLimit {
+  category: string;
+  limitAmount: number;
+  transactions: BudgetTransaction[];
+}
+
+export interface TodoTask {
+  id: string;
+  title: string;
+  amount?: number;
+  dueDate: string;
+  completed: boolean;
+  createdAt: string;
+}
