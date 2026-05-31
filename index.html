@@ -27,8 +27,9 @@
         body {
             font-family: 'Kohinoor Bangla', sans-serif !important;
             background-color: #f8fafc;
-            /* Ensure native overscroll (rubber-banding) works on Android */
-            overscroll-behavior-y: auto;
+            /* Disable native overscroll bounce (rubber-banding) on Android WebView and iOS */
+            overscroll-behavior-y: none;
+            overscroll-behavior: none;
         }
         
         /* Ensure inputs always render in light mode (fixes mobile dark mode issues) */
@@ -58,6 +59,8 @@
         html {
             -ms-overflow-style: none;  /* IE and Edge */
             scrollbar-width: none;  /* Firefox */
+            overscroll-behavior-y: none;
+            overscroll-behavior: none;
         }
     </style>
 <script type="importmap">
