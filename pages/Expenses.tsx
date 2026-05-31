@@ -179,7 +179,7 @@ export const Expenses: React.FC = () => {
   const categoryInputRef = useRef<HTMLDivElement>(null);
 
   const [newExpense, setNewExpense] = useState<any>({
-    category: '',
+    category: 'অন্যান্য',
     date: new Date().toLocaleDateString('en-CA'),
     amount: 0,
     notes: ''
@@ -346,8 +346,8 @@ export const Expenses: React.FC = () => {
     setSelectedProjectDue(0);
     setFormErrors({});
 
-    setNewExpense({ category: '', date: localToday, amount: 0, notes: '' });
-    setNewIncome({ projectid: null, projectname: '', clientname: '', amount: 0, date: localToday, method: 'বিকাশ' });
+    setNewExpense({ category: 'অন্যান্য', date: localToday, amount: 0, notes: '' });
+    setNewIncome({ projectid: null, projectname: 'আয়', clientname: '', amount: 0, date: localToday, method: 'বিকাশ' });
     
     setModalOpen(true);
   };
@@ -376,7 +376,7 @@ export const Expenses: React.FC = () => {
       
       setNewIncome({
         projectid: null,
-        projectname: tx.rawItem.projectname || '',
+        projectname: tx.rawItem.projectname || 'আয়',
         clientname: tx.rawItem.clientname || '',
         amount: tx.amount,
         date: rawDate,
@@ -411,13 +411,17 @@ export const Expenses: React.FC = () => {
         errors.amount = 'সঠিক পরিমাণ দিন (০ থেকে বেশি)';
       }
       
+      /* 
       if (!newExpense.category || !newExpense.category.trim()) {
         errors.category = 'ক্যাটাগরি দেওয়া আবশ্যক';
       }
+      */
     } else {
+      /* 
       if (!newIncome.projectname || !newIncome.projectname.trim()) {
         errors.projectname = 'প্রজেক্ট নম্বর / নাম দেওয়া আবশ্যক';
       }
+      */
       
       const parsedAmount = Number(safeEval(newIncome.amount)) || 0;
       if (parsedAmount <= 0) {
@@ -461,7 +465,7 @@ export const Expenses: React.FC = () => {
 
         if (isEditing && activeExpenseId) {
           let query = supabase.from('expenses').update({
-            category: newExpense.category,
+            category: newExpense.category || 'অন্যান্য',
             amount: parsedAmount,
             date: dateToSave,
             notes: newExpense.notes
@@ -475,7 +479,7 @@ export const Expenses: React.FC = () => {
           showToast('খরচ আপডেট হয়েছে', 'success');
         } else {
           const { error } = await supabase.from('expenses').insert({
-            category: newExpense.category,
+            category: newExpense.category || 'অন্যান্য',
             amount: parsedAmount,
             date: dateToSave,
             notes: newExpense.notes,
@@ -939,7 +943,7 @@ export const Expenses: React.FC = () => {
   return (
     <div className="space-y-3 animate-in fade-in duration-300">
       {/* 6-Icon Navigation Tabs */}
-      <div className="bg-white py-0.5 px-1 text-slate-800 w-full max-w-lg mx-auto mb-1.5 select-none">
+      <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md py-2 px-1 text-slate-800 w-full max-w-lg mx-auto select-none border-b border-slate-100/80 shadow-[0_4px_12px_rgba(0,0,0,0.02)]">
         <div className="flex items-center justify-around w-full gap-0.5">
           {/* Tab 1: Expenses / Dashboard / লেনদেন */}
           <button
@@ -1923,59 +1927,13 @@ export const Expenses: React.FC = () => {
                         )}
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">তারিখ</label>
-                          <DatePicker 
-                            value={newExpense.date}
-                            onChange={(date) => setNewExpense({...newExpense, date: date})}
-                            placeholder="তারিখ"
-                          />
-                        </div>
-                        
-                        {/* Category Input with Suggestions */}
-                        <div className="relative" ref={categoryInputRef}>
-                          <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">ক্যাটাগরি</label>
-                          <input 
-                            type="text"
-                            value={newExpense.category}
-                            onFocus={() => {
-                              setShowCategorySuggestions(true);
-                              if (formErrors.category) setFormErrors({...formErrors, category: null});
-                            }}
-                            onChange={e => {
-                              setNewExpense({...newExpense, category: e.target.value});
-                              setShowCategorySuggestions(true);
-                              if (formErrors.category) setFormErrors({...formErrors, category: null});
-                            }}
-                            className={`w-full px-3 py-3 bg-white border rounded-xl font-bold text-sm text-slate-800 outline-none transition-all focus:ring-2 ${
-                              formErrors.category 
-                                ? 'border-rose-500 focus:ring-rose-200 bg-rose-50/20' 
-                                : 'border-slate-200 focus:ring-rose-500 focus:border-rose-500'
-                            }`}
-                            placeholder="ক্যাটাগরি..."
-                          />
-                          {formErrors.category && (
-                            <p className="text-xs font-semibold text-rose-500 mt-1 flex items-center gap-1 animate-in fade-in slide-in-from-top-1 duration-150">
-                              <AlertCircle size={14} className="shrink-0" /> {formErrors.category}
-                            </p>
-                          )}
-                          
-                          {showCategorySuggestions && (newExpense.category || filteredSuggestions.length > 0) && (
-                            <div className="absolute top-full right-0 left-0 mt-1 w-full bg-white border border-slate-100 rounded-xl shadow-2xl max-h-40 overflow-y-auto z-[60]">
-                              {filteredSuggestions.map((cat, idx) => (
-                                <div key={idx} onClick={() => handleSelectCategory(cat)} className="px-4 py-3 border-b border-slate-50 hover:bg-rose-50 font-medium text-xs cursor-pointer transition-colors text-slate-700">
-                                  {EXPENSE_CATEGORY_LABELS[cat] || cat}
-                                </div>
-                              ))}
-                              {!filteredSuggestions.some(c => (EXPENSE_CATEGORY_LABELS[c] || c).toLowerCase() === (newExpense.category || '').toLowerCase()) && newExpense.category && (
-                                <div className="px-4 py-2 bg-rose-50 text-rose-700 text-[10px] font-bold border-t">
-                                  + নতুন ক্যাটাগরি হিসেবে যোগ হবে
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
+                      <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">তারিখ</label>
+                        <DatePicker 
+                          value={newExpense.date}
+                          onChange={(date) => setNewExpense({...newExpense, date: date})}
+                          placeholder="তারিখ"
+                        />
                       </div>
 
                       <button type="submit" disabled={isSubmitting} className="w-full bg-rose-600 text-white py-4 rounded-2xl font-bold text-base shadow-lg shadow-rose-200 active:scale-95 transition-transform flex items-center justify-center gap-2 mt-4">
@@ -1986,33 +1944,9 @@ export const Expenses: React.FC = () => {
                   ) : (
                     /* Income Specific Fields */
                     <>
-                      {/* Project Number / Name Text Input */}
-                      <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">প্রজেক্ট নম্বর / নাম</label>
-                        <input 
-                          type="text"
-                          value={newIncome.projectname || ''}
-                          onChange={e => {
-                            setNewIncome({...newIncome, projectname: e.target.value});
-                            if (formErrors.projectname) setFormErrors({...formErrors, projectname: null});
-                          }}
-                          className={`w-full px-3 py-3 bg-white border rounded-xl font-bold text-sm text-slate-800 outline-none transition-all focus:ring-2 ${
-                            formErrors.projectname 
-                              ? 'border-rose-500 focus:ring-rose-200 bg-rose-50/20' 
-                              : 'border-slate-200 focus:ring-emerald-500 focus:border-emerald-500'
-                          }`}
-                          placeholder="প্রজেক্ট নম্বর বা নাম লিখুন..."
-                        />
-                        {formErrors.projectname && (
-                          <p className="text-xs font-semibold text-rose-500 mt-1 flex items-center gap-1 animate-in fade-in slide-in-from-top-1 duration-150">
-                            <AlertCircle size={14} className="shrink-0" /> {formErrors.projectname}
-                          </p>
-                        )}
-                      </div>
-
                       {/* Optional Title / Description Input */}
                       <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">অপশনাল টাইটেল / বিবরণ</label>
+                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">বিবরণ (অপশনাল)</label>
                         <input 
                           type="text"
                           value={newIncome.clientname || ''}
@@ -2130,6 +2064,8 @@ const DuesManager: React.FC = () => {
   
   const [isAddPersonModalOpen, setAddPersonModalOpen] = useState(false);
   const [isAddTransactionModalOpen, setAddTransactionModalOpen] = useState(false);
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [isTxDatePickerOpen, setIsTxDatePickerOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   
   // Person Menu and Edit states
@@ -2520,8 +2456,8 @@ const DuesManager: React.FC = () => {
 
         {/* Add Transaction Modal */}
         {isAddTransactionModalOpen && (
-          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-             <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl relative">
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] overflow-y-auto flex items-start sm:items-center justify-center p-4">
+             <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl relative my-auto">
                 <div className="p-6">
                   <h3 className="text-xl font-bold text-center text-slate-800 mb-6">{isEditingTx ? 'লেনদেন আপডেট করুন' : 'লেনদেন অ্যাড করুন'}</h3>
                   
@@ -2542,7 +2478,7 @@ const DuesManager: React.FC = () => {
                     </button>
                   </div>
 
-                  <form className="space-y-4" onSubmit={handleAddTransaction}>
+                  <form className={`space-y-4 transition-all duration-300 ${isTxDatePickerOpen ? 'pb-[340px]' : ''}`} onSubmit={handleAddTransaction}>
                     <div className="relative">
                       <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"><DollarSign size={20} /></div>
                       <input type="number" value={txAmount} onChange={e => setTxAmount(e.target.value)} placeholder="টাকার পরিমাণ দিন" className="w-full py-3.5 pl-12 pr-4 bg-white border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-xl outline-none" required />
@@ -2557,6 +2493,8 @@ const DuesManager: React.FC = () => {
                         value={txDate}
                         onChange={(date) => setTxDate(date)}
                         placeholder="তারিখ"
+                        onOpenChange={(open) => setIsTxDatePickerOpen(open)}
+                        openDirection="down"
                       />
                     </div>
 
@@ -2564,7 +2502,7 @@ const DuesManager: React.FC = () => {
                       {isSubmittingTx ? <Loader2 size={24} className="animate-spin" /> : null}
                       {isEditingTx ? 'আপডেট করুন' : 'সেভ করুন'}
                     </button>
-                    <button type="button" onClick={() => { setAddTransactionModalOpen(false); resetTransactionForm(); }} className="w-full py-3 mt-2 text-slate-500 font-bold text-sm rounded-xl transition-colors hover:bg-slate-100">
+                    <button type="button" onClick={() => { setAddTransactionModalOpen(false); resetTransactionForm(); setIsTxDatePickerOpen(false); }} className="w-full py-3 mt-2 text-slate-500 font-bold text-sm rounded-xl transition-colors hover:bg-slate-100">
                       বাতিল করুন
                     </button>
                   </form>
@@ -2715,8 +2653,8 @@ const DuesManager: React.FC = () => {
 
       {/* Add Person Modal */}
       {isAddPersonModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl relative">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] overflow-y-auto flex items-start sm:items-center justify-center p-4">
+            <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl relative my-auto">
               <div className="p-6 text-center">
                 
                 <div className="flex justify-center mb-6 mt-4">
@@ -2748,7 +2686,7 @@ const DuesManager: React.FC = () => {
                   </label>
                 </div>
 
-                <form className="space-y-4" onSubmit={handleAddPerson}>
+                <form className={`space-y-4 transition-all duration-300 ${isDatePickerOpen ? 'pb-[340px]' : ''}`} onSubmit={handleAddPerson}>
                   <div className="relative">
                     <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"><UserIcon size={20} /></div>
                     <input type="text" value={newPersonName} onChange={e => setNewPersonName(e.target.value)} placeholder="নাম" className="w-full py-3.5 pl-12 pr-4 bg-white border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-xl outline-none" required />
@@ -2767,6 +2705,8 @@ const DuesManager: React.FC = () => {
                       value={newPersonDate}
                       onChange={(date) => setNewPersonDate(date)}
                       placeholder="তারিখ"
+                      onOpenChange={(open) => setIsDatePickerOpen(open)}
+                      openDirection="down"
                     />
                   </div>
 
@@ -2774,7 +2714,7 @@ const DuesManager: React.FC = () => {
                     {isSubmittingPerson ? <Loader2 size={24} className="animate-spin" /> : null}
                     {isEditingPerson ? 'আপডেট করুন' : 'সেভ করুন'}
                   </button>
-                  <button type="button" onClick={() => { setAddPersonModalOpen(false); resetPersonForm(); }} className="w-full py-3 mt-2 text-slate-500 font-bold text-sm rounded-xl transition-colors hover:bg-slate-100">
+                  <button type="button" onClick={() => { setAddPersonModalOpen(false); resetPersonForm(); setIsDatePickerOpen(false); }} className="w-full py-3 mt-2 text-slate-500 font-bold text-sm rounded-xl transition-colors hover:bg-slate-100">
                     বাতিল করুন
                   </button>
                 </form>

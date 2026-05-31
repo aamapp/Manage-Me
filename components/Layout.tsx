@@ -288,7 +288,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   };
 
   return (
-    <div className="min-h-screen bg-[#fafbfd] font-sans w-full overflow-x-hidden selection:bg-indigo-100 selection:text-indigo-700 flex flex-col lg:flex-row">
+    <div className={`min-h-screen bg-[#fafbfd] font-sans w-full selection:bg-indigo-100 selection:text-indigo-700 flex flex-col lg:flex-row ${isExpensesPage ? 'overflow-x-clip' : 'overflow-x-hidden'}`}>
       {/* Desktop Sidebar - Visible only on LG screens */}
       <aside className="hidden lg:flex flex-col w-72 bg-white border-r border-slate-200 h-screen lg:fixed lg:top-0 lg:left-0 z-50">
         <div className="p-6 border-b border-slate-100">
@@ -498,9 +498,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
           isFullScreenPage
             ? "p-0"
             : isExpensesPage
-            ? "pt-3 lg:pt-8 pb-[72px] lg:pb-8 px-3 lg:px-8"
+            ? "pt-0 pb-[72px] lg:pb-8 px-3 lg:px-8"
             : "pt-[68px] lg:pt-8 pb-[72px] lg:pb-8 px-3 lg:px-8"
-        } animate-in fade-in duration-300 w-full max-w-[100vw] lg:max-w-none overflow-x-hidden lg:ml-72`}
+        } animate-in fade-in duration-300 w-full max-w-[100vw] lg:max-w-none ${isExpensesPage ? 'overflow-x-clip' : 'overflow-x-hidden'} lg:ml-72`}
       >
         <div
           className={`max-w-7xl mx-auto w-full ${isFullScreenPage ? "h-[100dvh] lg:h-auto" : ""}`}

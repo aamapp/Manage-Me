@@ -9,9 +9,18 @@ interface DatePickerProps {
   label?: string;
   align?: 'left' | 'right';
   onOpenChange?: (open: boolean) => void;
+  openDirection?: 'up' | 'down';
 }
 
-export const DatePicker: React.FC<DatePickerProps> = ({ value, onChange, placeholder, label, align = 'left', onOpenChange }) => {
+export const DatePicker: React.FC<DatePickerProps> = ({ 
+  value, 
+  onChange, 
+  placeholder, 
+  label, 
+  align = 'left', 
+  onOpenChange,
+  openDirection = 'down'
+}) => {
   const [isOpen, setIsOpenState] = useState(false);
   
   const setIsOpen = (open: boolean) => {
@@ -111,7 +120,11 @@ export const DatePicker: React.FC<DatePickerProps> = ({ value, onChange, placeho
       {label && <label className={`absolute max-w-[calc(100%-3rem)] truncate text-sm font-bold duration-300 transform z-10 origin-[0] left-3 px-1 pointer-events-none transition-all ${(value || isOpen) ? 'top-0 -translate-y-1/2 scale-[0.80] bg-white' : 'top-1/2 -translate-y-1/2 scale-100 bg-transparent'} ${isOpen ? 'text-indigo-600' : 'text-slate-500'}`} style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>{label}</label>}
 
       {isOpen && (
-        <div className={`absolute top-full mt-2 w-64 bg-white border border-slate-100 rounded-2xl shadow-2xl z-[150] p-4 animate-in fade-in slide-in-from-top-2 duration-200 origin-top ${align === 'right' ? 'right-0' : 'left-0'}`}>
+        <div className={`absolute w-64 bg-white border border-slate-100 rounded-2xl shadow-2xl z-[150] p-4 animate-in fade-in duration-200 ${
+          openDirection === 'up' 
+            ? 'bottom-full mb-2 origin-bottom slide-in-from-bottom-2' 
+            : 'top-full mt-2 origin-top slide-in-from-top-2'
+        } ${align === 'right' ? 'right-0' : 'left-0'}`}>
           <div className="flex items-center justify-between mb-4">
             <button type="button" onClick={() => changeMonth(-1)} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 transition-colors">
               <ChevronLeft size={18} />
