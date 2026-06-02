@@ -7,7 +7,7 @@
   src: url('https://cdn.jsdelivr.net/gh/manthib/Typhaine@master/Site/maheer/assets/font/KohinoorBangla-Regular.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
-  font-display: block;
+  font-display: swap;
 }
 
 body {

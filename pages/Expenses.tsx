@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Receipt, Plus, Search, Tag, X, ShoppingCart, Loader2, Trash2, MoreVertical, Pencil, SquarePen, Calculator, CalendarDays, Download, Filter, Music, Share2, ExternalLink, Copy, AlertCircle, Banknote, ArrowRightLeft, ArrowDown, ArrowUp, Users, MapPin, Phone, User as UserIcon, Calendar, ImagePlus, DollarSign, FileText, ArrowLeft, ArrowUpDown, TrendingUp, ListChecks, Check, Network, Shapes } from 'lucide-react';
+import { Receipt, Plus, Search, Tag, X, ShoppingCart, Loader2, Trash2, MoreVertical, Pencil, SquarePen, Calculator, CalendarDays, Download, Filter, Music, Share2, ExternalLink, Copy, AlertCircle, Banknote, ArrowRightLeft, ArrowDown, ArrowUp, Users, MapPin, Phone, User as UserIcon, Calendar, ImagePlus, DollarSign, FileText, ArrowLeft, ArrowUpDown, TrendingUp, ListChecks, Check, Network, Shapes, Wallet, ChevronDown } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useLocation } from 'react-router-dom';
 import html2canvas from 'html2canvas';
@@ -12,7 +12,23 @@ import { supabase } from '../lib/supabase';
 import { NumericKeypad } from '@/components/NumericKeypad';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { DatePicker } from '@/components/DatePicker';
+import { WalletManager } from '@/components/WalletManager';
 import { DuePerson, DueTransaction, BudgetLimit, BudgetTransaction, TodoTask } from '../types';
+
+export const parseExpenseNotes = (fullNotes: string): { notes: string; wallet: string } => {
+  if (!fullNotes) return { notes: '', wallet: 'ক্যাশ' };
+  const match = fullNotes.match(/(.*)\s*\[ওয়ালেট:\s*(.*)\]$/);
+  if (match) {
+    return {
+      notes: match[1].trim(),
+      wallet: match[2].trim()
+    };
+  }
+  return {
+    notes: fullNotes,
+    wallet: 'ক্যাশ'
+  };
+};
 
 export const Expenses: React.FC = () => {
   // Use cached expenses and incomes from AppContext
@@ -21,7 +37,7 @@ export const Expenses: React.FC = () => {
   const [isModalOpen, setModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'expenses' | 'dues' | 'budget' | 'savings' | 'reports' | 'tasks'>('expenses');
+  const [activeTab, setActiveTab] = useState<'expenses' | 'dues' | 'budget' | 'savings' | 'reports' | 'tasks' | 'wallet'>('expenses');
 
   // Floating Action Button visibility based on scroll direction (optimized with direct DOM ref to run at 60fps without React lagging)
   const fabRef = useRef<HTMLButtonElement>(null);
@@ -182,7 +198,8 @@ export const Expenses: React.FC = () => {
     category: 'অন্যান্য',
     date: new Date().toLocaleDateString('en-CA'),
     amount: 0,
-    notes: ''
+    notes: '',
+    wallet: 'ক্যাশ'
   });
 
   const [newIncome, setNewIncome] = useState<any>({
@@ -195,6 +212,89 @@ export const Expenses: React.FC = () => {
   });
 
   const [formErrors, setFormErrors] = useState<any>({});
+
+  const [wallets, setWallets] = useState<any[]>([]);
+  const [isExpenseWalletOpen, setIsExpenseWalletOpen] = useState(false);
+  const [isIncomeWalletOpen, setIsIncomeWalletOpen] = useState(false);
+
+  const fetchWallets = async () => {
+    if (!user) return;
+    try {
+      const cached = localStorage.getItem(`manage_me_wallets_${user.id}`);
+      if (cached) {
+        setWallets(JSON.parse(cached));
+      }
+      const { data, error } = await supabase
+        .from('wallets')
+        .select('*')
+        .eq('userid', user.id);
+      if (!error && data) {
+        const sortedData = [...data].sort((a, b) => {
+          if (a.isDefault && !b.isDefault) return -1;
+          if (!a.isDefault && b.isDefault) return 1;
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
+        setWallets(sortedData);
+        localStorage.setItem(`manage_me_wallets_${user.id}`, JSON.stringify(sortedData));
+      }
+    } catch (e) {
+      console.warn("Error fetching wallets:", e);
+    }
+  };
+
+  const adjustWalletBalance = async (walletName: string, changeAmount: number) => {
+    if (!user) return;
+    try {
+      let currentWallets = [...wallets];
+      if (currentWallets.length === 0) {
+        const cached = localStorage.getItem(`manage_me_wallets_${user.id}`);
+        if (cached) {
+          currentWallets = JSON.parse(cached);
+        }
+      }
+      const targetIdx = currentWallets.findIndex(w => w.name.trim() === walletName.trim());
+      if (targetIdx !== -1) {
+        const targetWallet = currentWallets[targetIdx];
+        const newBalance = Number(targetWallet.balance || 0) + changeAmount;
+        targetWallet.balance = newBalance;
+        targetWallet.lastTransactionDate = new Date().toLocaleDateString('bn-BD');
+        
+        setWallets(currentWallets);
+        localStorage.setItem(`manage_me_wallets_${user.id}`, JSON.stringify(currentWallets));
+        
+        await supabase
+          .from('wallets')
+          .update({ 
+            balance: newBalance, 
+            lastTransactionDate: new Date().toISOString() 
+          })
+          .eq('id', targetWallet.id);
+      } else {
+        const walletId = walletName === 'ক্যাশ' ? `wallet-cash-${user.id}` : `wallet-${Date.now()}-${user.id}`;
+        const newWallet = {
+          id: walletId,
+          name: walletName,
+          balance: changeAmount,
+          isDefault: walletName === 'ক্যাশ',
+          lastTransactionDate: new Date().toISOString(),
+          userid: user.id,
+          createdAt: new Date().toISOString()
+        };
+        const updated = [...currentWallets, newWallet];
+        setWallets(updated);
+        localStorage.setItem(`manage_me_wallets_${user.id}`, JSON.stringify(updated));
+        await supabase.from('wallets').upsert([newWallet]);
+      }
+    } catch (err) {
+      console.warn("Error adjusting wallet balance:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchWallets();
+    }
+  }, [user]);
 
   // Bangla Formatter helpers
   const toBanglaNumbers = (num: string | number): string => {
@@ -346,8 +446,9 @@ export const Expenses: React.FC = () => {
     setSelectedProjectDue(0);
     setFormErrors({});
 
-    setNewExpense({ category: 'অন্যান্য', date: localToday, amount: 0, notes: '' });
-    setNewIncome({ projectid: null, projectname: 'আয়', clientname: '', amount: 0, date: localToday, method: 'বিকাশ' });
+    const defaultWallet = wallets.find(w => w.isDefault)?.name || 'ক্যাশ';
+    setNewExpense({ category: 'অন্যান্য', date: localToday, amount: 0, notes: '', wallet: defaultWallet });
+    setNewIncome({ projectid: null, projectname: 'আয়', clientname: '', amount: 0, date: localToday, method: defaultWallet });
     
     setModalOpen(true);
   };
@@ -363,11 +464,13 @@ export const Expenses: React.FC = () => {
 
     if (tx.type === 'expense') {
       setActiveExpenseId(tx.id);
+      const parsedNotes = parseExpenseNotes(tx.rawItem.notes);
       setNewExpense({
         category: EXPENSE_CATEGORY_LABELS[tx.rawItem.category] || tx.rawItem.category,
         date: rawDate,
         amount: tx.amount,
-        notes: tx.title
+        notes: parsedNotes.notes,
+        wallet: parsedNotes.wallet
       });
     } else {
       setActiveIncomeId(tx.id);
@@ -463,12 +566,22 @@ export const Expenses: React.FC = () => {
           dateToSave = new Date(`${dateToSave}T${currentTimeAtNoon}`).toISOString();
         }
 
+        const selectedWallet = newExpense.wallet || 'ক্যাশ';
+        const finalNotesColumn = `${newExpense.notes.trim()} [ওয়ালেট: ${selectedWallet}]`;
+
         if (isEditing && activeExpenseId) {
+          // Revert old budget/saving/wallet balance
+          const oldExp = expenses.find(e => e.id === activeExpenseId);
+          if (oldExp) {
+            const oldParsed = parseExpenseNotes(oldExp.notes);
+            await adjustWalletBalance(oldParsed.wallet, oldExp.amount);
+          }
+
           let query = supabase.from('expenses').update({
             category: newExpense.category || 'অন্যান্য',
             amount: parsedAmount,
             date: dateToSave,
-            notes: newExpense.notes
+            notes: finalNotesColumn
           }).eq('id', activeExpenseId);
           
           if (user.role !== 'admin') {
@@ -476,16 +589,24 @@ export const Expenses: React.FC = () => {
           }
           const { error } = await query;
           if (error) throw error;
+
+          // Apply new balance deduction
+          await adjustWalletBalance(selectedWallet, -parsedAmount);
+
           showToast('খরচ আপডেট হয়েছে', 'success');
         } else {
           const { error } = await supabase.from('expenses').insert({
             category: newExpense.category || 'অন্যান্য',
             amount: parsedAmount,
             date: dateToSave,
-            notes: newExpense.notes,
+            notes: finalNotesColumn,
             userid: targetUserId
           });
           if (error) throw error;
+
+          // Apply balance deduction
+          await adjustWalletBalance(selectedWallet, -parsedAmount);
+
           showToast('খরচ সফলভাবে সেভ হয়েছে', 'success');
         }
       } else {
@@ -499,14 +620,22 @@ export const Expenses: React.FC = () => {
           dateToSave = new Date(`${dateToSave}T${currentTimeAtNoon}`).toISOString();
         }
 
+        const selectedWallet = newIncome.method || 'বিকাশ';
+
         if (isEditing && activeIncomeId) {
+          // Revert old income wallet balance addition
+          const oldInc = incomeRecords.find(i => i.id === activeIncomeId);
+          if (oldInc) {
+            await adjustWalletBalance(oldInc.method || 'বিকাশ', -oldInc.amount);
+          }
+
           let query = supabase.from('income_records').update({
             projectid: null,
             projectname: newIncome.projectname,
             clientname: newIncome.clientname || '',
             amount: parsedAmount,
             date: dateToSave,
-            method: newIncome.method
+            method: selectedWallet
           }).eq('id', activeIncomeId);
 
           if (user.role !== 'admin') {
@@ -514,6 +643,9 @@ export const Expenses: React.FC = () => {
           }
           const { error: updErr } = await query;
           if (updErr) throw updErr;
+
+          // Apply new income wallet balance addition
+          await adjustWalletBalance(selectedWallet, parsedAmount);
 
           showToast('আয় রেকর্ড আপডেট করা হয়েছে', 'success');
         } else {
@@ -523,10 +655,13 @@ export const Expenses: React.FC = () => {
             clientname: newIncome.clientname || '',
             amount: parsedAmount,
             date: dateToSave,
-            method: newIncome.method,
+            method: selectedWallet,
             userid: targetUserId
           });
           if (insErr) throw insErr;
+
+          // Apply income wallet balance addition
+          await adjustWalletBalance(selectedWallet, parsedAmount);
 
           showToast('নতুন পেমেন্ট রেকর্ড করা হয়েছে', 'success');
         }
@@ -534,6 +669,7 @@ export const Expenses: React.FC = () => {
       
       setModalOpen(false);
       await refreshData();
+      await fetchWallets();
     } catch (error: any) {
       showToast(error.message, 'error');
     } finally {
@@ -566,6 +702,9 @@ export const Expenses: React.FC = () => {
             .update({ notes: `[TRASH] ${expenseObj.notes || ''}`.trim() })
             .eq('id', txToDelete.id);
           if (error) throw error;
+
+          const parsed = parseExpenseNotes(expenseObj.notes);
+          await adjustWalletBalance(parsed.wallet, txToDelete.amount);
         }
         showToast('খরচটি রিসাইকেল বিনে পাঠানো হয়েছে', 'success');
       } else {
@@ -589,10 +728,14 @@ export const Expenses: React.FC = () => {
               dueamount: targetProj.totalamount - newPaid
             }).eq('id', targetProj.id);
           }
+
+          // Revert income wallet balance
+          await adjustWalletBalance(incomeObj.method || 'বিকাশ', -txToDelete.amount);
         }
         showToast('পেমেন্ট রেকর্ড ডিলিট করা হয়েছে', 'success');
       }
       await refreshData();
+      await fetchWallets();
       setShowDeleteModal(false);
     } catch(err: any) {
       showToast(err.message);
@@ -672,11 +815,14 @@ export const Expenses: React.FC = () => {
                             categoryLabel.toLowerCase().includes(searchTerm.toLowerCase());
       if (searchTerm && !matchesSearch) return;
 
+      const parsedNotes = parseExpenseNotes(notesVal);
+
       combined.push({
         id: e.id,
         type: 'expense',
-        title: notesVal || categoryLabel,
+        title: parsedNotes.notes || categoryLabel,
         category: categoryLabel,
+        walletName: parsedNotes.wallet,
         amount: e.amount,
         date: e.date,
         rawItem: e
@@ -715,6 +861,7 @@ export const Expenses: React.FC = () => {
         type: 'income',
         title: titleVal,
         category: methodLabel,
+        walletName: methodLabel,
         amount: i.amount,
         date: i.date,
         rawItem: i
@@ -1076,10 +1223,34 @@ export const Expenses: React.FC = () => {
               <div className="w-4 h-[2px] bg-transparent rounded-full mt-0.5" />
             )}
           </button>
+
+          {/* Tab 7: Wallet / ওয়ালেট */}
+          <button
+            onClick={() => setActiveTab('wallet')}
+            title="ওয়ালেট"
+            className="flex flex-col items-center flex-1 cursor-pointer group focus:outline-none"
+          >
+            <div
+              className={`w-[28px] h-[28px] rounded-[8px] flex items-center justify-center transition-all border relative ${
+                activeTab === 'wallet'
+                  ? 'border-[#1a73e8] text-[#1a73e8] bg-white shadow-sm'
+                  : 'border-[#cdd5de] text-[#8e9aa8] hover:border-slate-300 hover:text-slate-600 bg-white'
+              }`}
+            >
+              <Wallet size={13} />
+            </div>
+            {activeTab === 'wallet' ? (
+              <div className="w-4 h-[2px] bg-[#1a73e8] rounded-full mt-0.5 animate-in fade-in zoom-in-95 duration-200" />
+            ) : (
+              <div className="w-4 h-[2px] bg-transparent rounded-full mt-0.5" />
+            )}
+          </button>
         </div>
       </div>
 
-      {activeTab === 'dues' ? (
+      {activeTab === 'wallet' ? (
+        <WalletManager />
+      ) : activeTab === 'dues' ? (
         <DuesManager />
       ) : activeTab === 'budget' ? (
         <BudgetManager expenses={expenses} user={user} />
@@ -1350,7 +1521,7 @@ export const Expenses: React.FC = () => {
             )}
 
             {/* Combined Grouped Transaction Ledger View */}
-            <div id="expenses-list-container" className="space-y-4">
+            <div id="expenses-list-container" className="flex flex-col space-y-4">
               {groupedTransactions.length === 0 ? (
                 <div className="py-16 text-center text-slate-400 bg-slate-50/50 rounded-2xl border border-slate-100 border-dashed">
                   <Receipt size={40} className="mx-auto mb-3 opacity-20" />
@@ -1379,13 +1550,13 @@ export const Expenses: React.FC = () => {
                     </div>
 
                     {/* Day Ledger Items Container */}
-                    <div className="space-y-2.5">
+                    <div className="flex flex-col space-y-2.5">
                        {group.transactions.map((tx) => {
                          const isIncome = tx.type === 'income';
                          return (
                            <div 
                              key={tx.id} 
-                             className={`group relative rounded-[12px] px-4 py-2.5 sm:py-3 flex items-center justify-between gap-3 transition-all shadow-[0_2px_6px_rgba(0,0,0,0.015)] border ${
+                             className={`group relative rounded-[12px] px-4 py-2.5 sm:py-3 flex items-center justify-between gap-3 transition-colors duration-200 shadow-[0_2px_6px_rgba(0,0,0,0.015)] border ${
                                isIncome 
                                  ? 'bg-[#f2f7f3] border-[#d1f2d9]/15' 
                                  : 'bg-[#fff5f5] border-[#fbdbda]/15'
@@ -1902,6 +2073,84 @@ export const Expenses: React.FC = () => {
                         )}
                       </div>
 
+                      {/* Wallet Selector for Expense */}
+                      <div className="relative">
+                        <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">ওয়ালেট (যেখান থেকে খরচ হচ্ছে)</label>
+                        {(() => {
+                          const selectedWalletName = newExpense.wallet || 'ক্যাশ';
+                          const selectedWallet = wallets.find(w => w.name === selectedWalletName) || { name: selectedWalletName, balance: 0 };
+                          return (
+                            <div className="relative">
+                              <button
+                                type="button"
+                                onClick={() => setIsExpenseWalletOpen(!isExpenseWalletOpen)}
+                                className="w-full flex items-center justify-between px-4 py-3.5 bg-white border border-slate-200 hover:border-slate-300 rounded-2xl active:bg-slate-50/50 transition-all text-left group cursor-pointer shadow-xs"
+                              >
+                                <div className="flex items-center">
+                                  <Wallet size={20} className="text-slate-400 mr-3 shrink-0" />
+                                  <span className="font-medium text-slate-700 text-sm sm:text-base mr-3">
+                                    {selectedWallet.name}
+                                  </span>
+                                  <span className="font-bold text-emerald-600 text-sm sm:text-base">
+                                    {selectedWallet.balance !== undefined ? selectedWallet.balance.toFixed(1) : '0.0'}
+                                  </span>
+                                </div>
+                                <ChevronDown size={18} className={`text-slate-400 transition-transform duration-200 shrink-0 ${isExpenseWalletOpen ? 'rotate-180 text-custom' : ''}`} />
+                              </button>
+
+                              {isExpenseWalletOpen && (
+                                <>
+                                  <div className="fixed inset-0 z-40" onClick={() => setIsExpenseWalletOpen(false)} />
+                                  <div className="absolute z-50 left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl max-h-60 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-150 py-1">
+                                    {wallets.length === 0 ? (
+                                      <div 
+                                        onClick={() => {
+                                          setNewExpense({ ...newExpense, wallet: 'ক্যাশ' });
+                                          setIsExpenseWalletOpen(false);
+                                        }}
+                                        className="px-4 py-3 flex items-center justify-between hover:bg-slate-50 active:bg-slate-100/60 cursor-pointer border-b last:border-b-0 border-slate-100 transition-colors"
+                                      >
+                                        <div className="flex items-center">
+                                          <Wallet size={16} className="text-slate-400 mr-2.5" />
+                                          <span className="font-medium text-slate-700 text-sm">ক্যাশ</span>
+                                        </div>
+                                        <span className="font-bold text-emerald-600 text-sm">0.0</span>
+                                      </div>
+                                    ) : (
+                                      wallets.map((wallet) => (
+                                        <div
+                                          key={wallet.id}
+                                          onClick={() => {
+                                            setNewExpense({ ...newExpense, wallet: wallet.name });
+                                            setIsExpenseWalletOpen(false);
+                                          }}
+                                          className={`px-4 py-3 flex items-center justify-between hover:bg-slate-50 active:bg-slate-100/60 cursor-pointer border-b last:border-b-0 border-slate-100 transition-colors ${
+                                            selectedWalletName === wallet.name ? 'bg-slate-50/70 border-l-4 border-l-rose-500 pl-3' : ''
+                                          }`}
+                                        >
+                                          <div className="flex items-center">
+                                            <Wallet size={16} className={`mr-2.5 ${selectedWalletName === wallet.name ? 'text-rose-500' : 'text-slate-400'}`} />
+                                            <span className={`font-medium text-sm ${selectedWalletName === wallet.name ? 'text-rose-600' : 'text-slate-700'}`}>
+                                              {wallet.name}
+                                            </span>
+                                          </div>
+                                          <div className="flex items-center gap-2">
+                                            <span className="font-bold text-emerald-600 text-sm">
+                                              {wallet.balance !== undefined ? wallet.balance.toFixed(1) : '0.0'}
+                                            </span>
+                                            {selectedWalletName === wallet.name && <Check size={14} className="text-rose-500 shrink-0" />}
+                                          </div>
+                                        </div>
+                                      ))
+                                    )}
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </div>
+
                       <div>
                         <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
                             পরিমাণ ({user?.currency})
@@ -1956,25 +2205,92 @@ export const Expenses: React.FC = () => {
                         />
                       </div>
 
-                      {/* Payment Method Select Buttons */}
-                      <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">পেমেন্ট মেথড</label>
-                        <div className="grid grid-cols-5 gap-1.5 select-none">
-                          {['বিকাশ', 'নগদ', 'রকেট', 'ব্যাংক', 'ক্যাশ'].map((method) => (
-                            <button
-                              key={method}
-                              type="button"
-                              onClick={() => setNewIncome({ ...newIncome, method })}
-                              className={`py-2 text-center text-xs font-bold rounded-xl transition-all border ${
-                                newIncome.method === method
-                                  ? 'bg-emerald-600 border-emerald-600 text-white shadow-xs'
-                                  : 'bg-slate-50 border-slate-100 text-slate-500 hover:text-slate-700 hover:bg-slate-100/50'
-                              }`}
-                            >
-                              {method}
-                            </button>
-                          ))}
-                        </div>
+                      {/* Wallet Selector for Income */}
+                      <div className="relative">
+                        <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">ওয়ালেট (যেখানে টাকা যুক্ত হবে)</label>
+                        {(() => {
+                          const selectedWalletName = newIncome.method || 'বিকাশ';
+                          const selectedWallet = wallets.find(w => w.name === selectedWalletName) || { name: selectedWalletName, balance: 0 };
+                          return (
+                            <div className="relative">
+                              <button
+                                type="button"
+                                onClick={() => setIsIncomeWalletOpen(!isIncomeWalletOpen)}
+                                className="w-full flex items-center justify-between px-4 py-3.5 bg-white border border-slate-200 hover:border-slate-300 rounded-2xl active:bg-slate-50/50 transition-all text-left group cursor-pointer shadow-xs"
+                              >
+                                <div className="flex items-center">
+                                  <Wallet size={20} className="text-slate-400 mr-3 shrink-0" />
+                                  <span className="font-medium text-slate-700 text-sm sm:text-base mr-3">
+                                    {selectedWallet.name}
+                                  </span>
+                                  <span className="font-bold text-emerald-600 text-sm sm:text-base">
+                                    {selectedWallet.balance !== undefined ? selectedWallet.balance.toFixed(1) : '0.0'}
+                                  </span>
+                                </div>
+                                <ChevronDown size={18} className={`text-slate-400 transition-transform duration-200 shrink-0 ${isIncomeWalletOpen ? 'rotate-180 text-custom' : ''}`} />
+                              </button>
+
+                              {isIncomeWalletOpen && (
+                                <>
+                                  <div className="fixed inset-0 z-40" onClick={() => setIsIncomeWalletOpen(false)} />
+                                  <div className="absolute z-50 left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl max-h-60 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-150 py-1">
+                                    {wallets.length === 0 ? (
+                                      ['বিকাশ', 'নগদ', 'রকেট', 'ব্যাংক', 'ক্যাশ'].map((method) => (
+                                        <div 
+                                          key={method}
+                                          onClick={() => {
+                                            setNewIncome({ ...newIncome, method });
+                                            setIsIncomeWalletOpen(false);
+                                          }}
+                                          className={`px-4 py-3 flex items-center justify-between hover:bg-slate-50 active:bg-slate-100/60 cursor-pointer border-b last:border-b-0 border-slate-100 transition-colors ${
+                                            selectedWalletName === method ? 'bg-slate-50/70 border-l-4 border-l-emerald-500 pl-3' : ''
+                                          }`}
+                                        >
+                                          <div className="flex items-center">
+                                            <Wallet size={16} className={`mr-2.5 ${selectedWalletName === method ? 'text-emerald-500' : 'text-slate-400'}`} />
+                                            <span className={`font-medium text-sm ${selectedWalletName === method ? 'text-emerald-600' : 'text-slate-700'}`}>
+                                              {method}
+                                            </span>
+                                          </div>
+                                          <div className="flex items-center gap-2">
+                                            <span className="font-bold text-emerald-600 text-sm">0.0</span>
+                                            {selectedWalletName === method && <Check size={14} className="text-emerald-500 shrink-0" />}
+                                          </div>
+                                        </div>
+                                      ))
+                                    ) : (
+                                      wallets.map((wallet) => (
+                                        <div
+                                          key={wallet.id}
+                                          onClick={() => {
+                                            setNewIncome({ ...newIncome, method: wallet.name });
+                                            setIsIncomeWalletOpen(false);
+                                          }}
+                                          className={`px-4 py-3 flex items-center justify-between hover:bg-slate-50 active:bg-slate-100/60 cursor-pointer border-b last:border-b-0 border-slate-100 transition-colors ${
+                                            selectedWalletName === wallet.name ? 'bg-slate-50/70 border-l-4 border-l-emerald-500 pl-3' : ''
+                                          }`}
+                                        >
+                                          <div className="flex items-center">
+                                            <Wallet size={16} className={`mr-2.5 ${selectedWalletName === wallet.name ? 'text-emerald-500' : 'text-slate-400'}`} />
+                                            <span className={`font-medium text-sm ${selectedWalletName === wallet.name ? 'text-emerald-600' : 'text-slate-700'}`}>
+                                              {wallet.name}
+                                            </span>
+                                          </div>
+                                          <div className="flex items-center gap-2">
+                                            <span className="font-bold text-emerald-600 text-sm">
+                                              {wallet.balance !== undefined ? wallet.balance.toFixed(1) : '0.0'}
+                                            </span>
+                                            {selectedWalletName === wallet.name && <Check size={14} className="text-emerald-500 shrink-0" />}
+                                          </div>
+                                        </div>
+                                      ))
+                                    )}
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
 
                       {/* Transaction Amount Picker */}

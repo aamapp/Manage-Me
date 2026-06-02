@@ -151,3 +151,14 @@ export interface TodoTask {
   completed: boolean;
   createdAt: string;
 }
+
+export interface Wallet {
+  id: string;
+  name: string;
+  balance: number;
+  isDefault?: boolean;
+  lastTransactionDate?: string;
+  userid: string;
+  createdAt: string;
+}
+
