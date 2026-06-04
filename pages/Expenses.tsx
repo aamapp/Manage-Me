@@ -13,6 +13,7 @@ import { supabase } from '../lib/supabase';
 import { NumericKeypad } from '@/components/NumericKeypad';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { DatePicker } from '@/components/DatePicker';
+import { TimePicker } from '@/components/TimePicker';
 import { WalletManager } from '@/components/WalletManager';
 import { DuePerson, DueTransaction, BudgetLimit, BudgetTransaction, TodoTask } from '../types';
 
@@ -43,6 +44,13 @@ export const Expenses: React.FC = () => {
   const [direction, setDirection] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
   const [swipeOffset, setSwipeOffset] = useState(0);
+  const [isTabTransitioning, setIsTabTransitioning] = useState(false);
+
+  useEffect(() => {
+    setIsTabTransitioning(true);
+    const t = setTimeout(() => setIsTabTransitioning(false), 260);
+    return () => clearTimeout(t);
+  }, [activeTabState]);
 
   const tabs = useMemo<('expenses' | 'dues' | 'savings' | 'reports' | 'tasks' | 'wallet')[]>(
     () => ['expenses', 'dues', 'reports', 'savings', 'tasks', 'wallet'],
@@ -113,6 +121,14 @@ export const Expenses: React.FC = () => {
   };
 
   const activeTab = activeTabState;
+
+  const getSlideClassName = (tabName: string) => {
+    const isActive = activeTab === tabName;
+    if (isActive || isSwiping || isTabTransitioning) {
+      return "w-full shrink-0 px-3 lg:px-8 pb-4 transition-all duration-150";
+    }
+    return "w-full shrink-0 px-3 lg:px-8 pb-0 h-0 overflow-hidden opacity-0 pointer-events-none select-none";
+  };
 
   const slideVariants = {
     enter: (dir: number) => ({
@@ -493,6 +509,7 @@ export const Expenses: React.FC = () => {
   const [newExpense, setNewExpense] = useState<any>({
     category: 'অন্যান্য',
     date: new Date().toLocaleDateString('en-CA'),
+    time: `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`,
     amount: 0,
     notes: '',
     wallet: 'ক্যাশ'
@@ -504,6 +521,7 @@ export const Expenses: React.FC = () => {
     clientname: '',
     amount: 0,
     date: new Date().toLocaleDateString('en-CA'),
+    time: `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`,
     method: 'বিকাশ'
   });
 
@@ -740,6 +758,10 @@ export const Expenses: React.FC = () => {
     const d = String(now.getDate()).padStart(2, '0');
     const localToday = `${y}-${m}-${d}`;
     
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    const currentLocalTime = `${hh}:${mm}`;
+    
     setIsEditing(false);
     setActiveExpenseId(null);
     setActiveIncomeId(null);
@@ -750,8 +772,8 @@ export const Expenses: React.FC = () => {
     setFormErrors({});
 
     const defaultWallet = wallets.find(w => w.isDefault)?.name || 'ক্যাশ';
-    setNewExpense({ category: 'অন্যান্য', date: localToday, amount: 0, notes: '', wallet: defaultWallet });
-    setNewIncome({ projectid: null, projectname: 'আয়', clientname: '', amount: 0, date: localToday, method: defaultWallet });
+    setNewExpense({ category: 'অন্যান্য', date: localToday, time: currentLocalTime, amount: 0, notes: '', wallet: defaultWallet });
+    setNewIncome({ projectid: null, projectname: 'আয়', clientname: '', amount: 0, date: localToday, time: currentLocalTime, method: defaultWallet });
     
     setModalOpen(true);
   };
@@ -764,6 +786,14 @@ export const Expenses: React.FC = () => {
 
     // Extract raw date YYYY-MM-DD from maybe full ISO string
     const rawDate = tx.date.substring(0, 10);
+    
+    let timeStr = `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`;
+    if (tx.rawItem && tx.rawItem.createdat) {
+      const dt = new Date(tx.rawItem.createdat);
+      if (!isNaN(dt.getTime())) {
+        timeStr = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
+      }
+    }
 
     if (tx.type === 'expense') {
       setActiveExpenseId(tx.id);
@@ -771,6 +801,7 @@ export const Expenses: React.FC = () => {
       setNewExpense({
         category: EXPENSE_CATEGORY_LABELS[tx.rawItem.category] || tx.rawItem.category,
         date: rawDate,
+        time: timeStr,
         amount: tx.amount,
         notes: parsedNotes.notes,
         wallet: parsedNotes.wallet
@@ -786,6 +817,7 @@ export const Expenses: React.FC = () => {
         clientname: tx.rawItem.clientname || '',
         amount: tx.amount,
         date: rawDate,
+        time: timeStr,
         method: tx.rawItem.method || 'বিকাশ'
       });
     }
@@ -863,10 +895,9 @@ export const Expenses: React.FC = () => {
         const parsedAmount = Number(safeEval(newExpense.amount)) || 0;
         let dateToSave = newExpense.date;
         
-        if (dateToSave === localToday) {
-          dateToSave = new Date(`${dateToSave}T${currentTimeNow}`).toISOString();
-        } else if (dateToSave && dateToSave.length === 10) {
-          dateToSave = new Date(`${dateToSave}T${currentTimeAtNoon}`).toISOString();
+        if (dateToSave && dateToSave.length === 10) {
+          const tTime = newExpense.time ? `${newExpense.time}:00` : currentTimeNow;
+          dateToSave = new Date(`${dateToSave}T${tTime}`).toISOString();
         }
 
         const selectedWallet = newExpense.wallet || 'ক্যাশ';
@@ -917,10 +948,9 @@ export const Expenses: React.FC = () => {
         const parsedAmount = Number(safeEval(newIncome.amount)) || 0;
         let dateToSave = newIncome.date;
         
-        if (dateToSave === localToday) {
-          dateToSave = new Date(`${dateToSave}T${currentTimeNow}`).toISOString();
-        } else if (dateToSave && dateToSave.length === 10) {
-          dateToSave = new Date(`${dateToSave}T${currentTimeAtNoon}`).toISOString();
+        if (dateToSave && dateToSave.length === 10) {
+          const tTime = newIncome.time ? `${newIncome.time}:00` : currentTimeNow;
+          dateToSave = new Date(`${dateToSave}T${tTime}`).toISOString();
         }
 
         const selectedWallet = newIncome.method || 'বিকাশ';
@@ -1565,7 +1595,7 @@ export const Expenses: React.FC = () => {
           }}
         >
           {/* Slide 1: Expenses/Dashboard (Index 0) */}
-          <div className="w-full shrink-0 px-3 lg:px-8 pb-4">
+          <div className={getSlideClassName('expenses')}>
           {/* Dynamic Period Stats Card - Unifying Income and Expense */}
           <div className="bg-[#fafbfd] border border-[#e2e7ec]/80 py-3 px-4 rounded-[12px] shadow-[0_2px_8px_rgba(0,0,0,0.02)] w-full max-w-lg mx-auto mb-4 select-none">
             {/* Period Segment Tabs matching the image */}
@@ -2288,27 +2318,27 @@ export const Expenses: React.FC = () => {
     </div>
 
           {/* Slide 2: Dues (Index 1) */}
-          <div className="w-full shrink-0 px-3 lg:px-8 pb-4">
-            <DuesManager wallets={wallets} adjustWalletBalance={adjustWalletBalance} />
+          <div className={getSlideClassName('dues')}>
+            <DuesManager wallets={wallets} adjustWalletBalance={adjustWalletBalance} activeTab={activeTab} />
           </div>
 
           {/* Slide 3: Reports (Index 2) */}
-          <div className="w-full shrink-0 px-3 lg:px-8 pb-4">
+          <div className={getSlideClassName('reports')}>
             <BudgetManager expenses={expenses} user={user} />
           </div>
 
           {/* Slide 4: Savings (Index 3) */}
-          <div className="w-full shrink-0 px-3 lg:px-8 pb-4">
+          <div className={getSlideClassName('savings')}>
             <SavingsManager />
           </div>
 
           {/* Slide 5: Tasks (Index 4) */}
-          <div className="w-full shrink-0 px-3 lg:px-8 pb-4">
+          <div className={getSlideClassName('tasks')}>
             <TasksManager expenses={expenses} user={user} />
           </div>
 
           {/* Slide 6: Wallet (Index 5) */}
-          <div className="w-full shrink-0 px-3 lg:px-8 pb-4">
+          <div className={getSlideClassName('wallet')}>
             <WalletManager />
           </div>
         </div>
@@ -2511,12 +2541,23 @@ export const Expenses: React.FC = () => {
                       </div>
 
                       <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">তারিখ</label>
-                        <DatePicker 
-                          value={newExpense.date}
-                          onChange={(date) => setNewExpense({...newExpense, date: date})}
-                          placeholder="তারিখ"
-                        />
+                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">তারিখ ও সময়</label>
+                        <div className="flex gap-2 relative z-20">
+                          <div className="flex-1 text-left relative">
+                            <DatePicker 
+                              value={newExpense.date}
+                              onChange={(date) => setNewExpense({...newExpense, date: date})}
+                              placeholder="তারিখ"
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <TimePicker 
+                              value={newExpense.time || ''} 
+                              onChange={val => setNewExpense({...newExpense, time: val})} 
+                              placeholder="সময়"
+                            />
+                          </div>
+                        </div>
                       </div>
 
                       <button type="submit" disabled={isSubmitting} className="w-full bg-rose-600 text-white py-4 rounded-2xl font-bold text-base shadow-lg shadow-rose-200 active:scale-95 transition-transform flex items-center justify-center gap-2 mt-4">
@@ -2655,12 +2696,23 @@ export const Expenses: React.FC = () => {
 
                       {/* Date Picker */}
                       <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">তারিখ</label>
-                        <DatePicker 
-                          value={newIncome.date}
-                          onChange={(date) => setNewIncome({...newIncome, date: date})}
-                          placeholder="সংগ্রহের তারিখ"
-                        />
+                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">তারিখ ও সময়</label>
+                        <div className="flex gap-2 relative z-20">
+                          <div className="flex-1 text-left relative">
+                            <DatePicker 
+                              value={newIncome.date}
+                              onChange={(date) => setNewIncome({...newIncome, date: date})}
+                              placeholder="সংগ্রহের তারিখ"
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <TimePicker 
+                              value={newIncome.time || ''} 
+                              onChange={val => setNewIncome({...newIncome, time: val})} 
+                              placeholder="সময়"
+                            />
+                          </div>
+                        </div>
                       </div>
 
                       <button type="submit" disabled={isSubmitting} className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold text-base shadow-lg shadow-emerald-200 active:scale-95 transition-transform flex items-center justify-center gap-2 mt-4">
@@ -2695,15 +2747,23 @@ export const Expenses: React.FC = () => {
 interface DuesManagerProps {
   wallets: any[];
   adjustWalletBalance: (walletName: string, changeAmount: number) => Promise<void>;
+  activeTab?: string;
 }
 
-const DuesManager: React.FC<DuesManagerProps> = ({ wallets, adjustWalletBalance }) => {
+const DuesManager: React.FC<DuesManagerProps> = ({ wallets, adjustWalletBalance, activeTab }) => {
   const { user, duePersons, setDuePersons, showToast, isOnline } = useAppContext();
   const persons = duePersons;
   const location = useLocation();
 
   const [activeView, setActiveView] = useState<'list' | 'details'>('list');
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (activeTab && activeTab !== 'dues') {
+      setActiveView('list');
+      setSelectedPersonId(null);
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -2968,8 +3028,10 @@ const DuesManager: React.FC<DuesManagerProps> = ({ wallets, adjustWalletBalance 
 
       if (txToDelete) {
         const wallet = txToDelete.walletName || 'ক্যাশ';
-        const impact = txToDelete.type === 'receive' ? -txToDelete.amount : txToDelete.amount;
-        await adjustWalletBalance(wallet, impact);
+        const impact = txToDelete.type === 'receive' ? 0 : txToDelete.amount;
+        if (impact !== 0) {
+          await adjustWalletBalance(wallet, impact);
+        }
       }
 
       setDuePersons(prev => prev.map(p => {
@@ -3009,15 +3071,19 @@ const DuesManager: React.FC<DuesManagerProps> = ({ wallets, adjustWalletBalance 
       if (isEditingTx && editingTxId) {
         const oldTx = person.transactions.find(t => t.id === editingTxId);
         if (oldTx) {
-            // Revert old transaction
+            // Revert old transaction if it was 'give'
             const oldWallet = oldTx.walletName || 'ক্যাশ';
-            const oldImpact = oldTx.type === 'receive' ? -oldTx.amount : oldTx.amount;
-            walletAdjustments.push({ wallet: oldWallet, amount: oldImpact });
+            const oldImpact = oldTx.type === 'receive' ? 0 : oldTx.amount;
+            if (oldImpact !== 0) {
+              walletAdjustments.push({ wallet: oldWallet, amount: oldImpact });
+            }
         }
         
-        // Apply new transaction
-        const newImpact = transactionType === 'receive' ? numTxAmount : -numTxAmount;
-        walletAdjustments.push({ wallet: txWalletName, amount: newImpact });
+        // Apply new transaction if it is 'give'
+        const newImpact = transactionType === 'receive' ? 0 : -numTxAmount;
+        if (newImpact !== 0) {
+          walletAdjustments.push({ wallet: txWalletName, amount: newImpact });
+        }
 
         updatedTransactions = person.transactions.map(t => 
           t.id === editingTxId 
@@ -3036,9 +3102,11 @@ const DuesManager: React.FC<DuesManagerProps> = ({ wallets, adjustWalletBalance 
         };
         updatedTransactions = [newTx, ...person.transactions];
         
-        // Apply new transaction
-        const newImpact = transactionType === 'receive' ? numTxAmount : -numTxAmount;
-        walletAdjustments.push({ wallet: txWalletName, amount: newImpact });
+        // Apply new transaction if it is 'give'
+        const newImpact = transactionType === 'receive' ? 0 : -numTxAmount;
+        if (newImpact !== 0) {
+          walletAdjustments.push({ wallet: txWalletName, amount: newImpact });
+        }
       }
       
       const { error } = await supabase
@@ -3077,7 +3145,7 @@ const DuesManager: React.FC<DuesManagerProps> = ({ wallets, adjustWalletBalance 
     const balance = getPersonBalance(person);
 
     return (
-      <div className="bg-slate-50 min-h-[500px] rounded-3xl pb-16 relative">
+      <div className="bg-slate-50 rounded-3xl pb-16 relative">
         {/* Header */}
         <div className="flex items-center gap-4 bg-white p-3 rounded-t-3xl border-b border-slate-100">
           <button onClick={() => setActiveView('list')} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
@@ -3217,15 +3285,11 @@ const DuesManager: React.FC<DuesManagerProps> = ({ wallets, adjustWalletBalance 
                         />
                       </div>
                       <div className="flex-1">
-                        <div className="relative">
-                          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-500"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
-                          <input 
-                            type="time" 
-                            value={txTime} 
-                            onChange={e => setTxTime(e.target.value)} 
-                            className="w-full py-4 pl-11 pr-4 bg-[#fcfdfd] border border-slate-200 hover:border-slate-300 focus:border-blue-500 rounded-[12px] outline-none text-[15px] text-blue-600 font-semibold appearance-none" 
-                          />
-                        </div>
+                        <TimePicker 
+                          value={txTime || ''} 
+                          onChange={val => setTxTime(val)} 
+                          placeholder="সময়"
+                        />
                       </div>
                     </div>
 
@@ -3394,7 +3458,7 @@ const DuesManager: React.FC<DuesManagerProps> = ({ wallets, adjustWalletBalance 
   const totalGive = persons.reduce((acc, p) => acc + (getPersonBalance(p) < 0 ? Math.abs(getPersonBalance(p)) : 0), 0);
 
   return (
-    <div className="space-y-3 relative min-h-[500px]">
+    <div className="space-y-3 relative">
       {/* Top Summaries */}
       <div className="grid grid-cols-3 gap-2 px-1">
          <div className="bg-white rounded-xl p-2 border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
@@ -3432,7 +3496,7 @@ const DuesManager: React.FC<DuesManagerProps> = ({ wallets, adjustWalletBalance 
       </div>
 
       {/* Persons List */}
-      <div className="space-y-2 pb-20 mt-1">
+      <div className="space-y-2 pb-8 mt-1">
         {filteredPersons.map(person => {
           const balance = getPersonBalance(person);
           const bgClass = balance < 0 ? 'bg-rose-50/50' : balance > 0 ? 'bg-emerald-50/50' : 'bg-slate-50/50';

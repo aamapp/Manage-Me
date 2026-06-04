@@ -10,6 +10,7 @@ import { supabase } from '../lib/supabase';
 import { NumericKeypad } from '@/components/NumericKeypad';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { DatePicker } from '@/components/DatePicker';
+import { TimePicker } from '@/components/TimePicker';
 
 // Custom Bkash Icon to match the brand logo shape (Origami Bird)
 const BkashIcon = ({ size = 16, className = "" }: { size?: number, className?: string }) => (
@@ -60,6 +61,7 @@ export const Income: React.FC = () => {
     projectName: '',
     clientName: '',
     date: new Date().toLocaleDateString('en-CA'),
+    time: `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`,
     amount: 0,
     method: 'বিকাশ'
   });
@@ -141,10 +143,25 @@ export const Income: React.FC = () => {
       showToast('অফলাইনে আয় এডিট করা যাবে না', 'error');
       return;
     }
+    
+    let timeStr = `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`;
+    let rawDate = new Date().toLocaleDateString('en-CA');
+    if (payment.createdat || payment.date) {
+      const dtStr = payment.createdat || payment.date;
+      const dt = new Date(dtStr);
+      if (!isNaN(dt.getTime())) {
+        timeStr = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
+        // extract 'YYYY-MM-DD' correctly safely
+        rawDate = String(dtStr).substring(0, 10);
+      }
+    }
+
     setIsEditing(true);
     setActivePaymentId(payment.id);
     setNewPayment({ 
       ...payment,
+      date: rawDate,
+      time: timeStr,
       projectName: payment.projectname || payment.projectName,
       clientName: payment.clientname || payment.clientName
     });
@@ -203,12 +220,9 @@ export const Income: React.FC = () => {
 
         let dateToSave = newPayment.date;
         
-        if (dateToSave === localToday) {
-           // If selected date is today, save the exact current time (local to UTC conversion via JS Date)
-           dateToSave = new Date(`${dateToSave}T${currentTimeNow}`).toISOString();
-        } else if (dateToSave && dateToSave.length === 10) {
-           // If it's a specific date, set to noon to avoid day jumps
-           dateToSave = new Date(`${dateToSave}T${currentTimeAtNoon}`).toISOString();
+        if (dateToSave && dateToSave.length === 10) {
+          const tTime = newPayment.time ? `${newPayment.time}:00` : currentTimeNow;
+          dateToSave = new Date(`${dateToSave}T${tTime}`).toISOString();
         }
 
         let query = supabase.from('income_records').update({
@@ -234,13 +248,12 @@ export const Income: React.FC = () => {
         }
         showToast('রেকর্ড আপডেট করা হয়েছে', 'success');
       } else {
-        // Prepare date: if it's the current date (local), use full ISO string to preserve current time
+        // Prepare date: combine with time
         let dateToSave = newPayment.date;
         
-        if (dateToSave === localToday) {
-           dateToSave = new Date(`${dateToSave}T${currentTimeNow}`).toISOString();
-        } else if (dateToSave && dateToSave.length === 10) {
-           dateToSave = new Date(`${dateToSave}T${currentTimeAtNoon}`).toISOString();
+        if (dateToSave && dateToSave.length === 10) {
+          const tTime = newPayment.time ? `${newPayment.time}:00` : currentTimeNow;
+          dateToSave = new Date(`${dateToSave}T${tTime}`).toISOString();
         }
 
         const { error: insErr } = await supabase.from('income_records').insert({
@@ -282,10 +295,15 @@ export const Income: React.FC = () => {
     const d = String(now.getDate()).padStart(2, '0');
     const localToday = `${y}-${m}-${d}`;
 
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    const currentLocalTime = `${hh}:${mm}`;
+
     setNewPayment({
       projectName: '',
       clientName: '',
       date: localToday,
+      time: currentLocalTime,
       amount: 0,
       method: 'বিকাশ'
     });
@@ -855,25 +873,34 @@ export const Income: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">তারিখ</label>
-                      <DatePicker 
-                        value={newPayment.date}
-                        onChange={(date) => setNewPayment({...newPayment, date: date})}
-                        placeholder="তারিখ"
-                      />
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">তারিখ ও সময়</label>
+                    <div className="grid grid-cols-2 gap-3 relative z-20">
+                      <div className="text-left relative">
+                        <DatePicker 
+                          value={newPayment.date}
+                          onChange={(date) => setNewPayment({...newPayment, date: date})}
+                          placeholder="তারিখ"
+                        />
+                      </div>
+                      <div>
+                        <TimePicker 
+                          value={newPayment.time || ''} 
+                          onChange={val => setNewPayment({...newPayment, time: val})} 
+                          placeholder="সময়"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">পদ্ধতি</label>
-                      <select value={newPayment.method} onChange={e => setNewPayment({...newPayment, method: e.target.value})} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500">
-                        <option value="বিকাশ">বিকাশ</option>
-                        <option value="নগদ">নগদ</option>
-                        <option value="রকেট">রকেট</option>
-                        <option value="ব্যাংক">ব্যাংক</option>
-                        <option value="নগদ (ক্যাশ)">ক্যাশ</option>
-                      </select>
-                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">পদ্ধতি</label>
+                    <select value={newPayment.method} onChange={e => setNewPayment({...newPayment, method: e.target.value})} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500">
+                      <option value="বিকাশ">বিকাশ</option>
+                      <option value="নগদ">নগদ</option>
+                      <option value="রকেট">রকেট</option>
+                      <option value="ব্যাংক">ব্যাংক</option>
+                      <option value="নগদ (ক্যাশ)">ক্যাশ</option>
+                    </select>
                   </div>
 
                   <button type="submit" disabled={isSubmitting} className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold text-base shadow-lg shadow-emerald-200 active:scale-95 transition-transform flex items-center justify-center gap-2 mt-4">
