@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { Receipt, Plus, Search, Tag, X, ShoppingCart, Loader2, Trash2, MoreVertical, Pencil, SquarePen, Calculator, CalendarDays, Download, Filter, Music, Share2, ExternalLink, Copy, AlertCircle, Banknote, ArrowLeftRight, ArrowRightLeft, ArrowDown, ArrowUp, Users, MapPin, Phone, User as UserIcon, Calendar, ImagePlus, DollarSign, FileText, ArrowLeft, ArrowUpDown, TrendingUp, ListChecks, Check, Network, Shapes, Wallet, ChevronDown, ArrowDownUp, ListTodo, Spline, ChartSpline } from 'lucide-react';
+import { Receipt, Plus, Search, Tag, X, ShoppingCart, Loader2, Trash2, MoreVertical, Pencil, SquarePen, Calculator, CalendarDays, Download, Filter, Music, Share2, ExternalLink, Copy, AlertCircle, Banknote, ArrowLeftRight, ArrowRightLeft, ArrowDown, ArrowUp, Users, MapPin, Phone, User as UserIcon, Calendar, ImagePlus, DollarSign, FileText, ArrowLeft, ArrowUpDown, TrendingUp, ListChecks, Check, Network, Shapes, Wallet, ChevronDown, ArrowDownUp, ListTodo, Spline, ChartSpline, Contact } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useLocation, useNavigate } from 'react-router-dom';
 import html2canvas from 'html2canvas';
@@ -2864,6 +2864,54 @@ const DuesManager: React.FC<DuesManagerProps> = ({ wallets, adjustWalletBalance,
     }, 0);
   };
 
+  const handlePickContact = async () => {
+    // 1. Check if running inside Android WebView with Contact Picker Bridge
+    if (typeof window !== 'undefined' && (window as any).AndroidContactPicker) {
+      try {
+        // Expose callback on window so native Android can pass back the picked results
+        (window as any).onContactPicked = (name: string, phone: string) => {
+          if (name) setNewPersonName(name);
+          if (phone) {
+            const cleanedPhone = phone.replace(/[\s-]/g, '');
+            setNewPersonPhone(cleanedPhone);
+          }
+          showToast('কন্টাক্ট সফলভাবে যুক্ত হয়েছে!', 'success');
+        };
+        (window as any).AndroidContactPicker.pickContact();
+        return;
+      } catch (err) {
+        console.error('Android bridge contact error:', err);
+      }
+    }
+
+    // 2. Fallback to standard Web Contacts API
+    if (typeof navigator !== 'undefined' && 'contacts' in navigator && (navigator as any).contacts && typeof (navigator as any).contacts.select === 'function') {
+      try {
+        const contacts = await (navigator as any).contacts.select(['name', 'tel'], { multiple: false });
+        if (contacts && contacts.length > 0) {
+          const contact = contacts[0];
+          if (contact.name && contact.name.length > 0) {
+            setNewPersonName(contact.name[0]);
+          }
+          if (contact.tel && contact.tel.length > 0) {
+            let phone = contact.tel[0];
+            // Clean common formatting characters like spaces or dashes, keeping digits and plus
+            phone = phone.replace(/[\s-]/g, '');
+            setNewPersonPhone(phone);
+          }
+          showToast('কন্টাক্ট সফলভাবে যুক্ত হয়েছে!', 'success');
+        }
+      } catch (err: any) {
+        if (err.name !== 'AbortError') {
+          console.error('Contact Pick Error: ', err);
+          showToast('কন্টাক্ট নির্বাচন করতে সমস্যা হয়েছে', 'error');
+        }
+      }
+    } else {
+      showToast('আপনার ডিভাইস বা ব্রাউজারে কন্টাক্ট বুক সমর্থন করে না', 'info');
+    }
+  };
+
   const handleAddPerson = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPersonName || !user || !isOnline) {
@@ -3626,6 +3674,17 @@ const DuesManager: React.FC<DuesManagerProps> = ({ wallets, adjustWalletBalance,
                     </label>
                   </div>
 
+                  <div className="flex justify-center mb-6">
+                    <button
+                      type="button"
+                      onClick={handlePickContact}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-100 font-bold text-[13.5px] rounded-full transition shadow-sm active:scale-95 cursor-pointer"
+                    >
+                      <Contact size={16} className="text-blue-500" />
+                      ফোনের কন্টাক্ট থেকে আনুন
+                    </button>
+                  </div>
+
                   <form id="add-person-form" className={`space-y-4 transition-all duration-300 relative ${isPersonWalletOpen || isDatePickerOpen ? 'pb-[280px]' : ''}`} onSubmit={handleAddPerson}>
                     <div className="relative pt-2">
                       <div className="relative">
@@ -3654,9 +3713,17 @@ const DuesManager: React.FC<DuesManagerProps> = ({ wallets, adjustWalletBalance,
                     </div>
 
                     <div className="relative pt-2">
-                      <div className="relative z-10 text-left">
-                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"><Phone size={20} strokeWidth={1.5} /></div>
-                        <input id="person-phone" type="tel" value={newPersonPhone} onChange={e => setNewPersonPhone(e.target.value)} placeholder=" " className="peer w-full py-4 pl-11 pr-4 bg-transparent border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-[12px] outline-none text-[16px] text-slate-800 transition shadow-sm" />
+                       <div className="relative z-10 text-left">
+                         <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"><Phone size={20} strokeWidth={1.5} /></div>
+                         <input id="person-phone" type="tel" value={newPersonPhone} onChange={e => setNewPersonPhone(e.target.value)} placeholder=" " className="peer w-full py-4 pl-11 pr-12 bg-transparent border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-[12px] outline-none text-[16px] text-slate-800 transition shadow-sm" />
+                         <button
+                           type="button"
+                           onClick={handlePickContact}
+                           className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-blue-500 active:scale-95 transition-all rounded-full hover:bg-slate-100"
+                           title="ফোনের কন্টাক্ট থেকে আনুন"
+                         >
+                           <Contact size={18} strokeWidth={1.5} />
+                         </button>
                         <label 
                           htmlFor="person-phone"
                           className="absolute bg-white px-1 transition-all duration-200 cursor-text
