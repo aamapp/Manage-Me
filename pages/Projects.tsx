@@ -1044,16 +1044,16 @@ export const Projects: React.FC = () => {
                         </p>
                         <div className={`flex items-center ${isGeneratingPDF ? 'gap-2' : 'gap-1 mt-2.5'} overflow-x-auto no-scrollbar pb-1`}>
                           <div className={`flex items-center ${isGeneratingPDF ? 'gap-1.5 px-3 py-1.5 rounded-xl' : 'gap-1 px-1.5 py-1 rounded-lg'} bg-slate-50 shrink-0`}>
-                            <span className={`${isGeneratingPDF ? 'text-xs' : 'text-[10px]'} font-bold text-slate-400`}>বাজেট</span>
-                            <span className={`${isGeneratingPDF ? 'text-sm' : 'text-xs'} font-black text-slate-700`}>{currency}{p.totalamount.toLocaleString('bn-BD')}</span>
+                            <span className={`${isGeneratingPDF ? 'text-xs' : 'text-[10px]'} font-normal text-slate-500`}>বাজেট</span>
+                            <span className={`${isGeneratingPDF ? 'text-sm' : 'text-xs'} font-medium text-slate-700`}>{currency}{p.totalamount.toLocaleString('bn-BD')}</span>
                           </div>
                           <div className={`flex items-center ${isGeneratingPDF ? 'gap-1.5 px-3 py-1.5 rounded-xl' : 'gap-1 px-1.5 py-1 rounded-lg'} bg-emerald-50 shrink-0`}>
-                            <span className={`${isGeneratingPDF ? 'text-xs' : 'text-[10px]'} font-bold text-emerald-500`}>আদায়</span>
-                            <span className={`${isGeneratingPDF ? 'text-sm' : 'text-xs'} font-black text-emerald-600`}>{currency}{p.paidamount.toLocaleString('bn-BD')}</span>
+                            <span className={`${isGeneratingPDF ? 'text-xs' : 'text-[10px]'} font-normal text-emerald-600`}>আদায়</span>
+                            <span className={`${isGeneratingPDF ? 'text-sm' : 'text-xs'} font-medium text-emerald-600`}>{currency}{p.paidamount.toLocaleString('bn-BD')}</span>
                           </div>
                           <div className={`flex items-center ${isGeneratingPDF ? 'gap-1.5 px-3 py-1.5 rounded-xl' : 'gap-1 px-1.5 py-1 rounded-lg'} shrink-0 ${p.dueamount > 0 ? 'bg-rose-50' : 'bg-slate-50'}`}>
-                            <span className={`${isGeneratingPDF ? 'text-xs' : 'text-[10px]'} font-bold ${p.dueamount > 0 ? 'text-rose-400' : 'text-slate-400'}`}>বকেয়া</span>
-                            <span className={`${isGeneratingPDF ? 'text-sm' : 'text-xs'} font-black ${p.dueamount > 0 ? 'text-rose-600' : 'text-slate-500'}`}>{currency}{p.dueamount.toLocaleString('bn-BD')}</span>
+                            <span className={`${isGeneratingPDF ? 'text-xs' : 'text-[10px]'} font-normal ${p.dueamount > 0 ? 'text-rose-500' : 'text-slate-400'}`}>বকেয়া</span>
+                            <span className={`${isGeneratingPDF ? 'text-sm' : 'text-xs'} font-medium ${p.dueamount > 0 ? 'text-rose-600' : 'text-slate-500'}`}>{currency}{p.dueamount.toLocaleString('bn-BD')}</span>
                           </div>
                         </div>
                       </div>
