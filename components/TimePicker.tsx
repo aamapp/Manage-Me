@@ -233,11 +233,11 @@ export const TimePicker: React.FC<TimePickerProps> = ({ value, onChange, placeho
     <div className="relative w-full">
       <div 
         onClick={openPicker}
-        className={`w-full px-4 py-[13.5px] bg-transparent border border-slate-200 hover:border-slate-300 rounded-xl font-bold text-[14px] text-[#1a73e8] outline-none focus:ring-2 focus:ring-[#1a73e8]/20 flex items-center justify-center gap-2 cursor-pointer transition-all ${isOpen ? 'ring-2 ring-[#1a73e8]/20 border-[#1a73e8]' : ''}`}
+        className={`w-full px-4 py-[13px] bg-[#f5f6f8] hover:bg-slate-100 rounded-2xl font-normal text-[15px] text-[#1a73e8] outline-none flex items-center justify-center gap-2 cursor-pointer transition-all ${isOpen ? 'ring-2 ring-[#1a73e8]/10' : ''}`}
         style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
       >
-        <Clock size={16} strokeWidth={2.5} />
-        <span className="truncate">
+        <Clock size={16} strokeWidth={1.8} className="text-[#1a73e8]" />
+        <span className="truncate font-normal">
           {value ? toBnDigits(getDisplayValue()) : placeholder || ''}
         </span>
       </div>

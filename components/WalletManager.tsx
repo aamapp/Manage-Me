@@ -18,10 +18,17 @@ import {
 } from 'lucide-react';
 
 export const WalletManager: React.FC = () => {
-  const { user, showToast } = useAppContext();
+  const { user, showToast, refreshData } = useAppContext();
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [isDbAvailable, setIsDbAvailable] = useState<boolean>(true);
+
+  // State for Add Money directly to wallet
+  const [isPayModalOpen, setIsPayModalOpen] = useState<boolean>(false);
+  const [payWallet, setPayWallet] = useState<Wallet | null>(null);
+  const [payAmount, setPayAmount] = useState<string>('');
+  const [paySource, setPaySource] = useState<string>('');
+  const [paySubmitting, setPaySubmitting] = useState<boolean>(false);
   
   useEffect(() => {
     const handleGlobalAdd = (e: Event) => {
@@ -347,6 +354,83 @@ export const WalletManager: React.FC = () => {
     setIsModalOpen(true);
   };
 
+  // Open Add Money Modal
+  const handleOpenAddMoney = (wallet: Wallet, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setPayWallet(wallet);
+    setPayAmount('');
+    setPaySource('');
+    setIsPayModalOpen(true);
+    setActiveMenuId(null);
+  };
+
+  const handlePaySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !payWallet) return;
+
+    const amountNum = Number(payAmount);
+    if (!payAmount || isNaN(amountNum) || amountNum <= 0) {
+      showToast('দয়া করে সঠিক টাকার পরিমাণ দিন', 'error');
+      return;
+    }
+
+    setPaySubmitting(true);
+    try {
+      const sourceName = paySource.trim() || 'সরাসরি ওয়ালেটে যুক্ত';
+      const timestamp = new Date().toISOString();
+
+      // 1. Double check current wallets
+      const updated = wallets.map(w => {
+        if (w.id === payWallet.id) {
+          const newBal = Number(w.balance || 0) + amountNum;
+          return {
+            ...w,
+            balance: newBal,
+            lastTransactionDate: new Date().toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' })
+          };
+        }
+        return w;
+      });
+
+      // 2. Add to Supabase
+      if (isDbAvailable) {
+        const { error: insErr } = await supabase.from('income_records').insert({
+          id: `income-${Math.random().toString(36).substring(2, 10)}-${Date.now()}`,
+          projectid: null,
+          projectname: sourceName,
+          clientname: 'সরাসরি ওয়ালেট যোগ',
+          amount: amountNum,
+          date: timestamp,
+          method: payWallet.name,
+          userid: user.id
+        });
+
+        if (insErr) {
+          console.error("Failed to insert income record:", insErr);
+          throw insErr;
+        }
+      }
+
+      await saveWalletsState(updated);
+      
+      // Refresh AppContext data to keep all charts/totals in sync immediately!
+      try {
+        await refreshData();
+      } catch (err) {
+        console.warn("Refresh context error ignored: ", err);
+      }
+
+      window.dispatchEvent(new CustomEvent('wallets-updated'));
+      showToast(`সফলভাবে ৳${toBanglaDigits(amountNum)}/- ${payWallet.name} ওয়ালেটে যুক্ত হয়েছে!`, 'success');
+      setIsPayModalOpen(false);
+    } catch (err: any) {
+      console.error("Error adding money to wallet:", err);
+      showToast('টাকা যুক্ত করতে সমস্যা হয়েছে: ' + err.message, 'error');
+    } finally {
+      setPaySubmitting(false);
+    }
+  };
+
   // Form Submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -357,38 +441,34 @@ export const WalletManager: React.FC = () => {
     }
 
     setSubmitting(true);
-    const amount = Number(formData.balance) || 0;
+    // Maintain old balance when editing name, or default to 0 for a new wallet
+    const amount = editingWallet ? Number(editingWallet.balance || 0) : 0;
     
     let updated: Wallet[];
 
     if (editingWallet) {
-      // Editing Mode
-      const isNowDefault = formData.isDefault;
+      // Editing Mode: Only name is updated
       updated = wallets.map(w => {
         if (w.id === editingWallet.id) {
           return {
             ...w,
             name: formData.name.trim(),
+            // Maintain balance
             balance: amount,
-            isDefault: isNowDefault,
             lastTransactionDate: 'আজ, ' + new Date().toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' })
           };
         }
-        // If the current wallet is editing to default, other wallets must not be default
-        if (isNowDefault && w.id !== editingWallet.id) {
-          return { ...w, isDefault: false };
-        }
         return w;
       });
-      showToast('ওয়ালেট সফলভাবে সংশোধন করা হয়েছে।', 'success');
+      showToast('ওয়ালেটের নাম সফলভাবে পরিবর্তন করা হয়েছে।', 'success');
     } else {
-      // Add Mode
-      const isNowDefault = formData.isDefault || wallets.length === 0;
+      // Add Mode: Balance is initialized to 0
+      const isNowDefault = wallets.length === 0; // First wallet is default by default
       const newId = `wallet-${Math.random().toString(36).substring(2, 10)}-${Date.now()}`;
       const newWallet: Wallet = {
         id: newId,
         name: formData.name.trim(),
-        balance: amount,
+        balance: 0,
         isDefault: isNowDefault,
         lastTransactionDate: 'নতুন ওয়ালেট',
         userid: user.id,
@@ -406,6 +486,13 @@ export const WalletManager: React.FC = () => {
     }
 
     await saveWalletsState(updated);
+    
+    try {
+      await refreshData();
+    } catch (err) {
+      console.warn("Refresh context error ignored: ", err);
+    }
+
     setIsModalOpen(false);
     setSubmitting(false);
   };
@@ -515,13 +602,21 @@ export const WalletManager: React.FC = () => {
                     {activeMenuId === wallet.id && (
                       <div 
                         onClick={(e) => e.stopPropagation()}
-                        className="absolute right-0 top-7 bg-white border border-slate-100/90 rounded-xl shadow-md w-40 py-1 z-50 text-slate-700 font-medium text-xs animate-in fade-in slide-in-from-top-1 duration-150"
+                        className="absolute right-0 top-7 bg-white border border-slate-100/90 rounded-xl shadow-md w-[150px] py-1 z-50 text-slate-700 font-medium text-xs animate-in fade-in slide-in-from-top-1 duration-150"
                       >
+                        <button
+                          type="button"
+                          onClick={(e) => handleOpenAddMoney(wallet, e)}
+                          className="flex items-center gap-1.5 w-full text-left py-1.5 px-2.5 hover:bg-[#ecfdf5] text-emerald-600 transition-all font-semibold border-b border-slate-50"
+                        >
+                          <Plus size={12} /> টাকা যুক্ত করুন
+                        </button>
+
                         {!wallet.isDefault && (
                           <button
                             type="button"
                             onClick={(e) => handleSetDefault(wallet.id, e)}
-                            className="flex items-center gap-1 w-full text-left py-1.5 px-2.5 hover:bg-slate-50 text-blue-600 transition-all font-semibold"
+                            className="flex items-center gap-1.5 w-full text-left py-1.5 px-2.5 hover:bg-slate-50 text-blue-600 transition-all font-semibold"
                           >
                             <Check size={12} /> ডিফল্ট করুন
                           </button>
@@ -529,7 +624,7 @@ export const WalletManager: React.FC = () => {
                         <button
                           type="button"
                           onClick={(e) => handleOpenEdit(wallet, e)}
-                          className="flex items-center gap-1 w-full text-left py-1.5 px-2.5 hover:bg-slate-50 transition-all"
+                          className="flex items-center gap-1.5 w-full text-left py-1.5 px-2.5 hover:bg-slate-50 transition-all"
                         >
                           <Edit2 size={11} /> সম্পাদনা করুন
                         </button>
@@ -537,7 +632,7 @@ export const WalletManager: React.FC = () => {
                           <button
                             type="button"
                             onClick={(e) => handleDelete(wallet.id, e)}
-                            className="flex items-center gap-1 w-full text-left py-1.5 px-2.5 hover:bg-red-50 text-red-600 transition-all font-semibold border-t border-slate-50 mt-1"
+                            className="flex items-center gap-1.5 w-full text-left py-1.5 px-2.5 hover:bg-red-50 text-red-600 transition-all font-semibold border-t border-slate-50 mt-1"
                           >
                             <Trash2 size={11} /> মুছে ফেলুন
                           </button>
@@ -556,87 +651,169 @@ export const WalletManager: React.FC = () => {
 
       {/* 4. Overlay Form Modal (Floating) */}
       {isModalOpen && createPortal(
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[1000] p-4 select-none animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-sm rounded-[24px] shadow-2xl overflow-hidden border border-slate-100 flex flex-col relative max-h-[90vh]">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-[#f8fafc]">
-              <h3 className="text-[17px] font-bold text-slate-800">
-                {editingWallet ? 'ওয়ালেট সম্পন্ন করুন' : 'নতুন ওয়ালেট যুক্ত করুন'}
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[1000] p-4 select-none animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-[320px] rounded-[28px] shadow-2xl overflow-hidden border border-slate-100 flex flex-col relative max-h-[90vh]">
+            {/* Modal Header/Title Centered and Clean, exactly as customized in prompt */}
+            <div className="text-center pt-8 pb-5 px-6">
+              {/* Profile-like Wallet Icon Container */}
+              <div className="mx-auto mb-4 flex items-center justify-center w-14 h-14 rounded-full bg-blue-50 text-[#1e75eb] border border-blue-100 shadow-sm animate-in zoom-in-50 duration-300">
+                <WalletIcon size={24} strokeWidth={1.5} />
+              </div>
+              <h3 className="text-[18px] font-medium text-slate-800 leading-tight">
+                {editingWallet ? 'ওয়ালেট সম্পাদনা করুন' : 'নতুন ওয়ালেট অ্যাড করুন'}
               </h3>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="p-1 rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all"
-              >
-                <X size={18} />
-              </button>
             </div>
 
             {/* Modal Form */}
-            <form onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto">
+            <form onSubmit={handleSubmit} className="space-y-5">
               {/* Input: Name */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-500 block">ওয়ালেটের নাম</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="বিকাশ, নগদ, রকেট ইত্যাদি"
-                  className="w-full py-2.5 px-3.5 bg-slate-50 border border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 rounded-xl outline-none text-[#1e293b] text-sm transition-all"
-                />
+              <div className="px-6 relative">
+                <div className="relative">
+                  <input
+                    id="wallet-name-input"
+                    type="text"
+                    required
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder=" "
+                    className="peer w-full py-3.5 pl-11 pr-4 bg-transparent border border-slate-200 focus:border-blue-500 rounded-[16px] outline-none text-[#1e293b] text-[15px] font-medium transition-all shadow-xs"
+                  />
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 peer-focus:text-blue-500 transition-colors pointer-events-none">
+                    <WalletIcon size={18} strokeWidth={1.5} />
+                  </div>
+                  <label
+                    htmlFor="wallet-name-input"
+                    className="absolute bg-white px-1.5 transition-all duration-200 cursor-text pointer-events-none
+                      top-0 left-10 -translate-y-1/2 text-[12px] text-slate-400 font-bold
+                      peer-placeholder-shown:top-1/2 peer-placeholder-shown:left-11 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-[14px] peer-placeholder-shown:font-medium
+                      peer-focus:top-0 peer-focus:left-10 peer-focus:-translate-y-1/2 peer-focus:text-[12px] peer-focus:text-blue-500 peer-focus:font-bold"
+                  >
+                    ওয়ালেটের নাম
+                  </label>
+                </div>
               </div>
 
-              {/* Input: Balance */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-500 block">প্রারম্ভিক ব্যালেন্স (৳)</label>
-                <input
-                  type="number"
-                  value={formData.balance}
-                  onChange={(e) => setFormData({ ...formData, balance: e.target.value })}
-                  placeholder="উদাহরণ: ৯০০০"
-                  className="w-full py-2.5 px-3.5 bg-slate-50 border border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 rounded-xl outline-none text-[#1e293b] font-mono text-sm transition-all"
-                />
-              </div>
-
-              {/* Checkbox: isDefault */}
-              <div className="flex items-center gap-2 pt-1">
-                <input
-                  id="wallet-default-checkbox"
-                  type="checkbox"
-                  checked={formData.isDefault}
-                  onChange={(e) => setFormData({ ...formData, isDefault: e.target.checked })}
-                  disabled={editingWallet?.isDefault} // Cannot turn off default if it's already default
-                  className="w-[17px] h-[17px] accent-blue-600 rounded text-blue-600 focus:ring-blue-500 cursor-pointer disabled:opacity-50"
-                />
-                <label 
-                  htmlFor="wallet-default-checkbox" 
-                  className={`text-xs font-semibold text-slate-600 cursor-pointer select-none ${editingWallet?.isDefault ? 'opacity-70' : ''}`}
-                >
-                  ডিফল্ট ওয়ালেট হিসেবে সেট করুন
-                </label>
-              </div>
-
-              {/* Submit Buttons */}
-              <div className="flex items-center gap-2.5 pt-3 border-t border-slate-100">
+              {/* Submit Buttons styled exactly matching the screenshot pill layout */}
+              <div className="flex items-center justify-center gap-6 pb-8 pt-2 px-6">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-center text-sm transition-all"
+                  className="text-[#1e75eb] font-bold text-[16px] py-2 hover:opacity-85 active:scale-95 transition-all cursor-pointer"
                 >
-                  বাতিল করুন
+                  বাতিল
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-center text-sm transition-all flex items-center justify-center gap-1.5 shadow-md shadow-blue-500/10"
+                  className="bg-[#1e75eb] hover:bg-[#1563cc] text-white font-bold text-[16px] px-8 py-2.5 rounded-full shadow-md shadow-blue-100 active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   {submitting ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" /> লোড হচ্ছে
-                    </>
+                    <Loader2 size={16} className="animate-spin" />
                   ) : (
-                    editingWallet ? 'সংরক্ষণ করুন' : 'যোগ করুন'
+                    editingWallet ? 'সংরক্ষণ' : 'অ্যাড'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* 5. Add Money (টাকা যুক্ত করুন) Modal */}
+      {isPayModalOpen && payWallet && createPortal(
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[1000] p-4 select-none animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-[320px] rounded-[28px] shadow-2xl overflow-hidden border border-slate-100 flex flex-col relative max-h-[90vh]">
+            <div className="text-center pt-8 pb-5 px-6">
+              {/* Profile-like Wallet Icon Container for Add Money */}
+              <div className="mx-auto mb-4 flex items-center justify-center w-14 h-14 rounded-full bg-emerald-50 text-emerald-500 border border-emerald-100 shadow-sm animate-in zoom-in-50 duration-300">
+                <WalletIcon size={24} strokeWidth={1.5} />
+              </div>
+              <h3 className="text-[18px] font-medium text-slate-800 leading-tight">
+                টাকা যুক্ত করুন
+              </h3>
+              <p className="text-slate-400 font-bold text-[12px] mt-1.5 bg-slate-50 px-2.5 py-1 rounded-full inline-block">
+                ওয়ালেট: {payWallet.name}
+              </p>
+            </div>
+
+            <form onSubmit={handlePaySubmit} className="space-y-4">
+              {/* Input: Amount */}
+              <div className="px-6 relative">
+                <div className="relative">
+                  <input
+                    id="pay-amount-input"
+                    type="number"
+                    required
+                    min="1"
+                    value={payAmount}
+                    onChange={(e) => setPayAmount(e.target.value)}
+                    placeholder=" "
+                    className="peer w-full py-3.5 pl-11 pr-4 bg-transparent border-2 border-slate-100 focus:border-emerald-500 rounded-[16px] outline-none text-[#1e293b] text-[15px] font-mono font-bold transition-all"
+                  />
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 peer-focus:text-emerald-500 transition-colors pointer-events-none">
+                    <span className="text-[17px] font-bold font-sans">৳</span>
+                  </div>
+                  <label
+                    htmlFor="pay-amount-input"
+                    className="absolute bg-white px-1.5 transition-all duration-200 cursor-text pointer-events-none
+                      top-0 left-10 -translate-y-1/2 text-[12px] text-slate-400 font-bold
+                      peer-placeholder-shown:top-1/2 peer-placeholder-shown:left-11 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-[14px] peer-placeholder-shown:font-medium
+                      peer-focus:top-0 peer-focus:left-10 peer-focus:-translate-y-1/2 peer-focus:text-[12px] peer-focus:text-emerald-500 peer-focus:font-bold"
+                  >
+                    টাকার পরিমাণ
+                  </label>
+                </div>
+              </div>
+
+              {/* Input: Source / Notes */}
+              <div className="px-6 relative">
+                <div className="relative">
+                  <input
+                    id="pay-source-input"
+                    type="text"
+                    value={paySource}
+                    onChange={(e) => setPaySource(e.target.value)}
+                    placeholder=" "
+                    className="peer w-full py-3.5 pl-11 pr-4 bg-transparent border-2 border-slate-100 focus:border-emerald-500 rounded-[16px] outline-none text-[#1e293b] text-[15px] font-medium transition-all"
+                  />
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 peer-focus:text-emerald-500 transition-colors pointer-events-none">
+                    <CreditCard size={16} strokeWidth={1.5} />
+                  </div>
+                  <label
+                    htmlFor="pay-source-input"
+                    className="absolute bg-white px-1.5 transition-all duration-200 cursor-text pointer-events-none
+                      top-0 left-10 -translate-y-1/2 text-[12px] text-slate-400 font-bold
+                      peer-placeholder-shown:top-1/2 peer-placeholder-shown:left-11 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-[14px] peer-placeholder-shown:font-medium
+                      peer-focus:top-0 peer-focus:left-10 peer-focus:-translate-y-1/2 peer-focus:text-[12px] peer-focus:text-emerald-500 peer-focus:font-bold"
+                  >
+                    আয়ের উৎস/বিবরণ (ঐচ্ছিক)
+                  </label>
+                </div>
+              </div>
+
+              <div className="text-center px-6 text-slate-400 text-[11px] font-semibold">
+                * টাকা যুক্ত করলে সেটি লেনদেনে আয় হিসেবে যুক্ত হবে
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex items-center justify-center gap-6 pb-8 pt-2 px-6">
+                <button
+                  type="button"
+                  onClick={() => setIsPayModalOpen(false)}
+                  className="text-slate-500 font-bold text-[16px] py-2 hover:opacity-85 active:scale-95 transition-all cursor-pointer"
+                >
+                  বাতিল
+                </button>
+                <button
+                  type="submit"
+                  disabled={paySubmitting}
+                  className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-[16px] px-8 py-2.5 rounded-full shadow-md shadow-emerald-100 active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  {paySubmitting ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    'অ্যাড'
                   )}
                 </button>
               </div>

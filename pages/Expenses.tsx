@@ -17,6 +17,51 @@ import { TimePicker } from '@/components/TimePicker';
 import { WalletManager } from '@/components/WalletManager';
 import { DuePerson, DueTransaction, BudgetLimit, BudgetTransaction, TodoTask } from '../types';
 
+const CustomCoinsIcon = ({ size = 20, strokeWidth = 1.5, className = "" }: { size?: number; strokeWidth?: number; className?: string }) => (
+  <svg 
+    width={size} 
+    height={size} 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    strokeWidth={strokeWidth} 
+    strokeLinecap="round" 
+    strokeLinejoin="round" 
+    className={className}
+  >
+    {/* Back coin (crescent peeking from behind) */}
+    <path d="M17 7A7.5 7.5 0 0 1 21.5 14A7.5 7.5 0 0 1 14 21.5A7.5 7.5 0 0 1 7 17" />
+    {/* Front coin */}
+    <circle cx="10" cy="10" r="7.5" />
+    {/* Dollar Sign inside front coin (perfectly proportioned and centered) */}
+    <path d="M13 7h-4.5a1.5 1.5 0 0 0 0 3h3a1.5 1.5 0 0 1 0 3H7" />
+    <path d="M10 5.5v9" />
+  </svg>
+);
+
+const CustomReceiptIcon = ({ size = 20, strokeWidth = 1.5, className = "" }: { size?: number; strokeWidth?: number; className?: string }) => (
+  <svg 
+    width={size} 
+    height={size} 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    strokeWidth={strokeWidth} 
+    strokeLinecap="round" 
+    strokeLinejoin="round" 
+    className={className}
+  >
+    {/* Main receipt body outline with rounded top-left and wavy bottom */}
+    <path d="M14.5 6H10C7.8 6 6 7.8 6 10V18Q7.4 19.5 8.8 18Q10.2 19.5 11.6 18Q13 19.5 14.5 18V6" />
+    {/* Roll at top right forming a loop fold */}
+    <path d="M14.5 6C17.5 6 19.5 7.5 19.5 9.5C19.5 11.5 17.5 13 14.5 13" />
+    <path d="M14.5 7.5C16 7.5 17 8.5 17 9.5C17 10.5 16 11.5 14.5 11.5" />
+    {/* Document line details */}
+    <path d="M9 11H12" />
+    <path d="M9 14H11.5" />
+  </svg>
+);
+
 export const parseExpenseNotes = (fullNotes: string): { notes: string; wallet: string } => {
   if (!fullNotes) return { notes: '', wallet: 'ক্যাশ' };
   const match = fullNotes.match(/(.*)\s*\[ওয়ালেট:\s*(.*)\]$/);
@@ -165,6 +210,16 @@ export const Expenses: React.FC = () => {
   const isMouseDown = useRef(false);
 
   const handleTouchStart = (e: React.TouchEvent) => {
+    // Disable swiping globally if any modal, overlay backdrop, dropdown, or numeric keypad is currently open
+    if (typeof document !== 'undefined') {
+      const hasActiveOverlay = !!document.querySelector(
+        '.backdrop-blur, .fixed.inset-0, [role="dialog"], .keypad-container, .no-swipe'
+      );
+      if (hasActiveOverlay) {
+        return;
+      }
+    }
+
     const target = e.target as HTMLElement;
     // Don't swipe on inputs, text areas, dropdowns, modals, custom sliders OR the main FAB
     if (
@@ -255,6 +310,16 @@ export const Expenses: React.FC = () => {
 
   // Dragging support for mouse gesture (PC/Desktop drag-to-scroll/swipe)
   const handleMouseDown = (e: React.MouseEvent) => {
+    // Disable swiping globally if any modal, overlay backdrop, dropdown, or numeric keypad is currently open
+    if (typeof document !== 'undefined') {
+      const hasActiveOverlay = !!document.querySelector(
+        '.backdrop-blur, .fixed.inset-0, [role="dialog"], .keypad-container, .no-swipe'
+      );
+      if (hasActiveOverlay) {
+        return;
+      }
+    }
+
     const target = e.target as HTMLElement;
     // Don't swipe on inputs, text areas, dropdowns, modals, custom sliders, scrollbars OR the main FAB
     if (
@@ -840,10 +905,6 @@ export const Expenses: React.FC = () => {
     // Custom Smart Validation
     const errors: any = {};
     if (txModalType === 'expense') {
-      if (!newExpense.notes || !newExpense.notes.trim()) {
-        errors.notes = 'বিবরণ দেওয়া আবশ্যক';
-      }
-      
       const parsedAmount = Number(safeEval(newExpense.amount)) || 0;
       if (parsedAmount <= 0) {
         errors.amount = 'সঠিক পরিমাণ দিন (০ থেকে বেশি)';
@@ -901,7 +962,8 @@ export const Expenses: React.FC = () => {
         }
 
         const selectedWallet = newExpense.wallet || 'ক্যাশ';
-        const finalNotesColumn = `${newExpense.notes.trim()} [ওয়ালেট: ${selectedWallet}]`;
+        const notesText = (newExpense.notes || '').trim() || (newExpense.category || 'অন্যান্য');
+        const finalNotesColumn = `${notesText} [ওয়ালেট: ${selectedWallet}]`;
 
         if (isEditing && activeExpenseId) {
           // Revert old budget/saving/wallet balance
@@ -1890,10 +1952,10 @@ export const Expenses: React.FC = () => {
                          return (
                            <div 
                              key={tx.id} 
-                             className={`group relative rounded-[12px] px-4 py-2.5 sm:py-3 flex items-center justify-between gap-3 transition-colors duration-200 shadow-[0_2px_6px_rgba(0,0,0,0.015)] border ${
+                             className={`group relative rounded-[12px] px-4 py-2.5 sm:py-3 flex items-center justify-between gap-3 transition-colors duration-200 shadow-[0_2px_6px_rgba(0,0,0,0.015)] ${
                                isIncome 
-                                 ? 'bg-[#f2f7f3] border-[#d1f2d9]/15' 
-                                 : 'bg-[#fff5f5] border-[#fbdbda]/15'
+                                 ? 'bg-emerald-50/50 border-emerald-100' 
+                                 : 'bg-rose-50/50 border-rose-100'
                              }`}
                            >
                              {/* Left side: Title and circular badge with Time detail */}
@@ -1904,8 +1966,8 @@ export const Expenses: React.FC = () => {
                                <div className="flex items-center gap-1.5 mt-1 select-none">
                                  <span className={`w-[18px] h-[18px] rounded-full flex items-center justify-center font-bold text-[9px] sm:text-[10px] shrink-0 ${
                                    isIncome
-                                     ? 'bg-[#e6f4ea] text-[#50AD54]'
-                                     : 'bg-[#fce8e6] text-[#db4437]'
+                                     ? 'bg-emerald-100 text-emerald-600'
+                                     : 'bg-rose-100 text-rose-600'
                                  }`}>
                                    {isIncome ? '+' : '-'}
                                  </span>
@@ -1918,7 +1980,7 @@ export const Expenses: React.FC = () => {
                              {/* Right side: Amount and Menu vertically centered */}
                              <div className="flex items-center gap-2.5 shrink-0 my-auto">
                                <span className={`font-medium text-[15px] sm:text-[16px] whitespace-nowrap ${
-                                 isIncome ? 'text-[#50AD54]' : 'text-[#db4437]'
+                                 isIncome ? 'text-emerald-600' : 'text-rose-600'
                                }`}>
                                  {toBanglaNumbers(tx.amount.toLocaleString('bn-BD'))}
                                </span>
@@ -2414,27 +2476,31 @@ export const Expenses: React.FC = () => {
                   {txModalType === 'expense' ? (
                     /* Expense Specific Fields */
                     <>
-                      <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">বিবরণ</label>
-                        <input 
-                          type="text" 
-                          value={newExpense.notes} 
-                          onChange={e => {
-                            setNewExpense({...newExpense, notes: e.target.value});
-                            if (formErrors.notes) setFormErrors({...formErrors, notes: null});
-                          }} 
-                          className={`w-full px-3 py-3 bg-slate-50 border rounded-xl font-bold text-slate-800 outline-none text-sm transition-all focus:ring-2 ${
-                            formErrors.notes 
-                              ? 'border-rose-500 focus:ring-rose-200 bg-rose-50/20' 
-                              : 'border-slate-200 focus:ring-rose-500 focus:border-rose-500'
-                          }`} 
-                          placeholder="কিসের জন্য খরচ?" 
-                        />
-                        {formErrors.notes && (
-                          <p className="text-xs font-semibold text-rose-500 mt-1 flex items-center gap-1 animate-in fade-in slide-in-from-top-1 duration-150">
-                            <AlertCircle size={14} className="shrink-0" /> {formErrors.notes}
-                          </p>
-                        )}
+                      <div className="relative pt-1.5">
+                        <div className="relative text-left">
+                          <input 
+                            id="expense-notes-input"
+                            type="text" 
+                            value={newExpense.notes} 
+                            onChange={e => {
+                              setNewExpense({...newExpense, notes: e.target.value});
+                            }} 
+                            placeholder=" "
+                            className="peer w-full py-[15px] pl-[50px] pr-4 bg-transparent border border-slate-200 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 rounded-2xl font-bold text-slate-800 outline-none text-[15px] transition-all shadow-xs" 
+                          />
+                          <div className="absolute left-[18px] top-1/2 -translate-y-1/2 text-slate-400 peer-focus:text-rose-500 transition-colors pointer-events-none">
+                            <CustomReceiptIcon size={28} strokeWidth={1.5} />
+                          </div>
+                          <label 
+                            htmlFor="expense-notes-input"
+                            className="absolute bg-white px-1.5 transition-all duration-200 cursor-text pointer-events-none
+                              top-0 left-[18px] -translate-y-1/2 text-[12px] font-bold text-slate-400 peer-focus:text-rose-500 peer-focus:font-bold
+                              peer-placeholder-shown:top-1/2 peer-placeholder-shown:left-[50px] peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-[15px] peer-placeholder-shown:font-normal
+                              peer-focus:top-0 peer-focus:left-[18px] peer-focus:-translate-y-1/2 peer-focus:text-[12px]"
+                          >
+                            বিবরণ (অপশনাল)
+                          </label>
+                        </div>
                       </div>
 
                       {/* Wallet Selector for Expense */}
@@ -2515,23 +2581,39 @@ export const Expenses: React.FC = () => {
                         })()}
                       </div>
 
-                      <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
-                            পরিমাণ ({user?.currency})
-                        </label>
-                        <div 
-                          onClick={() => {
-                            setShowKeypad(true);
-                            if (formErrors.amount) setFormErrors({...formErrors, amount: null});
-                          }}
-                          className={`keypad-trigger w-full px-3 py-3 bg-slate-50 border rounded-xl font-black text-xl transition-all flex items-center justify-between cursor-pointer ${
-                            formErrors.amount 
-                              ? 'border-rose-500 text-rose-600 bg-rose-50/20' 
-                              : 'border-slate-200 text-rose-600 active:bg-slate-100'
-                          }`}
-                        >
-                           <span>{newExpense.amount || 0}</span>
-                           <Calculator size={18} className="text-slate-500" />
+                      <div className="relative pt-1.5">
+                        <div className="relative text-left">
+                          <input 
+                            id="expense-amount-input"
+                            type="text" 
+                            readOnly
+                            value={String(newExpense.amount || '')} 
+                            onClick={() => {
+                              setShowKeypad(true);
+                              if (formErrors.amount) setFormErrors({...formErrors, amount: null});
+                            }} 
+                            placeholder=" "
+                            className={`peer w-full py-[15px] pl-[50px] pr-10 bg-transparent border rounded-2xl font-black text-rose-600 outline-none text-[17px] transition-all shadow-xs cursor-pointer ${
+                              formErrors.amount 
+                                ? 'border-rose-500 bg-rose-50/10' 
+                                : 'border-slate-200 focus:border-rose-500 focus:ring-1 focus:ring-rose-500'
+                            }`}
+                          />
+                          <div className="absolute left-[18px] top-1/2 -translate-y-1/2 text-slate-400 peer-focus:text-rose-500 transition-colors pointer-events-none">
+                            <CustomCoinsIcon size={20} strokeWidth={1.5} />
+                          </div>
+                          <label 
+                            htmlFor="expense-amount-input"
+                            className="absolute bg-white px-1.5 transition-all duration-200 cursor-text pointer-events-none
+                              top-0 left-[18px] -translate-y-1/2 text-[12px] font-bold text-slate-400 peer-focus:text-rose-500 peer-focus:font-bold
+                              peer-placeholder-shown:top-1/2 peer-placeholder-shown:left-[50px] peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-[15px] peer-placeholder-shown:font-normal
+                              peer-focus:top-0 peer-focus:left-[18px] peer-focus:-translate-y-1/2 peer-focus:text-[12px]"
+                          >
+                            টাকার পরিমাণ
+                          </label>
+                          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                            <Calculator size={16} />
+                          </div>
                         </div>
                         {formErrors.amount && (
                           <p className="text-xs font-semibold text-rose-500 mt-1 flex items-center gap-1 animate-in fade-in slide-in-from-top-1 duration-150">
@@ -2569,15 +2651,29 @@ export const Expenses: React.FC = () => {
                     /* Income Specific Fields */
                     <>
                       {/* Optional Title / Description Input */}
-                      <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">বিবরণ (অপশনাল)</label>
-                        <input 
-                          type="text"
-                          value={newIncome.clientname || ''}
-                          onChange={e => setNewIncome({...newIncome, clientname: e.target.value})}
-                          className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none transition-all focus:ring-2 focus:ring-emerald-500"
-                          placeholder="আয়ের অপশনাল টাইটেল বা বিবরণ..."
-                        />
+                      <div className="relative pt-1.5">
+                        <div className="relative text-left">
+                          <input 
+                            id="income-notes-input"
+                            type="text"
+                            value={newIncome.clientname || ''}
+                            onChange={e => setNewIncome({...newIncome, clientname: e.target.value})}
+                            placeholder=" "
+                            className="peer w-full py-[15px] pl-[50px] pr-4 bg-transparent border border-slate-200 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 rounded-2xl font-bold text-[15px] text-slate-800 outline-none transition-all shadow-xs"
+                          />
+                          <div className="absolute left-[18px] top-1/2 -translate-y-1/2 text-slate-400 peer-focus:text-emerald-500 transition-colors pointer-events-none">
+                            <CustomReceiptIcon size={28} strokeWidth={1.5} />
+                          </div>
+                          <label 
+                            htmlFor="income-notes-input"
+                            className="absolute bg-white px-1.5 transition-all duration-200 cursor-text pointer-events-none
+                              top-0 left-[18px] -translate-y-1/2 text-[12px] text-slate-400 font-bold
+                              peer-placeholder-shown:top-1/2 peer-placeholder-shown:left-[50px] peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-[14px] peer-placeholder-shown:font-medium
+                              peer-focus:top-0 peer-focus:left-[18px] peer-focus:-translate-y-1/2 peer-focus:text-[12px] peer-focus:text-emerald-500 peer-focus:font-bold"
+                          >
+                            বিবরণ (অপশনাল)
+                          </label>
+                        </div>
                       </div>
 
                       {/* Wallet Selector for Income */}
@@ -2668,24 +2764,39 @@ export const Expenses: React.FC = () => {
                         })()}
                       </div>
 
-                      {/* Transaction Amount Picker */}
-                      <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
-                            সংগৃহীত পরিমাণ ({user?.currency})
-                        </label>
-                        <div 
-                          onClick={() => {
-                            setShowKeypad(true);
-                            if (formErrors.amount) setFormErrors({...formErrors, amount: null});
-                          }}
-                          className={`keypad-trigger w-full px-3 py-3 bg-slate-50 border rounded-xl font-black text-xl transition-all flex items-center justify-between cursor-pointer ${
-                            formErrors.amount 
-                              ? 'border-rose-500 text-emerald-600 bg-rose-50/20' 
-                              : 'border-slate-200 text-emerald-600 active:bg-slate-100'
-                          }`}
-                        >
-                           <span>{newIncome.amount || 0}</span>
-                           <Calculator size={18} className="text-slate-500" />
+                      <div className="relative pt-1.5">
+                        <div className="relative text-left">
+                          <input 
+                            id="income-amount-input"
+                            type="text" 
+                            readOnly
+                            value={String(newIncome.amount || '')} 
+                            onClick={() => {
+                              setShowKeypad(true);
+                              if (formErrors.amount) setFormErrors({...formErrors, amount: null});
+                            }} 
+                            placeholder=" "
+                            className={`peer w-full py-[15px] pl-[50px] pr-10 bg-transparent border rounded-2xl font-black text-emerald-600 outline-none text-[17px] transition-all shadow-xs cursor-pointer ${
+                              formErrors.amount 
+                                ? 'border-rose-500 bg-rose-50/10' 
+                                : 'border-slate-200 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500'
+                            }`}
+                          />
+                          <div className="absolute left-[18px] top-1/2 -translate-y-1/2 text-slate-400 peer-focus:text-emerald-500 transition-colors pointer-events-none">
+                            <CustomCoinsIcon size={20} strokeWidth={1.5} />
+                          </div>
+                          <label 
+                            htmlFor="income-amount-input"
+                            className="absolute bg-white px-1.5 transition-all duration-200 cursor-text pointer-events-none
+                              top-0 left-[18px] -translate-y-1/2 text-[12px] font-bold text-slate-400 peer-focus:text-emerald-500 peer-focus:font-bold
+                              peer-placeholder-shown:top-1/2 peer-placeholder-shown:left-[50px] peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-[14px] peer-placeholder-shown:font-medium
+                              peer-focus:top-0 peer-focus:left-[18px] peer-focus:-translate-y-1/2 peer-focus:text-[12px]"
+                          >
+                            টাকার পরিমাণ
+                          </label>
+                          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                            <Calculator size={16} />
+                          </div>
                         </div>
                         {formErrors.amount && (
                           <p className="text-xs font-semibold text-rose-500 mt-1 flex items-center gap-1 animate-in fade-in slide-in-from-top-1 duration-150">
@@ -2870,7 +2981,6 @@ const DuesManager: React.FC<DuesManagerProps> = ({ wallets, adjustWalletBalance,
       try {
         // Expose callback on window so native Android can pass back the picked results
         (window as any).onContactPicked = (name: string, phone: string) => {
-          if (name) setNewPersonName(name);
           if (phone) {
             const cleanedPhone = phone.replace(/[\s-]/g, '');
             setNewPersonPhone(cleanedPhone);
@@ -2887,12 +2997,9 @@ const DuesManager: React.FC<DuesManagerProps> = ({ wallets, adjustWalletBalance,
     // 2. Fallback to standard Web Contacts API
     if (typeof navigator !== 'undefined' && 'contacts' in navigator && (navigator as any).contacts && typeof (navigator as any).contacts.select === 'function') {
       try {
-        const contacts = await (navigator as any).contacts.select(['name', 'tel'], { multiple: false });
+        const contacts = await (navigator as any).contacts.select(['tel'], { multiple: false });
         if (contacts && contacts.length > 0) {
           const contact = contacts[0];
-          if (contact.name && contact.name.length > 0) {
-            setNewPersonName(contact.name[0]);
-          }
           if (contact.tel && contact.tel.length > 0) {
             let phone = contact.tel[0];
             // Clean common formatting characters like spaces or dashes, keeping digits and plus
@@ -4081,34 +4188,126 @@ const SavingsManager: React.FC = () => {
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[1000] flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl w-full max-w-sm p-5 shadow-2xl relative text-left h-[calc(100vh-2rem)] sm:h-auto overflow-y-auto animate-in zoom-in-95 duration-200">
             <h3 className="text-base font-bold text-slate-800 text-center mb-4">নতুন সঞ্চয় লক্ষ্য তৈরি</h3>
-            <form onSubmit={handleCreateGoal} className="space-y-3.5">
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">লক্ষে্যর নাম</label>
-                <input required type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="যেমন: নতুন ল্যাপটপ কেনা" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-800 text-xs" />
+            <form onSubmit={handleCreateGoal} className="space-y-4 pt-2">
+              <div className="relative text-left">
+                <input 
+                  required 
+                  id="goal-title"
+                  type="text" 
+                  value={title} 
+                  onChange={e => setTitle(e.target.value)} 
+                  placeholder=" " 
+                  className="peer w-full px-3.5 py-3 bg-transparent border border-slate-200 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 rounded-[14px] outline-none font-bold text-slate-800 text-sm transition shadow-xs" 
+                />
+                <label 
+                  htmlFor="goal-title"
+                  className="absolute bg-white px-1 transition-all duration-200 cursor-text
+                             top-0 left-3 -translate-y-1/2 text-[11px] text-slate-400 font-bold
+                             peer-placeholder-shown:top-1/2 peer-placeholder-shown:left-3.5 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-[13px] peer-placeholder-shown:text-slate-400 peer-placeholder-shown:font-medium
+                             peer-focus:top-0 peer-focus:left-3 peer-focus:-translate-y-1/2 peer-focus:text-[11px] peer-focus:text-indigo-600 peer-focus:font-bold"
+                >
+                  লক্ষ্যের নাম
+                </label>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">খাত / ক্যাটাগরি</label>
-                  <input type="text" value={category} onChange={e => setCategory(e.target.value)} placeholder="যেমন: ডিভাইস" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-800 text-xs" />
+              <div className="grid grid-cols-2 gap-3.5">
+                <div className="relative text-left">
+                  <input 
+                    id="goal-category"
+                    type="text" 
+                    value={category} 
+                    onChange={e => setCategory(e.target.value)} 
+                    placeholder=" " 
+                    className="peer w-full px-3.5 py-3 bg-transparent border border-slate-200 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 rounded-[14px] outline-none font-bold text-slate-800 text-sm transition shadow-xs" 
+                  />
+                  <label 
+                    htmlFor="goal-category"
+                    className="absolute bg-white px-1 transition-all duration-200 cursor-text
+                               top-0 left-3 -translate-y-1/2 text-[11px] text-slate-400 font-bold
+                               peer-placeholder-shown:top-1/2 peer-placeholder-shown:left-3.5 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-[13px] peer-placeholder-shown:text-slate-400 peer-placeholder-shown:font-medium
+                               peer-focus:top-0 peer-focus:left-3 peer-focus:-translate-y-1/2 peer-focus:text-[11px] peer-focus:text-indigo-600 peer-focus:font-bold"
+                  >
+                    খাত / ক্যাটাগরি
+                  </label>
                 </div>
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">লক্ষ্য তারিখ</label>
-                  <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-800 text-xs" />
+                <div className="relative text-left">
+                  <input 
+                    required
+                    id="goal-deadline"
+                    type="date" 
+                    value={deadline} 
+                    onChange={e => setDeadline(e.target.value)} 
+                    placeholder=" " 
+                    className="peer w-full px-3.5 py-3 bg-transparent border border-slate-200 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 rounded-[14px] outline-none font-bold text-slate-800 text-sm transition shadow-xs" 
+                  />
+                  <label 
+                    htmlFor="goal-deadline"
+                    className="absolute bg-white px-1 transition-all duration-200 cursor-text
+                               top-0 left-3 -translate-y-1/2 text-[11px] text-slate-400 font-bold
+                               peer-placeholder-shown:top-1/2 peer-placeholder-shown:left-3.5 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-[13px] peer-placeholder-shown:text-slate-400 peer-placeholder-shown:font-medium
+                               peer-focus:top-0 peer-focus:left-3 peer-focus:-translate-y-1/2 peer-focus:text-[11px] peer-focus:text-indigo-600 peer-focus:font-bold"
+                  >
+                    লক্ষ্য তারিখ
+                  </label>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">টার্গেট পরিমাণ</label>
-                  <input required type="number" value={targetAmount} onChange={e => setTargetAmount(e.target.value)} placeholder="টার্গেট টাকা" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-800 text-xs" />
+              <div className="grid grid-cols-2 gap-3.5">
+                <div className="relative text-left">
+                  <input 
+                    required 
+                    id="goal-target"
+                    type="number" 
+                    value={targetAmount} 
+                    onChange={e => setTargetAmount(e.target.value)} 
+                    placeholder=" " 
+                    className="peer w-full px-3.5 py-3 bg-transparent border border-slate-200 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 rounded-[14px] outline-none font-bold text-slate-800 text-sm transition shadow-xs" 
+                  />
+                  <label 
+                    htmlFor="goal-target"
+                    className="absolute bg-white px-1 transition-all duration-200 cursor-text
+                               top-0 left-3 -translate-y-1/2 text-[11px] text-slate-400 font-bold
+                               peer-placeholder-shown:top-1/2 peer-placeholder-shown:left-3.5 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-[13px] peer-placeholder-shown:text-slate-400 peer-placeholder-shown:font-medium
+                               peer-focus:top-0 peer-focus:left-3 peer-focus:-translate-y-1/2 peer-focus:text-[11px] peer-focus:text-indigo-600 peer-focus:font-bold"
+                  >
+                    টার্গেট পরিমাণ
+                  </label>
                 </div>
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">প্রাথমিক জমা</label>
-                  <input type="number" value={currentAmount} onChange={e => setCurrentAmount(e.target.value)} placeholder="প্রাথমিক টাকা" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-800 text-xs" />
+                <div className="relative text-left">
+                  <input 
+                    id="goal-current"
+                    type="number" 
+                    value={currentAmount} 
+                    onChange={e => setCurrentAmount(e.target.value)} 
+                    placeholder=" " 
+                    className="peer w-full px-3.5 py-3 bg-transparent border border-slate-200 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 rounded-[14px] outline-none font-bold text-slate-800 text-sm transition shadow-xs" 
+                  />
+                  <label 
+                    htmlFor="goal-current"
+                    className="absolute bg-white px-1 transition-all duration-200 cursor-text
+                               top-0 left-3 -translate-y-1/2 text-[11px] text-slate-400 font-bold
+                               peer-placeholder-shown:top-1/2 peer-placeholder-shown:left-3.5 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-[13px] peer-placeholder-shown:text-slate-400 peer-placeholder-shown:font-medium
+                               peer-focus:top-0 peer-focus:left-3 peer-focus:-translate-y-1/2 peer-focus:text-[11px] peer-focus:text-indigo-600 peer-focus:font-bold"
+                  >
+                    প্রাথমিক জমা
+                  </label>
                 </div>
               </div>
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">বিবরণ (ঐচ্ছিক)</label>
-                <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="সংক্ষিপ্ত বর্ণনা..." className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-800 text-xs h-20 resize-none" />
+              <div className="relative text-left">
+                <textarea 
+                  id="goal-notes"
+                  value={notes} 
+                  onChange={e => setNotes(e.target.value)} 
+                  placeholder=" " 
+                  className="peer w-full px-3.5 py-3 bg-transparent border border-slate-200 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 rounded-[14px] outline-none font-bold text-slate-800 text-sm h-20 resize-none transition shadow-xs" 
+                />
+                <label 
+                  htmlFor="goal-notes"
+                  className="absolute bg-white px-1 transition-all duration-200 cursor-text
+                             top-0 left-3 -translate-y-1/2 text-[11px] text-slate-400 font-bold
+                             peer-placeholder-shown:top-6 peer-placeholder-shown:left-3.5 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-[13px] peer-placeholder-shown:text-slate-400 peer-placeholder-shown:font-medium
+                             peer-focus:top-0 peer-focus:left-3 peer-focus:-translate-y-1/2 peer-focus:text-[11px] peer-focus:text-indigo-600 peer-focus:font-bold"
+                >
+                  বিবরণ (ঐচ্ছিক)
+                </label>
               </div>
               <div className="flex gap-2 pt-2">
                 <button type="button" onClick={() => setAddModalOpen(false)} className="flex-1 py-3.5 bg-slate-100 text-slate-500 font-bold text-xs rounded-xl hover:bg-slate-200 transition-colors">বাতিল</button>
@@ -4128,18 +4327,49 @@ const SavingsManager: React.FC = () => {
               {txType === 'deposit' ? 'সঞ্চয় জমা করুন' : 'সঞ্চয় উত্তোলন করুন'}
             </h3>
             <p className="text-xs text-slate-400 text-center mb-4">লক্ষ্য: {selectedGoal.title}</p>
-            <form onSubmit={handleSavingsTransaction} className="space-y-3.5">
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase">টাকার পরিমাণ</label>
-                <input required type="number" value={txAmount} onChange={e => setTxAmount(e.target.value)} placeholder="টাকা টাইপ করুন" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-black text-slate-800 text-base" />
+            <form onSubmit={handleSavingsTransaction} className="space-y-4 pt-2">
+              <div className="relative text-left">
+                <input 
+                  required 
+                  id="goal-tx-amount"
+                  type="number" 
+                  value={txAmount} 
+                  onChange={e => setTxAmount(e.target.value)} 
+                  placeholder=" " 
+                  className="peer w-full px-3.5 py-3 bg-transparent border border-slate-200 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 rounded-[14px] outline-none font-bold text-slate-800 text-sm transition shadow-xs" 
+                />
+                <label 
+                  htmlFor="goal-tx-amount"
+                  className="absolute bg-white px-1 transition-all duration-200 cursor-text
+                             top-0 left-3 -translate-y-1/2 text-[11px] text-slate-400 font-bold
+                             peer-placeholder-shown:top-1/2 peer-placeholder-shown:left-3.5 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-[13px] peer-placeholder-shown:text-slate-400 peer-placeholder-shown:font-medium
+                             peer-focus:top-0 peer-focus:left-3 peer-focus:-translate-y-1/2 peer-focus:text-[11px] peer-focus:text-indigo-600 peer-focus:font-bold"
+                >
+                  টাকার পরিমাণ
+                </label>
               </div>
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase">নোট বা মন্তব্য</label>
-                <input type="text" value={txNotes} onChange={e => setTxNotes(e.target.value)} placeholder="যেমন: মে মাসের বোনাস" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-800 text-xs" />
+              <div className="relative text-left">
+                <input 
+                  id="goal-tx-notes"
+                  type="text" 
+                  value={txNotes} 
+                  onChange={e => setTxNotes(e.target.value)} 
+                  placeholder=" " 
+                  className="peer w-full px-3.5 py-3 bg-transparent border border-slate-200 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 rounded-[14px] outline-none font-bold text-slate-800 text-sm transition shadow-xs" 
+                />
+                <label 
+                  htmlFor="goal-tx-notes"
+                  className="absolute bg-white px-1 transition-all duration-200 cursor-text
+                             top-0 left-3 -translate-y-1/2 text-[11px] text-slate-400 font-bold
+                             peer-placeholder-shown:top-1/2 peer-placeholder-shown:left-3.5 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-[13px] peer-placeholder-shown:text-slate-400 peer-placeholder-shown:font-medium
+                             peer-focus:top-0 peer-focus:left-3 peer-focus:-translate-y-1/2 peer-focus:text-[11px] peer-focus:text-indigo-600 peer-focus:font-bold"
+                >
+                  নোট বা মন্তব্য
+                </label>
               </div>
               <div className="flex gap-2 pt-2">
                 <button type="button" onClick={() => { setTxAmount(''); setTxNotes(''); setTxModalOpen(false); }} className="flex-1 py-3 bg-slate-100 text-slate-500 font-bold text-xs rounded-xl hover:bg-slate-200 transition-colors">বাতিল</button>
-                <button type="submit" className={`flex-1 py-3 text-white font-bold text-xs rounded-xl transition-colors shadow-sm ${txType === 'deposit' ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-rose-500 hover:bg-rose-600'}`}>
+                <button type="submit" className={`flex-1 py-4 text-white font-bold text-xs rounded-[14px] transition-colors shadow-sm ${txType === 'deposit' ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-rose-500 hover:bg-rose-600'}`}>
                   {txType === 'deposit' ? 'জমা করুন' : 'উত্তোলন করুন'}
                 </button>
               </div>
@@ -4839,25 +5069,74 @@ const BudgetManager: React.FC<{ expenses: any[]; user: any }> = ({ expenses, use
                   </div>
                 </div>
 
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 block mb-1">বিবরণ বা নাম</label>
-                  <input required type="text" value={txDescription} onChange={e => setTxDescription(e.target.value)} placeholder="যেমন: সপ্তাহিক তরকারি বাজার, বাড়তি টাকা" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-[#1a73e8] font-bold text-slate-800 text-xs" />
+                <div className="relative text-left">
+                  <input 
+                    required 
+                    id="bud-tx-desc"
+                    type="text" 
+                    value={txDescription} 
+                    onChange={e => setTxDescription(e.target.value)} 
+                    placeholder=" " 
+                    className="peer w-full px-3.5 py-3 bg-transparent border border-slate-200 focus:border-[#1a73e8] focus:ring-1 focus:ring-[#1a73e8] rounded-[14px] outline-none font-bold text-slate-800 text-sm transition shadow-xs" 
+                  />
+                  <label 
+                    htmlFor="bud-tx-desc"
+                    className="absolute bg-white px-1 transition-all duration-200 cursor-text
+                               top-0 left-3 -translate-y-1/2 text-[11px] text-slate-400 font-bold
+                               peer-placeholder-shown:top-1/2 peer-placeholder-shown:left-3.5 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-[13px] peer-placeholder-shown:text-slate-400 peer-placeholder-shown:font-medium
+                               peer-focus:top-0 peer-focus:left-3 peer-focus:-translate-y-1/2 peer-focus:text-[11px] peer-focus:text-[#1a73e8] peer-focus:font-bold"
+                  >
+                    বিবরণ বা নাম
+                  </label>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-400 block mb-1">টাকার পরিমাণ</label>
-                    <input required type="number" value={txAmount} onChange={e => setTxAmount(e.target.value)} placeholder="টাকা" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-[#1a73e8] font-black text-slate-800 text-base" />
+                <div className="grid grid-cols-2 gap-3.5">
+                  <div className="relative text-left">
+                    <input 
+                      required 
+                      id="bud-tx-amount"
+                      type="number" 
+                      value={txAmount} 
+                      onChange={e => setTxAmount(e.target.value)} 
+                      placeholder=" " 
+                      className="peer w-full px-3.5 py-3 bg-transparent border border-slate-200 focus:border-[#1a73e8] focus:ring-1 focus:ring-[#1a73e8] rounded-[14px] outline-none font-bold text-slate-800 text-sm transition shadow-xs" 
+                    />
+                    <label 
+                      htmlFor="bud-tx-amount"
+                      className="absolute bg-white px-1 transition-all duration-200 cursor-text
+                                 top-0 left-3 -translate-y-1/2 text-[11px] text-slate-400 font-bold
+                                 peer-placeholder-shown:top-1/2 peer-placeholder-shown:left-3.5 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-[13px] peer-placeholder-shown:text-slate-400 peer-placeholder-shown:font-medium
+                                 peer-focus:top-0 peer-focus:left-3 peer-focus:-translate-y-1/2 peer-focus:text-[11px] peer-focus:text-[#1a73e8] peer-focus:font-bold"
+                    >
+                      টাকার পরিমাণ
+                    </label>
                   </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-400 block mb-1">তারিখ</label>
-                    <input required type="date" value={txDate} onChange={e => setTxDate(e.target.value)} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-[#1a73e8] font-bold text-slate-800 text-xs" />
+
+                  <div className="relative text-left">
+                    <input 
+                      required 
+                      id="bud-tx-date"
+                      type="date" 
+                      value={txDate} 
+                      onChange={e => setTxDate(e.target.value)} 
+                      placeholder=" " 
+                      className="peer w-full px-3.5 py-3 bg-transparent border border-slate-200 focus:border-[#1a73e8] focus:ring-1 focus:ring-[#1a73e8] rounded-[14px] outline-none font-bold text-slate-800 text-sm transition shadow-xs" 
+                    />
+                    <label 
+                      htmlFor="bud-tx-date"
+                      className="absolute bg-white px-1 transition-all duration-200 cursor-text
+                                 top-0 left-3 -translate-y-1/2 text-[11px] text-slate-400 font-bold
+                                 peer-placeholder-shown:top-1/2 peer-placeholder-shown:left-3.5 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-[13px] peer-placeholder-shown:text-slate-400 peer-placeholder-shown:font-medium
+                                 peer-focus:top-0 peer-focus:left-3 peer-focus:-translate-y-1/2 peer-focus:text-[11px] peer-focus:text-[#1a73e8] peer-focus:font-bold"
+                    >
+                      তারিখ
+                    </label>
                   </div>
                 </div>
 
                 <div className="flex gap-2 pt-2">
                   <button type="button" onClick={() => setIsTxModalOpen(false)} className="flex-1 py-3 bg-slate-100 text-slate-500 font-bold text-xs rounded-xl hover:bg-slate-200 transition-colors">বাতিল</button>
-                  <button type="submit" className="flex-1 py-3 bg-[#1a73e8] text-white font-bold text-xs rounded-xl hover:bg-blue-700 transition-colors shadow-sm">নিশ্চিত করুন</button>
+                  <button type="submit" className="flex-1 py-3 bg-[#1a73e8] text-white font-bold text-xs rounded-[12px] hover:bg-blue-700 transition-colors shadow-sm">নিশ্চিত করুন</button>
                 </div>
               </form>
             </div>
@@ -4983,14 +5262,46 @@ const BudgetManager: React.FC<{ expenses: any[]; user: any }> = ({ expenses, use
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[1000] flex items-center justify-center p-4">
           <div className="bg-white rounded-[24px] w-full max-w-[320px] p-5 shadow-2xl relative text-left animate-in zoom-in-95 duration-200 flex flex-col">
             <h3 className="text-[17px] font-bold text-slate-800 text-center mb-4">ঋণ বা খরচের বাজেট লিমিট</h3>
-            <form onSubmit={handleSaveBudget} className="space-y-3">
-              <div>
-                <label className="text-[11px] font-bold text-slate-500 block mb-1.5 ml-1">খাত / ক্যাটাগরি</label>
-                <input required type="text" value={budCategory} onChange={e => setBudCategory(e.target.value)} placeholder="যেমন: বাজার, যাতায়াত" className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-[12px] outline-none focus:border-[#1a73e8] focus:ring-1 focus:ring-[#1a73e8] font-semibold text-slate-800 text-[14px]" />
+            <form onSubmit={handleSaveBudget} className="space-y-4 pt-1.5">
+              <div className="relative text-left">
+                <input 
+                  required 
+                  id="budget-category-input"
+                  type="text" 
+                  value={budCategory} 
+                  onChange={e => setBudCategory(e.target.value)} 
+                  placeholder=" " 
+                  className="peer w-full px-3.5 py-3 bg-transparent border border-slate-200 focus:border-[#1a73e8] focus:ring-1 focus:ring-[#1a73e8] rounded-[14px] outline-none font-bold text-slate-800 text-sm transition shadow-xs" 
+                />
+                <label 
+                  htmlFor="budget-category-input"
+                  className="absolute bg-white px-1 transition-all duration-200 cursor-text
+                             top-0 left-3 -translate-y-1/2 text-[11px] text-slate-400 font-bold
+                             peer-placeholder-shown:top-1/2 peer-placeholder-shown:left-3.5 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-[13px] peer-placeholder-shown:text-slate-400 peer-placeholder-shown:font-medium
+                             peer-focus:top-0 peer-focus:left-3 peer-focus:-translate-y-1/2 peer-focus:text-[11px] peer-focus:text-[#1a73e8] peer-focus:font-bold"
+                >
+                  খাত / ক্যাটাগরি
+                </label>
               </div>
-              <div>
-                <label className="text-[11px] font-bold text-slate-500 block mb-1.5 ml-1">বাজেট পরিমাণ</label>
-                <input required type="number" value={budLimit} onChange={e => setBudLimit(e.target.value)} placeholder="সর্বোচ্চ টাকা লিমিট" className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-[12px] outline-none focus:border-[#1a73e8] focus:ring-1 focus:ring-[#1a73e8] font-bold text-slate-800 text-[15px]" />
+              <div className="relative text-left">
+                <input 
+                  required 
+                  id="budget-limit-input"
+                  type="number" 
+                  value={budLimit} 
+                  onChange={e => setBudLimit(e.target.value)} 
+                  placeholder=" " 
+                  className="peer w-full px-3.5 py-3 bg-transparent border border-slate-200 focus:border-[#1a73e8] focus:ring-1 focus:ring-[#1a73e8] rounded-[14px] outline-none font-bold text-slate-800 text-sm transition shadow-xs" 
+                />
+                <label 
+                  htmlFor="budget-limit-input"
+                  className="absolute bg-white px-1 transition-all duration-200 cursor-text
+                             top-0 left-3 -translate-y-1/2 text-[11px] text-slate-400 font-bold
+                             peer-placeholder-shown:top-1/2 peer-placeholder-shown:left-3.5 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-[13px] peer-placeholder-shown:text-slate-400 peer-placeholder-shown:font-medium
+                             peer-focus:top-0 peer-focus:left-3 peer-focus:-translate-y-1/2 peer-focus:text-[11px] peer-focus:text-[#1a73e8] peer-focus:font-bold"
+                >
+                  বাজেট পরিমাণ
+                </label>
               </div>
               <div className="flex gap-2 pt-2">
                 <button type="button" onClick={() => setBudgetModalOpen(false)} className="flex-1 py-2.5 bg-slate-100 text-slate-600 font-bold text-[14px] rounded-[12px] hover:bg-slate-200 transition-colors">বাতিল</button>
@@ -5165,24 +5476,71 @@ const TasksManager: React.FC<{ expenses: any[]; user: any }> = ({ expenses, user
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[1000] flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative text-left animate-in zoom-in-95 duration-150 h-[calc(100vh-2rem)] sm:h-auto overflow-y-auto">
             <h3 className="text-base font-bold text-slate-800 text-center mb-4">নতুন খরচ বা ডিল যোগ</h3>
-            <form onSubmit={handleAddTask} className="space-y-3.5">
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 block mb-1">কাজের নাম</label>
-                <input required type="text" value={taskTitle} onChange={e => setTaskTitle(e.target.value)} placeholder="যেমন: বাড়ি ভাড়া পরিশোধ করা" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-[#1a73e8] font-bold text-slate-800 text-xs" />
+            <form onSubmit={handleAddTask} className="space-y-4 pt-1.5">
+              <div className="relative text-left">
+                <input 
+                  required 
+                  id="task-title-input"
+                  type="text" 
+                  value={taskTitle} 
+                  onChange={e => setTaskTitle(e.target.value)} 
+                  placeholder=" " 
+                  className="peer w-full px-3.5 py-3 bg-transparent border border-slate-200 focus:border-[#1a73e8] focus:ring-1 focus:ring-[#1a73e8] rounded-[14px] outline-none font-bold text-slate-800 text-sm transition shadow-xs" 
+                />
+                <label 
+                  htmlFor="task-title-input"
+                  className="absolute bg-white px-1 transition-all duration-200 cursor-text
+                             top-0 left-3 -translate-y-1/2 text-[11px] text-slate-400 font-bold
+                             peer-placeholder-shown:top-1/2 peer-placeholder-shown:left-3.5 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-[13px] peer-placeholder-shown:text-slate-400 peer-placeholder-shown:font-medium
+                             peer-focus:top-0 peer-focus:left-3 peer-focus:-translate-y-1/2 peer-focus:text-[11px] peer-focus:text-[#1a73e8] peer-focus:font-bold"
+                >
+                  কাজের নাম
+                </label>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 block mb-1">সম্ভাব্য খরচ</label>
-                  <input type="number" value={taskAmount} onChange={e => setTaskAmount(e.target.value)} placeholder="ঐচ্ছিক" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-[#1a73e8] font-bold text-slate-800 text-xs" />
+              <div className="grid grid-cols-2 gap-3.5">
+                <div className="relative text-left">
+                  <input 
+                    id="task-amount-input"
+                    type="number" 
+                    value={taskAmount} 
+                    onChange={e => setTaskAmount(e.target.value)} 
+                    placeholder=" " 
+                    className="peer w-full px-3.5 py-3 bg-transparent border border-slate-200 focus:border-[#1a73e8] focus:ring-1 focus:ring-[#1a73e8] rounded-[14px] outline-none font-bold text-slate-800 text-sm transition shadow-xs" 
+                  />
+                  <label 
+                    htmlFor="task-amount-input"
+                    className="absolute bg-white px-1 transition-all duration-200 cursor-text
+                               top-0 left-3 -translate-y-1/2 text-[11px] text-slate-400 font-bold
+                               peer-placeholder-shown:top-1/2 peer-placeholder-shown:left-3.5 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-[13px] peer-placeholder-shown:text-slate-400 peer-placeholder-shown:font-medium
+                               peer-focus:top-0 peer-focus:left-3 peer-focus:-translate-y-1/2 peer-focus:text-[11px] peer-focus:text-[#1a73e8] peer-focus:font-bold"
+                  >
+                    সম্ভাব্য খরচ (ঐচ্ছিক)
+                  </label>
                 </div>
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 block mb-1">টার্গেট ডেট</label>
-                  <input required type="date" value={taskDate} onChange={e => setTaskDate(e.target.value)} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-[#1a73e8] font-bold text-slate-800 text-xs" />
+                <div className="relative text-left">
+                  <input 
+                    required 
+                    id="task-date-input"
+                    type="date" 
+                    value={taskDate} 
+                    onChange={e => setTaskDate(e.target.value)} 
+                    placeholder=" " 
+                    className="peer w-full px-3.5 py-3 bg-transparent border border-slate-200 focus:border-[#1a73e8] focus:ring-1 focus:ring-[#1a73e8] rounded-[14px] outline-none font-bold text-slate-800 text-sm transition shadow-xs" 
+                  />
+                  <label 
+                    htmlFor="task-date-input"
+                    className="absolute bg-white px-1 transition-all duration-200 cursor-text
+                               top-0 left-3 -translate-y-1/2 text-[11px] text-slate-400 font-bold
+                               peer-placeholder-shown:top-1/2 peer-placeholder-shown:left-3.5 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-[13px] peer-placeholder-shown:text-slate-400 peer-placeholder-shown:font-medium
+                               peer-focus:top-0 peer-focus:left-3 peer-focus:-translate-y-1/2 peer-focus:text-[11px] peer-focus:text-[#1a73e8] peer-focus:font-bold"
+                  >
+                    টার্গেট ডেট
+                  </label>
                 </div>
               </div>
               <div className="flex gap-2 pt-2">
                 <button type="button" onClick={() => setTaskModalOpen(false)} className="flex-1 py-3 bg-slate-100 text-slate-500 font-bold text-xs rounded-xl hover:bg-slate-200 transition-colors">বাতিল</button>
-                <button type="submit" className="flex-1 py-3 bg-[#1a73e8] text-white font-bold text-xs rounded-xl hover:bg-blue-700 transition-colors shadow-sm">কাজ যোগ</button>
+                <button type="submit" className="flex-1 py-3 bg-[#1a73e8] text-white font-bold text-xs rounded-[12px] hover:bg-blue-700 transition-colors shadow-sm">কাজ যোগ</button>
               </div>
             </form>
           </div>
