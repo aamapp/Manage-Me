@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Receipt, Plus, Search, Tag, X, ShoppingCart, Loader2, Trash2, MoreVertical, Pencil, SquarePen, Calculator, CalendarDays, Download, Filter, Music, Share2, ExternalLink, Copy, AlertCircle, Banknote, ArrowRightLeft, ArrowDown, ArrowUp, Users, MapPin, Phone, User as UserIcon, Calendar, ImagePlus, DollarSign, FileText, ArrowLeft, ArrowUpDown, TrendingUp, ListChecks, Check, Network, Shapes, Wallet, ChevronDown } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Receipt, Plus, Search, Tag, X, ShoppingCart, Loader2, Trash2, MoreVertical, Pencil, SquarePen, Calculator, CalendarDays, Download, Filter, Music, Share2, ExternalLink, Copy, AlertCircle, Banknote, ArrowLeftRight, ArrowRightLeft, ArrowDown, ArrowUp, Users, MapPin, Phone, User as UserIcon, Calendar, ImagePlus, DollarSign, FileText, ArrowLeft, ArrowUpDown, TrendingUp, ListChecks, Check, Network, Shapes, Wallet, ChevronDown, ArrowDownUp, ListTodo, Spline, ChartSpline } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { EXPENSE_CATEGORY_LABELS, APP_NAME } from '../constants';
@@ -34,21 +35,317 @@ export const Expenses: React.FC = () => {
   // Use cached expenses and incomes from AppContext
   const { user, showToast, adminSelectedUserId, expenses, setExpenses, refreshData, isOnline, incomeRecords, projects } = useAppContext();
   const location = useLocation();
+  const navigate = useNavigate();
   const [isModalOpen, setModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'expenses' | 'dues' | 'budget' | 'savings' | 'reports' | 'tasks' | 'wallet'>('expenses');
+  const [activeTabState, setActiveTabState] = useState<'expenses' | 'dues' | 'savings' | 'reports' | 'tasks' | 'wallet'>('expenses');
+  const [direction, setDirection] = useState(0);
+  const [isSwiping, setIsSwiping] = useState(false);
+  const [swipeOffset, setSwipeOffset] = useState(0);
 
-  // Floating Action Button visibility based on scroll direction (optimized with direct DOM ref to run at 60fps without React lagging)
-  const fabRef = useRef<HTMLButtonElement>(null);
-  const isFabVisibleRef = useRef(true);
-  const lastScrollY = useRef(0);
+  const tabs = useMemo<('expenses' | 'dues' | 'savings' | 'reports' | 'tasks' | 'wallet')[]>(
+    () => ['expenses', 'dues', 'reports', 'savings', 'tasks', 'wallet'],
+    []
+  );
 
-  const setFabVisibleDirectly = (visible: boolean) => {
-    if (isFabVisibleRef.current === visible) return;
-    isFabVisibleRef.current = visible;
+  const tabsContainerRef = useRef<HTMLDivElement>(null);
+  const containerWidthRef = useRef<number>(448);
+  const screenWidthRef = useRef<number>(window.innerWidth);
+
+  useEffect(() => {
+    const updateWidths = () => {
+      if (tabsContainerRef.current) {
+        containerWidthRef.current = tabsContainerRef.current.offsetWidth;
+      }
+      screenWidthRef.current = window.innerWidth;
+    };
     
-    const el = fabRef.current;
+    updateWidths();
+    // Use a small delay to make sure layout has settled and offsetWidth is accurate
+    const timer = setTimeout(updateWidths, 100);
+    
+    window.addEventListener('resize', updateWidths);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', updateWidths);
+    };
+  }, []);
+
+  const getIndicatorLeft = () => {
+    const currentIndex = tabs.indexOf(activeTabState);
+    const containerWidth = containerWidthRef.current || 448;
+    const D = (containerWidth - 76) / 5;
+    
+    let left = 24.5 + currentIndex * D;
+    
+    if (isSwiping) {
+      const swWidth = screenWidthRef.current || window.innerWidth;
+      const ratio = swipeOffset / swWidth;
+      left += ratio * D;
+    }
+    
+    const minLeft = 24.5;
+    const maxLeft = 24.5 + 5 * D;
+    return Math.max(minLeft, Math.min(maxLeft, left));
+  };
+
+  const setActiveTab = (newTab: 'expenses' | 'dues' | 'savings' | 'reports' | 'tasks' | 'wallet') => {
+    const tabs: ('expenses' | 'dues' | 'savings' | 'reports' | 'tasks' | 'wallet')[] = [
+      'expenses',
+      'dues',
+      'reports',
+      'savings',
+      'tasks',
+      'wallet'
+    ];
+    const currentIndex = tabs.indexOf(activeTabState);
+    const newIndex = tabs.indexOf(newTab);
+    if (currentIndex !== -1 && newIndex !== -1) {
+      setDirection(newIndex > currentIndex ? 1 : -1);
+    }
+    setActiveTabState(newTab);
+    
+    // Force a fresh calculation of current container width to align properly when tab changes
+    if (tabsContainerRef.current) {
+      containerWidthRef.current = tabsContainerRef.current.offsetWidth;
+    }
+  };
+
+  const activeTab = activeTabState;
+
+  const slideVariants = {
+    enter: (dir: number) => ({
+      x: dir > 0 ? 120 : dir < 0 ? -120 : 0,
+      opacity: 0,
+    }),
+    center: {
+      x: 0,
+      opacity: 1,
+      transition: {
+        x: { type: "spring" as const, stiffness: 350, damping: 30 },
+        opacity: { duration: 0.18 }
+      }
+    },
+    exit: (dir: number) => ({
+      x: dir < 0 ? 120 : dir > 0 ? -120 : 0,
+      opacity: 0,
+      transition: {
+        x: { type: "spring" as const, stiffness: 350, damping: 30 },
+        opacity: { duration: 0.15 }
+      }
+    })
+  };
+
+  // Touch & Mouse Swipe Gesture Handlers for changing tabs (with click-capture to prevent accidental presses during horizontal drag)
+  const swipeOccurred = useRef(false);
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
+  const touchStartTime = useRef<number>(0);
+  
+  const mouseStartX = useRef<number | null>(null);
+  const mouseStartY = useRef<number | null>(null);
+  const mouseStartTime = useRef<number>(0);
+  const isMouseDown = useRef(false);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const target = e.target as HTMLElement;
+    // Don't swipe on inputs, text areas, dropdowns, modals, custom sliders OR the main FAB
+    if (
+      target.tagName === 'INPUT' || 
+      target.tagName === 'TEXTAREA' || 
+      target.tagName === 'SELECT' || 
+      target.closest('[role="dialog"]') ||
+      target.closest('.keypad-container') ||
+      target.closest('.no-swipe') ||
+      (mainFabRef.current && mainFabRef.current.contains(target))
+    ) {
+      return;
+    }
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+    touchStartTime.current = Date.now();
+    swipeOccurred.current = false;
+    
+    if (tabsContainerRef.current) {
+      containerWidthRef.current = tabsContainerRef.current.offsetWidth;
+    }
+    screenWidthRef.current = window.innerWidth;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStartX.current === null || touchStartY.current === null) return;
+    
+    const currentX = e.touches[0].clientX;
+    const currentY = e.touches[0].clientY;
+    
+    const diffX = touchStartX.current - currentX;
+    const diffY = touchStartY.current - currentY;
+    
+    // Lock into horizontal swipe if horizontal movement is clearly larger than vertical movement
+    if (!isSwiping && Math.abs(diffX) > Math.abs(diffY) * 1.05 && Math.abs(diffX) > 4) {
+      setIsSwiping(true);
+      swipeOccurred.current = true;
+    }
+
+    if (isSwiping) {
+      if (e.cancelable) {
+        e.preventDefault();
+      }
+      
+      // Add boundaries resistance/elasticity so user cannot swipe past first/last tab infinitely
+      const currentIndex = tabs.indexOf(activeTab);
+      let offset = diffX;
+      
+      if (currentIndex === 0 && diffX < 0) {
+        offset = diffX * 0.15; // Higher elasticity at start boundary
+      } else if (currentIndex === tabs.length - 1 && diffX > 0) {
+        offset = diffX * 0.15; // Higher elasticity at end boundary
+      }
+      
+      setSwipeOffset(offset);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (isSwiping) {
+      const duration = Date.now() - touchStartTime.current || 1;
+      const velocity = swipeOffset / duration; // Switch fast if user flicks
+      
+      const threshold = 15; // Effortless 15px static threshold
+      const velocityThreshold = 0.08; // Super sensitive flick speed
+      
+      const currentIndex = tabs.indexOf(activeTab);
+      let targetIndex = currentIndex;
+      
+      if ((swipeOffset > threshold || velocity > velocityThreshold) && currentIndex < tabs.length - 1) {
+        targetIndex = currentIndex + 1;
+      } else if ((swipeOffset < -threshold || velocity < -velocityThreshold) && currentIndex > 0) {
+        targetIndex = currentIndex - 1;
+      }
+      
+      setActiveTab(tabs[targetIndex]);
+      
+      setTimeout(() => {
+        swipeOccurred.current = false;
+      }, 50);
+    }
+    
+    setIsSwiping(false);
+    setSwipeOffset(0);
+    touchStartX.current = null;
+    touchStartY.current = null;
+  };
+
+  // Dragging support for mouse gesture (PC/Desktop drag-to-scroll/swipe)
+  const handleMouseDown = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    // Don't swipe on inputs, text areas, dropdowns, modals, custom sliders, scrollbars OR the main FAB
+    if (
+      target.tagName === 'INPUT' || 
+      target.tagName === 'TEXTAREA' || 
+      target.tagName === 'SELECT' || 
+      target.closest('[role="dialog"]') ||
+      target.closest('.keypad-container') ||
+      target.closest('.no-swipe') ||
+      (mainFabRef.current && mainFabRef.current.contains(target))
+    ) {
+      return;
+    }
+    isMouseDown.current = true;
+    mouseStartX.current = e.clientX;
+    mouseStartY.current = e.clientY;
+    mouseStartTime.current = Date.now();
+    swipeOccurred.current = false;
+    
+    if (tabsContainerRef.current) {
+      containerWidthRef.current = tabsContainerRef.current.offsetWidth;
+    }
+    screenWidthRef.current = window.innerWidth;
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isMouseDown.current || mouseStartX.current === null || mouseStartY.current === null) return;
+    
+    const currentX = e.clientX;
+    const currentY = e.clientY;
+    
+    const diffX = mouseStartX.current - currentX;
+    const diffY = mouseStartY.current - currentY;
+    
+    if (!isSwiping && Math.abs(diffX) > Math.abs(diffY) * 1.05 && Math.abs(diffX) > 4) {
+      setIsSwiping(true);
+      swipeOccurred.current = true;
+    }
+
+    if (isSwiping) {
+      const currentIndex = tabs.indexOf(activeTab);
+      let offset = diffX;
+      
+      if (currentIndex === 0 && diffX < 0) {
+        offset = diffX * 0.15;
+      } else if (currentIndex === tabs.length - 1 && diffX > 0) {
+        offset = diffX * 0.15;
+      }
+      
+      setSwipeOffset(offset);
+    }
+  };
+
+  const handleMouseUp = () => {
+    if (isMouseDown.current) {
+      if (isSwiping) {
+        const duration = Date.now() - mouseStartTime.current || 1;
+        const velocity = swipeOffset / duration;
+        
+        const threshold = 15; // Effortless 15px threshold
+        const velocityThreshold = 0.08; // High sensitivity flick velocity
+        
+        const currentIndex = tabs.indexOf(activeTab);
+        let targetIndex = currentIndex;
+        
+        if ((swipeOffset > threshold || velocity > velocityThreshold) && currentIndex < tabs.length - 1) {
+          targetIndex = currentIndex + 1;
+        } else if ((swipeOffset < -threshold || velocity < -velocityThreshold) && currentIndex > 0) {
+          targetIndex = currentIndex - 1;
+        }
+        
+        setActiveTab(tabs[targetIndex]);
+        
+        setTimeout(() => {
+          swipeOccurred.current = false;
+        }, 50);
+      }
+    }
+    
+    isMouseDown.current = false;
+    setIsSwiping(false);
+    setSwipeOffset(0);
+    mouseStartX.current = null;
+    mouseStartY.current = null;
+  };
+
+  const handleClickCapture = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (mainFabRef.current && mainFabRef.current.contains(target)) {
+      return;
+    }
+    if (swipeOccurred.current) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+  };
+
+  // Floating Action Button helpers for the global viewport-level FAB
+  const mainFabRef = useRef<HTMLButtonElement>(null);
+  const isMainFabVisibleRef = useRef(true);
+  const lastGlobalScrollY = useRef(0);
+
+  const setMainFabVisibleDirectly = (visible: boolean) => {
+    if (isMainFabVisibleRef.current === visible) return;
+    isMainFabVisibleRef.current = visible;
+    
+    const el = mainFabRef.current;
     if (!el) return;
     
     if (visible) {
@@ -63,81 +360,80 @@ export const Expenses: React.FC = () => {
   };
 
   useEffect(() => {
-    lastScrollY.current = window.scrollY;
-    let lastTouchY = 0;
+    // Reset FAB visibility to visible on mount or tab change
+    isMainFabVisibleRef.current = true;
+    if (mainFabRef.current) {
+      mainFabRef.current.style.opacity = '1';
+      mainFabRef.current.style.transform = 'translateY(0) scale(1)';
+      mainFabRef.current.style.pointerEvents = 'auto';
+    }
+
+    lastGlobalScrollY.current = window.scrollY;
     
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
-      const diffScrollY = currentScrollY - lastScrollY.current;
+      const diffScrollY = currentScrollY - lastGlobalScrollY.current;
       
-      if (diffScrollY > 0) {
-        setFabVisibleDirectly(false);
-      } else if (diffScrollY < 0) {
-        setFabVisibleDirectly(true);
+      // Use a delta threshold of 10px to avoid micro-scroll sensitivity
+      if (Math.abs(diffScrollY) > 10) {
+        if (diffScrollY > 0) {
+          setMainFabVisibleDirectly(false);
+        } else if (diffScrollY < 0) {
+          setMainFabVisibleDirectly(true);
+        }
+        lastGlobalScrollY.current = currentScrollY;
       }
       
-      // Always show when close to the top
+      // Always show when close to top
       if (currentScrollY < 30) {
-        setFabVisibleDirectly(true);
-      }
-      
-      lastScrollY.current = currentScrollY;
-    };
-
-    const handleTouchStart = (e: TouchEvent) => {
-      if (e.touches && e.touches.length > 0) {
-        lastTouchY = e.touches[0].clientY;
-      }
-    };
-
-    const handleTouchMove = (e: TouchEvent) => {
-      if (!e.touches || e.touches.length === 0) return;
-      
-      const currentY = e.touches[0].clientY;
-      const diffY = currentY - lastTouchY;
-      
-      // finger moved UP (scrolling DOWN) -> Hide FAB instantly
-      if (diffY < 0) {
-        setFabVisibleDirectly(false);
-      } 
-      // finger moved DOWN (scrolling UP) -> Show FAB instantly
-      else if (diffY > 0) {
-        setFabVisibleDirectly(true);
-      }
-      
-      lastTouchY = currentY;
-      
-      // Always show when close to the top
-      if (window.scrollY < 30) {
-        setFabVisibleDirectly(true);
-      }
-    };
-
-    const handleWheel = (e: WheelEvent) => {
-      if (e.deltaY > 0) {
-        setFabVisibleDirectly(false);
-      } else if (e.deltaY < 0) {
-        setFabVisibleDirectly(true);
-      }
-      
-      // Always show when close to the top
-      if (window.scrollY < 30) {
-        setFabVisibleDirectly(true);
+        setMainFabVisibleDirectly(true);
       }
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
-    window.addEventListener('touchstart', handleTouchStart, { passive: true });
-    window.addEventListener('touchmove', handleTouchMove, { passive: true });
-    window.addEventListener('wheel', handleWheel, { passive: true });
 
     return () => {
       window.removeEventListener('scroll', handleScroll);
-      window.removeEventListener('touchstart', handleTouchStart);
-      window.removeEventListener('touchmove', handleTouchMove);
-      window.removeEventListener('wheel', handleWheel);
     };
-  }, []);
+  }, [activeTab]);
+
+  const getFabColor = () => {
+    switch (activeTab) {
+      case 'dues':
+        return 'bg-teal-600 hover:bg-teal-700 shadow-teal-100';
+      case 'savings':
+        return 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100';
+      case 'tasks':
+        return 'bg-[#1a73e8] hover:bg-blue-700 shadow-blue-100';
+      case 'wallet':
+        return 'bg-[#1a73e8] hover:bg-blue-700 shadow-blue-100';
+      default:
+        return 'bg-[#1a73e8] hover:bg-blue-700 shadow-blue-100';
+    }
+  };
+
+  const getFabTitle = () => {
+    switch (activeTab) {
+      case 'dues':
+        return 'নতুন দেনাদার/পাওনাদার';
+      case 'savings':
+        return 'নতুন লক্ষ্য';
+      case 'tasks':
+        return 'নতুন কাজ';
+      case 'wallet':
+        return 'নতুন ওয়ালেট';
+      default:
+        return 'নতুন লেনদেন';
+    }
+  };
+
+  const handleFabClick = () => {
+    if (activeTab === 'expenses') {
+      handleOpenAddModal();
+    } else {
+      window.dispatchEvent(new CustomEvent('open-add-modal', { detail: { tab: activeTab } }));
+    }
+  };
 
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -257,7 +553,7 @@ export const Expenses: React.FC = () => {
         const targetWallet = currentWallets[targetIdx];
         const newBalance = Number(targetWallet.balance || 0) + changeAmount;
         targetWallet.balance = newBalance;
-        targetWallet.lastTransactionDate = new Date().toLocaleDateString('bn-BD');
+        targetWallet.lastTransactionDate = new Date().toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' });
         
         setWallets(currentWallets);
         localStorage.setItem(`manage_me_wallets_${user.id}`, JSON.stringify(currentWallets));
@@ -276,15 +572,17 @@ export const Expenses: React.FC = () => {
           name: walletName,
           balance: changeAmount,
           isDefault: walletName === 'ক্যাশ',
-          lastTransactionDate: new Date().toISOString(),
+          lastTransactionDate: new Date().toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' }),
           userid: user.id,
           createdAt: new Date().toISOString()
         };
         const updated = [...currentWallets, newWallet];
         setWallets(updated);
         localStorage.setItem(`manage_me_wallets_${user.id}`, JSON.stringify(updated));
+        
         await supabase.from('wallets').upsert([newWallet]);
       }
+      window.dispatchEvent(new CustomEvent('wallets-updated'));
     } catch (err) {
       console.warn("Error adjusting wallet balance:", err);
     }
@@ -294,7 +592,7 @@ export const Expenses: React.FC = () => {
     if (user) {
       fetchWallets();
     }
-  }, [user]);
+  }, [user, activeTab, isModalOpen]);
 
   // Bangla Formatter helpers
   const toBanglaNumbers = (num: string | number): string => {
@@ -323,10 +621,16 @@ export const Expenses: React.FC = () => {
     }
   };
 
-  const formatTimeToBangla = (dateStr: string): string => {
+  const formatTimeToBangla = (dateStr: string, createdAtStr?: string): string => {
     if (!dateStr) return '';
     try {
-      const dateObj = new Date(dateStr);
+      let dateObj = new Date(dateStr);
+      if (createdAtStr) {
+        const testObj = new Date(createdAtStr);
+        if (!isNaN(testObj.getTime())) {
+          dateObj = testObj;
+        }
+      }
       if (isNaN(dateObj.getTime())) return '';
       
       let hours = dateObj.getHours();
@@ -428,8 +732,7 @@ export const Expenses: React.FC = () => {
 
   const handleOpenAddModal = () => {
     if (!isOnline) {
-      showToast('অফলাইনে নতুন লেনদেন যোগ করা যাবে না', 'error');
-      return;
+      showToast('অফলাইন মোডে আছেন। নতুন লেনদেন পরবর্তীতে সিঙ্ক হতে পারে।', 'info');
     }
     const now = new Date();
     const y = now.getFullYear();
@@ -786,13 +1089,14 @@ export const Expenses: React.FC = () => {
 
     const incomeSum = filteredIncomes.reduce((s, i) => s + i.amount, 0);
     const expenseSum = filteredExp.reduce((s, e) => s + e.amount, 0);
+    const walletsTotal = wallets.reduce((s, w) => s + (w.balance || 0), 0);
 
     return {
       income: incomeSum,
       expense: expenseSum,
-      balance: incomeSum - expenseSum
+      balance: wallets.length > 0 ? walletsTotal : (incomeSum - expenseSum)
     };
-  }, [expenses, incomeRecords, statsFilter, user, adminSelectedUserId]);
+  }, [expenses, incomeRecords, statsFilter, user, adminSelectedUserId, wallets]);
 
   // 2. Compute Filtered Ledger Transactions (With combined Search & Range Filters)
   const unifiedTransactions = useMemo(() => {
@@ -1088,180 +1392,180 @@ export const Expenses: React.FC = () => {
   };
 
   return (
-    <div className="space-y-3 animate-in fade-in duration-300">
+    <>
+    <div 
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
+      onClickCapture={handleClickCapture}
+      className="space-y-3 animate-in fade-in duration-300 overflow-x-clip"
+    >
       {/* 6-Icon Navigation Tabs */}
-      <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md py-2 px-1 text-slate-800 w-full max-w-lg mx-auto select-none border-b border-slate-100/80 shadow-[0_4px_12px_rgba(0,0,0,0.02)]">
-        <div className="flex items-center justify-around w-full gap-0.5">
+      <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md pt-2 text-slate-800 border-b border-slate-200 shadow-[0_4px_12px_rgba(0,0,0,0.02)] select-none">
+        <div ref={tabsContainerRef} className="flex items-center justify-between w-full max-w-md mx-auto px-4 relative">
           {/* Tab 1: Expenses / Dashboard / লেনদেন */}
           <button
             onClick={() => setActiveTab('expenses')}
             title="লেনদেন / ড্যাশবোর্ড"
-            className="flex flex-col items-center flex-1 cursor-pointer group focus:outline-none"
+            className="flex flex-col items-center w-[44px] cursor-pointer group focus:outline-none pb-2 relative"
           >
             <div
-              className={`w-[28px] h-[28px] rounded-[8px] flex items-center justify-center transition-all border relative ${
+              className={`w-[27px] h-[27px] rounded-[8px] flex items-center justify-center transition-all border relative ${
                 activeTab === 'expenses'
-                  ? 'border-[#1a73e8] text-[#1a73e8] bg-white shadow-sm'
+                  ? 'border-[#1a73e8] text-white bg-[#1a73e8] shadow-xs'
                   : 'border-[#cdd5de] text-[#8e9aa8] hover:border-slate-300 hover:text-slate-600 bg-white'
               }`}
             >
-              <ArrowRightLeft size={13} />
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M20 9H4l4.5-4.5" />
+                <path d="M4 15h16l-4.5 4.5" />
+              </svg>
             </div>
-            {activeTab === 'expenses' ? (
-              <div className="w-4 h-[2px] bg-[#1a73e8] rounded-full mt-0.5 animate-in fade-in zoom-in-95 duration-200" />
-            ) : (
-              <div className="w-4 h-[2px] bg-transparent rounded-full mt-0.5" />
-            )}
           </button>
 
           {/* Tab 2: Dues / লেনা-দেনা */}
           <button
             onClick={() => setActiveTab('dues')}
             title="লেনা-দেনা / দেনা-পাওনা"
-            className="flex flex-col items-center flex-1 cursor-pointer group focus:outline-none"
+            className="flex flex-col items-center w-[44px] cursor-pointer group focus:outline-none pb-2 relative"
           >
             <div
-              className={`w-[28px] h-[28px] rounded-[8px] flex items-center justify-center transition-all border relative ${
+              className={`w-[27px] h-[27px] rounded-[8px] flex items-center justify-center transition-all border relative ${
                 activeTab === 'dues'
-                  ? 'border-[#1a73e8] text-[#1a73e8] bg-white shadow-sm'
+                  ? 'border-[#1a73e8] text-white bg-[#1a73e8] shadow-xs'
                   : 'border-[#cdd5de] text-[#8e9aa8] hover:border-slate-300 hover:text-slate-600 bg-white'
               }`}
             >
-              <ArrowUpDown size={13} />
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M9 4v16l-4.5-4.5" />
+                <path d="M15 20V4l4.5 4.5" />
+              </svg>
             </div>
-            {activeTab === 'dues' ? (
-              <div className="w-4 h-[2px] bg-[#1a73e8] rounded-full mt-0.5 animate-in fade-in zoom-in-95 duration-200" />
-            ) : (
-              <div className="w-4 h-[2px] bg-transparent rounded-full mt-0.5" />
-            )}
           </button>
 
-          {/* Tab 3: Budget / বাজেট */}
+          {/* Tab 5: Reports / বাজেট ও রিপোর্ট */}
           <button
-            onClick={() => setActiveTab('budget')}
-            title="বাজেট"
-            className="flex flex-col items-center flex-1 cursor-pointer group focus:outline-none"
+            onClick={() => setActiveTab('reports')}
+            title="বজেট"
+            className="flex flex-col items-center w-[44px] cursor-pointer group focus:outline-none pb-2 relative"
           >
             <div
-              className={`w-[28px] h-[28px] rounded-[8px] flex items-center justify-center transition-all border relative ${
-                activeTab === 'budget'
-                  ? 'border-[#1a73e8] text-[#1a73e8] bg-white shadow-sm'
+              className={`w-[27px] h-[27px] rounded-[8px] flex items-center justify-center transition-all border relative ${
+                activeTab === 'reports'
+                  ? 'border-[#1a73e8] text-white bg-[#1a73e8] shadow-xs'
                   : 'border-[#cdd5de] text-[#8e9aa8] hover:border-slate-300 hover:text-slate-600 bg-white'
               }`}
             >
-              <Receipt size={13} />
+              <svg
+                width="16.5"
+                height="16.5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M 5.5 14.5 C 8 11.5, 9.5 9.5, 11.5 9.5 C 13.5 9.5, 14.5 14.5, 16.5 14.5 C 18 14.5, 19 13, 20 12" />
+              </svg>
             </div>
-            {activeTab === 'budget' ? (
-              <div className="w-4 h-[2px] bg-[#1a73e8] rounded-full mt-0.5 animate-in fade-in zoom-in-95 duration-200" />
-            ) : (
-              <div className="w-4 h-[2px] bg-transparent rounded-full mt-0.5" />
-            )}
           </button>
 
           {/* Tab 4: Savings / সঞ্চয় ও লক্ষ্য */}
           <button
             onClick={() => setActiveTab('savings')}
             title="সঞ্চয় ও লক্ষ্য"
-            className="flex flex-col items-center flex-1 cursor-pointer group focus:outline-none"
+            className="flex flex-col items-center w-[44px] cursor-pointer group focus:outline-none pb-2 relative"
           >
             <div
-              className={`w-[28px] h-[28px] rounded-[8px] flex items-center justify-center transition-all border relative ${
+              className={`w-[27px] h-[27px] rounded-[8px] flex items-center justify-center transition-all border relative ${
                 activeTab === 'savings'
-                  ? 'border-[#1a73e8] text-[#1a73e8] bg-white shadow-sm'
+                  ? 'border-[#1a73e8] text-white bg-[#1a73e8] shadow-xs'
                   : 'border-[#cdd5de] text-[#8e9aa8] hover:border-slate-300 hover:text-slate-600 bg-white'
               }`}
             >
-              <Plus size={13} />
+              <Plus size={14} strokeWidth={2.4} />
             </div>
-            {activeTab === 'savings' ? (
-              <div className="w-4 h-[2px] bg-[#1a73e8] rounded-full mt-0.5 animate-in fade-in zoom-in-95 duration-200" />
-            ) : (
-              <div className="w-4 h-[2px] bg-transparent rounded-full mt-0.5" />
-            )}
-          </button>
-
-          {/* Tab 5: Reports / রিপোর্ট ও চার্ট */}
-          <button
-            onClick={() => setActiveTab('reports')}
-            title="রিপোর্ট ও চার্ট"
-            className="flex flex-col items-center flex-1 cursor-pointer group focus:outline-none"
-          >
-            <div
-              className={`w-[28px] h-[28px] rounded-[8px] flex items-center justify-center transition-all border relative ${
-                activeTab === 'reports'
-                  ? 'border-[#1a73e8] text-[#1a73e8] bg-white shadow-sm'
-                  : 'border-[#cdd5de] text-[#8e9aa8] hover:border-slate-300 hover:text-slate-600 bg-white'
-              }`}
-            >
-              <TrendingUp size={13} />
-            </div>
-            {activeTab === 'reports' ? (
-              <div className="w-4 h-[2px] bg-[#1a73e8] rounded-full mt-0.5 animate-in fade-in zoom-in-95 duration-200" />
-            ) : (
-              <div className="w-4 h-[2px] bg-transparent rounded-full mt-0.5" />
-            )}
           </button>
 
           {/* Tab 6: Tasks / টাস্ক */}
           <button
             onClick={() => setActiveTab('tasks')}
             title="টাস্ক"
-            className="flex flex-col items-center flex-1 cursor-pointer group focus:outline-none"
+            className="flex flex-col items-center w-[44px] cursor-pointer group focus:outline-none pb-2 relative"
           >
             <div
-              className={`w-[28px] h-[28px] rounded-[8px] flex items-center justify-center transition-all border relative ${
+              className={`w-[27px] h-[27px] rounded-[8px] flex items-center justify-center transition-all border relative ${
                 activeTab === 'tasks'
-                  ? 'border-[#1a73e8] text-[#1a73e8] bg-white shadow-sm'
+                  ? 'border-[#1a73e8] text-white bg-[#1a73e8] shadow-xs'
                   : 'border-[#cdd5de] text-[#8e9aa8] hover:border-slate-300 hover:text-slate-600 bg-white'
               }`}
             >
-              <ListChecks size={13} />
+              <ListTodo size={14} strokeWidth={2.4} />
             </div>
-            {activeTab === 'tasks' ? (
-              <div className="w-4 h-[2px] bg-[#1a73e8] rounded-full mt-0.5 animate-in fade-in zoom-in-95 duration-200" />
-            ) : (
-              <div className="w-4 h-[2px] bg-transparent rounded-full mt-0.5" />
-            )}
           </button>
 
           {/* Tab 7: Wallet / ওয়ালেট */}
           <button
             onClick={() => setActiveTab('wallet')}
             title="ওয়ালেট"
-            className="flex flex-col items-center flex-1 cursor-pointer group focus:outline-none"
+            className="flex flex-col items-center w-[44px] cursor-pointer group focus:outline-none pb-2 relative"
           >
             <div
-              className={`w-[28px] h-[28px] rounded-[8px] flex items-center justify-center transition-all border relative ${
+              className={`w-[27px] h-[27px] rounded-[8px] flex items-center justify-center transition-all border relative ${
                 activeTab === 'wallet'
-                  ? 'border-[#1a73e8] text-[#1a73e8] bg-white shadow-sm'
+                  ? 'border-[#1a73e8] text-white bg-[#1a73e8] shadow-xs'
                   : 'border-[#cdd5de] text-[#8e9aa8] hover:border-slate-300 hover:text-slate-600 bg-white'
               }`}
             >
-              <Wallet size={13} />
+              <Wallet size={14} strokeWidth={2.4} />
             </div>
-            {activeTab === 'wallet' ? (
-              <div className="w-4 h-[2px] bg-[#1a73e8] rounded-full mt-0.5 animate-in fade-in zoom-in-95 duration-200" />
-            ) : (
-              <div className="w-4 h-[2px] bg-transparent rounded-full mt-0.5" />
-            )}
           </button>
+
+          {/* Real-time floating active tab indicator line */}
+          <div
+            className="absolute bottom-0 h-[3.5px] bg-[#1a73e8] rounded-t-[3px] pointer-events-none"
+            style={{
+              width: '27px',
+              left: `${getIndicatorLeft()}px`,
+              transition: isSwiping ? 'none' : 'left 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+          />
         </div>
       </div>
 
-      {activeTab === 'wallet' ? (
-        <WalletManager />
-      ) : activeTab === 'dues' ? (
-        <DuesManager />
-      ) : activeTab === 'budget' ? (
-        <BudgetManager expenses={expenses} user={user} />
-      ) : activeTab === 'savings' ? (
-        <SavingsManager />
-      ) : activeTab === 'reports' ? (
-        <ExpenseCategoryReports expenses={expenses} user={user} />
-      ) : activeTab === 'tasks' ? (
-        <TasksManager expenses={expenses} user={user} />
-      ) : (
-        <>
+      <div className="overflow-hidden w-full relative">
+        <div
+          className="flex w-full"
+          style={{
+            transform: `translateX(calc(-${tabs.indexOf(activeTab) * 100}% - ${isSwiping ? swipeOffset : 0}px))`,
+            transition: isSwiping ? 'none' : 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+          }}
+        >
+          {/* Slide 1: Expenses/Dashboard (Index 0) */}
+          <div className="w-full shrink-0 px-3 lg:px-8 pb-4">
           {/* Dynamic Period Stats Card - Unifying Income and Expense */}
           <div className="bg-[#fafbfd] border border-[#e2e7ec]/80 py-3 px-4 rounded-[12px] shadow-[0_2px_8px_rgba(0,0,0,0.02)] w-full max-w-lg mx-auto mb-4 select-none">
             {/* Period Segment Tabs matching the image */}
@@ -1576,7 +1880,7 @@ export const Expenses: React.FC = () => {
                                    {isIncome ? '+' : '-'}
                                  </span>
                                  <span className="text-[10.5px] sm:text-[11px] font-medium text-slate-400">
-                                   {formatTimeToBangla(tx.rawItem.date)}
+                                   {formatTimeToBangla(tx.rawItem.date, tx.rawItem.createdat)}
                                  </span>
                                </div>
                              </div>
@@ -1646,22 +1950,7 @@ export const Expenses: React.FC = () => {
             </div>
           </div>
 
-          {/* Sticky Floating Action Button on Bottom Right */}
-          {!isGeneratingPDF && (
-            <button 
-              ref={fabRef}
-              onClick={handleOpenAddModal}
-              className="fixed bottom-[76px] lg:bottom-8 right-5 lg:right-8 bg-[#1a73e8] hover:bg-blue-700 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg shadow-blue-200 active:scale-95 transition-all duration-[150ms] ease-out z-40 pointer-events-auto opacity-100 scale-100 translate-y-0"
-              style={{
-                willChange: 'transform, opacity',
-              }}
-              title="নতুন লেনদেন"
-            >
-              <Plus size={28} />
-            </button>
-          )}
-        </>
-      )}
+          {/* Sticky Floating Action Button on Bottom Right is now handled globally at parent level */}
 
       <ConfirmModal 
         isOpen={showDeleteModal}
@@ -1995,6 +2284,51 @@ export const Expenses: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+    </div>
+
+          {/* Slide 2: Dues (Index 1) */}
+          <div className="w-full shrink-0 px-3 lg:px-8 pb-4">
+            <DuesManager wallets={wallets} adjustWalletBalance={adjustWalletBalance} />
+          </div>
+
+          {/* Slide 3: Reports (Index 2) */}
+          <div className="w-full shrink-0 px-3 lg:px-8 pb-4">
+            <BudgetManager expenses={expenses} user={user} />
+          </div>
+
+          {/* Slide 4: Savings (Index 3) */}
+          <div className="w-full shrink-0 px-3 lg:px-8 pb-4">
+            <SavingsManager />
+          </div>
+
+          {/* Slide 5: Tasks (Index 4) */}
+          <div className="w-full shrink-0 px-3 lg:px-8 pb-4">
+            <TasksManager expenses={expenses} user={user} />
+          </div>
+
+          {/* Slide 6: Wallet (Index 5) */}
+          <div className="w-full shrink-0 px-3 lg:px-8 pb-4">
+            <WalletManager />
+          </div>
+        </div>
+      </div>
+    </div>
+
+      {/* Sticky Floating Action Button on Bottom Right (Unified Grid for all Tabs/Slides) */}
+      {!isGeneratingPDF && createPortal(
+        <button
+          ref={mainFabRef}
+          onClick={(e) => { e.preventDefault(); handleFabClick(); }}
+          className={`fixed bottom-[90px] lg:bottom-12 right-5 lg:right-8 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-[0_4px_20px_rgba(0,0,0,0.2)] active:scale-95 transition-all duration-[150ms] ease-out z-[1000] pointer-events-auto opacity-100 scale-100 translate-y-0 ${getFabColor()}`}
+          style={{
+            willChange: 'transform, opacity',
+          }}
+          title={getFabTitle()}
+        >
+          <Plus size={28} />
+        </button>,
+        document.body
       )}
 
       {isModalOpen && createPortal(
@@ -2354,11 +2688,16 @@ export const Expenses: React.FC = () => {
         </div>,
         document.body
       )}
-    </div>
+    </>
   );
 };
 
-const DuesManager: React.FC = () => {
+interface DuesManagerProps {
+  wallets: any[];
+  adjustWalletBalance: (walletName: string, changeAmount: number) => Promise<void>;
+}
+
+const DuesManager: React.FC<DuesManagerProps> = ({ wallets, adjustWalletBalance }) => {
   const { user, duePersons, setDuePersons, showToast, isOnline } = useAppContext();
   const persons = duePersons;
   const location = useLocation();
@@ -2410,11 +2749,20 @@ const DuesManager: React.FC = () => {
   const [newPersonAddress, setNewPersonAddress] = useState('');
   const [newPersonDate, setNewPersonDate] = useState(new Date().toISOString().split('T')[0]);
   const [newPersonAvatar, setNewPersonAvatar] = useState('');
+  const [newPersonWallet, setNewPersonWallet] = useState('ক্যাশ');
+  const [isPersonWalletOpen, setIsPersonWalletOpen] = useState(false);
 
   // Form states for Add Transaction
   const [txAmount, setTxAmount] = useState('');
   const [txDescription, setTxDescription] = useState('');
   const [txDate, setTxDate] = useState(new Date().toISOString().split('T')[0]);
+  const [txTime, setTxTime] = useState(() => {
+    const now = new Date();
+    return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+  });
+  const [txWalletName, setTxWalletName] = useState('ক্যাশ');
+  const [isTxWalletOpen, setIsTxWalletOpen] = useState(false);
+  const [isTxKeypadOpen, setIsTxKeypadOpen] = useState(true);
   
   const [isSubmittingPerson, setIsSubmittingPerson] = useState(false);
   const [isSubmittingTx, setIsSubmittingTx] = useState(false);
@@ -2430,6 +2778,25 @@ const DuesManager: React.FC = () => {
       document.removeEventListener('click', handleClickOutside);
     };
   }, []);
+
+  useEffect(() => {
+    const handleGlobalAdd = (e: Event) => {
+      console.log('DuesManager: handleGlobalAdd triggered', (e as CustomEvent).detail);
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail?.tab === 'dues') {
+        console.log('DuesManager: handleGlobalAdd - matching tab, activeView is', activeView);
+        if (activeView === 'details') {
+          resetTransactionForm();
+          setAddTransactionModalOpen(true);
+        } else {
+          resetPersonForm();
+          setAddPersonModalOpen(true);
+        }
+      }
+    };
+    window.addEventListener('open-add-modal', handleGlobalAdd);
+    return () => window.removeEventListener('open-add-modal', handleGlobalAdd);
+  }, [activeView, persons]);
 
   const getPersonBalance = (person: DuePerson) => {
     return person.transactions.reduce((acc, curr) => {
@@ -2501,7 +2868,10 @@ const DuesManager: React.FC = () => {
     setNewPersonPhone('');
     setNewPersonAddress('');
     setNewPersonAvatar('');
+    const defaultWallet = wallets.find(w => w.isDefault)?.name || 'ক্যাশ';
+    setNewPersonWallet(defaultWallet);
     setNewPersonDate(new Date().toISOString().split('T')[0]);
+    setIsPersonWalletOpen(false);
     setIsEditingPerson(false);
     setEditingPersonId(null);
   };
@@ -2546,6 +2916,12 @@ const DuesManager: React.FC = () => {
     setTxAmount('');
     setTxDescription('');
     setTxDate(new Date().toISOString().split('T')[0]);
+    const now = new Date();
+    setTxTime(`${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`);
+    const defaultWallet = wallets.find(w => w.isDefault)?.name || 'ক্যাশ';
+    setTxWalletName(defaultWallet);
+    setIsTxWalletOpen(false);
+    setIsTxKeypadOpen(true);
     setTransactionType('receive');
     setIsEditingTx(false);
     setEditingTxId(null);
@@ -2557,7 +2933,13 @@ const DuesManager: React.FC = () => {
     setTxAmount(tx.amount.toString());
     setTxDescription(tx.description || '');
     setTxDate(tx.date);
+    setTxTime(tx.time || (() => {
+      const now = new Date();
+      return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    })());
+    setTxWalletName(tx.walletName || 'ক্যাশ');
     setTransactionType(tx.type);
+    setIsTxKeypadOpen(false); // don't open by default for edits
     setAddTransactionModalOpen(true);
     setActiveTxMenuId(null);
   };
@@ -2573,6 +2955,7 @@ const DuesManager: React.FC = () => {
       const person = persons.find(p => p.id === selectedPersonId);
       if (!person) throw new Error("ব্যক্তি পাওয়া যায়নি");
 
+      const txToDelete = person.transactions.find(t => t.id === txToDeleteId);
       const updatedTransactions = person.transactions.filter(t => t.id !== txToDeleteId);
 
       const { error } = await supabase
@@ -2582,6 +2965,12 @@ const DuesManager: React.FC = () => {
         .eq('userid', user.id);
 
       if (error) throw error;
+
+      if (txToDelete) {
+        const wallet = txToDelete.walletName || 'ক্যাশ';
+        const impact = txToDelete.type === 'receive' ? -txToDelete.amount : txToDelete.amount;
+        await adjustWalletBalance(wallet, impact);
+      }
 
       setDuePersons(prev => prev.map(p => {
         if (p.id === selectedPersonId) {
@@ -2614,22 +3003,42 @@ const DuesManager: React.FC = () => {
       if (!person) throw new Error("ব্যক্তি পাওয়া যায়নি");
       
       let updatedTransactions;
+      let walletAdjustments: { wallet: string, amount: number }[] = [];
+      const numTxAmount = Number(txAmount);
       
       if (isEditingTx && editingTxId) {
+        const oldTx = person.transactions.find(t => t.id === editingTxId);
+        if (oldTx) {
+            // Revert old transaction
+            const oldWallet = oldTx.walletName || 'ক্যাশ';
+            const oldImpact = oldTx.type === 'receive' ? -oldTx.amount : oldTx.amount;
+            walletAdjustments.push({ wallet: oldWallet, amount: oldImpact });
+        }
+        
+        // Apply new transaction
+        const newImpact = transactionType === 'receive' ? numTxAmount : -numTxAmount;
+        walletAdjustments.push({ wallet: txWalletName, amount: newImpact });
+
         updatedTransactions = person.transactions.map(t => 
           t.id === editingTxId 
-            ? { ...t, type: transactionType, amount: Number(txAmount), description: txDescription, date: txDate }
+            ? { ...t, type: transactionType, amount: numTxAmount, description: txDescription, date: txDate, time: txTime, walletName: txWalletName }
             : t
         );
       } else {
         const newTx: DueTransaction = {
           id: crypto.randomUUID(),
           type: transactionType,
-          amount: Number(txAmount),
+          amount: numTxAmount,
           description: txDescription,
-          date: txDate
+          date: txDate,
+          time: txTime,
+          walletName: txWalletName
         };
         updatedTransactions = [newTx, ...person.transactions];
+        
+        // Apply new transaction
+        const newImpact = transactionType === 'receive' ? numTxAmount : -numTxAmount;
+        walletAdjustments.push({ wallet: txWalletName, amount: newImpact });
       }
       
       const { error } = await supabase
@@ -2639,6 +3048,10 @@ const DuesManager: React.FC = () => {
         .eq('userid', user.id);
         
       if (error) throw error;
+      
+      for (const adj of walletAdjustments) {
+        await adjustWalletBalance(adj.wallet, adj.amount);
+      }
       
       setDuePersons(prev => prev.map(p => {
         if (p.id === selectedPersonId) {
@@ -2762,69 +3175,202 @@ const DuesManager: React.FC = () => {
           </div>
         </div>
 
-        {/* FAB */}
-        <button 
-          onClick={() => { resetTransactionForm(); setAddTransactionModalOpen(true); }}
-          className="fixed lg:absolute bottom-20 right-6 w-14 h-14 bg-blue-600 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-blue-700 active:scale-95 transition-all z-10"
-        >
-          <Plus size={28} />
-        </button>
+        {/* FAB is now handled globally at parent level */}
 
         {/* Add Transaction Modal */}
-        {isAddTransactionModalOpen && (
-          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] overflow-y-auto flex items-start sm:items-center justify-center p-4">
-             <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl relative my-auto">
-                <div className="p-6">
-                  <h3 className="text-xl font-bold text-center text-slate-800 mb-6">{isEditingTx ? 'লেনদেন আপডেট করুন' : 'লেনদেন অ্যাড করুন'}</h3>
-                  
-                  <div className="flex gap-4 mb-6">
-                    <button 
-                      type="button"
-                      onClick={() => setTransactionType('receive')}
-                      className={`flex-1 py-3 rounded-xl font-bold text-lg border transition-colors ${transactionType === 'receive' ? 'bg-emerald-500 text-white border-emerald-600 shadow-sm' : 'bg-slate-50 text-emerald-600 border-slate-200'}`}
-                    >
-                      পেলাম
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => setTransactionType('give')}
-                      className={`flex-1 py-3 rounded-xl font-bold text-lg border transition-colors ${transactionType === 'give' ? 'bg-rose-50 text-rose-600 border-slate-200' : 'bg-slate-50 text-rose-500 border-slate-200'}`}
-                    >
-                      দিলাম
-                    </button>
-                  </div>
+        {isAddTransactionModalOpen && createPortal(
+          <div className="fixed inset-0 bg-slate-50/95 backdrop-blur-md z-[1000] flex flex-col items-center justify-start sm:p-4">
+            <div className="bg-white sm:rounded-[24px] w-full h-full sm:h-auto sm:max-h-[95vh] sm:max-w-md shadow-2xl relative animate-in slide-in-from-bottom-5 duration-200 flex flex-col overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 bg-white shrink-0 mb-2">
+                <button type="button" onClick={() => { setAddTransactionModalOpen(false); resetTransactionForm(); setIsTxDatePickerOpen(false); }} className="p-2 -ml-2 text-slate-700 hover:bg-slate-100 rounded-full transition-colors">
+                  <ArrowLeft size={24} strokeWidth={2.5} />
+                </button>
+                <h2 className="text-[18px] font-bold text-slate-800">{isEditingTx ? 'লেনদেন আপডেট করুন' : 'লেনদেন অ্যাড করুন'}</h2>
+                <button 
+                  type="button" 
+                  disabled={isSubmittingTx || !txAmount || Number(txAmount) <= 0}
+                  onClick={() => {
+                    const form = document.getElementById('add-tx-form') as HTMLFormElement;
+                    if (form) form.requestSubmit();
+                  }}
+                  className={`px-5 py-2 font-bold rounded-full text-[15px] transition-colors disabled:opacity-50 ${
+                    (!txAmount || Number(txAmount) <= 0) ? 'bg-slate-200 text-slate-500 hover:bg-slate-300' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
+                  }`}
+                >
+                  সেইভ
+                </button>
+              </div>
 
-                  <form className={`space-y-4 transition-all duration-300 ${isTxDatePickerOpen ? 'pb-[340px]' : ''}`} onSubmit={handleAddTransaction}>
-                    <div className="relative">
-                      <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"><DollarSign size={20} /></div>
-                      <input type="number" value={txAmount} onChange={e => setTxAmount(e.target.value)} placeholder="টাকার পরিমাণ দিন" className="w-full py-3.5 pl-12 pr-4 bg-white border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-xl outline-none" required />
+              <div className="flex-1 overflow-y-auto px-4 pb-8">
+                <div className="max-w-md mx-auto">
+                  <form id="add-tx-form" className={`space-y-4 transition-all duration-300 relative ${isTxWalletOpen || isTxDatePickerOpen ? 'pb-[280px]' : ''}`} onSubmit={handleAddTransaction}>
+                    
+                    <div className="flex gap-3 relative z-20">
+                      <div className="flex-1 text-left relative">
+                        <DatePicker 
+                          label=""
+                          placeholder="তারিখ"
+                          value={txDate}
+                          onChange={(date) => setTxDate(date)}
+                          onOpenChange={(open) => setIsTxDatePickerOpen(open)}
+                          openDirection="down"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <div className="relative">
+                          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-500"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+                          <input 
+                            type="time" 
+                            value={txTime} 
+                            onChange={e => setTxTime(e.target.value)} 
+                            className="w-full py-4 pl-11 pr-4 bg-[#fcfdfd] border border-slate-200 hover:border-slate-300 focus:border-blue-500 rounded-[12px] outline-none text-[15px] text-blue-600 font-semibold appearance-none" 
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <div className="relative">
-                      <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"><FileText size={20} /></div>
-                      <input type="text" value={txDescription} onChange={e => setTxDescription(e.target.value)} placeholder="বিবরণ (ঐচ্ছিক)" className="w-full py-3.5 pl-12 pr-4 bg-white border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-xl outline-none" />
+
+                    <div className="flex gap-3 pt-2">
+                       <div 
+                         onClick={() => { setTransactionType('receive'); setIsTxKeypadOpen(true); }} 
+                         className={`flex-1 relative cursor-text border-2 rounded-[12px] p-4 transition-all duration-200 ${transactionType === 'receive' ? 'border-blue-500 bg-white shadow-sm' : 'border-slate-200 bg-[#fcfdfd] shadow-sm'}`}
+                       >
+                         <label className={`absolute top-0 left-4 -translate-y-1/2 px-1 text-[13px] font-medium transition-colors ${transactionType === 'receive' ? 'text-blue-500 bg-white visible' : 'text-slate-400 invisible'}`}>
+                           পেলাম
+                         </label>
+                         <div className="flex items-center gap-2">
+                           <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+                             <DollarSign size={14} className="text-emerald-600" strokeWidth={2.5} />
+                           </div>
+                           {transactionType === 'receive' ? (
+                             <input 
+                                type="text" 
+                                value={txAmount} 
+                                className="w-full bg-transparent outline-none text-[18px] text-slate-800 font-bold keypad-trigger"
+                                placeholder=""
+                                readOnly 
+                             />
+                           ) : (
+                             <span className="text-slate-400 font-medium text-[16px]">পেলাম</span>
+                           )}
+                         </div>
+                       </div>
+
+                       <div 
+                         onClick={() => { setTransactionType('give'); setIsTxKeypadOpen(true); }} 
+                         className={`flex-1 relative cursor-text border-2 rounded-[12px] p-4 transition-all duration-200 ${transactionType === 'give' ? 'border-blue-500 bg-white shadow-sm' : 'border-slate-200 bg-[#fcfdfd] shadow-sm'}`}
+                       >
+                         <label className={`absolute top-0 left-4 -translate-y-1/2 px-1 text-[13px] font-medium transition-colors ${transactionType === 'give' ? 'text-blue-500 bg-white visible' : 'text-slate-400 invisible'}`}>
+                           দিলাম
+                         </label>
+                         <div className="flex items-center gap-2">
+                           <div className="w-6 h-6 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
+                             <DollarSign size={14} className="text-rose-600" strokeWidth={2.5} />
+                           </div>
+                           {transactionType === 'give' ? (
+                             <input 
+                                type="text" 
+                                value={txAmount} 
+                                className="w-full bg-transparent outline-none text-[18px] text-slate-800 font-bold keypad-trigger"
+                                placeholder=""
+                                readOnly
+                             />
+                           ) : (
+                             <span className="text-slate-400 font-medium text-[16px]">দিলাম</span>
+                           )}
+                         </div>
+                       </div>
                     </div>
+
+                    <div className="relative pt-2">
+                      <div className="relative z-10 text-left">
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"><FileText size={20} /></div>
+                        <input id="tx-description" type="text" value={txDescription} onChange={e => setTxDescription(e.target.value)} placeholder=" " className="peer w-full py-4 pl-12 pr-4 bg-transparent border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-[12px] outline-none text-[16px] text-slate-800 transition shadow-sm" />
+                        <label 
+                          htmlFor="tx-description"
+                          className="absolute bg-white px-1 transition-all duration-200 cursor-text
+                                     top-0 left-4 -translate-y-1/2 text-[13.5px] text-slate-400 font-medium
+                                     peer-placeholder-shown:top-1/2 peer-placeholder-shown:left-12 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-[16px] peer-placeholder-shown:text-slate-400 peer-placeholder-shown:font-normal
+                                     peer-focus:top-0 peer-focus:left-4 peer-focus:-translate-y-1/2 peer-focus:text-[13.5px] peer-focus:text-blue-500 peer-focus:font-medium"
+                        >
+                          বিবরণ (অপশনাল)
+                        </label>
+                      </div>
+                    </div>
+
                     <div className="relative z-10">
-                      <DatePicker 
-                        label="তারিখ"
-                        value={txDate}
-                        onChange={(date) => setTxDate(date)}
-                        placeholder="তারিখ"
-                        onOpenChange={(open) => setIsTxDatePickerOpen(open)}
-                        openDirection="down"
-                      />
+                      <button 
+                        type="button" 
+                        onClick={() => setIsTxWalletOpen(!isTxWalletOpen)}
+                        className="w-full flex items-center justify-between py-4 pl-4 pr-3.5 bg-[#fcfdfd] border border-slate-200 hover:border-slate-300 rounded-[12px] transition-colors shadow-sm"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Wallet size={20} className="text-slate-500 pt-[1px]" strokeWidth={1.5} />
+                          <span className="text-[16px] text-slate-800 font-medium">{txWalletName}</span>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <span className={`${transactionType === 'give' ? 'text-rose-600' : 'text-emerald-600'} font-bold text-[15px]`}>
+                            {(() => {
+                              const b = wallets.find(w => w.name === txWalletName)?.balance;
+                              return b !== undefined ? b.toFixed(1) : '0.0';
+                            })()}
+                          </span>
+                          <ChevronDown size={20} className="text-slate-400" />
+                        </div>
+                      </button>
+
+                      {isTxWalletOpen && (
+                        <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-[16px] shadow-xl border border-slate-100 z-50 overflow-hidden divide-y divide-slate-50">
+                          {wallets.length === 0 ? (
+                            <div className="px-4 py-3 text-sm text-slate-500 text-center">কোন ওয়ালেট পাওয়া যায়নি</div>
+                          ) : (
+                            wallets.map((wallet) => (
+                              <div
+                                key={wallet.id}
+                                onClick={() => {
+                                  setTxWalletName(wallet.name);
+                                  setIsTxWalletOpen(false);
+                                }}
+                                className={`px-4 py-4 flex items-center justify-between hover:bg-slate-50 cursor-pointer transition-colors ${
+                                  txWalletName === wallet.name ? 'bg-blue-50/50' : ''
+                                }`}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <Wallet size={18} className={txWalletName === wallet.name ? 'text-blue-500' : 'text-slate-400'} />
+                                  <span className={`text-[15px] ${txWalletName === wallet.name ? 'text-blue-600 font-bold' : 'text-slate-700 font-medium'}`}>{wallet.name}</span>
+                                </div>
+                                <span className={`font-bold text-[14px] ${txWalletName === wallet.name ? 'text-blue-600' : 'text-slate-500'}`}>
+                                  {wallet.balance !== undefined ? wallet.balance.toFixed(1) : '0.0'}
+                                </span>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      )}
                     </div>
 
-                    <button type="submit" disabled={isSubmittingTx} className="w-full flex justify-center items-center gap-2 py-3.5 mt-2 bg-blue-600 text-white font-bold text-lg rounded-xl transition-colors hover:bg-blue-700 shadow-md">
-                      {isSubmittingTx ? <Loader2 size={24} className="animate-spin" /> : null}
-                      {isEditingTx ? 'আপডেট করুন' : 'সেভ করুন'}
-                    </button>
-                    <button type="button" onClick={() => { setAddTransactionModalOpen(false); resetTransactionForm(); setIsTxDatePickerOpen(false); }} className="w-full py-3 mt-2 text-slate-500 font-bold text-sm rounded-xl transition-colors hover:bg-slate-100">
-                      বাতিল করুন
-                    </button>
+                    <div className="pt-2">
+                      <button 
+                        type="submit" 
+                        disabled={isSubmittingTx || !txAmount || Number(txAmount) <= 0} 
+                        className={`w-full flex justify-center items-center gap-2 py-4 decoration-none font-bold text-[17px] rounded-[14px] transition-colors ${
+                          (!txAmount || Number(txAmount) <= 0) ? 'bg-[#f1f5f9] text-slate-400 shadow-none' : (transactionType === 'receive' ? 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-md shadow-emerald-200' : 'bg-rose-500 text-white hover:bg-rose-600 shadow-md shadow-rose-200')
+                        }`}
+                      >
+                        {isSubmittingTx ? <Loader2 size={20} className="animate-spin" /> : 'সেইভ'}
+                      </button>
+                    </div>
                   </form>
                 </div>
-             </div>
-          </div>
+              </div>
+            </div>
+            <NumericKeypad 
+              isOpen={isTxKeypadOpen} 
+              onClose={() => setIsTxKeypadOpen(false)} 
+              initialValue={txAmount} 
+              onValueChange={(val) => setTxAmount(val.toString())}
+            />
+          </div>,
+          document.body
         )}
 
         {/* Delete Transaction Confirmation */}
@@ -2949,13 +3495,7 @@ const DuesManager: React.FC = () => {
         })}
       </div>
 
-      {/* FAB */}
-      <button 
-        onClick={() => { resetPersonForm(); setAddPersonModalOpen(true); }}
-        className="fixed lg:absolute bottom-20 right-6 w-14 h-14 bg-teal-500 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-teal-600 active:scale-95 transition-all z-10"
-      >
-        <Plus size={28} />
-      </button>
+      {/* FAB is now handled globally at parent level */}
 
       {/* Delete Person Confirmation */}
       <ConfirmModal 
@@ -2968,75 +3508,147 @@ const DuesManager: React.FC = () => {
       />
 
       {/* Add Person Modal */}
-      {isAddPersonModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] overflow-y-auto flex items-start sm:items-center justify-center p-4">
-            <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl relative my-auto">
-              <div className="p-6 text-center">
-                
-                <div className="flex justify-center mb-6 mt-4">
-                  <label className="w-24 h-24 rounded-full border-2 border-blue-200 bg-blue-50 flex items-center justify-center text-blue-500 overflow-hidden cursor-pointer hover:bg-blue-100 transition-colors">
-                    {newPersonAvatar ? (
-                      <img src={newPersonAvatar} alt="Avatar" className="w-full h-full object-cover" />
-                    ) : (
-                      <ImagePlus size={40} />
-                    )}
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      className="hidden" 
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          if (file.size > 1 * 1024 * 1024) {
-                            showToast('ছবির সাইজ ১ মেগাবাইটের কম হতে হবে');
-                            return;
+      {isAddPersonModalOpen && createPortal(
+        <div className="fixed inset-0 bg-slate-50/95 backdrop-blur-md z-[1000] flex flex-col items-center justify-start sm:p-4">
+            <div className="bg-white sm:rounded-[24px] w-full h-full sm:h-auto sm:max-h-[95vh] sm:max-w-md shadow-2xl relative animate-in slide-in-from-bottom-5 duration-200 flex flex-col overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 bg-white shrink-0 mb-4">
+                <button type="button" onClick={() => { setAddPersonModalOpen(false); resetPersonForm(); setIsDatePickerOpen(false); }} className="p-2 -ml-2 text-slate-700 hover:bg-slate-100 rounded-full transition-colors">
+                  <ArrowLeft size={24} strokeWidth={2.5} />
+                </button>
+                <h2 className="text-[18px] font-bold text-slate-800">{isEditingPerson ? 'এডিট ব্যক্তি' : 'নতুন ব্যক্তি'}</h2>
+                <button 
+                  type="button" 
+                  disabled={isSubmittingPerson || !newPersonName}
+                  onClick={() => {
+                    const form = document.getElementById('add-person-form') as HTMLFormElement;
+                    if (form) form.requestSubmit();
+                  }}
+                  className={`px-5 py-2 font-bold rounded-full text-[15px] transition-colors disabled:opacity-50 ${
+                    !newPersonName ? 'bg-slate-200 text-slate-500 hover:bg-slate-300' : 'bg-blue-500 text-white hover:bg-blue-600 shadow-sm'
+                  }`}
+                >
+                  সেইভ
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto px-4 pb-8">
+                <div className="max-w-md mx-auto">
+                  <div className="flex justify-center mb-8">
+                    <label className="w-[110px] h-[110px] rounded-full border border-blue-200 bg-[#eff6ff] flex items-center justify-center text-blue-600 overflow-hidden cursor-pointer hover:bg-blue-100 transition-colors shadow-[0_0_0_2px_white,0_0_0_2px_#eff6ff]">
+                      {newPersonAvatar ? (
+                        <img src={newPersonAvatar} alt="Avatar" className="w-full h-full object-cover" />
+                      ) : (
+                        <ImagePlus size={36} strokeWidth={2} />
+                      )}
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        className="hidden" 
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            if (file.size > 1 * 1024 * 1024) {
+                              showToast('ছবির সাইজ ১ মেগাবাইটের কম হতে হবে');
+                              return;
+                            }
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                              setNewPersonAvatar(reader.result as string);
+                            };
+                            reader.readAsDataURL(file);
                           }
-                          const reader = new FileReader();
-                          reader.onloadend = () => {
-                            setNewPersonAvatar(reader.result as string);
-                          };
-                          reader.readAsDataURL(file);
-                        }
-                      }}
-                    />
-                  </label>
+                        }}
+                      />
+                    </label>
+                  </div>
+
+                  <form id="add-person-form" className={`space-y-4 transition-all duration-300 relative ${isPersonWalletOpen || isDatePickerOpen ? 'pb-[280px]' : ''}`} onSubmit={handleAddPerson}>
+                    <div className="relative pt-2">
+                      <div className="relative">
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                          <UserIcon size={20} strokeWidth={1.5} />
+                        </div>
+                        <input 
+                          id="person-name"
+                          type="text" 
+                          value={newPersonName} 
+                          onChange={e => setNewPersonName(e.target.value)} 
+                          placeholder=" "
+                          className="peer w-full py-4 pl-11 pr-4 bg-transparent border border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-[12px] outline-none text-[16px] text-slate-800 transition shadow-sm" 
+                          required 
+                        />
+                        <label 
+                          htmlFor="person-name"
+                          className="absolute bg-white px-1 transition-all duration-200 cursor-text
+                                     top-0 left-4 -translate-y-1/2 text-[13.5px] text-slate-400 font-medium
+                                     peer-placeholder-shown:top-1/2 peer-placeholder-shown:left-11 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-[16px] peer-placeholder-shown:text-slate-400 peer-placeholder-shown:font-normal
+                                     peer-focus:top-0 peer-focus:left-4 peer-focus:-translate-y-1/2 peer-focus:text-[13.5px] peer-focus:text-slate-400 peer-focus:font-medium"
+                        >
+                          নাম
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="relative pt-2">
+                      <div className="relative z-10 text-left">
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"><Phone size={20} strokeWidth={1.5} /></div>
+                        <input id="person-phone" type="tel" value={newPersonPhone} onChange={e => setNewPersonPhone(e.target.value)} placeholder=" " className="peer w-full py-4 pl-11 pr-4 bg-transparent border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-[12px] outline-none text-[16px] text-slate-800 transition shadow-sm" />
+                        <label 
+                          htmlFor="person-phone"
+                          className="absolute bg-white px-1 transition-all duration-200 cursor-text
+                                     top-0 left-4 -translate-y-1/2 text-[13.5px] text-slate-400 font-medium
+                                     peer-placeholder-shown:top-1/2 peer-placeholder-shown:left-11 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-[16px] peer-placeholder-shown:text-slate-400 peer-placeholder-shown:font-normal
+                                     peer-focus:top-0 peer-focus:left-4 peer-focus:-translate-y-1/2 peer-focus:text-[13.5px] peer-focus:text-blue-500 peer-focus:font-medium"
+                        >
+                          ফোন নম্বর (ঐচ্ছিক)
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="relative pt-2">
+                      <div className="relative z-10 text-left">
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"><MapPin size={20} strokeWidth={1.5} /></div>
+                        <input id="person-address" type="text" value={newPersonAddress} onChange={e => setNewPersonAddress(e.target.value)} placeholder=" " className="peer w-full py-4 pl-11 pr-4 bg-transparent border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-[12px] outline-none text-[16px] text-slate-800 transition shadow-sm" />
+                        <label 
+                          htmlFor="person-address"
+                          className="absolute bg-white px-1 transition-all duration-200 cursor-text
+                                     top-0 left-4 -translate-y-1/2 text-[13.5px] text-slate-400 font-medium
+                                     peer-placeholder-shown:top-1/2 peer-placeholder-shown:left-11 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-[16px] peer-placeholder-shown:text-slate-400 peer-placeholder-shown:font-normal
+                                     peer-focus:top-0 peer-focus:left-4 peer-focus:-translate-y-1/2 peer-focus:text-[13.5px] peer-focus:text-blue-500 peer-focus:font-medium"
+                        >
+                          ঠিকানা (ঐচ্ছিক)
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="relative z-10 text-left">
+                      <DatePicker 
+                        label=""
+                        placeholder="তারিখ"
+                        value={newPersonDate}
+                        onChange={(date) => setNewPersonDate(date)}
+                        onOpenChange={(open) => setIsDatePickerOpen(open)}
+                        openDirection="down"
+                      />
+                    </div>
+
+                    <div className="pt-6">
+                      <button 
+                        type="submit" 
+                        disabled={isSubmittingPerson || !newPersonName} 
+                        className={`w-full flex justify-center items-center gap-2 py-4 decoration-none font-bold text-[17px] rounded-[14px] transition-colors ${
+                          !newPersonName ? 'bg-slate-200 text-slate-400 shadow-none' : 'bg-blue-500 text-white hover:bg-blue-600 shadow-md shadow-blue-200'
+                        }`}
+                      >
+                        {isSubmittingPerson ? <Loader2 size={20} className="animate-spin" /> : 'সেইভ'}
+                      </button>
+                    </div>
+                  </form>
                 </div>
-
-                <form className={`space-y-4 transition-all duration-300 ${isDatePickerOpen ? 'pb-[340px]' : ''}`} onSubmit={handleAddPerson}>
-                  <div className="relative">
-                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"><UserIcon size={20} /></div>
-                    <input type="text" value={newPersonName} onChange={e => setNewPersonName(e.target.value)} placeholder="নাম" className="w-full py-3.5 pl-12 pr-4 bg-white border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-xl outline-none" required />
-                  </div>
-                  <div className="relative">
-                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"><Phone size={20} /></div>
-                    <input type="tel" value={newPersonPhone} onChange={e => setNewPersonPhone(e.target.value)} placeholder="ফোন নম্বর (ঐচ্ছিক)" className="w-full py-3.5 pl-12 pr-4 bg-white border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-xl outline-none" />
-                  </div>
-                  <div className="relative">
-                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"><MapPin size={20} /></div>
-                    <input type="text" value={newPersonAddress} onChange={e => setNewPersonAddress(e.target.value)} placeholder="ঠিকানা (ঐচ্ছিক)" className="w-full py-3.5 pl-12 pr-4 bg-white border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-xl outline-none" />
-                  </div>
-                  <div className="relative z-10">
-                    <DatePicker 
-                      label="তারিখ"
-                      value={newPersonDate}
-                      onChange={(date) => setNewPersonDate(date)}
-                      placeholder="তারিখ"
-                      onOpenChange={(open) => setIsDatePickerOpen(open)}
-                      openDirection="down"
-                    />
-                  </div>
-
-                  <button type="submit" disabled={isSubmittingPerson} className="w-full flex justify-center items-center gap-2 py-3.5 mt-2 bg-blue-600 text-white font-bold text-lg rounded-xl transition-colors hover:bg-blue-700 shadow-md">
-                    {isSubmittingPerson ? <Loader2 size={24} className="animate-spin" /> : null}
-                    {isEditingPerson ? 'আপডেট করুন' : 'সেভ করুন'}
-                  </button>
-                  <button type="button" onClick={() => { setAddPersonModalOpen(false); resetPersonForm(); setIsDatePickerOpen(false); }} className="w-full py-3 mt-2 text-slate-500 font-bold text-sm rounded-xl transition-colors hover:bg-slate-100">
-                    বাতিল করুন
-                  </button>
-                </form>
               </div>
             </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -3142,6 +3754,20 @@ const SavingsManager: React.FC = () => {
     setDeadline(new Date().toISOString().split('T')[0]);
     setNotes('');
   };
+
+  useEffect(() => {
+    const handleGlobalAdd = (e: Event) => {
+      console.log('SavingsManager: handleGlobalAdd triggered', (e as CustomEvent).detail);
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail?.tab === 'savings') {
+        console.log('SavingsManager: handleGlobalAdd - matching tab');
+        resetForm();
+        setAddModalOpen(true);
+      }
+    };
+    window.addEventListener('open-add-modal', handleGlobalAdd);
+    return () => window.removeEventListener('open-add-modal', handleGlobalAdd);
+  }, []);
 
   const handleSavingsTransaction = (e: React.FormEvent) => {
     e.preventDefault();
@@ -3320,9 +3946,9 @@ const SavingsManager: React.FC = () => {
       )}
 
       {/* Add Goal Modal */}
-      {isAddModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-sm p-5 shadow-2xl relative text-left">
+      {isAddModalOpen && createPortal(
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[1000] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-sm p-5 shadow-2xl relative text-left h-[calc(100vh-2rem)] sm:h-auto overflow-y-auto animate-in zoom-in-95 duration-200">
             <h3 className="text-base font-bold text-slate-800 text-center mb-4">নতুন সঞ্চয় লক্ষ্য তৈরি</h3>
             <form onSubmit={handleCreateGoal} className="space-y-3.5">
               <div>
@@ -3359,13 +3985,14 @@ const SavingsManager: React.FC = () => {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Transaction Deposit/Withdrawal Modal */}
-      {isTxModalOpen && selectedGoal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-sm p-5 shadow-2xl relative text-left">
+      {isTxModalOpen && selectedGoal && createPortal(
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[1000] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-sm p-5 shadow-2xl relative text-left h-[calc(100vh-2rem)] sm:h-auto overflow-y-auto animate-in zoom-in-95 duration-200">
             <h3 className="text-base font-bold text-slate-800 text-center mb-2">
               {txType === 'deposit' ? 'সঞ্চয় জমা করুন' : 'সঞ্চয় উত্তোলন করুন'}
             </h3>
@@ -3387,7 +4014,8 @@ const SavingsManager: React.FC = () => {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {goalToDelete && (
@@ -3623,112 +4251,22 @@ const BudgetManager: React.FC<{ expenses: any[]; user: any }> = ({ expenses, use
   const [txDate, setTxDate] = useState(new Date().toISOString().split('T')[0]);
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
 
-  // Floating Action Button visibility based on scroll direction (optimized with direct DOM ref to run at 60fps without React lagging)
-  const budgetFabRef = useRef<HTMLButtonElement>(null);
-  const isBudgetFabVisibleRef = useRef(true);
-  const lastBudgetScrollY = useRef(0);
-
-  const setBudgetFabVisibleDirectly = (visible: boolean) => {
-    if (isBudgetFabVisibleRef.current === visible) return;
-    isBudgetFabVisibleRef.current = visible;
-    
-    const el = budgetFabRef.current;
-    if (!el) return;
-    
-    if (visible) {
-      el.style.opacity = '1';
-      el.style.transform = 'translateY(0) scale(1)';
-      el.style.pointerEvents = 'auto';
-    } else {
-      el.style.opacity = '0';
-      el.style.transform = 'translateY(32px) scale(0.9)';
-      el.style.pointerEvents = 'none';
-    }
-  };
-
   useEffect(() => {
-    // Reset FAB visibility to visible on mount/view change
-    isBudgetFabVisibleRef.current = true;
-    if (budgetFabRef.current) {
-      budgetFabRef.current.style.opacity = '1';
-      budgetFabRef.current.style.transform = 'translateY(0) scale(1)';
-      budgetFabRef.current.style.pointerEvents = 'auto';
-    }
-
-    lastBudgetScrollY.current = window.scrollY;
-    let lastBudgetTouchY = 0;
-    
-    const handleScroll = () => {
-      const currentScrollY = window.scrollY;
-      const diffScrollY = currentScrollY - lastBudgetScrollY.current;
-      
-      if (diffScrollY > 0) {
-        setBudgetFabVisibleDirectly(false);
-      } else if (diffScrollY < 0) {
-        setBudgetFabVisibleDirectly(true);
-      }
-      
-      // Always show when close to the top
-      if (currentScrollY < 30) {
-        setBudgetFabVisibleDirectly(true);
-      }
-      
-      lastBudgetScrollY.current = currentScrollY;
-    };
-
-    const handleTouchStart = (e: TouchEvent) => {
-      if (e.touches && e.touches.length > 0) {
-        lastBudgetTouchY = e.touches[0].clientY;
+    const handleGlobalAdd = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail?.tab === 'reports') {
+        if (activeView === 'details') {
+          resetTxForm();
+          setIsTxModalOpen(true);
+        } else {
+          setBudCategory('');
+          setBudLimit('');
+          setBudgetModalOpen(true);
+        }
       }
     };
-
-    const handleTouchMove = (e: TouchEvent) => {
-      if (!e.touches || e.touches.length === 0) return;
-      
-      const currentY = e.touches[0].clientY;
-      const diffY = currentY - lastBudgetTouchY;
-      
-      // finger moved UP (scrolling DOWN) -> Hide FAB instantly
-      if (diffY < 0) {
-        setBudgetFabVisibleDirectly(false);
-      } 
-      // finger moved DOWN (scrolling UP) -> Show FAB instantly
-      else if (diffY > 0) {
-        setBudgetFabVisibleDirectly(true);
-      }
-      
-      lastBudgetTouchY = currentY;
-      
-      // Always show when close to the top
-      if (window.scrollY < 30) {
-        setBudgetFabVisibleDirectly(true);
-      }
-    };
-
-    const handleWheel = (e: WheelEvent) => {
-      if (e.deltaY > 0) {
-        setBudgetFabVisibleDirectly(false);
-      } else if (e.deltaY < 0) {
-        setBudgetFabVisibleDirectly(true);
-      }
-      
-      // Always show when close to the top
-      if (window.scrollY < 30) {
-        setBudgetFabVisibleDirectly(true);
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    window.addEventListener('touchstart', handleTouchStart, { passive: true });
-    window.addEventListener('touchmove', handleTouchMove, { passive: true });
-    window.addEventListener('wheel', handleWheel, { passive: true });
-
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-      window.removeEventListener('touchstart', handleTouchStart);
-      window.removeEventListener('touchmove', handleTouchMove);
-      window.removeEventListener('wheel', handleWheel);
-    };
+    window.addEventListener('open-add-modal', handleGlobalAdd);
+    return () => window.removeEventListener('open-add-modal', handleGlobalAdd);
   }, [activeView]);
 
   const toBanglaNumbers = (num: string | number): string => {
@@ -4131,23 +4669,12 @@ const BudgetManager: React.FC<{ expenses: any[]; user: any }> = ({ expenses, use
           )}
         </div>
 
-        {/* Floating action button inside detailed view */}
-        <button
-          ref={budgetFabRef}
-          onClick={() => { resetTxForm(); setIsTxModalOpen(true); }}
-          className="fixed bottom-[76px] lg:bottom-8 right-5 lg:right-8 bg-[#10b981] hover:bg-emerald-600 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg shadow-emerald-100 active:scale-95 transition-all duration-[150ms] ease-out z-40 cursor-pointer pointer-events-auto opacity-100 scale-100 translate-y-0"
-          style={{
-            willChange: 'transform, opacity',
-          }}
-          title="বাজেট লেনদেন যোগ করুন"
-        >
-          <Plus size={28} />
-        </button>
+        {/* Floating action button inside detailed view is now handled globally at parent level */}
 
         {/* Add/Edit Sub-Transaction Modal inside detailed view */}
-        {isTxModalOpen && (
-          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative text-left animate-in zoom-in-95 duration-150">
+        {isTxModalOpen && createPortal(
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[1000] flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative text-left animate-in zoom-in-95 duration-150 h-[calc(100vh-2rem)] sm:h-auto overflow-y-auto">
               <h3 className="text-sm font-bold text-slate-800 text-center mb-1">বাজেট লেনদেন লগার</h3>
               <p className="text-[10px] text-slate-400 text-center mb-5 font-semibold">বরাদ্দ বৃদ্ধি বা খরচের বিবরণ সেভ করুন</p>
               
@@ -4203,7 +4730,8 @@ const BudgetManager: React.FC<{ expenses: any[]; user: any }> = ({ expenses, use
                 </div>
               </form>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
       </div>
     );
@@ -4317,40 +4845,30 @@ const BudgetManager: React.FC<{ expenses: any[]; user: any }> = ({ expenses, use
         )}
       </div>
 
-      {/* Floating Action Button (Screenshot Accurate Layout) */}
-      <button
-        ref={budgetFabRef}
-        onClick={() => { setBudCategory(''); setBudLimit(''); setBudgetModalOpen(true); }}
-        className="fixed bottom-[76px] lg:bottom-8 right-5 lg:right-8 bg-[#1a73e8] hover:bg-blue-700 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg shadow-blue-200 active:scale-95 transition-all duration-[150ms] ease-out z-40 cursor-pointer pointer-events-auto opacity-100 scale-100 translate-y-0"
-        style={{
-          willChange: 'transform, opacity',
-        }}
-        title="বাজেট সেট করুন"
-      >
-        <Plus size={28} />
-      </button>
+      {/* Floating Action Button is now handled globally at parent level */}
 
       {/* Budget Limit Set Modal */}
-      {isBudgetModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative text-left animate-in zoom-in-95 duration-150">
-            <h3 className="text-base font-bold text-slate-800 text-center mb-4">ঋণ বা খরচের বাজেট লিমিট</h3>
-            <form onSubmit={handleSaveBudget} className="space-y-4">
+      {isBudgetModalOpen && createPortal(
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[1000] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[24px] w-full max-w-[320px] p-5 shadow-2xl relative text-left animate-in zoom-in-95 duration-200 flex flex-col">
+            <h3 className="text-[17px] font-bold text-slate-800 text-center mb-4">ঋণ বা খরচের বাজেট লিমিট</h3>
+            <form onSubmit={handleSaveBudget} className="space-y-3">
               <div>
-                <label className="text-[10px] font-bold text-slate-400 block mb-1">খাত / ক্যাটাগরি</label>
-                <input required type="text" value={budCategory} onChange={e => setBudCategory(e.target.value)} placeholder="যেমন: বাজার, যাতায়াত" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-[#1a73e8] font-bold text-slate-800 text-xs" />
+                <label className="text-[11px] font-bold text-slate-500 block mb-1.5 ml-1">খাত / ক্যাটাগরি</label>
+                <input required type="text" value={budCategory} onChange={e => setBudCategory(e.target.value)} placeholder="যেমন: বাজার, যাতায়াত" className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-[12px] outline-none focus:border-[#1a73e8] focus:ring-1 focus:ring-[#1a73e8] font-semibold text-slate-800 text-[14px]" />
               </div>
               <div>
-                <label className="text-[10px] font-bold text-slate-400 block mb-1">বাজেট পরিমাণ</label>
-                <input required type="number" value={budLimit} onChange={e => setBudLimit(e.target.value)} placeholder="সর্বোচ্চ টাকা লিমিট" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-[#1a73e8] font-black text-slate-800 text-base" />
+                <label className="text-[11px] font-bold text-slate-500 block mb-1.5 ml-1">বাজেট পরিমাণ</label>
+                <input required type="number" value={budLimit} onChange={e => setBudLimit(e.target.value)} placeholder="সর্বোচ্চ টাকা লিমিট" className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-[12px] outline-none focus:border-[#1a73e8] focus:ring-1 focus:ring-[#1a73e8] font-bold text-slate-800 text-[15px]" />
               </div>
               <div className="flex gap-2 pt-2">
-                <button type="button" onClick={() => setBudgetModalOpen(false)} className="flex-1 py-3 bg-slate-100 text-slate-500 font-bold text-xs rounded-xl hover:bg-slate-200 transition-colors">বাতিল</button>
-                <button type="submit" className="flex-1 py-3 bg-[#1a73e8] text-white font-bold text-xs rounded-xl hover:bg-blue-700 transition-colors shadow-sm">বাজেট সেভ</button>
+                <button type="button" onClick={() => setBudgetModalOpen(false)} className="flex-1 py-2.5 bg-slate-100 text-slate-600 font-bold text-[14px] rounded-[12px] hover:bg-slate-200 transition-colors">বাতিল</button>
+                <button type="submit" className="flex-1 py-2.5 bg-[#1a73e8] text-white font-bold text-[14px] rounded-[12px] hover:bg-blue-700 transition-colors shadow-sm">বাজেট সেভ</button>
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {budgetToDelete && (
@@ -4395,6 +4913,19 @@ const TasksManager: React.FC<{ expenses: any[]; user: any }> = ({ expenses, user
   useEffect(() => {
     localStorage.setItem(`budget_tasks_${userId}`, JSON.stringify(tasks));
   }, [tasks, userId]);
+
+  useEffect(() => {
+    const handleGlobalAdd = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail?.tab === 'tasks') {
+        setTaskTitle('');
+        setTaskAmount('');
+        setTaskModalOpen(true);
+      }
+    };
+    window.addEventListener('open-add-modal', handleGlobalAdd);
+    return () => window.removeEventListener('open-add-modal', handleGlobalAdd);
+  }, []);
 
   const [isTaskModalOpen, setTaskModalOpen] = useState(false);
   const [taskTitle, setTaskTitle] = useState('');
@@ -4496,19 +5027,12 @@ const TasksManager: React.FC<{ expenses: any[]; user: any }> = ({ expenses, user
         )}
       </div>
 
-      {/* Sticky Floating Action Button */}
-      <button
-        onClick={() => { setTaskTitle(''); setTaskAmount(''); setTaskModalOpen(true); }}
-        className="fixed bottom-[76px] lg:bottom-8 right-5 lg:right-8 bg-[#1a73e8] hover:bg-blue-700 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg shadow-blue-200 active:scale-95 transition-all duration-[150ms] ease-out z-40 cursor-pointer"
-        title="নতুন কাজ যোগ করুন"
-      >
-        <Plus size={28} />
-      </button>
+      {/* Sticky Floating Action Button is now handled globally at parent level */}
 
       {/* Checklist Tasks Set Modal */}
-      {isTaskModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative text-left animate-in zoom-in-95 duration-150">
+      {isTaskModalOpen && createPortal(
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[1000] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative text-left animate-in zoom-in-95 duration-150 h-[calc(100vh-2rem)] sm:h-auto overflow-y-auto">
             <h3 className="text-base font-bold text-slate-800 text-center mb-4">নতুন খরচ বা ডিল যোগ</h3>
             <form onSubmit={handleAddTask} className="space-y-3.5">
               <div>
@@ -4531,7 +5055,8 @@ const TasksManager: React.FC<{ expenses: any[]; user: any }> = ({ expenses, user
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

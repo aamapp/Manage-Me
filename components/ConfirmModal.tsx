@@ -1,7 +1,6 @@
-
-import React from 'react';
-import { createPortal } from 'react-dom';
-import { AlertTriangle, Loader2 } from 'lucide-react';
+import React from "react";
+import { createPortal } from "react-dom";
+import { AlertTriangle, Loader2, Trash } from "lucide-react";
 
 interface ConfirmModalProps {
   isOpen: boolean;
@@ -12,61 +11,77 @@ interface ConfirmModalProps {
   isProcessing?: boolean;
   confirmText?: string;
   cancelText?: string;
-  type?: 'danger' | 'warning' | 'primary';
+  type?: "danger" | "warning" | "primary";
 }
 
-export const ConfirmModal: React.FC<ConfirmModalProps> = ({ 
-  isOpen, 
-  onClose, 
-  onConfirm, 
-  title, 
-  message, 
+export const ConfirmModal: React.FC<ConfirmModalProps> = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  title,
+  message,
   isProcessing = false,
   confirmText = "ডিলিট",
   cancelText = "বাতিল",
-  type = 'danger'
+  type = "danger",
 }) => {
   if (!isOpen) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[2000] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div 
-        className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 animate-in zoom-in-95 duration-200 border border-slate-100"
-        onClick={e => e.stopPropagation()}
+    <div className="fixed inset-0 z-[2000] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+      <div
+        className="bg-white rounded-[28px] shadow-xl max-w-[310px] w-full p-6 animate-in zoom-in-95 duration-200"
+        onClick={(e) => e.stopPropagation()}
       >
-        <div className={`w-14 h-14 rounded-full flex items-center justify-center mb-5 mx-auto ${
-          type === 'danger' ? 'bg-rose-50 text-rose-500' : 
-          type === 'warning' ? 'bg-amber-50 text-amber-500' :
-          'bg-indigo-50 text-indigo-500'
-        }`}>
-          <AlertTriangle size={28} />
+        <div
+          className={`w-[72px] h-[72px] rounded-full flex items-center justify-center mb-4 mx-auto ${
+            type === "danger"
+              ? "bg-[#ffebeb] text-[#f04438]"
+              : type === "warning"
+                ? "bg-amber-50 text-amber-500"
+                : "bg-indigo-50 text-indigo-500"
+          }`}
+        >
+          {type === "danger" ? (
+            <Trash size={32} strokeWidth={2} />
+          ) : (
+            <AlertTriangle size={32} strokeWidth={2} />
+          )}
         </div>
-        
-        <h3 className="text-xl font-bold text-slate-800 text-center mb-2">{title}</h3>
-        <p className="text-sm text-slate-500 text-center mb-8 font-medium leading-relaxed">{message}</p>
-        
+
+        <h3 className="text-[22px] font-bold text-slate-900 text-center mb-2.5 leading-tight">
+          {title}
+        </h3>
+        <p className="text-[15px] text-slate-600 text-center mb-8">{message}</p>
+
         <div className="flex gap-3">
-          <button 
+          <button
             onClick={onClose}
             disabled={isProcessing}
-            className="flex-1 py-3.5 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors disabled:opacity-50 active:scale-95"
+            className="flex-1 py-3 rounded-full font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 transition-colors disabled:opacity-50 active:scale-95 text-[15px]"
           >
             {cancelText}
           </button>
-          <button 
+          <button
             onClick={onConfirm}
             disabled={isProcessing}
-            className={`flex-1 py-3.5 rounded-xl font-bold text-white shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 ${
-              type === 'danger' ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-200' : 
-              type === 'warning' ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-200' :
-              'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200'
+            className={`flex-1 py-3 rounded-full font-bold text-white transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 text-[15px] ${
+              type === "danger"
+                ? "bg-[#f04438] hover:bg-red-600"
+                : type === "warning"
+                  ? "bg-amber-500 hover:bg-amber-600"
+                  : "bg-indigo-500 hover:bg-indigo-600"
             }`}
           >
-            {isProcessing ? <Loader2 size={18} className="animate-spin" /> : confirmText}
+            {isProcessing ? (
+              <Loader2 size={18} className="animate-spin" />
+            ) : (
+              confirmText
+            )}
           </button>
         </div>
       </div>
     </div>,
-    document.body
+    document.body,
   );
 };

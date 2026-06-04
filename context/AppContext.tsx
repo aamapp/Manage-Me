@@ -639,17 +639,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       try {
-        // Try to fetch a tiny resource with a cache-buster to verify actual internet access
-        // Using a 3-second timeout for faster detection
-        const response = await fetch('https://www.google.com/favicon.ico', { 
-          mode: 'no-cors', 
+        // Fetch a local light endpoint representing the app's own origin to verify network capability
+        // This avoids sandbox CORS / Third-party CSP rules blocking Google favicon requests
+        const response = await fetch('/api/health?_cb=' + Date.now(), { 
           cache: 'no-store',
           signal: AbortSignal.timeout(3000) 
         });
         setIsOnline(true);
       } catch (error) {
-        // If fetch fails, it's likely no actual internet (e.g. no MB)
-        setIsOnline(false);
+        // Fallback: If local fetch fails or api is loading, trust navigator.onLine instead of forcing offline
+        setIsOnline(navigator.onLine);
       }
     };
 

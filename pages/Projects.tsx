@@ -1038,7 +1038,7 @@ export const Projects: React.FC = () => {
                          <Music size={isGeneratingPDF ? 28 : 20} />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <h3 className={`font-bold text-slate-800 ${isGeneratingPDF ? 'text-lg mb-1.5' : 'text-sm'} truncate leading-snug`} style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>{p.name}</h3>
+                        <h3 className={`font-medium text-slate-800 ${isGeneratingPDF ? 'text-lg mb-1.5' : 'text-sm'} truncate leading-snug`} style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>{p.name}</h3>
                         <p className={`${isGeneratingPDF ? 'text-sm' : 'text-[11px]'} text-slate-500 font-medium truncate flex items-center gap-1.5 ${isGeneratingPDF ? 'mb-3' : 'mt-1'}`}>
                           <Users size={isGeneratingPDF ? 14 : 10} className="shrink-0" /> {p.clientname}
                         </p>

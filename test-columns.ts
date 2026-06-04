@@ -7,19 +7,25 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 async function check() {
   console.log("Checking expenses table...");
-  const { data: exp, error: expErr } = await supabase.from('expenses').select('*').limit(1);
+  const { data: exp, error: expErr } = await supabase.from('expenses').select('*').limit(5);
   if (expErr) {
     console.error("Expenses error:", expErr);
   } else {
-    console.log("Expenses first row keys:", exp.length > 0 ? Object.keys(exp[0]) : "No rows found");
+    console.log("Expenses rows:");
+    exp?.forEach(r => {
+      console.log(`ID: ${r.id} | Category: ${r.category} | Date: ${r.date} | CreatedAt: ${r.createdat}`);
+    });
   }
 
   console.log("Checking income_records table...");
-  const { data: inc, error: incErr } = await supabase.from('income_records').select('*').limit(1);
+  const { data: inc, error: incErr } = await supabase.from('income_records').select('*').limit(5);
   if (incErr) {
     console.error("Income records error:", incErr);
   } else {
-    console.log("Income records first row keys:", inc.length > 0 ? Object.keys(inc[0]) : "No rows found");
+    console.log("Income records rows:");
+    inc?.forEach(r => {
+      console.log(`ID: ${r.id} | Name: ${r.projectname || r.clientname} | Date: ${r.date} | CreatedAt: ${r.createdat}`);
+    });
   }
 }
 

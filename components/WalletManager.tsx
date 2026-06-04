@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useAppContext } from '@/context/AppContext';
 import { supabase } from '@/lib/supabase';
 import { Wallet } from '@/types';
@@ -22,105 +23,16 @@ export const WalletManager: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [isDbAvailable, setIsDbAvailable] = useState<boolean>(true);
   
-  // Floating Action Button visibility based on scroll direction (optimized with direct DOM ref to run at 60fps without React lagging)
-  const fabRef = useRef<HTMLButtonElement>(null);
-  const isFabVisibleRef = useRef(true);
-  const lastScrollY = useRef(0);
-
-  const setFabVisibleDirectly = (visible: boolean) => {
-    if (isFabVisibleRef.current === visible) return;
-    isFabVisibleRef.current = visible;
-    
-    const el = fabRef.current;
-    if (!el) return;
-    
-    if (visible) {
-      el.style.opacity = '1';
-      el.style.transform = 'translateY(0) scale(1)';
-      el.style.pointerEvents = 'auto';
-    } else {
-      el.style.opacity = '0';
-      el.style.transform = 'translateY(32px) scale(0.9)';
-      el.style.pointerEvents = 'none';
-    }
-  };
-
   useEffect(() => {
-    lastScrollY.current = window.scrollY;
-    let lastTouchY = 0;
-    
-    const handleScroll = () => {
-      const currentScrollY = window.scrollY;
-      const diffScrollY = currentScrollY - lastScrollY.current;
-      
-      if (diffScrollY > 0) {
-        setFabVisibleDirectly(false);
-      } else if (diffScrollY < 0) {
-        setFabVisibleDirectly(true);
-      }
-      
-      // Always show when close to the top
-      if (currentScrollY < 30) {
-        setFabVisibleDirectly(true);
-      }
-      
-      lastScrollY.current = currentScrollY;
-    };
-
-    const handleTouchStart = (e: TouchEvent) => {
-      if (e.touches && e.touches.length > 0) {
-        lastTouchY = e.touches[0].clientY;
+    const handleGlobalAdd = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail?.tab === 'wallet') {
+        handleOpenAdd();
       }
     };
-
-    const handleTouchMove = (e: TouchEvent) => {
-      if (!e.touches || e.touches.length === 0) return;
-      
-      const currentY = e.touches[0].clientY;
-      const diffY = currentY - lastTouchY;
-      
-      // finger moved UP (scrolling DOWN) -> Hide FAB instantly
-      if (diffY < 0) {
-        setFabVisibleDirectly(false);
-      } 
-      // finger moved DOWN (scrolling UP) -> Show FAB instantly
-      else if (diffY > 0) {
-        setFabVisibleDirectly(true);
-      }
-      
-      lastTouchY = currentY;
-      
-      // Always show when close to the top
-      if (window.scrollY < 30) {
-        setFabVisibleDirectly(true);
-      }
-    };
-
-    const handleWheel = (e: WheelEvent) => {
-      if (e.deltaY > 0) {
-        setFabVisibleDirectly(false);
-      } else if (e.deltaY < 0) {
-        setFabVisibleDirectly(true);
-      }
-      
-      // Always show when close to the top
-      if (window.scrollY < 30) {
-        setFabVisibleDirectly(true);
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    window.addEventListener('touchstart', handleTouchStart, { passive: true });
-    window.addEventListener('touchmove', handleTouchMove, { passive: true });
-    window.addEventListener('wheel', handleWheel, { passive: true });
-
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-      window.removeEventListener('touchstart', handleTouchStart);
-      window.removeEventListener('touchmove', handleTouchMove);
-      window.removeEventListener('wheel', handleWheel);
-    };
-  }, []);
+    window.addEventListener('open-add-modal', handleGlobalAdd);
+    return () => window.removeEventListener('open-add-modal', handleGlobalAdd);
+  }, [wallets]);
 
   // Modal & form states
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -170,9 +82,9 @@ export const WalletManager: React.FC = () => {
   };
 
   // Fetch wallets
-  const fetchWallets = async () => {
+  const fetchWallets = async (background = false) => {
     if (!user) return;
-    setLoading(true);
+    if (!background) setLoading(true);
     
     try {
       // Try to fetch from Supabase
@@ -323,6 +235,10 @@ export const WalletManager: React.FC = () => {
 
   useEffect(() => {
     fetchWallets();
+
+    const handleWalletsUpdated = () => fetchWallets(true);
+    window.addEventListener('wallets-updated', handleWalletsUpdated);
+    return () => window.removeEventListener('wallets-updated', handleWalletsUpdated);
   }, [user?.id]);
 
   // Handle menu outside click close
@@ -636,24 +552,11 @@ export const WalletManager: React.FC = () => {
         </div>
       )}
 
-      {/* 3. Floating Action Button to Add New Wallet */}
-      <button
-        ref={fabRef}
-        type="button"
-        id="add-wallet-fab"
-        onClick={handleOpenAdd}
-        className="fixed bottom-[76px] lg:bottom-8 right-5 lg:right-8 bg-[#1a73e8] hover:bg-blue-700 active:scale-95 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg shadow-blue-200 transition-all duration-[150ms] ease-out z-40 cursor-pointer pointer-events-auto opacity-100 scale-100 translate-y-0"
-        style={{
-          willChange: 'transform, opacity',
-        }}
-        title="নতুন ওয়ালেট যোগ করুন"
-      >
-        <Plus size={28} />
-      </button>
+      {/* 3. Floating Action Button is now handled globally at Parent Level */}
 
       {/* 4. Overlay Form Modal (Floating) */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4 select-none animate-in fade-in duration-200">
+      {isModalOpen && createPortal(
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[1000] p-4 select-none animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-sm rounded-[24px] shadow-2xl overflow-hidden border border-slate-100 flex flex-col relative max-h-[90vh]">
             {/* Modal Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-[#f8fafc]">
@@ -739,7 +642,8 @@ export const WalletManager: React.FC = () => {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
     </div>

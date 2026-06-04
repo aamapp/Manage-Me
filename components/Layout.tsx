@@ -120,24 +120,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
     };
   }, [isMoreMenuOpen, isAboutOpen]);
 
-  const [avatarCacheBuster, setAvatarCacheBuster] = useState(Date.now());
-
-  // Handle online/offline events to refresh avatar
-  useEffect(() => {
-    const handleOnline = () => {
-      setAvatarCacheBuster(Date.now());
-    };
-    window.addEventListener("online", handleOnline);
-    return () => window.removeEventListener("online", handleOnline);
-  }, []);
-
-  const getAvatarUrl = (url: string | null | undefined) => {
-    if (!url) return null;
-    // Add cache buster to URL
-    const separator = url.includes("?") ? "&" : "?";
-    return `${url}${separator}t=${avatarCacheBuster}`;
-  };
-
   const trashCount =
     trashedProjects.length + trashedExpenses.length + trashedGhazalNotes.length;
 
@@ -385,10 +367,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
             className="bg-slate-50 p-3 rounded-2xl border border-slate-100 flex items-center gap-3 mb-3 cursor-pointer hover:bg-slate-100 transition-colors"
           >
             <div className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center shadow-sm overflow-hidden">
-              {user.avatar_url && isOnline ? (
+              {user.avatar_url ? (
                 <img
-                  key={`${user.avatar_url}-${avatarCacheBuster}`}
-                  src={getAvatarUrl(user.avatar_url) || ""}
+                  src={user.avatar_url}
                   alt={user.name}
                   className="w-full h-full object-cover"
                   referrerPolicy="no-referrer"
@@ -470,10 +451,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                   User View
                 </span>
               )}
-              {user.avatar_url && isOnline ? (
+              {user.avatar_url ? (
                 <img
-                  key={`${user.avatar_url}-${avatarCacheBuster}`}
-                  src={getAvatarUrl(user.avatar_url) || ""}
+                  src={user.avatar_url}
                   alt={user.name}
                   className="w-9 h-9 rounded-full border-2 border-white shadow-md object-cover ring-1 ring-slate-100"
                   referrerPolicy="no-referrer"
@@ -498,7 +478,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
           isFullScreenPage
             ? "p-0"
             : isExpensesPage
-            ? "pt-0 pb-[72px] lg:pb-8 px-3 lg:px-8"
+            ? "pt-0 pb-[72px] lg:pb-8 px-0"
             : "pt-[68px] lg:pt-8 pb-[72px] lg:pb-8 px-3 lg:px-8"
         } animate-in fade-in duration-300 w-full max-w-[100vw] lg:max-w-none ${isExpensesPage ? 'overflow-x-clip' : 'overflow-x-hidden'} lg:ml-72`}
       >
@@ -588,13 +568,16 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
 
               <div className="flex items-center gap-2 relative z-10 min-w-0">
                 <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-white border-2 border-white flex items-center justify-center shadow-md">
-                  {user.avatar_url && isOnline ? (
+                  {user.avatar_url ? (
                     <img
-                      key={user.avatar_url}
                       src={user.avatar_url}
                       alt={user.name}
                       className="w-full h-full object-cover"
                       referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || "User")}&background=random`;
+                      }}
                     />
                   ) : (
                     <div className="w-full h-full bg-indigo-50 flex items-center justify-center text-indigo-600">

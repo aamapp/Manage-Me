@@ -104,6 +104,8 @@ export interface DueTransaction {
   amount: number;
   description: string;
   date: string;
+  time?: string;
+  walletName?: string;
 }
 
 export interface DuePerson {
