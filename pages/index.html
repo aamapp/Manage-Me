@@ -1,0 +1,84 @@
+
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage-Me</title>
+    <link rel="preload" href="https://cdn.jsdelivr.net/gh/manthib/Typhaine@master/Site/maheer/assets/font/KohinoorBangla-Regular.ttf" as="font" type="font/ttf" crossorigin="anonymous">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Kohinoor Bangla"', 'sans-serif'],
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        /* Force Light Mode for Form Elements */
+        :root {
+            color-scheme: light;
+        }
+        
+        body {
+            font-family: 'Kohinoor Bangla', sans-serif !important;
+            background-color: #f8fafc;
+            /* Ensure native overscroll (rubber-banding) works on Android */
+            overscroll-behavior-y: auto;
+        }
+        
+        /* Ensure inputs always render in light mode (fixes mobile dark mode issues) */
+        input, select, textarea {
+            color-scheme: light;
+        }
+
+        .bg-brand-purple { background-color: #6366f1; }
+        .text-brand-purple { color: #6366f1; }
+        .border-brand-purple { border-color: #6366f1; }
+        
+        /* Date picker icon visibility improvement */
+        input[type="date"]::-webkit-calendar-picker-indicator {
+            cursor: pointer;
+            filter: invert(0.4);
+            transition: filter 0.2s;
+        }
+        input[type="date"]::-webkit-calendar-picker-indicator:hover {
+            filter: invert(0.2);
+        }
+
+        /* Hide scrollbar for Chrome, Safari and Opera */
+        ::-webkit-scrollbar {
+            display: none;
+        }
+        /* Hide scrollbar for IE, Edge and Firefox */
+        html {
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react": "https://esm.sh/react@^19.2.4",
+    "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
+    "react-router-dom": "https://esm.sh/react-router-dom@^7.13.0",
+    "recharts": "https://esm.sh/recharts@^3.7.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "html2canvas": "https://esm.sh/html2canvas@1.4.1",
+    "react-dom": "https://esm.sh/react-dom@^19.2.4"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+    <link rel="manifest" href="/manifest.json">
+</head>
+<body>
+    <div id="root"></div>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>

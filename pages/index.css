@@ -1,0 +1,106 @@
+/* Tailwind is handled via CDN in index.html */
+
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap');
+
+@font-face {
+  font-family: 'Kohinoor Bangla';
+  src: url('https://cdn.jsdelivr.net/gh/manthib/Typhaine@master/Site/maheer/assets/font/KohinoorBangla-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+body {
+  font-family: 'Kohinoor Bangla', sans-serif !important;
+  background-color: #f8fafc;
+  /* Prevent pull-to-refresh on mobile browsers / WebView */
+  overscroll-behavior-y: none;
+  /* Prevent text selection to feel like native app */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+input, textarea {
+  /* Allow selection within input and textarea elements */
+  -webkit-user-select: auto;
+  user-select: auto;
+}
+
+.recharts-wrapper, .recharts-surface, .recharts-responsive-container, .recharts-wrapper * {
+  outline: none !important;
+}
+
+@keyframes premium-glow {
+  0%, 100% {
+    box-shadow: 0 0 15px 2px rgba(79, 70, 229, 0.4);
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    box-shadow: 0 0 25px 8px rgba(99, 102, 241, 0.8), inset 0 0 10px rgba(255, 255, 255, 0.5);
+    transform: scale(1.08);
+    opacity: 0.9;
+  }
+}
+
+.logo-processing {
+  animation: premium-glow 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  background: linear-gradient(135deg, #6366f1, #4f46e5, #818cf8);
+  background-size: 200% 200%;
+  animation-name: premium-glow, gradient-shift;
+  animation-duration: 2s, 3s;
+  animation-iteration-count: infinite;
+  animation-timing-function: ease-in-out;
+}
+
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Super Premium, Lag-Free Animation */
+.premium-loader-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.4);
+  box-shadow: 0 8px 32px rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(8px);
+}
+
+.premium-loader-ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 1.1rem;
+  border: 4px solid transparent;
+  border-top-color: #4f46e5;
+  border-bottom-color: #818cf8;
+  transform: translateZ(0); /* Hardware acceleration */
+  animation: smooth-spin 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.premium-loader-text {
+  font-weight: 900;
+  color: #4f46e5;
+  /* Pure hardware accelerated properties to guarantee NO lag */
+  transform: translateZ(0);
+  animation: smooth-pulse 2s ease-in-out infinite;
+}
+
+@keyframes smooth-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes smooth-pulse {
+  0%, 100% { transform: scale(0.9); opacity: 0.7; }
+  50% { transform: scale(1.1); opacity: 1; text-shadow: 0 0 15px rgba(79, 70, 229, 0.6); }
+}
