@@ -1254,53 +1254,53 @@ export const Projects: React.FC = () => {
                                         <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 border-2 border-white shadow-sm ${
                                             event.type === 'created' ? 'bg-indigo-100 text-indigo-600' :
                                             event.type === 'payment' ? 'bg-emerald-100 text-emerald-600' :
-                                            'bg-blue-100 text-blue-600'
+                                            event.type === 'progress' ? 'bg-amber-100 text-amber-600' :
+                                            'bg-indigo-600 text-white'
                                         }`}>
-                                            {event.type === 'created' ? <Plus size={14} /> :
-                                             event.type === 'payment' ? <DollarSign size={14} /> :
-                                             <CheckCircle2 size={14} />}
+                                            {event.type === 'created' ? <Briefcase size={12} /> :
+                                             event.type === 'payment' ? <DollarSign size={12} /> :
+                                             event.type === 'progress' ? <Play size={12} /> :
+                                             <CheckCircle2 size={12} />}
                                         </div>
-                                        <div className="ml-3 flex-1 pt-1.5">
-                                            <p className="text-sm font-bold text-slate-700">{event.text}</p>
-                                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mt-0.5 gap-1">
-                                                <span className="text-xs font-semibold text-slate-500 tracking-wide font-sans">
-                                                  {new Date(event.date).toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: 'numeric' })}
-                                                  {' • '}
-                                                  {event.hasTime ? new Date(event.date).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true }) : 'সময় নেই'}
+                                        <div className="ml-3 flex-1 text-left">
+                                            <div className="flex items-center justify-between">
+                                                <p className="text-xs font-bold text-slate-700" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                                                    {event.text}
+                                                </p>
+                                                <span className="text-[10px] font-bold text-slate-400 font-sans">
+                                                    {new Date(event.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                                                    {event.hasTime && ` ${new Date(event.date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`}
                                                 </span>
-                                                {event.amount && <span className="text-xs font-bold text-emerald-600 font-sans tracking-wide">+{currency}{event.amount}</span>}
                                             </div>
+                                            {event.amount && (
+                                                <p className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100 inline-block mt-1 font-sans">
+                                                    +{currency}{event.amount.toLocaleString('en-US')}
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
                                 ))}
                             </div>
                         </div>
                     </div>
-
-                    {/* Notes */}
-                    {viewProject.notes && (
-                        <div className="bg-amber-50 p-3 rounded-xl border border-amber-100">
-                             <p className="text-[10px] font-bold text-amber-600 uppercase mb-1">নোটস</p>
-                             <p className="text-xs font-medium text-amber-800 leading-relaxed">{viewProject.notes}</p>
-                        </div>
-                    )}
-                  </div>
                 </div>
-                </div>
-
-                {/* Footer Buttons */}
-                <div className="p-4 border-t border-slate-100 flex gap-3 shrink-0">
+            </div>
+        </div>
+        {/* Footer Buttons */}
+        <div className="p-4 border-t border-slate-100 flex gap-3 shrink-0">
                     <button 
                         onClick={handleDownloadImage}
                         disabled={isGeneratingImage}
-                        className="flex-1 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-slate-200 transition-colors"
+                        className="flex-1 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold active:scale-95 transition-transform flex items-center justify-center gap-2"
+                        style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
                     >
-                        {isGeneratingImage ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
-                        ছবি সেভ করুন
+                        {isGeneratingImage ? <Loader2 className="animate-spin" size={18} /> : <Download size={18} />}
+                        ডাউনলোড ইমেজ
                     </button>
                     <button 
                         onClick={() => setViewProject(null)}
-                        className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-colors"
+                        className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold active:scale-95 transition-transform"
+                        style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
                     >
                         বন্ধ করুন
                     </button>
@@ -1310,47 +1310,73 @@ export const Projects: React.FC = () => {
           document.body
       )}
 
-      {/* Add/Edit Modal (Full Screen with Portal) */}
+      {/* Fullscreen Create/Edit Project Modal */}
       {isModalOpen && createPortal(
-        <div className="fixed inset-0 z-[1000] bg-white flex flex-col h-[100dvh] animate-in fade-in duration-200">
-            {/* Header - Compact */}
-            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
-              <h2 className="text-base font-bold text-slate-800" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
-                {isEditing ? 'প্রজেক্ট এডিট' : 'নতুন প্রজেক্ট'}
-              </h2>
-              <button disabled={isSubmitting} onClick={() => setModalOpen(false)} className="p-2 bg-slate-50 rounded-full text-slate-500 hover:bg-slate-100 transition-colors">
-                <X size={20} />
-              </button>
-            </div>
-            
-            {/* Form - Compact Layout */}
-            <div className="flex-1 overflow-y-auto">
-                <form onSubmit={handleSubmit} className="px-4 pt-3 pb-24 space-y-4">
-                  
-                  {/* Smart Error Banner */}
-                  {formError && (
-                    <div className="bg-rose-50 text-rose-600 p-3 rounded-xl flex items-start gap-2 border border-rose-100 animate-in slide-in-from-top-2">
-                       <AlertCircle size={16} className="shrink-0 mt-0.5" />
-                       <div>
-                         <p className="font-bold text-xs">ত্রুটি!</p>
-                         <p className="text-[10px] font-medium mt-0.5">{formError}</p>
-                       </div>
-                    </div>
-                  )}
-
+         <div className="fixed inset-0 z-[1000] bg-white flex flex-col h-[100dvh] animate-in fade-in duration-200">
+             <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
+               <h2 className="text-base font-bold text-slate-800" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                 {isEditing ? 'প্রজেক্ট এডিট' : 'নতুন প্রজেক্ট'}
+               </h2>
+               <button disabled={isSubmitting} onClick={() => setModalOpen(false)} className="p-2 bg-slate-50 rounded-full text-slate-500 hover:bg-slate-100 transition-colors">
+                 <X size={20} />
+               </button>
+             </div>
+             
+             <div className="flex-1 overflow-y-auto">
+                 <form onSubmit={handleSubmit} className="px-4 pt-4 pb-24 space-y-5">
                   <div className="relative">
-                    <input type="text" id="project_name_input" value={newProject.name} onChange={e => setNewProject({...newProject, name: e.target.value})} className="block px-4 py-3.5 w-full text-sm font-bold text-slate-800 bg-transparent rounded-xl border border-slate-200 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 peer transition-colors" placeholder=" " style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }} />
-                    <label htmlFor="project_name_input" className={`absolute text-sm font-bold text-slate-500 duration-300 transform z-10 origin-[0] left-3 px-1 pointer-events-none transition-all ${newProject.name ? 'top-0 -translate-y-1/2 scale-[0.80] bg-white' : 'top-1/2 -translate-y-1/2 scale-100 bg-transparent'} peer-focus:top-0 peer-focus:-translate-y-1/2 peer-focus:scale-[0.80] peer-focus:text-indigo-600 peer-focus:bg-white`} style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>প্রজেক্ট নাম</label>
+                    <input 
+                      type="text" 
+                      id="project_name_input" 
+                      value={newProject.name} 
+                      onChange={e => setNewProject({...newProject, name: e.target.value})} 
+                      className="block px-4 py-3.5 w-full text-sm font-bold text-slate-800 bg-white rounded-xl border border-slate-200 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 peer transition-colors" 
+                      placeholder=" " 
+                      style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }} 
+                    />
+                    <label 
+                      htmlFor="project_name_input" 
+                      className={`absolute text-sm font-bold duration-300 transform z-10 origin-left left-3 px-1.5 pointer-events-none transition-all 
+                        ${newProject.name 
+                          ? 'top-0 -translate-y-1/2 scale-[0.80] bg-white text-slate-500' 
+                          : 'top-1/2 -translate-y-1/2 scale-100 bg-transparent text-slate-400'
+                        } 
+                        peer-focus:top-0 peer-focus:-translate-y-1/2 peer-focus:scale-[0.80] peer-focus:text-indigo-600 peer-focus:bg-white`} 
+                      style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
+                    >
+                      প্রজেক্ট নাম
+                    </label>
                   </div>
 
                   <div className="relative" ref={clientInputRef}>
-                    <input type="text" id="client_input" value={clientSearch} onFocus={() => setShowClientSuggestions(true)} onChange={e => {setClientSearch(e.target.value); setShowClientSuggestions(true);}} className="block px-4 py-3.5 w-full text-sm font-bold text-slate-800 bg-transparent rounded-xl border border-slate-200 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 peer transition-colors" placeholder=" " style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }} autoComplete="off" />
-                    <label htmlFor="client_input" className={`absolute text-sm font-bold text-slate-500 duration-300 transform z-10 origin-[0] left-3 px-1 pointer-events-none transition-all ${clientSearch ? 'top-0 -translate-y-1/2 scale-[0.80] bg-white' : 'top-1/2 -translate-y-1/2 scale-100 bg-transparent'} peer-focus:top-0 peer-focus:-translate-y-1/2 peer-focus:scale-[0.80] peer-focus:text-indigo-600 peer-focus:bg-white`} style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>ক্লায়েন্ট</label>
+                    <input 
+                      type="text" 
+                      id="client_input" 
+                      value={clientSearch} 
+                      onFocus={() => setShowClientSuggestions(true)} 
+                      onChange={e => {setClientSearch(e.target.value); setShowClientSuggestions(true);}} 
+                      className="block px-4 py-3.5 w-full text-sm font-bold text-slate-800 bg-white rounded-xl border border-slate-200 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 peer transition-colors" 
+                      placeholder=" " 
+                      style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }} 
+                      autoComplete="off" 
+                    />
+                    <label 
+                      htmlFor="client_input" 
+                      className={`absolute text-sm font-bold duration-300 transform z-10 origin-left left-3 px-1.5 pointer-events-none transition-all 
+                        ${clientSearch 
+                          ? 'top-0 -translate-y-1/2 scale-[0.80] bg-white text-slate-500' 
+                          : 'top-1/2 -translate-y-1/2 scale-100 bg-transparent text-slate-400'
+                        } 
+                        peer-focus:top-0 peer-focus:-translate-y-1/2 peer-focus:scale-[0.80] peer-focus:text-indigo-600 peer-focus:bg-white`} 
+                      style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
+                    >
+                      ক্লায়েন্ট
+                    </label>
                     
                     {showClientSuggestions && (clientSearch || clientSuggestions.length > 0) && (
                       <div className="absolute top-full mt-1 w-full bg-white border border-slate-100 rounded-xl shadow-2xl max-h-40 overflow-y-auto z-[60]">
                         {clientSuggestions.map(c => (
-                          <div key={c.id} onClick={() => handleSelectClient(c)} className="px-4 py-3 border-b border-slate-50 hover:bg-indigo-50 font-medium text-sm cursor-pointer transition-colors text-slate-700">
+                          <div key={c.id} onClick={() => handleSelectClient(c)} className="px-4 py-3 border-b border-slate-50 hover:bg-slate-50 font-medium text-sm cursor-pointer transition-colors text-slate-700">
                             {c.name}
                           </div>
                         ))}
@@ -1363,39 +1389,42 @@ export const Projects: React.FC = () => {
                     )}
                   </div>
 
-                  <StatusPicker 
-                    label="স্ট্যাটাস"
-                    value={newProject.status}
-                    onChange={status => setNewProject({...newProject, status})}
-                    options={PROJECT_STATUS_LABELS}
-                  />
+                  <div className="flex flex-col gap-1.5 text-left">
+                    <label className="text-xs font-bold text-slate-500 pl-1" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>স্ট্যাটাস</label>
+                    <StatusPicker 
+                      value={newProject.status}
+                      onChange={status => setNewProject({...newProject, status})}
+                      options={PROJECT_STATUS_LABELS}
+                    />
+                  </div>
 
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="relative">
+                    <div className="flex flex-col gap-1.5 text-left">
+                      <label className="text-xs font-bold text-slate-500 pl-1" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>বাজেট ({currency})</label>
                       <div 
                         onClick={() => openKeypad('total')}
-                        className={`keypad-trigger relative w-full px-4 py-3.5 bg-transparent border border-slate-200 rounded-xl font-bold text-slate-800 active:bg-slate-50 transition-colors flex items-center justify-between cursor-pointer ${(showKeypad && activeAmountField === 'total') ? 'ring-2 ring-indigo-500 border-indigo-500' : ''}`}
+                        className={`keypad-trigger relative w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 active:bg-slate-100 transition-all flex items-center justify-between cursor-pointer min-h-[48px] ${(showKeypad && activeAmountField === 'total') ? 'ring-2 ring-indigo-500 border-indigo-500' : ''}`}
                       >
-                         <span className="text-sm">{newProject.totalamount || ((showKeypad && activeAmountField === 'total') ? '' : '')}</span>
+                         <span className="text-sm">{newProject.totalamount || '০'}</span>
                          <Calculator size={18} className="text-slate-400" />
                       </div>
-                      <label className={`absolute text-sm font-bold duration-300 transform z-10 origin-[0] left-3 px-1 pointer-events-none transition-all ${(newProject.totalamount || (showKeypad && activeAmountField === 'total')) ? 'top-0 -translate-y-1/2 scale-[0.80] bg-white' : 'top-1/2 -translate-y-1/2 scale-100 bg-transparent'} ${(showKeypad && activeAmountField === 'total') ? 'text-indigo-600' : 'text-slate-500'}`} style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>বাজেট ({currency})</label>
                     </div>
-                    <div className="relative">
+                    <div className="flex flex-col gap-1.5 text-left">
+                      <label className="text-xs font-bold text-slate-500 pl-1" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>পরিশোধ ({currency})</label>
                       <div 
                         onClick={() => openKeypad('paid')}
-                        className={`keypad-trigger relative w-full px-4 py-3.5 bg-transparent border border-slate-200 rounded-xl font-bold text-emerald-600 active:bg-slate-50 transition-colors flex items-center justify-between cursor-pointer ${(showKeypad && activeAmountField === 'paid') ? 'ring-2 ring-indigo-500 border-indigo-500' : ''}`}
+                        className={`keypad-trigger relative w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-emerald-600 active:bg-slate-100 transition-all flex items-center justify-between cursor-pointer min-h-[48px] ${(showKeypad && activeAmountField === 'paid') ? 'ring-2 ring-indigo-500 border-indigo-500' : ''}`}
                       >
-                         <span className="text-sm">{newProject.paidamount || ((showKeypad && activeAmountField === 'paid') ? '' : '')}</span>
+                         <span className="text-sm">{newProject.paidamount || '০'}</span>
                          <Calculator size={18} className="text-slate-400" />
                       </div>
-                      <label className={`absolute text-sm font-bold duration-300 transform z-10 origin-[0] left-3 px-1 pointer-events-none transition-all ${(newProject.paidamount || (showKeypad && activeAmountField === 'paid')) ? 'top-0 -translate-y-1/2 scale-[0.80] bg-white' : 'top-1/2 -translate-y-1/2 scale-100 bg-transparent'} ${(showKeypad && activeAmountField === 'paid') ? 'text-indigo-600' : 'text-slate-500'}`} style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>পরিশোধ ({currency})</label>
                     </div>
                   </div>
 
-                   <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex flex-col gap-1.5 text-left">
+                      <label className="text-xs font-bold text-slate-500 pl-1" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>শুরু</label>
                       <DatePicker 
-                        label="শুরু"
                         value={newProject.createdat ? newProject.createdat.split('T')[0] : ''}
                         onChange={(date) => {
                             const now = new Date();
@@ -1409,8 +1438,10 @@ export const Projects: React.FC = () => {
                         }}
                         placeholder="শুরু তারিখ"
                       />
+                    </div>
+                    <div className="flex flex-col gap-1.5 text-left">
+                      <label className="text-xs font-bold text-slate-500 pl-1" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>ডেডলাইন (অপশনাল)</label>
                       <DatePicker 
-                        label="ডেডলাইন (অপশনাল)"
                         value={newProject.deadline ? newProject.deadline.split('T')[0] : ''}
                         onChange={(date) => {
                           const fullIsoDate = date ? new Date(`${date}T23:59:59`).toISOString() : '';
@@ -1419,7 +1450,8 @@ export const Projects: React.FC = () => {
                         placeholder="ডেডলাইন"
                         align="right"
                       />
-                   </div>
+                    </div>
+                  </div>
 
                   <button type="submit" disabled={isSubmitting} className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold text-base shadow-lg shadow-indigo-200 active:scale-95 transition-transform flex items-center justify-center gap-2 mt-4" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
                     {isSubmitting ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}

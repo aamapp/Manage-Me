@@ -16,7 +16,7 @@
   },
   "build": {
     "appId": "com.manageme.app",
-    "productName": "Manage-Me",
+    "productName": "Audio Balance",
     "directories": {
       "output": "release"
     },
@@ -35,7 +35,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Manage Me"
+      "shortcutName": "Audio Balance"
     }
   },
   "dependencies": {

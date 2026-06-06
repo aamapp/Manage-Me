@@ -279,9 +279,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
             className="flex items-center gap-3 cursor-pointer group"
           >
             <div
-              className={`w-10 h-10 rounded-xl flex items-center justify-center p-2 text-white font-bold text-xl shadow-lg shadow-indigo-200 ring-2 ring-white transition-all duration-300 ${isProcessing ? "logo-processing" : "bg-gradient-to-br from-indigo-600 to-indigo-700 group-hover:scale-105"}`}
+              className={`w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden shadow-lg transition-all duration-300 ${isProcessing ? "logo-processing" : "group-hover:scale-105"}`}
             >
-              <AppLogo variant="white" size="100%" />
+              <AppLogo variant="color" size="100%" />
             </div>
             <span className="font-bold text-slate-800 text-xl tracking-tight group-hover:text-indigo-600 transition-colors">
               {APP_NAME}
@@ -421,9 +421,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                 className="flex items-center gap-2.5 cursor-pointer active:opacity-70 transition-opacity group"
               >
                 <div
-                  className={`w-9 h-9 rounded-xl flex items-center justify-center p-1.5 text-white font-bold text-lg shadow-lg shadow-indigo-200 ring-2 ring-white transition-all duration-300 ${isProcessing ? "logo-processing" : "bg-gradient-to-br from-indigo-600 to-indigo-700 group-active:scale-95"}`}
+                  className={`w-9 h-9 rounded-xl flex items-center justify-center overflow-hidden shadow-lg transition-all duration-300 ${isProcessing ? "logo-processing" : "group-active:scale-95"}`}
                 >
-                  <AppLogo variant="white" size="100%" />
+                  <AppLogo variant="color" size="100%" />
                 </div>
                 <span className="font-bold text-slate-800 text-lg tracking-tight group-hover:text-indigo-600 transition-colors">
                   {APP_NAME}
@@ -818,7 +818,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
               <div className="premium-loader-container !w-16 !h-16 p-3.5">
                 <div className="premium-loader-ring"></div>
                 <div className="premium-loader-text w-full h-full flex items-center justify-center">
-                  <AppLogo variant="color" size="100%" />
+                  <AppLogo variant="transparent-color" size="100%" />
                 </div>
               </div>
               <div className="flex flex-col items-center gap-1">
@@ -841,10 +841,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
               <div className="premium-loader-container !w-20 !h-20 p-4.5">
                 <div className="premium-loader-ring"></div>
                 <div className="premium-loader-text w-full h-full flex items-center justify-center">
-                  <AppLogo variant="color" size="100%" />
+                  <AppLogo variant="transparent-color" size="100%" />
                 </div>
               </div>
-              <p className="text-indigo-600 font-bold tracking-widest text-base uppercase animate-pulse">
+              <p className="text-indigo-600 font-semibold tracking-widest text-lg md:text-xl uppercase animate-pulse">
                 লোড হচ্ছে...
               </p>
             </div>

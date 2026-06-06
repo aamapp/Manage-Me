@@ -177,7 +177,7 @@ const AppContent: React.FC = () => {
           <div className="premium-loader-container !w-16 !h-16 p-3.5">
             <div className="premium-loader-ring"></div>
             <div className="premium-loader-text w-full h-full flex items-center justify-center">
-              <AppLogo variant="color" size="100%" />
+              <AppLogo variant="transparent-color" size="100%" />
             </div>
           </div>
           <div className="flex flex-col items-center gap-1">
@@ -223,10 +223,10 @@ const AppContent: React.FC = () => {
             <div className="premium-loader-container !w-14 !h-14 p-3 font-normal">
               <div className="premium-loader-ring"></div>
               <div className="premium-loader-text w-full h-full flex items-center justify-center">
-                <AppLogo variant="color" size="100%" />
+                <AppLogo variant="transparent-color" size="100%" />
               </div>
             </div>
-            <p className="text-indigo-600 font-bold tracking-widest text-[10px] uppercase animate-pulse">লোড হচ্ছে...</p>
+            <p className="text-indigo-600 font-semibold tracking-widest text-sm md:text-base uppercase animate-pulse">লোড হচ্ছে...</p>
           </div>
         </div>
       }>

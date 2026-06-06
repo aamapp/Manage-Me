@@ -708,7 +708,7 @@ export const Expenses: React.FC = () => {
     if (!dateStr) return '';
     try {
       let dateObj = new Date(dateStr);
-      if (createdAtStr) {
+      if ((isNaN(dateObj.getTime()) || dateStr.length <= 10) && createdAtStr) {
         const testObj = new Date(createdAtStr);
         if (!isNaN(testObj.getTime())) {
           dateObj = testObj;
@@ -853,7 +853,12 @@ export const Expenses: React.FC = () => {
     const rawDate = tx.date.substring(0, 10);
     
     let timeStr = `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`;
-    if (tx.rawItem && tx.rawItem.createdat) {
+    if (tx.rawItem && tx.rawItem.date && tx.rawItem.date.length > 10) {
+      const dt = new Date(tx.rawItem.date);
+      if (!isNaN(dt.getTime())) {
+        timeStr = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
+      }
+    } else if (tx.rawItem && tx.rawItem.createdat) {
       const dt = new Date(tx.rawItem.createdat);
       if (!isNaN(dt.getTime())) {
         timeStr = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
