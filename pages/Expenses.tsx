@@ -15,6 +15,8 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 import { DatePicker } from '@/components/DatePicker';
 import { TimePicker } from '@/components/TimePicker';
 import { WalletManager } from '@/components/WalletManager';
+import { ImageCropper } from '@/components/ImageCropper';
+import { AppLogo } from '@/components/AppLogo';
 import { DuePerson, DueTransaction, BudgetLimit, BudgetTransaction, TodoTask } from '../types';
 
 const CustomCoinsIcon = ({ size = 20, strokeWidth = 1.5, className = "" }: { size?: number; strokeWidth?: number; className?: string }) => (
@@ -1859,6 +1861,7 @@ export const Expenses: React.FC = () => {
                       }
                     }
                     
+                    setModalSubView('main');
                     setShowFilterModal(true);
                   }}
                   className={`transition-colors shrink-0 ${showDateFilter || dateRange.start || dateRange.end ? 'text-[#1a73e8]' : 'text-[#8e9aa8] md:hover:text-slate-700'}`}
@@ -2063,7 +2066,7 @@ export const Expenses: React.FC = () => {
       />
 
       {/* Date Filter Selection Modal */}
-      {showFilterModal && (
+      {showFilterModal && createPortal(
         <div 
           onClick={() => {
             setIsStartDatePickerOpen(false);
@@ -2287,7 +2290,8 @@ export const Expenses: React.FC = () => {
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* PDF Preview Modal */}
@@ -2925,6 +2929,7 @@ const DuesManager: React.FC<DuesManagerProps> = ({ wallets, adjustWalletBalance,
   const [newPersonAddress, setNewPersonAddress] = useState('');
   const [newPersonDate, setNewPersonDate] = useState(new Date().toISOString().split('T')[0]);
   const [newPersonAvatar, setNewPersonAvatar] = useState('');
+  const [cropSource, setCropSource] = useState<string | null>(null);
   const [newPersonWallet, setNewPersonWallet] = useState('ক্যাশ');
   const [isPersonWalletOpen, setIsPersonWalletOpen] = useState(false);
 
@@ -3318,8 +3323,12 @@ const DuesManager: React.FC<DuesManagerProps> = ({ wallets, adjustWalletBalance,
           {/* File Card */}
           <div className="bg-white p-2.5 rounded-xl shadow-sm border border-slate-100 relative">
             <div className="flex gap-3 items-start">
-              <div className="w-14 h-14 bg-slate-200 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-indigo-500 font-bold text-lg bg-indigo-100">
-                 {person.avatar ? <img src={person.avatar} alt="Avatar" className="w-full h-full object-cover" /> : person.name.charAt(0)}
+              <div className="w-14 h-14 rounded-full overflow-hidden shrink-0 flex items-center justify-center bg-indigo-100">
+                 {person.avatar ? (
+                   <img src={person.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                 ) : (
+                   <AppLogo variant="navy-striped" size="100%" />
+                 )}
               </div>
               <div className="flex-1 text-left">
                 <h3 className="text-base font-bold text-slate-800">{person.name}</h3>
@@ -3668,8 +3677,12 @@ const DuesManager: React.FC<DuesManagerProps> = ({ wallets, adjustWalletBalance,
               onClick={() => { setSelectedPersonId(person.id); setActiveView('details'); }}
               className={`p-2.5 rounded-xl flex items-center gap-3 border border-slate-50 shadow-sm cursor-pointer hover:shadow-md transition-all relative ${bgClass}`}
             >
-              <div className="w-11 h-11 bg-slate-200 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-indigo-500 font-bold text-base bg-indigo-100">
-                 {person.avatar ? <img src={person.avatar} alt="Avatar" className="w-full h-full object-cover" /> : person.name.charAt(0)}
+              <div className="w-11 h-11 rounded-full overflow-hidden shrink-0 flex items-center justify-center bg-indigo-100">
+                 {person.avatar ? (
+                   <img src={person.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                 ) : (
+                   <AppLogo variant="navy-striped" size="100%" />
+                 )}
               </div>
               <div className="flex-1 min-w-0 text-left">
                 <h3 className="text-sm font-bold text-slate-800 truncate leading-tight">{person.name}</h3>
@@ -3757,44 +3770,56 @@ const DuesManager: React.FC<DuesManagerProps> = ({ wallets, adjustWalletBalance,
 
               <div className="flex-1 overflow-y-auto px-4 pb-8">
                 <div className="max-w-md mx-auto">
-                  <div className="flex justify-center mb-8">
-                    <label className="w-[110px] h-[110px] rounded-full border border-blue-200 bg-[#eff6ff] flex items-center justify-center text-blue-600 overflow-hidden cursor-pointer hover:bg-blue-100 transition-colors shadow-[0_0_0_2px_white,0_0_0_2px_#eff6ff]">
-                      {newPersonAvatar ? (
-                        <img src={newPersonAvatar} alt="Avatar" className="w-full h-full object-cover" />
-                      ) : (
-                        <ImagePlus size={36} strokeWidth={2} />
-                      )}
-                      <input 
-                        type="file" 
-                        accept="image/*" 
-                        className="hidden" 
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            if (file.size > 1 * 1024 * 1024) {
-                              showToast('ছবির সাইজ ১ মেগাবাইটের কম হতে হবে');
-                              return;
+                  <div className="flex flex-col items-center justify-center pt-5 mb-8 gap-2">
+                    <div className="relative w-[110px] h-[110px]">
+                      <label className="w-full h-full rounded-full border border-blue-200 bg-[#eff6ff] flex items-center justify-center text-blue-600 overflow-hidden cursor-pointer hover:bg-blue-100 transition-colors shadow-[0_0_0_2px_white,0_0_0_2px_#eff6ff] block">
+                        {newPersonAvatar ? (
+                          <img src={newPersonAvatar} alt="Avatar" className="w-full h-full object-cover" />
+                        ) : (
+                          <ImagePlus size={36} strokeWidth={2} />
+                        )}
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          className="hidden" 
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const reader = new FileReader();
+                              reader.onload = (event) => {
+                                if (event.target?.result) {
+                                  setCropSource(event.target.result as string);
+                                }
+                              };
+                              reader.readAsDataURL(file);
                             }
-                            const reader = new FileReader();
-                            reader.onloadend = () => {
-                              setNewPersonAvatar(reader.result as string);
-                            };
-                            reader.readAsDataURL(file);
-                          }
-                        }}
-                      />
-                    </label>
-                  </div>
-
-                  <div className="flex justify-center mb-6">
-                    <button
-                      type="button"
-                      onClick={handlePickContact}
-                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-100 font-bold text-[13.5px] rounded-full transition shadow-sm active:scale-95 cursor-pointer"
-                    >
-                      <Contact size={16} className="text-blue-500" />
-                      ফোনের কন্টাক্ট থেকে আনুন
-                    </button>
+                          }}
+                        />
+                      </label>
+                      {newPersonAvatar && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setNewPersonAvatar('');
+                          }}
+                          className="absolute -top-1.5 -right-1.5 w-8 h-8 bg-rose-500 hover:bg-rose-600 active:scale-95 text-white rounded-full flex items-center justify-center shadow-lg transition-all border-2 border-white cursor-pointer z-50 animate-in zoom-in-50 duration-150"
+                          title="ছবি মুছুন"
+                        >
+                          <Trash2 size={13} strokeWidth={2.5} />
+                        </button>
+                      )}
+                    </div>
+                    {newPersonAvatar && (
+                      <button
+                        type="button"
+                        onClick={() => setNewPersonAvatar('')}
+                        className="text-[12px] text-rose-500 hover:text-rose-600 font-bold active:scale-95 transition-all cursor-pointer underline decoration-dotted underline-offset-2"
+                      >
+                        ছবি সরিয়ে ফেলুন
+                      </button>
+                    )}
                   </div>
 
                   <form id="add-person-form" className={`space-y-4 transition-all duration-300 relative ${isPersonWalletOpen || isDatePickerOpen ? 'pb-[280px]' : ''}`} onSubmit={handleAddPerson}>
@@ -3891,6 +3916,18 @@ const DuesManager: React.FC<DuesManagerProps> = ({ wallets, adjustWalletBalance,
               </div>
             </div>
         </div>,
+        document.body
+      )}
+
+      {cropSource && createPortal(
+        <ImageCropper
+          imageSrc={cropSource}
+          onCropComplete={(croppedBase64) => {
+            setNewPersonAvatar(croppedBase64);
+            setCropSource(null);
+          }}
+          onCancel={() => setCropSource(null)}
+        />,
         document.body
       )}
     </div>

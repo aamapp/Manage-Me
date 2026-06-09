@@ -14,11 +14,31 @@ import {
   X,
   CreditCard,
   Banknote,
-  AlertTriangle
+  AlertTriangle,
+  ArrowUpRight,
+  ArrowDownLeft,
+  Calendar,
+  Clock,
+  ArrowLeft
 } from 'lucide-react';
 
+const parseExpenseNotes = (fullNotes: string): { notes: string; wallet: string } => {
+  if (!fullNotes) return { notes: '', wallet: 'ক্যাশ' };
+  const match = fullNotes.match(/(.*)\s*\[ওয়ালেট:\s*(.*)\]$/);
+  if (match) {
+    return {
+      notes: match[1].trim(),
+      wallet: match[2].trim()
+    };
+  }
+  return {
+    notes: fullNotes,
+    wallet: 'ক্যাশ'
+  };
+};
+
 export const WalletManager: React.FC = () => {
-  const { user, showToast, refreshData } = useAppContext();
+  const { user, showToast, refreshData, expenses, incomeRecords, duePersons } = useAppContext();
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [isDbAvailable, setIsDbAvailable] = useState<boolean>(true);
@@ -29,6 +49,9 @@ export const WalletManager: React.FC = () => {
   const [payAmount, setPayAmount] = useState<string>('');
   const [paySource, setPaySource] = useState<string>('');
   const [paySubmitting, setPaySubmitting] = useState<boolean>(false);
+
+  // State for details view modal
+  const [selectedDetailsWallet, setSelectedDetailsWallet] = useState<Wallet | null>(null);
   
   useEffect(() => {
     const handleGlobalAdd = (e: Event) => {
@@ -507,6 +530,229 @@ export const WalletManager: React.FC = () => {
   const walletCount = wallets.length;
   const totalBalance = wallets.reduce((sum, w) => sum + w.balance, 0);
 
+  // Helper functions for Bengali formatting and fetching detailed transaction list
+  const toBanglaNumbers = (num: string | number): string => {
+    const banglaDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+    return String(num).replace(/[0-9]/g, (digit) => banglaDigits[parseInt(digit)]);
+  };
+
+  const formatDateToBangla = (dateStr: string): string => {
+    if (!dateStr) return '';
+    try {
+      const dateObj = new Date(dateStr);
+      if (isNaN(dateObj.getTime())) return dateStr;
+      
+      const day = dateObj.getDate();
+      const monthIdx = dateObj.getMonth();
+      const year = dateObj.getFullYear();
+      
+      const banglaMonths = [
+        'জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
+        'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'
+      ];
+      
+      return `${toBanglaNumbers(day)} ${banglaMonths[monthIdx]}, ${toBanglaNumbers(year)}`;
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const formatTimeToBangla = (dateStr: string): string => {
+    if (!dateStr) return '';
+    try {
+      const dateObj = new Date(dateStr);
+      if (isNaN(dateObj.getTime())) return '';
+      
+      let hours = dateObj.getHours();
+      const minutes = dateObj.getMinutes();
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      
+      hours = hours % 12;
+      hours = hours ? hours : 12;
+      
+      const minutesStr = minutes < 10 ? '0' + minutes : minutes;
+      
+      return `${toBanglaNumbers(hours)}:${toBanglaNumbers(minutesStr)} ${ampm}`;
+    } catch {
+      return '';
+    }
+  };
+
+  const getWalletTransactions = (walletName: string) => {
+    const list: any[] = [];
+
+    // 1. Incomes
+    if (incomeRecords) {
+      incomeRecords.forEach((i) => {
+        const method = i.method || 'বিকাশ';
+        if (method.trim() === walletName.trim()) {
+          let rawDate = new Date();
+          if (i.date) {
+            const parsedD = new Date(i.date);
+            if (!isNaN(parsedD.getTime())) rawDate = parsedD;
+          }
+          list.push({
+            id: i.id,
+            type: 'income',
+            amount: i.amount,
+            date: i.date,
+            title: i.projectname || 'আয়',
+            subtitle: i.clientname || 'সরাসরি ওয়ালেট যোগ',
+            rawDate,
+          });
+        }
+      });
+    }
+
+    // 2. Expenses
+    if (expenses) {
+      expenses.forEach((e) => {
+        const parsed = parseExpenseNotes(e.notes);
+        if (parsed.wallet.trim() === walletName.trim()) {
+          let rawDate = new Date();
+          if (e.date) {
+            const parsedD = new Date(e.date);
+            if (!isNaN(parsedD.getTime())) rawDate = parsedD;
+          }
+          list.push({
+            id: e.id,
+            type: 'expense',
+            amount: e.amount,
+            date: e.date,
+            title: parsed.notes || e.category || 'অন্যান্য খরচ',
+            subtitle: e.category || 'খরচ',
+            rawDate,
+          });
+        }
+      });
+    }
+
+    // 3. Due transactions
+    if (duePersons) {
+      duePersons.forEach((person) => {
+        if (person.transactions) {
+          person.transactions.forEach((tx) => {
+            const wName = tx.walletName || 'ক্যাশ';
+            if (wName.trim() === walletName.trim()) {
+              let rawDate = new Date();
+              if (tx.date) {
+                const parsedD = new Date(tx.date);
+                if (!isNaN(parsedD.getTime())) rawDate = parsedD;
+              }
+              list.push({
+                id: tx.id,
+                type: tx.type === 'receive' ? 'income' : 'expense',
+                amount: tx.amount,
+                date: tx.date,
+                title: tx.description || `${tx.type === 'receive' ? 'টাকা গ্রহণ' : 'টাকা প্রদান'}`,
+                subtitle: `দেনাদার/পাওনাদার: ${person.name}`,
+                rawDate,
+              });
+            }
+          });
+        }
+      });
+    }
+
+    // Sort by date descending
+    return list.sort((a, b) => b.rawDate.getTime() - a.rawDate.getTime());
+  };
+
+  if (selectedDetailsWallet) {
+    const txList = getWalletTransactions(selectedDetailsWallet.name);
+    const totalTxCount = txList.length;
+
+    return (
+      <div className="w-full max-w-lg mx-auto pb-24 px-1.5 select-none relative animate-in slide-in-from-right duration-300">
+        
+        {/* Nice Header with Back Button */}
+        <div className="flex items-center justify-between pb-3.5 pt-1.5 mb-4 border-b border-slate-100/90">
+          <button
+            type="button"
+            onClick={() => setSelectedDetailsWallet(null)}
+            className="flex items-center gap-1.5 text-slate-500 hover:text-slate-800 transition-all font-bold text-[14px] cursor-pointer"
+          >
+            <ArrowLeft size={18} />
+            <span>ফিরে যান</span>
+          </button>
+          
+          <h3 className="text-[17px] font-black text-slate-800 tracking-tight text-right flex-1 pr-1 truncate">
+            {selectedDetailsWallet.name} - এর লেনদেন
+          </h3>
+        </div>
+
+        {/* Wallet Info Banner */}
+        <div className="bg-white border border-slate-100 rounded-2xl py-4.5 px-6 text-center shadow-[0_2px_12px_rgba(30,117,235,0.015)] mb-4">
+          <span className="text-slate-500 font-medium text-[11px] tracking-wide">
+            বর্তমান ব্যালেন্স • মোট লেনদেন: {toBanglaDigits(totalTxCount)}টি
+          </span>
+          <div className="text-2xl sm:text-3xl font-black text-[#1e75eb] tracking-tight mt-1.5">
+            ৳ {to_with_sign_digits(selectedDetailsWallet.balance)}/-
+          </div>
+        </div>
+
+        {/* Transactions List */}
+        <div className="space-y-2.5">
+          {totalTxCount === 0 ? (
+            <div className="text-center py-16 bg-white border border-dashed border-slate-200 rounded-2xl p-6">
+              <Banknote size={38} className="mx-auto text-slate-300 mb-2.5" />
+              <p className="text-slate-500 font-bold text-sm mb-1">কোনো লেনদেন পাওয়া যায়নি</p>
+              <p className="text-slate-400 text-xs">এই ওয়ালেটে এখনো কোনো লেনদেন হিসাব করা হয়নি।</p>
+            </div>
+          ) : (
+            txList.map((tx) => {
+              const isIncome = tx.type === 'income';
+              return (
+                <div 
+                  key={tx.id}
+                  className="bg-white border border-slate-100/90 rounded-2xl p-3.5 flex justify-between items-center shadow-[0_1.5px_6px_rgba(0,0,0,0.008)] hover:shadow-sm hover:border-slate-200 transition-all duration-200"
+                >
+                  {/* Left Side: Icon, Title & Date */}
+                  <div className="flex items-center gap-3 min-w-0 pr-2">
+                    <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
+                      isIncome 
+                        ? 'bg-emerald-50 text-emerald-600' 
+                        : 'bg-rose-50 text-rose-600'
+                    }`}>
+                      {isIncome ? <ArrowDownLeft size={18} /> : <ArrowUpRight size={18} />}
+                    </div>
+                    
+                    <div className="min-w-0 flex-1">
+                      <h4 className="text-[13.5px] font-bold text-slate-800 leading-tight truncate">
+                        {tx.title}
+                      </h4>
+                      <p className="text-[11px] text-slate-400 font-medium mt-0.5 truncate">
+                        {tx.subtitle}
+                      </p>
+                      
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <span className="text-[10px] text-slate-400 font-medium flex items-center gap-0.5 shrink-0">
+                          <Calendar size={10} className="text-slate-300" />
+                          {formatDateToBangla(tx.date)}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-medium flex items-center gap-0.5 shrink-0 ml-1.5">
+                          <Clock size={10} className="text-slate-300" />
+                          {formatTimeToBangla(tx.date)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Side: Amount */}
+                  <div className={`text-[14px] sm:text-[15px] font-bold font-mono tracking-tight shrink-0 text-right ${
+                    isIncome ? 'text-emerald-500' : 'text-rose-500'
+                  }`}>
+                    {isIncome ? '+' : '-'} ৳ {toBanglaDigits(tx.amount)}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full max-w-lg mx-auto pb-24 px-0.5 select-none relative animate-in fade-in duration-300">
       
@@ -549,7 +795,8 @@ export const WalletManager: React.FC = () => {
             return (
               <div 
                 key={wallet.id}
-                className="bg-white border border-slate-100/95 rounded-xl py-3.5 px-4 shadow-[0_1.5px_6px_rgba(0,0,0,0.012)] hover:shadow-sm hover:border-blue-100/60 transition-all duration-300 flex items-center justify-between relative group"
+                onClick={() => setSelectedDetailsWallet(wallet)}
+                className="bg-white border border-slate-100/95 rounded-xl py-3.5 px-4 shadow-[0_1.5px_6px_rgba(0,0,0,0.012)] hover:shadow-sm hover:border-blue-100/60 transition-all duration-300 flex items-center justify-between relative group cursor-pointer"
               >
                 {/* Left side: Icon & Title info */}
                 <div className="flex items-center gap-3 flex-1 min-w-0 pr-1">

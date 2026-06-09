@@ -45,6 +45,7 @@ interface LayoutProps {
 export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   const [isMoreMenuOpen, setMoreMenuOpen] = useState(false);
   const [isAboutOpen, setAboutOpen] = useState(false);
+  const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false); // New state for logout confirmation
   const [isProcessing, setIsProcessing] = useState(false); // New state for processing animation
   const [processingMessage, setProcessingMessage] = useState(
     "কন্টেন্ট তৈরি হচ্ছে...",
@@ -394,7 +395,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
             </div>
           </div>
           <button
-            onClick={onLogout}
+            onClick={() => setIsLogoutConfirmOpen(true)}
             className="w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-rose-50 text-rose-600 font-bold text-xs hover:bg-rose-100 transition-colors border border-rose-100"
           >
             <LogOut size={16} />
@@ -596,7 +597,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
               </div>
 
               <button
-                onClick={onLogout}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsLogoutConfirmOpen(true);
+                }}
                 className="relative z-10 flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl bg-rose-50 text-rose-600 font-bold text-[10px] active:scale-95 transition-all border border-rose-100 shadow-sm flex-shrink-0"
               >
                 <LogOut size={12} />
@@ -847,6 +851,58 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
               <p className="text-indigo-600 font-semibold tracking-widest text-lg md:text-xl uppercase animate-pulse">
                 লোড হচ্ছে...
               </p>
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      {/* App Logout Confirmation Modal */}
+      {isLogoutConfirmOpen &&
+        createPortal(
+          <div className="fixed inset-0 z-[2000] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200 select-none">
+            {/* Overlay background click to close */}
+            <div 
+              className="absolute inset-0" 
+              onClick={() => setIsLogoutConfirmOpen(false)} 
+            />
+            
+            <div 
+              className="relative bg-white rounded-[32px] shadow-2xl max-w-[340px] w-full p-6 pb-7 animate-in zoom-in-95 duration-200 border border-slate-50"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Title matches the screenshot */}
+              <h3 className="text-[25px] font-black text-slate-900 text-center mb-3 leading-tight tracking-tight">
+                লগ আউট
+              </h3>
+              
+              {/* Message matches the screenshot */}
+              <p className="text-[17px] font-semibold text-slate-800 text-center mb-7 max-w-[270px] mx-auto leading-relaxed">
+                আপনি কি আসলেই লগ আউট করতে চান?
+              </p>
+
+              {/* Confirm & Cancel Buttons formatted like the screenshot:
+                  "না" (vibrant blue container, white text, prominent/primary action to stay)
+                  "হ্যাঁ" (light grey container, dark slate/black text, secondary action to exit)
+              */}
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsLogoutConfirmOpen(false)}
+                  className="flex-1 py-3.5 rounded-full font-black text-white bg-[#1e75eb] hover:bg-blue-600 shadow-lg shadow-blue-100 transition-all active:scale-[0.96] text-[16.5px] cursor-pointer"
+                >
+                  না
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsLogoutConfirmOpen(false);
+                    onLogout();
+                  }}
+                  className="flex-1 py-3.5 rounded-full font-bold text-slate-900 bg-[#eaeaea] hover:bg-[#dfdfdf] transition-all active:scale-[0.96] text-[16.5px] cursor-pointer"
+                >
+                  হ্যাঁ
+                </button>
+              </div>
             </div>
           </div>,
           document.body,
