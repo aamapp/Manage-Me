@@ -92,6 +92,16 @@ export const Expenses: React.FC = () => {
   const [isSwiping, setIsSwiping] = useState(false);
   const [swipeOffset, setSwipeOffset] = useState(0);
   const [isTabTransitioning, setIsTabTransitioning] = useState(false);
+  const [isWalletSubView, setIsWalletSubView] = useState(false);
+
+  useEffect(() => {
+    const handleWalletSubview = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      setIsWalletSubView(!!customEvent.detail?.hasSubView);
+    };
+    window.addEventListener('wallet-subview-changed', handleWalletSubview);
+    return () => window.removeEventListener('wallet-subview-changed', handleWalletSubview);
+  }, []);
 
   useEffect(() => {
     setIsTabTransitioning(true);
@@ -969,7 +979,8 @@ export const Expenses: React.FC = () => {
         }
 
         const selectedWallet = newExpense.wallet || 'ক্যাশ';
-        const notesText = (newExpense.notes || '').trim() || (newExpense.category || 'অন্যান্য');
+        const categoryVal = newExpense.category || 'অন্যান্য';
+        const notesText = (newExpense.notes || '').trim() || (categoryVal === 'অন্যান্য' ? 'ব্যয়' : categoryVal);
         const finalNotesColumn = `${notesText} [ওয়ালেট: ${selectedWallet}]`;
 
         if (isEditing && activeExpenseId) {
@@ -2417,7 +2428,7 @@ export const Expenses: React.FC = () => {
     </div>
 
       {/* Sticky Floating Action Button on Bottom Right (Unified Grid for all Tabs/Slides) */}
-      {!isGeneratingPDF && createPortal(
+      {!isGeneratingPDF && (!isWalletSubView || activeTab !== 'wallet') && createPortal(
         <button
           ref={mainFabRef}
           onClick={(e) => { e.preventDefault(); handleFabClick(); }}

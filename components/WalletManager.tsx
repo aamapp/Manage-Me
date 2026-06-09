@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useAppContext } from '@/context/AppContext';
+import { EXPENSE_CATEGORY_LABELS } from '../constants';
 import { supabase } from '@/lib/supabase';
 import { Wallet } from '@/types';
 import { 
@@ -52,6 +53,17 @@ export const WalletManager: React.FC = () => {
 
   // State for details view modal
   const [selectedDetailsWallet, setSelectedDetailsWallet] = useState<Wallet | null>(null);
+
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('wallet-subview-changed', {
+      detail: { hasSubView: selectedDetailsWallet !== null }
+    }));
+    return () => {
+      window.dispatchEvent(new CustomEvent('wallet-subview-changed', {
+        detail: { hasSubView: false }
+      }));
+    };
+  }, [selectedDetailsWallet]);
   
   useEffect(() => {
     const handleGlobalAdd = (e: Event) => {
@@ -614,13 +626,14 @@ export const WalletManager: React.FC = () => {
             const parsedD = new Date(e.date);
             if (!isNaN(parsedD.getTime())) rawDate = parsedD;
           }
+          const categoryLabel = EXPENSE_CATEGORY_LABELS[e.category] || e.category;
           list.push({
             id: e.id,
             type: 'expense',
             amount: e.amount,
             date: e.date,
-            title: parsed.notes || e.category || 'অন্যান্য খরচ',
-            subtitle: e.category || 'খরচ',
+            title: parsed.notes || categoryLabel || 'অন্যান্য খরচ',
+            subtitle: categoryLabel || 'খরচ',
             rawDate,
           });
         }
@@ -705,7 +718,7 @@ export const WalletManager: React.FC = () => {
               return (
                 <div 
                   key={tx.id}
-                  className="bg-white border border-slate-100/90 rounded-2xl p-3.5 flex justify-between items-center shadow-[0_1.5px_6px_rgba(0,0,0,0.008)] hover:shadow-sm hover:border-slate-200 transition-all duration-200"
+                  className="bg-white border border-slate-100/90 rounded-xl p-3.5 flex justify-between items-center shadow-[0_1.5px_6px_rgba(0,0,0,0.008)] hover:shadow-sm hover:border-slate-200 transition-all duration-200"
                 >
                   {/* Left Side: Icon, Title & Date */}
                   <div className="flex items-center gap-3 min-w-0 pr-2">
@@ -721,9 +734,15 @@ export const WalletManager: React.FC = () => {
                       <h4 className="text-[13.5px] font-bold text-slate-800 leading-tight truncate">
                         {tx.title}
                       </h4>
-                      <p className="text-[11px] text-slate-400 font-medium mt-0.5 truncate">
-                        {tx.subtitle}
-                      </p>
+                      {tx.subtitle && 
+                       tx.subtitle !== 'অন্যান্য' && 
+                       tx.subtitle !== 'Others' && 
+                       tx.subtitle !== 'খরচ' && 
+                       tx.subtitle !== tx.title && (
+                        <p className="text-[11px] text-slate-400 font-medium mt-0.5 truncate">
+                          {tx.subtitle}
+                        </p>
+                      )}
                       
                       <div className="flex items-center gap-2 mt-1.5">
                         <span className="text-[10px] text-slate-400 font-medium flex items-center gap-0.5 shrink-0">
