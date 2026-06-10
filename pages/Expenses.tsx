@@ -980,7 +980,8 @@ export const Expenses: React.FC = () => {
 
         const selectedWallet = newExpense.wallet || 'ক্যাশ';
         const categoryVal = newExpense.category || 'অন্যান্য';
-        const notesText = (newExpense.notes || '').trim() || (categoryVal === 'অন্যান্য' ? 'ব্যয়' : categoryVal);
+        const isOthersCategory = categoryVal === 'অন্যান্য' || categoryVal === 'Others' || categoryVal === '';
+        const notesText = (newExpense.notes || '').trim() || (isOthersCategory ? 'ব্যয়' : categoryVal);
         const finalNotesColumn = `${notesText} [ওয়ালেট: ${selectedWallet}]`;
 
         if (isEditing && activeExpenseId) {

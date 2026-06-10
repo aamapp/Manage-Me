@@ -55,10 +55,20 @@ export const WalletManager: React.FC = () => {
   const [selectedDetailsWallet, setSelectedDetailsWallet] = useState<Wallet | null>(null);
 
   useEffect(() => {
+    // Dispatch immediately
     window.dispatchEvent(new CustomEvent('wallet-subview-changed', {
       detail: { hasSubView: selectedDetailsWallet !== null }
     }));
+
+    // Dispatch after a tiny 60ms timeout to ensure DOM/React cycle settling
+    const t = setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('wallet-subview-changed', {
+        detail: { hasSubView: selectedDetailsWallet !== null }
+      }));
+    }, 60);
+
     return () => {
+      clearTimeout(t);
       window.dispatchEvent(new CustomEvent('wallet-subview-changed', {
         detail: { hasSubView: false }
       }));
@@ -718,7 +728,7 @@ export const WalletManager: React.FC = () => {
               return (
                 <div 
                   key={tx.id}
-                  className="bg-white border border-slate-100/90 rounded-xl p-3.5 flex justify-between items-center shadow-[0_1.5px_6px_rgba(0,0,0,0.008)] hover:shadow-sm hover:border-slate-200 transition-all duration-200"
+                  className="bg-white border border-slate-100/90 rounded-lg p-3.5 flex justify-between items-center shadow-[0_1.5px_6px_rgba(0,0,0,0.008)] hover:shadow-sm hover:border-slate-200 transition-all duration-200"
                 >
                   {/* Left Side: Icon, Title & Date */}
                   <div className="flex items-center gap-3 min-w-0 pr-2">
@@ -735,10 +745,12 @@ export const WalletManager: React.FC = () => {
                         {tx.title}
                       </h4>
                       {tx.subtitle && 
-                       tx.subtitle !== 'অন্যান্য' && 
-                       tx.subtitle !== 'Others' && 
-                       tx.subtitle !== 'খরচ' && 
-                       tx.subtitle !== tx.title && (
+                       tx.subtitle.trim() !== 'অন্যান্য' && 
+                       tx.subtitle.trim() !== 'Others' && 
+                       tx.subtitle.trim() !== 'Other' && 
+                       tx.subtitle.trim() !== 'অন্যান্য খরচ' && 
+                       tx.subtitle.trim() !== 'খরচ' && 
+                       tx.subtitle.trim() !== tx.title && (
                         <p className="text-[11px] text-slate-400 font-medium mt-0.5 truncate">
                           {tx.subtitle}
                         </p>

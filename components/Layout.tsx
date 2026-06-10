@@ -60,6 +60,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
     null,
   );
 
+  const [isReportPreviewOpen, setIsReportPreviewOpen] = useState(false);
+
   const {
     adminSelectedUserId,
     setAdminSelectedUserId,
@@ -73,7 +75,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   const navigate = useNavigate();
   const isAiAssistant = location.pathname === "/ai-assistant";
   const isNotifications = location.pathname === "/notifications";
-  const isFullScreenPage = isAiAssistant || isNotifications;
+  const isFullScreenPage = isAiAssistant || isNotifications || isReportPreviewOpen;
   const isExpensesPage = location.pathname === "/expenses";
 
   const handleNavigate = (path: string) => {
@@ -94,7 +96,18 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
 
   useEffect(() => {
     setIsNavigating(false);
+    setIsReportPreviewOpen(false);
   }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    const handleReportPreview = (e: any) => {
+      setIsReportPreviewOpen(!!e?.detail?.active);
+    };
+    window.addEventListener("reports:preview", handleReportPreview);
+    return () => {
+      window.removeEventListener("reports:preview", handleReportPreview);
+    };
+  }, []);
 
   useEffect(() => {
     const handleProcessing = (e: any) => {
