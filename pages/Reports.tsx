@@ -15,6 +15,47 @@ import jsPDF from 'jspdf';
 import { useAppContext } from '@/context/AppContext';
 import { APP_NAME } from '@/constants';
 import { AppLogo } from '@/components/AppLogo';
+
+// Specialized highly robust App logo component designed specifically for html2canvas export
+// This avoids dynamic SVG transforms and scales which cause layout offsets in pdf rendering.
+const ReportAppLogo: React.FC<{ size: number; variant?: 'color' | 'white' | 'transparent-color' }> = ({ size, variant = 'color' }) => {
+  const strokeColor = variant === 'transparent-color' ? '#4f46e5' : '#FFFFFF';
+  return (
+    <svg 
+      viewBox="0 0 100 100" 
+      width={size} 
+      height={size} 
+      fill="none" 
+      xmlns="http://www.w3.org/2000/svg"
+      style={{ display: 'block', width: `${size}px`, height: `${size}px` }}
+    >
+      {variant === 'color' && (
+        <rect 
+          width="100" 
+          height="100" 
+          rx="24" 
+          fill="#4f46e5" 
+        />
+      )}
+      {/* Mathematically pre-scaled shape paths of the original logo (applying transform=0.75 from center) */}
+      <polygon 
+        points="41.19,29 55.25,29 47.75,59 28.06,59" 
+        stroke={strokeColor} 
+        strokeWidth="6.375" 
+        strokeLinejoin="round" 
+        fill="none" 
+      />
+      <polygon 
+        points="52.25,41 71.94,41 58.81,71 44.75,71" 
+        stroke={strokeColor} 
+        strokeWidth="6.375" 
+        strokeLinejoin="round" 
+        fill="none" 
+      />
+    </svg>
+  );
+};
+
 import { supabase } from '@/lib/supabase';
 import { Expense } from '@/types';
 import { DatePicker } from '@/components/DatePicker';
@@ -229,30 +270,93 @@ export const Reports: React.FC = () => {
     
     setIsGeneratingPDF(true);
     
-    // Store original styles
-    const prevTransform = element.style.transform;
-    const prevLeft = element.style.left;
-    const prevMarginLeft = element.style.marginLeft;
-    const prevPosition = element.style.position;
+    // Create an active, visible-to-browser but hidden-to-user fixed-width wrapper to replicate 100% desktop/A4 workspace with correct font rendering
+    const wrapper = document.createElement('div');
+    wrapper.id = 'pdf-report-clone-wrapper';
+    wrapper.style.position = 'fixed';
+    wrapper.style.top = '0px';
+    wrapper.style.left = '0px'; // Render in active viewport for proper font family/baseline metrics
+    wrapper.style.width = '794px';
+    wrapper.style.height = 'auto';
+    wrapper.style.zIndex = '-9999'; // Render behind the normal layout hierarchy
+    wrapper.style.opacity = '0.01'; // Fully transparent to the user, but active in the rendering tree
+    wrapper.style.pointerEvents = 'none';
+    wrapper.style.overflow = 'hidden';
 
-    // Reset styles temporarily to 1:1 scale for crystal clear render
-    element.style.transform = 'none';
-    element.style.left = '0px';
-    element.style.marginLeft = '0px';
-    element.style.position = 'relative';
+    // Create an unscaled, standalone clone of the report sheet
+    const clone = element.cloneNode(true) as HTMLDivElement;
+    
+    // Do not apply any manual top offsets since the true browser-rendered font is now fully active
+    clone.style.position = 'relative';
+    clone.style.top = '0px';
+    clone.style.left = '0px';
+    clone.style.transform = 'none';
+    clone.style.margin = '0px';
+    clone.style.boxShadow = 'none';
+    clone.style.border = 'none';
+    clone.style.borderRadius = '0px'; // clean printable style
+    
+    // Give the clone a unique ID so we can find it in the cloned document
+    clone.id = 'pdf-report-clone-for-export';
 
+    // Apply alignment fixes DIRECTLY to our clone (primary fix)
+    const directHeaderText = clone.querySelector('.pdf-header-left-text') as HTMLElement | null;
+    if (directHeaderText) {
+      directHeaderText.style.position = 'relative';
+      directHeaderText.style.top = '-3px';
+    }
+    const directH1 = directHeaderText?.querySelector('h1') as HTMLElement | null;
+    if (directH1) {
+      directH1.style.lineHeight = '1.1';
+    }
+    const directRightName = clone.querySelector('.pdf-header-right-name') as HTMLElement | null;
+    if (directRightName) {
+      directRightName.style.position = 'relative';
+      directRightName.style.top = '-2px';
+    }
+
+    wrapper.appendChild(clone);
+    document.body.appendChild(wrapper);
+    
+    // Give the engine a quick ticks block to render the fonts and SVG graphics completely
+    await document.fonts.ready;
+    await new Promise(requestAnimationFrame);
     await new Promise(resolve => setTimeout(resolve, 300));
     
     try {
-      const canvas = await html2canvas(element, {
-        scale: 2,
+      const canvas = await html2canvas(clone, {
+        scale: 2.5, // 2.5x super-sampling for crystal clear text readability in export
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff',
+        width: 794,
+        height: clone.offsetHeight || 1100,
+        scrollX: 0,
+        scrollY: 0,
+        onclone: (clonedDoc: Document) => {
+          // Secondary fix: also apply in html2canvas's own cloned document
+          const clonedSheet = clonedDoc.getElementById('pdf-report-clone-for-export');
+          if (!clonedSheet) return;
+          
+          const headerTextEl = clonedSheet.querySelector('.pdf-header-left-text') as HTMLElement | null;
+          if (headerTextEl) {
+            headerTextEl.style.position = 'relative';
+            headerTextEl.style.top = '-3px';
+          }
+          const appNameH1 = headerTextEl?.querySelector('h1') as HTMLElement | null;
+          if (appNameH1) {
+            appNameH1.style.lineHeight = '1.1';
+          }
+          const headerRightName = clonedSheet.querySelector('.pdf-header-right-name') as HTMLElement | null;
+          if (headerRightName) {
+            headerRightName.style.position = 'relative';
+            headerRightName.style.top = '-2px';
+          }
+        }
       });
 
-      const imgWidth = canvas.width / 2;
-      const imgHeight = canvas.height / 2;
+      const imgWidth = canvas.width / 2.5;
+      const imgHeight = canvas.height / 2.5;
       
       const pdf = new jsPDF({
         orientation: 'portrait',
@@ -260,7 +364,7 @@ export const Reports: React.FC = () => {
         format: [imgWidth, imgHeight]
       });
 
-      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      const imgData = canvas.toDataURL('image/jpeg', 0.98);
       pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
       
       pdf.save(`financial_report_${pdfStartDate}_to_${pdfEndDate}.pdf`);
@@ -268,11 +372,10 @@ export const Reports: React.FC = () => {
       console.error(e);
       alert('পিডিএফ তৈরিতে ত্রুটি দেখা দিয়েছে');
     } finally {
-      // Revert styles safely
-      element.style.transform = prevTransform;
-      element.style.left = prevLeft;
-      element.style.marginLeft = prevMarginLeft;
-      element.style.position = prevPosition;
+      // Safely sweep and remove the wrapper from the DOM tree
+      if (wrapper.parentNode) {
+        document.body.removeChild(wrapper);
+      }
       setIsGeneratingPDF(false);
     }
   };
@@ -1109,26 +1212,30 @@ export const Reports: React.FC = () => {
               {/* Document Inner Area */}
               <div className="space-y-8">
                 {/* 1. Header Banner of Document */}
-                <div className="flex items-center justify-between border-b border-slate-100 pb-6">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '24px', marginBottom: '24px' }}>
                   {/* Left Logo Side */}
-                  <div className="flex items-center gap-3">
-                    <AppLogo size={48} variant="color" />
-                    <div>
-                      <h1 className="text-[20px] font-black text-slate-900 tracking-tight leading-none mb-1 font-sans">{APP_NAME}</h1>
-                      <p className="text-[10px] font-bold text-slate-400 tracking-wide">Keep track of every day</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', textAlign: 'left' }}>
+                    <div style={{ width: '48px', height: '48px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <ReportAppLogo size={48} variant="color" />
+                    </div>
+                    <div className="pdf-header-left-text" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', textAlign: 'left' }}>
+                      <h1 style={{ fontSize: '20px', fontWeight: 900, margin: 0, padding: 0, fontFamily: "'Inter', sans-serif", lineHeight: 1.1 }} className="text-slate-900 tracking-tight">Audio Balance</h1>
+                      <p style={{ fontSize: '10px', fontWeight: 700, margin: '3px 0 0 0', padding: 0, lineHeight: 1 }} className="text-slate-400 tracking-wide font-sans">Keep track of every day</p>
                     </div>
                   </div>
 
                   {/* Right Meta Side */}
-                  <div className="text-right">
-                    <h1 className="text-2xl font-black text-indigo-600 tracking-widest leading-none mb-1.5 font-sans">REPORT</h1>
-                    <div className="text-[9px] font-bold text-slate-400 flex items-center justify-end gap-1.5 select-none">
-                      <span className="uppercase tracking-widest font-black leading-none text-slate-400">POWERED BY</span>
-                      <span className="inline-flex items-center justify-center shrink-0">
-                        <AppLogo size={11} variant="transparent-color" />
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', textAlign: 'right', justifyContent: 'center' }}>
+                    <h1 className="text-2xl font-black text-indigo-600 tracking-widest font-sans" style={{ margin: 0, padding: 0, marginBottom: '6px', lineHeight: 1 }}>REPORT</h1>
+                    <div style={{ display: 'flex', alignItems: 'center', fontSize: '9px', lineHeight: 1, marginTop: '6px' }}>
+                      <span className="text-[9px] font-black tracking-widest text-slate-400 font-sans" style={{ marginRight: '6px' }}>
+                        POWERED BY
                       </span>
-                      <span className="text-slate-600 font-extrabold tracking-normal leading-none">
-                        {APP_NAME}
+                      <div style={{ width: '11px', height: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: '6px' }}>
+                        <ReportAppLogo size={11} variant="transparent-color" />
+                      </div>
+                      <span className="pdf-header-right-name text-[9px] text-slate-600 font-extrabold tracking-normal" style={{ fontFamily: "'Inter', sans-serif" }}>
+                        Audio Balance
                       </span>
                     </div>
                   </div>
