@@ -1893,13 +1893,7 @@ export const Expenses: React.FC = () => {
                   <Shapes size={19} />
                 </button>
 
-                <button 
-                  onClick={handleDownloadPDF}
-                  className="text-[#8e9aa8] md:hover:text-slate-700 transition-[#1a73e8] transition-colors shrink-0 active:scale-95"
-                  title="মেনু / ডাউনলোড"
-                >
-                  <MoreVertical size={19} />
-                </button>
+
               </div>
             </div>
           </div>

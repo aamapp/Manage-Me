@@ -8,9 +8,12 @@ import {
   TrendingUp,
   Wallet,
   RefreshCcw, Clock, Receipt, Download, Share2, Hexagon, X, AlertCircle, ExternalLink, Copy, Music, Filter,
-  ChevronRight, ArrowLeft, FileText, ChevronLeft, Calendar, User, Phone, MapPin, Mail, FileDown
+  ChevronRight, ArrowLeft, FileText, ChevronLeft, Calendar, User, Phone, MapPin, Mail, FileDown, FolderOpen,
+  Navigation, Compass, Locate
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import html2canvas from 'html2canvas';
+import { toCanvas } from 'html-to-image';
 import jsPDF from 'jspdf';
 import { useAppContext } from '@/context/AppContext';
 import { APP_NAME } from '@/constants';
@@ -59,9 +62,11 @@ const ReportAppLogo: React.FC<{ size: number; variant?: 'color' | 'white' | 'tra
 import { supabase } from '@/lib/supabase';
 import { Expense } from '@/types';
 import { DatePicker } from '@/components/DatePicker';
+import { bdDivisions, bdDistricts, bdUpazilas } from '@/lib/bangladeshData';
+import { Search, Check, Plus, Home, Building, Users, CheckCircle, Activity, Layers } from 'lucide-react';
 
 export const Reports: React.FC = () => {
-  const { projects, user, adminSelectedUserId, expenses, incomeRecords, isOnline } = useAppContext();
+  const { projects, user, adminSelectedUserId, expenses, incomeRecords, isOnline, clients } = useAppContext();
   const currency = user?.currency || '৳';
   const reportRef = useRef<HTMLDivElement>(null);
 
@@ -112,14 +117,106 @@ export const Reports: React.FC = () => {
       window.removeEventListener('resize', updateDimensions);
     };
   }, [viewState, expenses, incomeRecords]);
-  const [pdfReportType, setPdfReportType] = useState<'all' | 'income' | 'expense'>('all');
+  const [pdfReportType, setPdfReportType] = useState<'all' | 'income' | 'expense' | 'projects' | 'dues'>('all');
+  
+  // Project & Dues report filtering popup states
+  const [isProjectFilterModalOpen, setIsProjectFilterModalOpen] = useState(false);
+  const [projectFilterModalType, setProjectFilterModalType] = useState<'projects' | 'dues' | null>(null);
+  const [pdfSelectedClientName, setPdfSelectedClientName] = useState<string | null>(null);
+  const [clientSearchQuery, setClientSearchQuery] = useState('');
+  const [projectFilterStep, setProjectFilterStep] = useState<1 | 2 | 3>(1);
+  const [pdfSelectedStatus, setPdfSelectedStatus] = useState<'All' | 'Pending' | 'In Progress' | 'Completed'>('All');
+  const [projectFilterSlideDirection, setProjectFilterSlideDirection] = useState<'forward' | 'backward'>('forward');
+
+  const uniqueClientNames = useMemo(() => {
+    const names = new Set<string>();
+    if (clients) {
+      clients.forEach(c => {
+        if (c.name) names.add(c.name.trim());
+      });
+    }
+    if (projects) {
+      projects.forEach(p => {
+        if (p.clientname) names.add(p.clientname.trim());
+      });
+    }
+    return Array.from(names).sort((a, b) => a.localeCompare(b, 'bn'));
+  }, [clients, projects]);
+
+  const filteredUniqueClientNames = useMemo(() => {
+    if (!clientSearchQuery) return uniqueClientNames;
+    return uniqueClientNames.filter(name => 
+      name.toLowerCase().includes(clientSearchQuery.toLowerCase())
+    );
+  }, [uniqueClientNames, clientSearchQuery]);
   const [pdfQuickRange, setPdfQuickRange] = useState<'current_month' | 'last_month' | 'current_year' | 'custom'>('current_month');
   const [pdfStartDate, setPdfStartDate] = useState('');
   const [pdfEndDate, setPdfEndDate] = useState('');
-  const [pdfAdminName, setPdfAdminName] = useState('');
-  const [pdfContactPhone, setPdfContactPhone] = useState('');
-  const [pdfContactEmail, setPdfContactEmail] = useState('');
-  const [pdfContactLocation, setPdfContactLocation] = useState('Dhaka, Bangladesh');
+  const [pdfAdminName, setPdfAdminName] = useState(() => localStorage.getItem('reports_pdfAdminName') || '');
+  const [pdfContactPhone, setPdfContactPhone] = useState(() => localStorage.getItem('reports_pdfContactPhone') || '');
+  const [pdfContactEmail, setPdfContactEmail] = useState(() => localStorage.getItem('reports_pdfContactEmail') || '');
+  const [pdfContactLocation, setPdfContactLocation] = useState(() => localStorage.getItem('reports_pdfContactLocation') || 'Dhaka, Bangladesh');
+
+  // Step-by-step location picker states
+  const [isLocModalOpen, setIsLocModalOpen] = useState(false);
+  const [locStep, setLocStep] = useState<1 | 2 | 3>(1);
+  const [locDivision, setLocDivision] = useState<string>(''); // name or Object name in Bengali
+  const [locDistrict, setLocDistrict] = useState<string>(''); // name or Object name in Bengali
+  const [locUpazila, setLocUpazila] = useState<string>('');   // name or Object name in Bengali
+  const [locSearchQuery, setLocSearchQuery] = useState('');
+  const [slideDirection, setSlideDirection] = useState<'forward' | 'backward'>('forward');
+
+  // Prevent background scrolling when modals are open
+  useEffect(() => {
+    if (isLocModalOpen || isProjectFilterModalOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isLocModalOpen, isProjectFilterModalOpen]);
+
+  const changeLocStep = (targetStep: number) => {
+    setSlideDirection(targetStep > locStep ? 'forward' : 'backward');
+    setLocStep(targetStep as any);
+    setLocSearchQuery('');
+  };
+
+  // Location selection helper variables
+  const filteredDivisions = useMemo(() => {
+    return bdDivisions.filter(d => 
+      d.name.toLowerCase().includes(locSearchQuery.toLowerCase()) || 
+      d.nameEn.toLowerCase().includes(locSearchQuery.toLowerCase())
+    );
+  }, [locSearchQuery]);
+
+  const filteredDistricts = useMemo(() => {
+    const matchedDivision = bdDivisions.find(d => d.name === locDivision);
+    if (!matchedDivision) return [];
+    return bdDistricts.filter(dist => dist.divisionId === matchedDivision.id && (
+      dist.name.toLowerCase().includes(locSearchQuery.toLowerCase()) || 
+      dist.nameEn.toLowerCase().includes(locSearchQuery.toLowerCase())
+    ));
+  }, [locDivision, locSearchQuery]);
+
+  const filteredUpazilas = useMemo(() => {
+    const matchedDistrict = bdDistricts.find(d => d.name === locDistrict);
+    if (!matchedDistrict) return [];
+    return bdUpazilas.filter(up => up.districtId === matchedDistrict.id && (
+      up.name.toLowerCase().includes(locSearchQuery.toLowerCase()) || 
+      up.nameEn.toLowerCase().includes(locSearchQuery.toLowerCase())
+    ));
+  }, [locDistrict, locSearchQuery]);
+
+  const generatedLocationPreview = useMemo(() => {
+    let parts: string[] = [];
+    if (locUpazila) parts.push(locUpazila);
+    if (locDistrict) parts.push(locDistrict);
+    if (locDivision) parts.push(locDivision);
+    return parts.join(', ');
+  }, [locDivision, locDistrict, locUpazila]);
 
   const parseExpenseValue = (fullNotes: string): string => {
     if (!fullNotes) return '';
@@ -146,10 +243,18 @@ export const Reports: React.FC = () => {
   };
 
   useEffect(() => {
-    if (user?.name) setPdfAdminName(user.name);
-    if (user?.phone) setPdfContactPhone(user.phone);
-    if (user?.email) setPdfContactEmail(user.email);
+    if (user?.name && !pdfAdminName) setPdfAdminName(user.name);
+    if (user?.phone && !pdfContactPhone) setPdfContactPhone(user.phone);
+    if (user?.email && !pdfContactEmail) setPdfContactEmail(user.email);
   }, [user]);
+
+  // Persist settings to local storage when they change
+  useEffect(() => {
+    localStorage.setItem('reports_pdfAdminName', pdfAdminName);
+    localStorage.setItem('reports_pdfContactPhone', pdfContactPhone);
+    localStorage.setItem('reports_pdfContactEmail', pdfContactEmail);
+    localStorage.setItem('reports_pdfContactLocation', pdfContactLocation);
+  }, [pdfAdminName, pdfContactPhone, pdfContactEmail, pdfContactLocation]);
 
   useEffect(() => {
     window.dispatchEvent(new CustomEvent('reports:preview', {
@@ -183,6 +288,38 @@ export const Reports: React.FC = () => {
       setPdfEndDate(`${year}-12-31`);
     }
   }, [pdfQuickRange]);
+
+  const pdfFilteredProjects = useMemo(() => {
+    return projects.filter(p => {
+      if (pdfSelectedClientName && p.clientname !== pdfSelectedClientName) {
+        return false;
+      }
+      if (pdfSelectedStatus && pdfSelectedStatus !== 'All' && p.status !== pdfSelectedStatus) {
+        return false;
+      }
+      if (!p.createdat) return true;
+      if (!pdfStartDate && !pdfEndDate) return true;
+      const projectDate = new Date(p.createdat);
+      
+      if (pdfStartDate) {
+        const start = new Date(pdfStartDate);
+        start.setHours(0, 0, 0, 0);
+        if (projectDate < start) return false;
+      }
+      
+      if (pdfEndDate) {
+        const end = new Date(pdfEndDate);
+        end.setHours(23, 59, 59, 999);
+        if (projectDate > end) return false;
+      }
+      
+      return true;
+    });
+  }, [projects, pdfStartDate, pdfEndDate, pdfSelectedClientName, pdfSelectedStatus]);
+
+  const pdfFilteredDues = useMemo(() => {
+    return pdfFilteredProjects.filter(p => p.dueamount > 0);
+  }, [pdfFilteredProjects]);
 
   const pdfTransactions = useMemo(() => {
     const list: any[] = [];
@@ -229,6 +366,21 @@ export const Reports: React.FC = () => {
   }, [pdfReportType, pdfStartDate, pdfEndDate, incomeRecords, expenses]);
 
   const pdfStats = useMemo(() => {
+    if (pdfReportType === 'projects' || pdfReportType === 'dues') {
+      const activeList = pdfReportType === 'projects' ? pdfFilteredProjects : pdfFilteredDues;
+      const totalBudget = activeList.reduce((sum, p) => sum + (p.totalamount || 0), 0);
+      const totalPaid = activeList.reduce((sum, p) => sum + (p.paidamount || 0), 0);
+      const totalDue = activeList.reduce((sum, p) => sum + (p.dueamount || 0), 0);
+      return {
+        totalBudget,
+        totalPaid,
+        totalDue,
+        totalIncome: 0,
+        totalExpense: 0,
+        balance: 0
+      };
+    }
+
     let totalIncome = 0;
     let totalExpense = 0;
 
@@ -241,11 +393,14 @@ export const Reports: React.FC = () => {
     });
 
     return {
+      totalBudget: 0,
+      totalPaid: 0,
+      totalDue: 0,
       totalIncome,
       totalExpense,
       balance: totalIncome - totalExpense
     };
-  }, [pdfTransactions]);
+  }, [pdfReportType, pdfTransactions, pdfFilteredProjects, pdfFilteredDues]);
 
   const formatPdfRowDate = (dateStr: string) => {
     if (!dateStr) return '';
@@ -299,11 +454,13 @@ export const Reports: React.FC = () => {
     // Give the clone a unique ID so we can find it in the cloned document
     clone.id = 'pdf-report-clone-for-export';
 
-    // Apply alignment fixes DIRECTLY to our clone (primary fix)
+    // With html-to-image, the browser's native rendering engine inside SVG foreignObject
+    // renders everything (flexboxes, margins, font alignments, line heights) perfectly.
+    // There is no more baseline font-shifting or layout mismatch, so we don't need any manual offsets!
     const directHeaderText = clone.querySelector('.pdf-header-left-text') as HTMLElement | null;
     if (directHeaderText) {
-      directHeaderText.style.position = 'relative';
-      directHeaderText.style.top = '-3px';
+      directHeaderText.style.position = 'static';
+      directHeaderText.style.top = 'auto';
     }
     const directH1 = directHeaderText?.querySelector('h1') as HTMLElement | null;
     if (directH1) {
@@ -311,8 +468,8 @@ export const Reports: React.FC = () => {
     }
     const directRightName = clone.querySelector('.pdf-header-right-name') as HTMLElement | null;
     if (directRightName) {
-      directRightName.style.position = 'relative';
-      directRightName.style.top = '-2px';
+      directRightName.style.position = 'static';
+      directRightName.style.top = 'auto';
     }
 
     wrapper.appendChild(clone);
@@ -324,34 +481,16 @@ export const Reports: React.FC = () => {
     await new Promise(resolve => setTimeout(resolve, 300));
     
     try {
-      const canvas = await html2canvas(clone, {
-        scale: 2.5, // 2.5x super-sampling for crystal clear text readability in export
-        useCORS: true,
-        logging: false,
+      // Use the high-fidelity html-to-image to generate a canvas exactly matching the browser preview
+      const canvas = await toCanvas(clone, {
+        pixelRatio: 2.5, // 2.5x super-sampling for crystal clear text readability in export
         backgroundColor: '#ffffff',
         width: 794,
         height: clone.offsetHeight || 1100,
-        scrollX: 0,
-        scrollY: 0,
-        onclone: (clonedDoc: Document) => {
-          // Secondary fix: also apply in html2canvas's own cloned document
-          const clonedSheet = clonedDoc.getElementById('pdf-report-clone-for-export');
-          if (!clonedSheet) return;
-          
-          const headerTextEl = clonedSheet.querySelector('.pdf-header-left-text') as HTMLElement | null;
-          if (headerTextEl) {
-            headerTextEl.style.position = 'relative';
-            headerTextEl.style.top = '-3px';
-          }
-          const appNameH1 = headerTextEl?.querySelector('h1') as HTMLElement | null;
-          if (appNameH1) {
-            appNameH1.style.lineHeight = '1.1';
-          }
-          const headerRightName = clonedSheet.querySelector('.pdf-header-right-name') as HTMLElement | null;
-          if (headerRightName) {
-            headerRightName.style.position = 'relative';
-            headerRightName.style.top = '-2px';
-          }
+        style: {
+          transform: 'none',
+          margin: '0px',
+          position: 'relative'
         }
       });
 
@@ -367,7 +506,17 @@ export const Reports: React.FC = () => {
       const imgData = canvas.toDataURL('image/jpeg', 0.98);
       pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
       
-      pdf.save(`financial_report_${pdfStartDate}_to_${pdfEndDate}.pdf`);
+      let filename = `financial_report_${pdfStartDate}_to_${pdfEndDate}.pdf`;
+      if (pdfReportType === 'projects') {
+        filename = pdfSelectedClientName 
+          ? `projects_report_${pdfSelectedClientName.replace(/\s+/g, '_')}_${pdfStartDate}_to_${pdfEndDate}.pdf`
+          : `all_projects_report_${pdfStartDate}_to_${pdfEndDate}.pdf`;
+      } else if (pdfReportType === 'dues') {
+        filename = pdfSelectedClientName 
+          ? `dues_report_${pdfSelectedClientName.replace(/\s+/g, '_')}_${pdfStartDate}_to_${pdfEndDate}.pdf`
+          : `all_dues_report_${pdfStartDate}_to_${pdfEndDate}.pdf`;
+      }
+      pdf.save(filename);
     } catch (e) {
       console.error(e);
       alert('পিডিএফ তৈরিতে ত্রুটি দেখা দিয়েছে');
@@ -994,10 +1143,13 @@ export const Reports: React.FC = () => {
             {/* Field 1: Report Type Selection */}
             <div className="space-y-2">
               <label className="text-xs font-black text-slate-700 block uppercase tracking-wider">রিপোর্টের খাত ও ধরণ</label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 <button
                   type="button"
-                  onClick={() => setPdfReportType('all')}
+                  onClick={() => {
+                    setPdfReportType('all');
+                    setPdfSelectedClientName(null);
+                  }}
                   className={`py-3 px-4 rounded-xl font-bold text-xs transition-all border ${
                     pdfReportType === 'all' 
                       ? 'bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-100' 
@@ -1008,7 +1160,10 @@ export const Reports: React.FC = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setPdfReportType('income')}
+                  onClick={() => {
+                    setPdfReportType('income');
+                    setPdfSelectedClientName(null);
+                  }}
                   className={`py-3 px-4 rounded-xl font-bold text-xs transition-all border ${
                     pdfReportType === 'income' 
                       ? 'bg-emerald-600 border-emerald-600 text-white shadow-md shadow-emerald-100' 
@@ -1019,7 +1174,10 @@ export const Reports: React.FC = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setPdfReportType('expense')}
+                  onClick={() => {
+                    setPdfReportType('expense');
+                    setPdfSelectedClientName(null);
+                  }}
                   className={`py-3 px-4 rounded-xl font-bold text-xs transition-all border ${
                     pdfReportType === 'expense' 
                       ? 'bg-rose-600 border-rose-600 text-white shadow-md shadow-rose-100' 
@@ -1028,7 +1186,79 @@ export const Reports: React.FC = () => {
                 >
                   শুধুমাত্র ব্যয়
                 </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProjectFilterModalType('projects');
+                    setClientSearchQuery('');
+                    setProjectFilterStep(1);
+                    setProjectFilterSlideDirection('forward');
+                    setIsProjectFilterModalOpen(true);
+                  }}
+                  className={`py-3 px-4 rounded-xl font-bold text-xs transition-all border ${
+                    pdfReportType === 'projects' 
+                      ? 'bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-100' 
+                      : 'bg-slate-50 border-slate-200/80 text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  প্রজেক্ট রিপোর্ট
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProjectFilterModalType('dues');
+                    setClientSearchQuery('');
+                    setProjectFilterStep(1);
+                    setProjectFilterSlideDirection('forward');
+                    setIsProjectFilterModalOpen(true);
+                  }}
+                  className={`py-3 px-4 rounded-xl font-bold text-xs transition-all border col-span-2 sm:col-span-1 ${
+                    pdfReportType === 'dues' 
+                      ? 'bg-amber-600 border-amber-600 text-white shadow-md shadow-amber-100' 
+                      : 'bg-slate-50 border-slate-200/80 text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  বকেয়া রিপোর্ট
+                </button>
               </div>
+
+              {(pdfSelectedClientName || pdfSelectedStatus !== 'All') && (pdfReportType === 'projects' || pdfReportType === 'dues') && (
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {pdfSelectedClientName && (
+                    <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-100/50 px-3 py-1.5 rounded-xl w-fit animate-in fade-in zoom-in-95 duration-200">
+                      <span className="text-[10px] text-indigo-700 font-bold font-sans" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                        👤 ক্লাইন্ট: {pdfSelectedClientName}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setPdfSelectedClientName(null)}
+                        className="text-indigo-500 hover:text-indigo-700 p-0.5 rounded-full hover:bg-indigo-100"
+                        title="ক্লাইন্ট ফিল্টার মুছুন"
+                      >
+                        <X size={12} strokeWidth={2.5} />
+                      </button>
+                    </div>
+                  )}
+                  {pdfSelectedStatus !== 'All' && (
+                    <div className="flex items-center gap-2 bg-amber-50 border border-amber-100/50 px-3 py-1.5 rounded-xl w-fit animate-in fade-in zoom-in-95 duration-200">
+                      <span className="text-[10px] text-amber-700 font-bold font-sans" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                        ⚙️ স্ট্যাটাস: {
+                          pdfSelectedStatus === 'In Progress' ? 'চলমান' :
+                          pdfSelectedStatus === 'Pending' ? 'পেন্ডিং' : 'সম্পন্ন'
+                        }
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setPdfSelectedStatus('All')}
+                        className="text-amber-500 hover:text-amber-700 p-0.5 rounded-full hover:bg-amber-100"
+                        title="স্ট্যাটাস ফিল্টার মুছুন"
+                      >
+                        <X size={12} strokeWidth={2.5} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Field 2: Quick date range preset selector */}
@@ -1139,15 +1369,43 @@ export const Reports: React.FC = () => {
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-600">ঠিকানা (অবস্থান)</label>
-                  <input
-                    type="text"
-                    value={pdfContactLocation}
-                    onChange={(e) => setPdfContactLocation(e.target.value)}
-                    placeholder="শহর, দেশ"
-                    className="w-full text-slate-800 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 font-bold text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none"
-                  />
+                <div className="space-y-1 relative">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-slate-600">ঠিকানা (অবস্থান)</label>
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        setIsLocModalOpen(true);
+                        setLocStep(1);
+                        setLocSearchQuery('');
+                      }} 
+                      className="text-[10px] text-indigo-600 font-extrabold flex items-center gap-1 hover:underline"
+                    >
+                      <MapPin size={10} />
+                      সহজ লোকেশন নির্বাচক সহায়ক
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={pdfContactLocation}
+                      onChange={(e) => setPdfContactLocation(e.target.value)}
+                      placeholder="গ্রাম, ইউনিয়ন, জেলা, বিভাগ"
+                      className="w-full text-slate-800 bg-slate-50 border border-slate-200 rounded-xl pr-10 pl-3.5 py-2.5 font-bold text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsLocModalOpen(true);
+                        setLocStep(1);
+                        setLocSearchQuery('');
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-indigo-600 transition-colors"
+                      title="লোকেশন নির্বাচক সহায়ক"
+                    >
+                      <MapPin size={15} />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1184,7 +1442,9 @@ export const Reports: React.FC = () => {
 
               {/* Transactions / Page count state pill exactly like screenshot */}
               <div className="bg-slate-100 hover:bg-slate-200/80 px-4 py-2 rounded-full border border-slate-200/50 text-slate-800 shadow-sm text-xs font-bold font-sans">
-                লেনদেন: {pdfTransactions.length} &nbsp;|&nbsp; পৃষ্ঠা: 1
+                {pdfReportType === 'projects' ? 'প্রজেক্ট' : pdfReportType === 'dues' ? 'বকেয়া' : 'লেনদেন'}: {
+                  pdfReportType === 'projects' ? pdfFilteredProjects.length : pdfReportType === 'dues' ? pdfFilteredDues.length : pdfTransactions.length
+                } &nbsp;|&nbsp; পৃষ্ঠা: 1
               </div>
             </div>
             <p className="text-[11px] text-slate-400 font-semibold pl-1">পৃষ্ঠা 1 এর 1</p>
@@ -1219,25 +1479,45 @@ export const Reports: React.FC = () => {
                       <ReportAppLogo size={48} variant="color" />
                     </div>
                     <div className="pdf-header-left-text" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', textAlign: 'left' }}>
-                      <h1 style={{ fontSize: '20px', fontWeight: 900, margin: 0, padding: 0, fontFamily: "'Inter', sans-serif", lineHeight: 1.1 }} className="text-slate-900 tracking-tight">Audio Balance</h1>
-                      <p style={{ fontSize: '10px', fontWeight: 700, margin: '3px 0 0 0', padding: 0, lineHeight: 1 }} className="text-slate-400 tracking-wide font-sans">Keep track of every day</p>
+                      <h1 style={{ fontSize: '20px', fontWeight: 900, margin: 0, padding: 0, fontFamily: "'Kohinoor Bangla', sans-serif", lineHeight: 1.1 }} className="text-slate-900 tracking-tight">{APP_NAME}</h1>
+                      <p style={{ fontSize: '10px', fontWeight: 500, margin: '3px 0 0 0', padding: 0, lineHeight: 1, fontFamily: "'Kohinoor Bangla', sans-serif" }} className="text-slate-500 tracking-wide font-sans">প্রতিদিনের হিসাব রাখুন</p>
                     </div>
                   </div>
 
                   {/* Right Meta Side */}
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', textAlign: 'right', justifyContent: 'center' }}>
-                    <h1 className="text-2xl font-black text-indigo-600 tracking-widest font-sans" style={{ margin: 0, padding: 0, marginBottom: '6px', lineHeight: 1 }}>REPORT</h1>
+                    <h1 className="text-2xl font-black text-indigo-600 tracking-widest font-sans" style={{ margin: 0, padding: 0, marginBottom: '6px', lineHeight: 1, fontFamily: "'Kohinoor Bangla', sans-serif" }}>রিপোর্ট</h1>
                     <div style={{ display: 'flex', alignItems: 'center', fontSize: '9px', lineHeight: 1, marginTop: '6px' }}>
-                      <span className="text-[9px] font-black tracking-widest text-slate-400 font-sans" style={{ marginRight: '6px' }}>
-                        POWERED BY
+                      <span className="text-[9px] font-medium tracking-widest text-slate-500 font-sans" style={{ marginRight: '6px', fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                        পাওয়ার্ড বাই
                       </span>
                       <div style={{ width: '11px', height: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: '6px' }}>
                         <ReportAppLogo size={11} variant="transparent-color" />
                       </div>
-                      <span className="pdf-header-right-name text-[9px] text-slate-600 font-extrabold tracking-normal" style={{ fontFamily: "'Inter', sans-serif" }}>
-                        Audio Balance
+                      <span className="pdf-header-right-name text-[9px] text-slate-600 font-extrabold tracking-normal" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                        {APP_NAME}
                       </span>
                     </div>
+                  </div>
+                </div>
+
+                {/* Report Type and Parameters Sub-banner */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8fafc', padding: '12px 16px', borderRadius: '12px', border: '1px solid #f1f5f9', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', textAlign: 'left' }}>
+                    <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', fontFamily: "'Kohinoor Bangla', sans-serif" }}>রিপোর্টের খাত ও ধরণ</span>
+                    <span style={{ fontSize: '12px', color: '#1e293b', fontWeight: '900', fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                      {pdfReportType === 'all' && 'আয় ও ব্যয় রিপোর্ট'}
+                      {pdfReportType === 'income' && 'আয় রিপোর্ট'}
+                      {pdfReportType === 'expense' && 'ব্যয় রিপোর্ট'}
+                      {pdfReportType === 'projects' && (pdfSelectedClientName ? `প্রজেক্ট রিপোর্ট (${pdfSelectedClientName})` : 'সমস্ত প্রজেক্ট রিপোর্ট')}
+                      {pdfReportType === 'dues' && (pdfSelectedClientName ? `বকেয়া রিপোর্ট (${pdfSelectedClientName})` : 'সমস্ত বকেয়া রিপোর্ট')}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px', textAlign: 'right' }}>
+                    <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', fontFamily: "'Kohinoor Bangla', sans-serif" }}>সময়সীমা</span>
+                    <span style={{ fontSize: '11px', color: '#334155', fontWeight: 'bold', fontFamily: 'monospace' }}>
+                      {pdfStartDate ? formatPdfRowDate(pdfStartDate) : 'শুরু'} - {pdfEndDate ? formatPdfRowDate(pdfEndDate) : 'শেষ'}
+                    </span>
                   </div>
                 </div>
 
@@ -1246,65 +1526,110 @@ export const Reports: React.FC = () => {
                   <div className="overflow-hidden border border-slate-100 rounded-xl">
                     <table className="w-full text-left border-collapse">
                       <thead>
-                        <tr className="bg-slate-50 border-b border-slate-100 text-[10px] text-slate-500 font-extrabold tracking-wider">
-                          <th className="py-3 px-4 font-bold">DATE</th>
-                          <th className="py-3 px-4 font-bold">TIME</th>
-                          <th className="py-3 px-4 font-bold">DESCRIPTION</th>
-                          <th className="py-3 px-4 font-bold">CATEGORY</th>
-                          <th className="py-3 px-4 text-right font-bold">AMOUNT (TK)</th>
-                        </tr>
-                      </thead>
-                      <tbody className="text-[12px] font-medium text-slate-700 divide-y divide-slate-50">
-                        {pdfTransactions.length === 0 ? (
-                          <tr>
-                            <td colSpan={5} className="py-12 text-center text-slate-400 bg-slate-50/50">
-                              <Calendar size={24} className="mx-auto text-slate-300 mb-2" />
-                              <p className="text-xs font-bold">কোনো লেনদেনের তথ্য পাওয়া যায়নি</p>
-                            </td>
+                        {(pdfReportType === 'projects' || pdfReportType === 'dues') ? (
+                          <tr className="bg-slate-50 border-b border-slate-100 text-[10px] text-slate-500 font-extrabold tracking-wider" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                            <th className="py-3 px-4 font-bold">প্রজেক্টের নাম</th>
+                            <th className="py-3 px-4 font-bold">ক্লায়েন্ট</th>
+                            <th className="py-3 px-4 font-bold text-right font-sans">বাজেট (৳)</th>
+                            <th className="py-3 px-4 font-bold text-right font-sans">আদায় (৳)</th>
+                            <th className="py-3 px-4 text-right font-bold font-sans">বকেয়া (৳)</th>
                           </tr>
                         ) : (
+                          <tr className="bg-slate-50 border-b border-slate-100 text-[10px] text-slate-500 font-extrabold tracking-wider" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                            <th className="py-3 px-4 font-bold">তারিখ</th>
+                            <th className="py-3 px-4 font-bold">সময়</th>
+                            <th className="py-3 px-4 font-bold">বিবরণ</th>
+                            <th className="py-3 px-4 font-bold">ক্যাটাগরি</th>
+                            <th className="py-3 px-4 text-right font-bold font-sans">পরিমাণ (৳)</th>
+                          </tr>
+                        )}
+                      </thead>
+                      <tbody className="text-[12px] font-medium text-slate-700 divide-y divide-slate-50">
+                        {(pdfReportType === 'projects' || pdfReportType === 'dues') ? (
                           (() => {
-                            let lastMonthHeader = '';
-                            return pdfTransactions.map((tx) => {
-                              const monthHeader = formatPdfMonthGroupHeader(tx.date);
-                              const renderHeader = lastMonthHeader !== monthHeader;
-                              lastMonthHeader = monthHeader;
-
+                            const activeList = pdfReportType === 'projects' ? pdfFilteredProjects : pdfFilteredDues;
+                            if (activeList.length === 0) {
                               return (
-                                <React.Fragment key={tx.id}>
-                                  {renderHeader && (
-                                    <tr className="bg-[#f0f4ff]/50">
-                                      <td colSpan={5} className="py-2.5 px-4">
-                                        <div className="flex items-center gap-1.5 text-[11px] font-bold text-indigo-700 font-sans">
-                                          <span>📅</span>
-                                          <span>{monthHeader}</span>
-                                        </div>
+                                <tr>
+                                  <td colSpan={5} className="py-12 text-center text-slate-400 bg-slate-50/50">
+                                    <FolderOpen size={24} className="mx-auto text-slate-300 mb-2" />
+                                    <p className="text-xs font-bold" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>কোনো প্রজেক্টের তথ্য পাওয়া যায়নি</p>
+                                  </td>
+                                </tr>
+                              );
+                            }
+                            return activeList.map((p) => (
+                              <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
+                                <td className="py-3 px-4 font-bold text-slate-800" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                                  {p.name}
+                                </td>
+                                <td className="py-3 px-4 text-slate-500 font-medium" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                                  {p.clientname}
+                                </td>
+                                <td className="py-3 px-4 text-right text-slate-600 font-bold font-sans">
+                                  {p.totalamount.toLocaleString('bn-BD')}
+                                </td>
+                                <td className="py-3 px-4 text-right text-emerald-600 font-bold font-sans">
+                                  {p.paidamount.toLocaleString('bn-BD')}
+                                </td>
+                                <td className={`py-3 px-4 text-right font-bold font-sans ${p.dueamount > 0 ? 'text-rose-600' : 'text-slate-500'}`}>
+                                  {p.dueamount.toLocaleString('bn-BD')}
+                                </td>
+                              </tr>
+                            ));
+                          })()
+                        ) : (
+                          pdfTransactions.length === 0 ? (
+                            <tr>
+                              <td colSpan={5} className="py-12 text-center text-slate-400 bg-slate-50/50">
+                                <Calendar size={24} className="mx-auto text-slate-300 mb-2" />
+                                <p className="text-xs font-bold" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>কোনো লেনদেনের তথ্য পাওয়া যায়নি</p>
+                              </td>
+                            </tr>
+                          ) : (
+                            (() => {
+                              let lastMonthHeader = '';
+                              return pdfTransactions.map((tx) => {
+                                const monthHeader = formatPdfMonthGroupHeader(tx.date);
+                                const renderHeader = lastMonthHeader !== monthHeader;
+                                lastMonthHeader = monthHeader;
+
+                                return (
+                                  <React.Fragment key={tx.id}>
+                                    {renderHeader && (
+                                      <tr className="bg-[#f0f4ff]/50">
+                                        <td colSpan={5} className="py-2.5 px-4">
+                                          <div className="flex items-center gap-1.5 text-[11px] font-bold text-indigo-700 font-sans">
+                                            <span>📅</span>
+                                            <span>{monthHeader}</span>
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    )}
+                                    <tr className="hover:bg-slate-50/50 transition-colors">
+                                      <td className="py-3 px-4 text-slate-500 font-sans text-[11px] font-bold">
+                                        {formatPdfRowDate(tx.date)}
+                                      </td>
+                                      <td className="py-3 px-4 text-slate-400 font-sans text-[11px] font-bold">
+                                        {tx.time ? formatReportTime(tx.time) : '--:--'}
+                                      </td>
+                                      <td className="py-3 px-4 font-normal text-slate-850" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                                        {tx.description}
+                                      </td>
+                                      <td className="py-3 px-4 text-slate-400 font-semibold" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                                        {tx.category && tx.category !== 'অন্যান্য' ? tx.category : ''}
+                                      </td>
+                                      <td className={`py-3 px-4 text-right font-bold font-sans text-[13px] ${
+                                        tx.type === 'income' ? 'text-emerald-600' : 'text-rose-600'
+                                      }`}>
+                                        {tx.type === 'income' ? '+' : '-'} {tx.amount.toLocaleString('bn-BD')}
                                       </td>
                                     </tr>
-                                  )}
-                                  <tr className="hover:bg-slate-50/50 transition-colors">
-                                    <td className="py-3 px-4 text-slate-500 font-mono text-[11px] font-bold">
-                                      {formatPdfRowDate(tx.date)}
-                                    </td>
-                                    <td className="py-3 px-4 text-slate-400 font-mono text-[11px] font-bold">
-                                      {tx.time ? formatReportTime(tx.time) : '--:--'}
-                                    </td>
-                                    <td className="py-3 px-4 font-normal text-slate-850">
-                                      {tx.description}
-                                    </td>
-                                    <td className="py-3 px-4 text-slate-400 font-semibold">
-                                      {tx.category && tx.category !== 'অন্যান্য' ? tx.category : ''}
-                                    </td>
-                                    <td className={`py-3 px-4 text-right font-bold font-mono text-[13px] ${
-                                      tx.type === 'income' ? 'text-emerald-600' : 'text-rose-600'
-                                    }`}>
-                                      {tx.type === 'income' ? '+' : '-'} {tx.amount.toLocaleString('en-US')}
-                                    </td>
-                                  </tr>
-                                </React.Fragment>
-                              );
-                            });
-                          })()
+                                  </React.Fragment>
+                                );
+                              });
+                            })()
+                          )
                         )}
                       </tbody>
                     </table>
@@ -1312,38 +1637,63 @@ export const Reports: React.FC = () => {
 
                   {/* Under table summary bar row exactly like photo */}
                   <div className="bg-slate-50 rounded-xl px-4 py-3 border border-slate-100 flex items-center justify-between text-xs text-slate-600 font-bold font-sans">
-                    <span className="text-slate-850">মাসিক মোট:</span>
-                    <div className="flex items-center gap-4">
-                      <span>আয়: <span className="text-emerald-600">{pdfStats.totalIncome} Tk</span></span>
-                      <span>ব্যয়: <span className="text-rose-600">{pdfStats.totalExpense} Tk</span></span>
-                      <span>ব্যালেন্স: <span className="text-blue-600">{pdfStats.balance} Tk</span></span>
-                    </div>
+                    {(pdfReportType === 'projects' || pdfReportType === 'dues') ? (
+                      <>
+                        <span className="text-slate-850" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>টোটাল প্রজেক্ট হিসাব:</span>
+                        <div className="flex items-center gap-4" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                          <span>টোটাল বাজেট: <span className="text-slate-800 font-sans">{pdfStats.totalBudget.toLocaleString('bn-BD')} ৳</span></span>
+                          <span>টোটাল আদায়: <span className="text-emerald-600 font-sans">{pdfStats.totalPaid.toLocaleString('bn-BD')} ৳</span></span>
+                          <span>টোটাল বকেয়া: <span className="text-rose-600 font-sans">{pdfStats.totalDue.toLocaleString('bn-BD')} ৳</span></span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-slate-850" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>মাসিক মোট:</span>
+                        <div className="flex items-center gap-4" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                          <span>আয়: <span className="text-emerald-600 font-sans">{pdfStats.totalIncome.toLocaleString('bn-BD')} ৳</span></span>
+                          <span>ব্যয়: <span className="text-rose-600 font-sans">{pdfStats.totalExpense.toLocaleString('bn-BD')} ৳</span></span>
+                          <span>ব্যালেন্স: <span className="text-blue-600 font-sans">{pdfStats.balance.toLocaleString('bn-BD')} ৳</span></span>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
 
                 {/* 3. Executive Metrics Blocks */}
                 <div className="grid grid-cols-3 gap-3">
-                  {/* Total Income */}
+                  {/* Total Income or Total Budget */}
                   <div className="bg-[#f0fdf4] border border-emerald-100 rounded-2xl p-4 flex flex-col justify-between h-20 shadow-xs">
-                    <p className="text-[9px] font-black text-emerald-800 uppercase tracking-widest">Total Income:</p>
-                    <p className="text-[18px] font-black text-emerald-600 font-mono mt-1">
-                      {pdfStats.totalIncome.toLocaleString('en-US')} Tk
+                    <p className="text-[9px] font-black text-emerald-800 uppercase tracking-widest" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                      {(pdfReportType === 'projects' || pdfReportType === 'dues') ? 'মোট বাজেট:' : 'মোট আয়:'}
+                    </p>
+                    <p className="text-[18px] font-black text-emerald-600 font-sans mt-1" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                      {(pdfReportType === 'projects' || pdfReportType === 'dues') 
+                        ? pdfStats.totalBudget.toLocaleString('bn-BD') 
+                        : pdfStats.totalIncome.toLocaleString('bn-BD')} ৳
                     </p>
                   </div>
 
-                  {/* Total Expense */}
+                  {/* Total Expense or Total Paid */}
                   <div className="bg-[#fdf2f2] border border-rose-100 rounded-2xl p-4 flex flex-col justify-between h-20 shadow-xs">
-                    <p className="text-[9px] font-black text-rose-800 uppercase tracking-widest">Total Expense:</p>
-                    <p className="text-[18px] font-black text-rose-600 font-mono mt-1">
-                      {pdfStats.totalExpense.toLocaleString('en-US')} Tk
+                    <p className="text-[9px] font-black text-rose-800 uppercase tracking-widest" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                      {(pdfReportType === 'projects' || pdfReportType === 'dues') ? 'মোট আদায়:' : 'মোট খরচ:'}
+                    </p>
+                    <p className="text-[18px] font-black text-rose-600 font-sans mt-1" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                      {(pdfReportType === 'projects' || pdfReportType === 'dues') 
+                        ? pdfStats.totalPaid.toLocaleString('bn-BD') 
+                        : pdfStats.totalExpense.toLocaleString('bn-BD')} ৳
                     </p>
                   </div>
 
-                  {/* Total Balance */}
+                  {/* Total Balance or Total Due */}
                   <div className="bg-[#f0f9ff] border border-blue-100 rounded-2xl p-4 flex flex-col justify-between h-20 shadow-xs">
-                    <p className="text-[9px] font-black text-blue-800 uppercase tracking-widest">Total Balance:</p>
-                    <p className="text-[18px] font-black text-indigo-600 font-mono mt-1">
-                      {pdfStats.balance.toLocaleString('en-US')} Tk
+                    <p className="text-[9px] font-black text-blue-800 uppercase tracking-widest" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                      {(pdfReportType === 'projects' || pdfReportType === 'dues') ? 'মোট বকেয়া:' : 'মোট ব্যালেন্স:'}
+                    </p>
+                    <p className="text-[18px] font-black text-indigo-600 font-sans mt-1" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                      {(pdfReportType === 'projects' || pdfReportType === 'dues') 
+                        ? pdfStats.totalDue.toLocaleString('bn-BD') 
+                        : pdfStats.balance.toLocaleString('bn-BD')} ৳
                     </p>
                   </div>
                 </div>
@@ -1355,19 +1705,19 @@ export const Reports: React.FC = () => {
                 <div className="space-y-1.5 leading-none">
                   {pdfContactPhone && (
                     <div className="flex items-center gap-1.5">
-                      <span className="text-slate-440">📞</span>
+                      <Phone size={12} className="text-slate-400" />
                       <span>{pdfContactPhone}</span>
                     </div>
                   )}
                   {pdfContactEmail && (
                     <div className="flex items-center gap-1.5">
-                      <span className="text-slate-440">✉</span>
+                      <Mail size={12} className="text-slate-400" />
                       <span>{pdfContactEmail}</span>
                     </div>
                   )}
                   {pdfContactLocation && (
                     <div className="flex items-center gap-1.5">
-                      <span className="text-slate-440">📍</span>
+                      <MapPin size={12} className="text-slate-400" />
                       <span>{pdfContactLocation}</span>
                     </div>
                   )}
@@ -1503,6 +1853,804 @@ export const Reports: React.FC = () => {
                  </div>
               </div>
            </div>
+        </div>
+      )}
+
+      {/* 📍 Bangladesh Cascading Location Selector Modal */}
+      {isLocModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-lg rounded-3xl shadow-xl overflow-hidden flex flex-col max-h-[85vh] border border-slate-100 animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-black text-slate-800 flex items-center gap-1.5 font-sans" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                  <MapPin className="text-indigo-600 animate-bounce" size={18} />
+                  লোকেশন নির্বাচক সহায়ক
+                </h3>
+                <p className="text-[10px] text-slate-400 font-semibold" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>ধাপে ধাপে আপনার ঠিকানা নির্বাচন করুন</p>
+              </div>
+              <button 
+                onClick={() => setIsLocModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-all"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Steps Navigation Stepper Tracker */}
+            <div className="px-6 pt-5 pb-3 bg-slate-50/20 border-b border-slate-50">
+              <div className="relative flex items-center justify-between w-full font-sans max-w-sm mx-auto">
+                {/* Background Connecting Line */}
+                <div className="absolute top-4 left-[10%] right-[10%] h-[2px] bg-slate-100 z-0" />
+                
+                {/* Step 1 to Step 2 Line Progress */}
+                <div 
+                  className={`absolute top-4 left-[10%] w-[40%] h-[2px] z-0 transition-all duration-500 ${
+                    locDivision ? 'bg-indigo-600' : 'bg-slate-100'
+                  }`}
+                />
+                
+                {/* Step 2 to Step 3 Line Progress */}
+                <div 
+                  className={`absolute top-4 left-[50%] w-[40%] h-[2px] z-0 transition-all duration-500 ${
+                    locDistrict ? 'bg-indigo-600' : 'bg-slate-100'
+                  }`}
+                />
+
+                {/* Step 1: বিভাগ */}
+                <div className="flex flex-col items-center z-10">
+                  <button
+                    type="button"
+                    onClick={() => changeLocStep(1)}
+                    className="flex flex-col items-center focus:outline-none transition-all group active:scale-95"
+                  >
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 font-bold text-xs shadow-xs transition-all duration-300 ${
+                      locStep === 1
+                        ? 'bg-indigo-600 border-indigo-600 text-white ring-4 ring-indigo-100 scale-105'
+                        : locDivision
+                          ? 'bg-emerald-500 border-emerald-500 text-white hover:bg-emerald-600 shadow-md shadow-emerald-100'
+                          : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'
+                    }`}>
+                      {locDivision ? (
+                        <Check size={14} className="stroke-[3] animate-in scale-in duration-200" />
+                      ) : (
+                        <span>১</span>
+                      )}
+                    </div>
+                    <span className={`text-[10px] font-bold mt-1.5 transition-all duration-300 ${
+                      locStep === 1 
+                        ? 'text-indigo-600 font-extrabold scale-105' 
+                        : locDivision 
+                          ? 'text-emerald-600 font-bold' 
+                          : 'text-slate-400'
+                    }`} style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                      বিভাগ
+                    </span>
+                  </button>
+                </div>
+
+                {/* Step 2: জেলা */}
+                <div className="flex flex-col items-center z-10">
+                  <button
+                    type="button"
+                    disabled={!locDivision}
+                    onClick={() => changeLocStep(2)}
+                    className="flex flex-col items-center focus:outline-none transition-all group disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
+                  >
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 font-bold text-xs shadow-xs transition-all duration-300 ${
+                      locStep === 2
+                        ? 'bg-indigo-600 border-indigo-600 text-white ring-4 ring-indigo-100 scale-105'
+                        : locDistrict
+                          ? 'bg-emerald-500 border-emerald-500 text-white hover:bg-emerald-600 shadow-md shadow-emerald-100'
+                          : !locDivision
+                            ? 'bg-slate-50 border-slate-200 text-slate-300'
+                            : 'bg-white border-slate-200 text-slate-400 hover:border-indigo-400'
+                    }`}>
+                      {locDistrict ? (
+                        <Check size={14} className="stroke-[3] animate-in scale-in duration-200" />
+                      ) : (
+                        <span>২</span>
+                      )}
+                    </div>
+                    <span className={`text-[10px] font-bold mt-1.5 transition-all duration-300 ${
+                      locStep === 2 
+                        ? 'text-indigo-600 font-extrabold scale-105' 
+                        : locDistrict 
+                          ? 'text-emerald-600 font-bold' 
+                          : 'text-slate-400'
+                    }`} style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                      জেলা
+                    </span>
+                  </button>
+                </div>
+
+                {/* Step 3: উপজেলা */}
+                <div className="flex flex-col items-center z-10">
+                  <button
+                    type="button"
+                    disabled={!locDistrict}
+                    onClick={() => changeLocStep(3)}
+                    className="flex flex-col items-center focus:outline-none transition-all group disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
+                  >
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 font-bold text-xs shadow-xs transition-all duration-300 ${
+                      locStep === 3
+                        ? 'bg-indigo-600 border-indigo-600 text-white ring-4 ring-indigo-100 scale-105'
+                        : locUpazila
+                          ? 'bg-emerald-500 border-emerald-500 text-white hover:bg-emerald-600 shadow-md shadow-emerald-100'
+                          : !locDistrict
+                            ? 'bg-slate-50 border-slate-200 text-slate-300'
+                            : 'bg-white border-slate-200 text-slate-400 hover:border-indigo-400'
+                    }`}>
+                      {locUpazila ? (
+                        <Check size={14} className="stroke-[3] animate-in scale-in duration-200" />
+                      ) : (
+                        <span>৩</span>
+                      )}
+                    </div>
+                    <span className={`text-[10px] font-bold mt-1.5 transition-all duration-300 ${
+                      locStep === 3 
+                        ? 'text-indigo-600 font-extrabold scale-105' 
+                        : locUpazila 
+                          ? 'text-emerald-600 font-bold' 
+                          : 'text-slate-400'
+                    }`} style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                      উপজেলা
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Search Box */}
+            {locStep <= 3 && (
+              <div className="px-5 py-3 border-b border-slate-50">
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={locSearchQuery}
+                    onChange={(e) => setLocSearchQuery(e.target.value)}
+                    placeholder={
+                      locStep === 1 
+                        ? 'বিভাগ খুঁজুন (যেমন: ঢাকা)...' 
+                        : locStep === 2 
+                          ? 'জেলা খুঁজুন (যেমন: গাজীপুর)...' 
+                          : 'উপজেলা খুঁজুন...'
+                    }
+                    className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:bg-white"
+                  />
+                  {locSearchQuery && (
+                    <button 
+                      onClick={() => setLocSearchQuery('')} 
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] bg-slate-200 hover:bg-slate-300 px-1.5 py-0.5 rounded text-slate-600"
+                    >
+                      মুছুন
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Scrollable list of options */}
+            <div className="p-5 flex-1 overflow-x-hidden overflow-y-auto max-h-[40vh] min-h-[25vh] bg-slate-50/20 relative">
+              <AnimatePresence mode="wait" initial={false}>
+                {locStep === 1 && (
+                  <motion.div
+                    key="step-1"
+                    initial={{ opacity: 0, x: slideDirection === 'forward' ? 50 : -50 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: slideDirection === 'forward' ? -50 : 50 }}
+                    transition={{ duration: 0.25, ease: "easeInOut" }}
+                    className="grid grid-cols-2 gap-2"
+                  >
+                    {filteredDivisions.length > 0 ? (
+                      filteredDivisions.map(div => (
+                        <button
+                          key={div.id}
+                          type="button"
+                          onClick={() => {
+                            setLocDivision(div.name);
+                            setLocDistrict('');
+                            setLocUpazila('');
+                            setSlideDirection('forward');
+                            setLocStep(2);
+                            setLocSearchQuery('');
+                          }}
+                          className={`flex items-center justify-between p-3.5 rounded-xl border text-left transition-all ${
+                            locDivision === div.name
+                              ? 'bg-indigo-50/80 border-indigo-200 text-indigo-700 shadow-xs font-bold'
+                              : 'bg-white border-slate-100 hover:border-indigo-100 text-slate-700 font-medium'
+                          }`}
+                        >
+                          <div>
+                            <p className="text-xs" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>{div.name}</p>
+                            <p className="text-[9px] text-slate-400 font-sans tracking-wide uppercase font-bold">{div.nameEn}</p>
+                          </div>
+                          {locDivision === div.name ? (
+                            <div className="w-5 h-5 rounded-full bg-indigo-600 flex items-center justify-center text-white">
+                              <Check size={11} className="stroke-[3]" />
+                            </div>
+                          ) : (
+                            <ChevronRight size={14} className="text-slate-300" />
+                          )}
+                        </button>
+                      ))
+                    ) : (
+                      <div className="col-span-2 text-center py-8 text-slate-400 font-bold" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                        কোনো বিভাগ পাওয়া যায়নি
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+
+                {locStep === 2 && (
+                  <motion.div
+                    key="step-2"
+                    initial={{ opacity: 0, x: slideDirection === 'forward' ? 50 : -50 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: slideDirection === 'forward' ? -50 : 50 }}
+                    transition={{ duration: 0.25, ease: "easeInOut" }}
+                    className="grid grid-cols-2 gap-2"
+                  >
+                    {filteredDistricts.length > 0 ? (
+                      filteredDistricts.map(dist => (
+                        <button
+                          key={dist.id}
+                          type="button"
+                          onClick={() => {
+                            setLocDistrict(dist.name);
+                            setLocUpazila('');
+                            setSlideDirection('forward');
+                            setLocStep(3);
+                            setLocSearchQuery('');
+                          }}
+                          className={`flex items-center justify-between p-3.5 rounded-xl border text-left transition-all ${
+                            locDistrict === dist.name
+                              ? 'bg-indigo-50/80 border-indigo-200 text-indigo-700 shadow-xs font-bold'
+                              : 'bg-white border-slate-100 hover:border-indigo-100 text-slate-700 font-medium'
+                          }`}
+                        >
+                          <div>
+                            <p className="text-xs" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>{dist.name}</p>
+                            <p className="text-[9px] text-slate-400 font-sans tracking-wide uppercase font-bold">{dist.nameEn}</p>
+                          </div>
+                          {locDistrict === dist.name ? (
+                            <div className="w-5 h-5 rounded-full bg-indigo-600 flex items-center justify-center text-white">
+                              <Check size={11} className="stroke-[3]" />
+                            </div>
+                          ) : (
+                            <ChevronRight size={14} className="text-slate-300" />
+                          )}
+                        </button>
+                      ))
+                    ) : (
+                      <div className="col-span-2 text-center py-8 text-slate-400 font-bold" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                        কোনো জেলা পাওয়া যায়নি
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+
+                {locStep === 3 && (
+                  <motion.div
+                    key="step-3"
+                    initial={{ opacity: 0, x: slideDirection === 'forward' ? 50 : -50 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: slideDirection === 'forward' ? -50 : 50 }}
+                    transition={{ duration: 0.25, ease: "easeInOut" }}
+                    className="grid grid-cols-2 gap-2"
+                  >
+                    {filteredUpazilas.length > 0 ? (
+                      filteredUpazilas.map(up => (
+                        <button
+                          key={up.id}
+                          type="button"
+                          onClick={() => {
+                            setLocUpazila(up.name);
+                          }}
+                          className={`flex items-center justify-between p-3.5 rounded-xl border text-left transition-all ${
+                            locUpazila === up.name
+                              ? 'bg-indigo-50/80 border-indigo-200 text-indigo-700 shadow-xs font-bold'
+                              : 'bg-white border-slate-100 hover:border-indigo-100 text-slate-700 font-medium'
+                          }`}
+                        >
+                          <div>
+                            <p className="text-xs" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>{up.name}</p>
+                            <p className="text-[9px] text-slate-400 font-sans tracking-wide uppercase font-bold">{up.nameEn}</p>
+                          </div>
+                          {locUpazila === up.name ? (
+                            <div className="w-5 h-5 rounded-full bg-indigo-600 flex items-center justify-center text-white">
+                              <Check size={11} className="stroke-[3]" />
+                            </div>
+                          ) : (
+                            <ChevronRight size={14} className="text-slate-350" />
+                          )}
+                        </button>
+                      ))
+                    ) : (
+                      <div className="col-span-2 text-center py-8 text-slate-400 font-bold" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                        কোনো উপজেলা পাওয়া যায়নি
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Footer with controls */}
+            <div className="p-5 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between">
+              <div>
+                {locStep > 1 ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSlideDirection('backward');
+                      setLocStep((prev) => (prev - 1) as any);
+                      setLocSearchQuery('');
+                    }}
+                    className="font-bold text-xs text-slate-500 hover:text-slate-800 flex items-center gap-1 bg-slate-100 px-3.5 py-2 rounded-xl transition-all"
+                    style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
+                  >
+                    <ArrowLeft size={12} />
+                    পিছনে ফেরুন
+                  </button>
+                ) : (
+                  <div className="text-[10px] text-slate-400 font-bold" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                    ধাপ ১: বিভাগ নির্বাচন
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-2">
+                {locStep < 3 ? (
+                  <button
+                    type="button"
+                    disabled={
+                      (locStep === 1 && !locDivision) ||
+                      (locStep === 2 && !locDistrict)
+                    }
+                    onClick={() => {
+                      setSlideDirection('forward');
+                      setLocStep((prev) => (prev + 1) as any);
+                      setLocSearchQuery('');
+                    }}
+                    className={`font-black text-xs py-2 px-4 rounded-xl flex items-center gap-1 transition-all ${
+                      ((locStep === 1 && !locDivision) ||
+                       (locStep === 2 && !locDistrict))
+                        ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                        : 'bg-indigo-600 text-white shadow-sm hover:bg-indigo-700 active:scale-95'
+                    }`}
+                    style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
+                  >
+                    পরবর্তী ধাপ
+                    <ChevronRight size={12} />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={!locUpazila}
+                    onClick={() => {
+                      setPdfContactLocation(generatedLocationPreview);
+                      setIsLocModalOpen(false);
+                    }}
+                    className={`font-black text-xs py-2.5 px-5 rounded-xl shadow-md flex items-center gap-1 active:scale-95 transition-all ${
+                      !locUpazila
+                        ? 'bg-emerald-600/50 text-white/70 cursor-not-allowed'
+                        : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                    }`}
+                    style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
+                  >
+                    <Check size={14} className="stroke-[3]" />
+                    ঠিকানা নিশ্চিত করুন
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 📁 Project & Dues Report Filter Scope Modal */}
+      {isProjectFilterModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-xl overflow-hidden flex flex-col max-h-[85vh] border border-slate-100 animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-black text-slate-800 flex items-center gap-1.5 font-sans" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                  <Building className="text-indigo-600 animate-bounce" size={18} />
+                  {projectFilterModalType === 'projects' ? 'প্রজেক্ট রিপোর্ট ক্যাস্কেডিং ফিল্টার' : 'বকেয়া রিপোর্ট ক্যাস্কেডিং ফিল্টার'}
+                </h3>
+                <p className="text-[10px] text-slate-400 font-semibold" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                  ধাপে ধাপে আপনার রিপোর্টের পরিধি নির্বাচন করুন
+                </p>
+              </div>
+              <button 
+                onClick={() => setIsProjectFilterModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-all"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Steps Tracker Stepper Progress Bar */}
+            <div className="px-6 pt-5 pb-3 bg-slate-50/20 border-b border-slate-50">
+              <div className="relative flex items-center justify-between w-full font-sans max-w-xs mx-auto">
+                {/* Background Line */}
+                <div className="absolute top-4 left-[10%] right-[10%] h-[2px] bg-slate-100 z-0" />
+                
+                {/* Active Connector Progress */}
+                <div 
+                  className={`absolute top-4 left-[10%] h-[2px] z-0 transition-all duration-500 ${
+                    projectFilterStep === 1 ? 'w-0 bg-slate-100' :
+                    projectFilterStep === 2 ? 'w-[40%] bg-indigo-600' :
+                    'w-[80%] bg-indigo-600'
+                  }`}
+                />
+
+                {/* Step 1: ক্লাইন্ট */}
+                <div className="flex flex-col items-center z-10">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProjectFilterSlideDirection('backward');
+                      setProjectFilterStep(1);
+                    }}
+                    className="flex flex-col items-center focus:outline-none transition-all group active:scale-95"
+                  >
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 font-bold text-xs shadow-xs transition-all duration-300 ${
+                      projectFilterStep === 1
+                        ? 'bg-indigo-600 border-indigo-600 text-white ring-4 ring-indigo-100 scale-105'
+                        : projectFilterStep > 1
+                          ? 'bg-emerald-500 border-emerald-500 text-white hover:bg-emerald-600 shadow-md shadow-emerald-100'
+                          : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'
+                    }`}>
+                      {projectFilterStep > 1 ? (
+                        <Check size={14} className="stroke-[3] animate-in scale-in duration-200" />
+                      ) : (
+                        <span>১</span>
+                      )}
+                    </div>
+                    <span className={`text-[10px] font-bold mt-1.5 transition-all duration-300 ${
+                      projectFilterStep === 1 
+                        ? 'text-indigo-600 font-extrabold scale-105' 
+                        : projectFilterStep > 1 
+                          ? 'text-emerald-600 font-bold' 
+                          : 'text-slate-400'
+                    }`} style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                      ক্লাইন্ট
+                    </span>
+                  </button>
+                </div>
+
+                {/* Step 2: স্ট্যাটাস */}
+                <div className="flex flex-col items-center z-10">
+                  <button
+                    type="button"
+                    disabled={projectFilterStep === 1 && !pdfSelectedClientName}
+                    onClick={() => {
+                      setProjectFilterSlideDirection(projectFilterStep > 2 ? 'backward' : 'forward');
+                      setProjectFilterStep(2);
+                    }}
+                    className="flex flex-col items-center focus:outline-none transition-all group disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
+                  >
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 font-bold text-xs shadow-xs transition-all duration-300 ${
+                      projectFilterStep === 2
+                        ? 'bg-indigo-600 border-indigo-600 text-white ring-4 ring-indigo-100 scale-105'
+                        : projectFilterStep > 2
+                          ? 'bg-emerald-500 border-emerald-500 text-white hover:bg-emerald-600 shadow-md shadow-emerald-100'
+                          : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'
+                    }`}>
+                      {projectFilterStep > 2 ? (
+                        <Check size={14} className="stroke-[3] animate-in scale-in duration-200" />
+                      ) : (
+                        <span>২</span>
+                      )}
+                    </div>
+                    <span className={`text-[10px] font-bold mt-1.5 transition-all duration-300 ${
+                      projectFilterStep === 2 
+                        ? 'text-indigo-600 font-extrabold scale-105' 
+                        : projectFilterStep > 2 
+                          ? 'text-emerald-600 font-bold' 
+                          : 'text-slate-400'
+                    }`} style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                      স্ট্যাটাস
+                    </span>
+                  </button>
+                </div>
+
+                {/* Step 3: হিসাব বা ধরণ */}
+                <div className="flex flex-col items-center z-10">
+                  <button
+                    type="button"
+                    disabled={projectFilterStep < 3}
+                    className="flex flex-col items-center focus:outline-none transition-all group disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
+                  >
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 font-bold text-xs shadow-xs transition-all duration-300 ${
+                      projectFilterStep === 3
+                        ? 'bg-indigo-600 border-indigo-600 text-white ring-4 ring-indigo-100 scale-105'
+                        : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'
+                    }`}>
+                      <span>৩</span>
+                    </div>
+                    <span className={`text-[10px] font-bold mt-1.5 transition-all duration-300 ${
+                      projectFilterStep === 3 
+                        ? 'text-indigo-600 font-extrabold scale-105' 
+                        : 'text-slate-400'
+                    }`} style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                      হিসাব ধরণ
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Search Box (Only on client stage) */}
+            {projectFilterStep === 1 && (
+              <div className="px-5 py-3 border-b border-slate-100">
+                <div className="relative">
+                  <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={clientSearchQuery}
+                    onChange={(e) => setClientSearchQuery(e.target.value)}
+                    placeholder="ক্লাইন্টের নাম লিখে খুঁজুন..."
+                    className="w-full text-slate-800 bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-xs font-bold focus:ring-1 focus:ring-indigo-500 focus:bg-white focus:outline-none"
+                    style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
+                  />
+                  {clientSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setClientSearchQuery('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] bg-slate-200 hover:bg-slate-300 text-slate-500 px-1.5 py-0.5 rounded"
+                      style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
+                    >
+                      মুছুন
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Scrollable list content */}
+            <div className="p-5 flex-1 overflow-x-hidden overflow-y-auto max-h-[42vh] min-h-[30vh] bg-slate-50/10 relative">
+              <AnimatePresence mode="wait" initial={false}>
+                {projectFilterStep === 1 && (
+                  <motion.div
+                    key="step-client"
+                    initial={{ opacity: 0, x: projectFilterSlideDirection === 'forward' ? 50 : -50 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: projectFilterSlideDirection === 'forward' ? -50 : 50 }}
+                    transition={{ duration: 0.25, ease: "easeInOut" }}
+                    className="space-y-2"
+                  >
+                    {/* All Clients Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPdfSelectedClientName(null);
+                        setProjectFilterSlideDirection('forward');
+                        setProjectFilterStep(2);
+                      }}
+                      className={`w-full text-left p-3.5 rounded-2xl border text-xs transition-all flex items-center justify-between active:scale-[0.99] ${
+                        pdfSelectedClientName === null
+                          ? 'bg-indigo-50/80 border-indigo-200 text-indigo-700 shadow-xs font-bold'
+                          : 'bg-white border-slate-100 hover:border-indigo-100 text-slate-700 font-medium'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-sm">
+                          <Users size={18} />
+                        </div>
+                        <div>
+                          <p className="text-xs font-black text-slate-800" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>সমস্ত ক্লাইন্ট হিসাব</p>
+                          <p className="text-[10px] text-slate-400 font-medium mt-0.5" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>সকল রেজিস্টার্ড ক্লাইন্টের সম্মিলিত প্রজেক্টের লিস্ট</p>
+                        </div>
+                      </div>
+                      <ChevronRight size={14} className="text-slate-400" />
+                    </button>
+
+                    {/* Divider */}
+                    <div className="flex py-2 items-center">
+                      <div className="flex-grow border-t border-slate-100"></div>
+                      <span className="flex-shrink mx-3 text-[9px] text-slate-400 font-black tracking-wider uppercase font-sans" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>অনন্য ক্লাইন্ট তালিকা</span>
+                      <div className="flex-grow border-t border-slate-100"></div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-1.5">
+                      {filteredUniqueClientNames.length > 0 ? (
+                        filteredUniqueClientNames.map((clientName) => {
+                          const isSelected = pdfSelectedClientName === clientName;
+                          return (
+                            <button
+                              key={clientName}
+                              type="button"
+                              onClick={() => {
+                                setPdfSelectedClientName(clientName);
+                                setProjectFilterSlideDirection('forward');
+                                setProjectFilterStep(2);
+                              }}
+                              className={`w-full text-left p-3 rounded-xl border text-xs transition-colors flex items-center justify-between ${
+                                isSelected 
+                                  ? 'bg-indigo-100/50 border-indigo-200 text-indigo-700 font-black' 
+                                  : 'bg-white border-slate-100 hover:bg-slate-50 text-slate-700 font-semibold'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <span className="text-slate-400"><User size={16} /></span>
+                                <span style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>{clientName}</span>
+                              </div>
+                              {isSelected ? (
+                                <div className="w-5 h-5 rounded-full bg-indigo-600 flex items-center justify-center text-white">
+                                  <Check size={11} className="stroke-[3]" />
+                                </div>
+                              ) : (
+                                <ChevronRight size={12} className="text-slate-300" />
+                              )}
+                            </button>
+                          );
+                        })
+                      ) : (
+                        <div className="text-center py-8 text-slate-400 text-xs font-bold" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                          কোনো ক্লাইন্ট পাওয়া যায়নি
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+
+                {projectFilterStep === 2 && (
+                  <motion.div
+                    key="step-status"
+                    initial={{ opacity: 0, x: projectFilterSlideDirection === 'forward' ? 50 : -50 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: projectFilterSlideDirection === 'forward' ? -50 : 50 }}
+                    transition={{ duration: 0.25, ease: "easeInOut" }}
+                    className="space-y-2.5"
+                  >
+                    {[
+                      { key: 'All', title: 'সমস্ত প্রজেক্ট', desc: 'যে কোনো স্ট্যাটাস নির্বিশেষে সকল প্রজেক্টের লিস্ট', icon: <Layers size={16} />, color: 'indigo' },
+                      { key: 'In Progress', title: 'চলমান প্রজেক্ট', desc: 'বর্তমানে চলমান (In Progress) প্রজেক্টের লিস্ট', icon: <Activity size={16} />, color: 'amber' },
+                      { key: 'Pending', title: 'পেন্ডিং প্রজেক্ট', desc: 'আদেশকৃত বা অপেক্ষমাণ (Pending) প্রজেক্টের লিস্ট', icon: <Clock size={16} />, color: 'rose' },
+                      { key: 'Completed', title: 'সম্পন্ন প্রজেক্ট', desc: 'সম্পূর্ণরূপে ডেলিভারকৃত (Completed) প্রজেক্টের লিস্ট', icon: <CheckCircle size={16} />, color: 'emerald' },
+                    ].map((item) => {
+                      const isSelected = pdfSelectedStatus === item.key;
+                      return (
+                        <button
+                          key={item.key}
+                          type="button"
+                          onClick={() => {
+                            setPdfSelectedStatus(item.key as any);
+                            setProjectFilterSlideDirection('forward');
+                            setProjectFilterStep(3);
+                          }}
+                          className={`w-full text-left p-4 rounded-2xl border transition-all flex items-center justify-between active:scale-[0.99] ${
+                            isSelected
+                              ? 'bg-indigo-50/80 border-indigo-200 text-indigo-700 shadow-xs font-bold'
+                              : 'bg-white border-slate-100 hover:border-slate-200 text-slate-700 font-medium'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center font-bold text-sm">
+                              {item.icon}
+                            </div>
+                            <div>
+                              <p className="text-xs font-black text-slate-800" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>{item.title}</p>
+                              <p className="text-[10px] text-slate-400 font-medium mt-0.5" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>{item.desc}</p>
+                            </div>
+                          </div>
+                          {isSelected ? (
+                            <div className="w-5 h-5 rounded-full bg-indigo-600 flex items-center justify-center text-white">
+                              <Check size={11} className="stroke-[3]" />
+                            </div>
+                          ) : (
+                            <ChevronRight size={14} className="text-slate-350" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </motion.div>
+                )}
+
+                {projectFilterStep === 3 && (
+                  <motion.div
+                    key="step-type"
+                    initial={{ opacity: 0, x: projectFilterSlideDirection === 'forward' ? 50 : -50 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: projectFilterSlideDirection === 'forward' ? -50 : 50 }}
+                    transition={{ duration: 0.25, ease: "easeInOut" }}
+                    className="space-y-3"
+                  >
+                    {[
+                      { key: 'projects', title: 'সমস্ত প্রজেক্ট হিসাব', desc: 'বাজেট, পেমেন্ট এবং সামগ্রিক লেনদেন বিবরণী', icon: '📝' },
+                      { key: 'dues', title: 'বকেয়া প্রজেক্ট হিসাব', desc: 'যে প্রজেক্টগুলোর অর্থ এখনো পুরোপুরি বকেয়া রয়েছে', icon: '💰' },
+                    ].map((item) => {
+                      const isSelected = pdfReportType === item.key;
+                      return (
+                        <button
+                          key={item.key}
+                          type="button"
+                          onClick={() => {
+                            setPdfReportType(item.key as any);
+                            setIsProjectFilterModalOpen(false);
+                            // Set viewState to preview page and auto preview load
+                            setViewState('preview');
+                          }}
+                          className={`w-full text-left p-4 rounded-2xl border transition-all flex items-center justify-between active:scale-[0.99] ${
+                            isSelected
+                              ? 'bg-indigo-50/80 border-indigo-200 text-indigo-700 shadow-xs font-bold'
+                              : 'bg-white border-slate-100 hover:border-slate-200 text-slate-700 font-medium'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center font-bold text-sm">
+                              {item.icon}
+                            </div>
+                            <div>
+                              <p className="text-xs font-black text-slate-800" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>{item.title}</p>
+                              <p className="text-[10px] text-slate-400 font-medium mt-0.5" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>{item.desc}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <span className="text-[10px] bg-indigo-600 text-white px-2 py-0.5 rounded-lg font-black" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>রিপোর্ট প্রিভিউ</span>
+                            <ChevronRight size={14} className="text-indigo-600 animate-pulse" />
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Footer with a cancel/back buttons */}
+            <div className="p-5 border-t border-slate-100 bg-slate-50/50 flex justify-between items-center">
+              {projectFilterStep > 1 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProjectFilterSlideDirection('backward');
+                    setProjectFilterStep((prev) => (prev - 1) as any);
+                  }}
+                  className="font-bold text-xs text-indigo-600 hover:text-indigo-800 bg-indigo-50/70 hover:bg-indigo-150 border border-indigo-100 px-4 py-2.5 rounded-xl transition-all active:scale-95 flex items-center gap-1"
+                  style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
+                >
+                  <ChevronLeft size={14} />
+                  পূর্ববর্তী ধাপ
+                </button>
+              ) : (
+                <div />
+              )}
+
+              <div className="flex items-center gap-2">
+                {projectFilterStep < 3 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProjectFilterSlideDirection('forward');
+                      setProjectFilterStep((prev) => (prev + 1) as any);
+                    }}
+                    className="font-bold text-xs text-white bg-indigo-600 hover:bg-indigo-700 px-5 py-2.5 rounded-xl flex items-center gap-1 transition-all active:scale-95 shadow-md shadow-indigo-100"
+                    style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
+                  >
+                    পরবর্তী ধাপ
+                    <ChevronRight size={14} />
+                  </button>
+                )}
+                {projectFilterStep === 3 && (
+                  <button
+                    type="button"
+                    onClick={() => setIsProjectFilterModalOpen(false)}
+                    className="font-bold text-xs text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 px-5 py-2.5 rounded-xl transition-all active:scale-95"
+                    style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
+                  >
+                    বন্ধ করুন
+                  </button>
+                )}
+              </div>
+            </div>
+
+          </div>
         </div>
       )}
     </div>

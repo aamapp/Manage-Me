@@ -85,13 +85,20 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
       location.pathname + location.search === path ||
       location.pathname === path
     ) {
+      setIsNavigating(true);
+      setTimeout(() => {
+        setIsNavigating(false);
+      }, 50);
       return;
     }
 
     setIsNavigating(true);
     setTimeout(() => {
-      navigate(path, { replace: true });
-    }, 10);
+      navigate(path);
+      setTimeout(() => {
+        setIsNavigating(false);
+      }, 50);
+    }, 50);
   };
 
   useEffect(() => {
@@ -211,11 +218,25 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   ];
 
   const handleNavigation = (path: string) => {
+    setMoreMenuOpen(false);
+    if (
+      location.pathname + location.search === path ||
+      location.pathname === path
+    ) {
+      setIsNavigating(true);
+      setTimeout(() => {
+        setIsNavigating(false);
+      }, 50);
+      return;
+    }
+
     setIsNavigating(true);
     setTimeout(() => {
-      navigate(path, { replace: true });
-      setMoreMenuOpen(false);
-    }, 10);
+      navigate(path);
+      setTimeout(() => {
+        setIsNavigating(false);
+      }, 50);
+    }, 50);
   };
 
   const handleBackToUsers = () => {
@@ -561,116 +582,118 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
       )}
 
       {/* "More" Menu Drawer */}
-      {isMoreMenuOpen && (
-        <div className="fixed inset-0 z-[100] flex flex-col justify-end">
-          <div
-            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300"
-            onClick={() => setMoreMenuOpen(false)}
-          />
-
-          <div className="relative bg-white rounded-t-[2rem] p-4 pb-6 shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[75vh] overflow-y-auto w-full max-w-lg mx-auto border-t border-slate-100">
+      {isMoreMenuOpen &&
+        createPortal(
+          <div className="fixed inset-0 z-[9999] flex flex-col justify-end">
             <div
-              className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-4 cursor-pointer"
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300"
               onClick={() => setMoreMenuOpen(false)}
             />
 
-            <div
-              onClick={() => handleNavigation("/profile")}
-              className="flex items-center justify-between gap-1 mb-5 bg-slate-50 p-2.5 rounded-3xl border border-slate-100 relative overflow-hidden cursor-pointer active:bg-slate-100 transition-colors"
-            >
-              <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-100 rounded-full -mr-10 -mt-10 opacity-50 blur-xl"></div>
+            <div className="relative bg-white rounded-t-[2rem] p-4 pb-6 shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[75vh] overflow-y-auto w-full max-w-lg mx-auto border-t border-slate-100">
+              <div
+                className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-4 cursor-pointer"
+                onClick={() => setMoreMenuOpen(false)}
+              />
 
-              <div className="flex items-center gap-2 relative z-10 min-w-0">
-                <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-white border-2 border-white flex items-center justify-center shadow-md">
-                  {user.avatar_url ? (
-                    <img
-                      src={user.avatar_url}
-                      alt={user.name}
-                      className="w-full h-full object-cover"
-                      referrerPolicy="no-referrer"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || "User")}&background=random`;
-                      }}
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-indigo-50 flex items-center justify-center text-indigo-600">
-                      <User size={18} />
-                    </div>
-                  )}
-                </div>
-                <div className="min-w-0">
-                  <h3 className="font-bold text-sm text-slate-800 truncate leading-tight">
-                    {user.name}
-                  </h3>
-                  <p className="text-[10px] text-slate-500 font-medium truncate mt-0.5">
-                    {isAdmin ? "Admin" : user.email}
-                  </p>
-                </div>
-              </div>
-
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsLogoutConfirmOpen(true);
-                }}
-                className="relative z-10 flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl bg-rose-50 text-rose-600 font-bold text-[10px] active:scale-95 transition-all border border-rose-100 shadow-sm flex-shrink-0"
+              <div
+                onClick={() => handleNavigation("/profile")}
+                className="flex items-center justify-between gap-1 mb-5 bg-slate-50 p-2.5 rounded-3xl border border-slate-100 relative overflow-hidden cursor-pointer active:bg-slate-100 transition-colors"
               >
-                <LogOut size={12} />
-                লগআউট
-              </button>
-            </div>
+                <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-100 rounded-full -mr-10 -mt-10 opacity-50 blur-xl"></div>
 
-            {isAdmin && (
-              <button
-                onClick={() => {
-                  handleBackToUsers();
-                  setMoreMenuOpen(false);
-                }}
-                className="w-full flex items-center justify-center gap-2 p-3.5 mb-4 rounded-2xl bg-indigo-50 text-indigo-600 font-bold text-sm active:scale-[0.98] transition-all border border-indigo-100"
-              >
-                <UserCog size={18} />
-                ইউজার লিস্টে ফিরে যান
-              </button>
-            )}
-
-            <h3
-              className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 px-2"
-              style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
-            >
-              অন্যান্য মেনু
-            </h3>
-
-            <div className="grid grid-cols-2 gap-2 mb-4">
-              {SECONDARY_NAV.map((item) => (
-                <button
-                  key={item.path}
-                  onClick={() => handleNavigation(item.path)}
-                  className="flex flex-col items-center justify-center p-2 rounded-xl bg-white border border-slate-100 shadow-sm active:scale-95 transition-all group hover:border-indigo-200 hover:shadow-md"
-                >
-                  <div className="w-7 h-7 rounded-full bg-slate-50 text-slate-600 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300 shadow-sm mb-1.5 relative">
-                    {React.cloneElement(
-                      item.icon as React.ReactElement<{ size?: number }>,
-                      { size: 14 },
-                    )}
-                    {item.path === "/trash" && trashCount > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[8px] font-black px-1 py-0.5 rounded-full min-w-[14px] h-[14px] flex items-center justify-center shadow-sm ring-2 bg-white group-hover:ring-indigo-600 transition-all animate-in zoom-in duration-300">
-                        {trashCount}
-                      </span>
+                <div className="flex items-center gap-2 relative z-10 min-w-0">
+                  <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-white border-2 border-white flex items-center justify-center shadow-md">
+                    {user.avatar_url ? (
+                      <img
+                        src={user.avatar_url}
+                        alt={user.name}
+                        className="w-full h-full object-cover"
+                        referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || "User")}&background=random`;
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-indigo-50 flex items-center justify-center text-indigo-600">
+                        <User size={18} />
+                      </div>
                     )}
                   </div>
-                  <p
-                    className="font-bold text-slate-800 text-[10px] leading-tight text-center"
-                    style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
-                  >
-                    {item.name}
-                  </p>
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-sm text-slate-800 truncate leading-tight">
+                      {user.name}
+                    </h3>
+                    <p className="text-[10px] text-slate-500 font-medium truncate mt-0.5">
+                      {isAdmin ? "Admin" : user.email}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsLogoutConfirmOpen(true);
+                  }}
+                  className="relative z-10 flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl bg-rose-50 text-rose-600 font-bold text-[10px] active:scale-95 transition-all border border-rose-100 shadow-sm flex-shrink-0"
+                >
+                  <LogOut size={12} />
+                  লগআউট
                 </button>
-              ))}
+              </div>
+
+              {isAdmin && (
+                <button
+                  onClick={() => {
+                    handleBackToUsers();
+                    setMoreMenuOpen(false);
+                  }}
+                  className="w-full flex items-center justify-center gap-2 p-3.5 mb-4 rounded-2xl bg-indigo-50 text-indigo-600 font-bold text-sm active:scale-[0.98] transition-all border border-indigo-100"
+                >
+                  <UserCog size={18} />
+                  ইউজার লিস্টে ফিরে যান
+                </button>
+              )}
+
+              <h3
+                className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 px-2"
+                style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
+              >
+                অন্যান্য মেনু
+              </h3>
+
+              <div className="grid grid-cols-2 gap-2 mb-4">
+                {SECONDARY_NAV.map((item) => (
+                  <button
+                    key={item.path}
+                    onClick={() => handleNavigation(item.path)}
+                    className="flex flex-col items-center justify-center p-2 rounded-xl bg-white border border-slate-100 shadow-sm active:scale-95 transition-all group hover:border-indigo-200 hover:shadow-md"
+                  >
+                    <div className="w-7 h-7 rounded-full bg-slate-50 text-slate-600 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300 shadow-sm mb-1.5 relative">
+                      {React.cloneElement(
+                        item.icon as React.ReactElement<{ size?: number }>,
+                        { size: 14 },
+                      )}
+                      {item.path === "/trash" && trashCount > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[8px] font-black px-1 py-0.5 rounded-full min-w-[14px] h-[14px] flex items-center justify-center shadow-sm ring-2 bg-white group-hover:ring-indigo-600 transition-all animate-in zoom-in duration-300">
+                          {trashCount}
+                        </span>
+                      )}
+                    </div>
+                    <p
+                      className="font-normal text-slate-700 text-[10px] leading-tight text-center"
+                      style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
+                    >
+                      {item.name}
+                    </p>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
 
       {/* ABOUT MODAL (Developer Info) - Keeps existing code structure... */}
       {isAboutOpen &&

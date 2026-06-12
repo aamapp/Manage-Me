@@ -769,12 +769,6 @@ export const Projects: React.FC = () => {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button 
-            onClick={handleDownloadPDF}
-            className="bg-emerald-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-emerald-200 active:scale-90 transition-transform"
-          >
-            <Download size={22} />
-          </button>
-          <button 
             onClick={handleOpenAddModal}
             className="bg-indigo-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-indigo-200 active:scale-90 transition-transform"
           >
