@@ -54,7 +54,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
     "কন্টেন্ট তৈরি হচ্ছে...",
   ); // Dynamic message
   const [isNavigating, setIsNavigating] = useState(false);
-  const [showNavLoader, setShowNavLoader] = useState(false);
   const [activeExpenseTab, setActiveExpenseTab] = useState<string>("expenses");
 
   useEffect(() => {
@@ -116,24 +115,15 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
     }
 
     setIsNavigating(true);
-    navigate(path);
+    setTimeout(() => {
+      navigate(path);
+    }, 100);
   };
 
   useEffect(() => {
     setIsNavigating(false);
     setIsReportPreviewOpen(false);
   }, [location.pathname, location.search]);
-
-  useEffect(() => {
-    if (isNavigating) {
-      const timer = setTimeout(() => {
-        setShowNavLoader(true);
-      }, 100); // 100ms threshold to prevent flickering loader on quick page loads
-      return () => clearTimeout(timer);
-    } else {
-      setShowNavLoader(false);
-    }
-  }, [isNavigating]);
 
   useEffect(() => {
     const handleReportPreview = (e: any) => {
@@ -256,7 +246,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
     }
 
     setIsNavigating(true);
-    navigate(path);
+    setTimeout(() => {
+      navigate(path);
+    }, 100);
   };
 
   const handleBackToUsers = () => {
@@ -1068,10 +1060,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
         )}
 
       {/* Page Transition Loading Overlay - Beautiful Centered Rotating Logo as Requested */}
-      {showNavLoader &&
+      {isNavigating &&
         !isProcessing &&
         createPortal(
-          <div className={`fixed ${!isFullScreenPage ? "top-14 lg:top-0" : "top-0"} left-0 lg:left-72 right-0 bottom-0 z-30 bg-gradient-to-tr from-indigo-50/40 via-white/70 to-violet-50/40 backdrop-blur-[5px] flex flex-col items-center justify-center select-none pointer-events-none animate-in fade-in duration-75`}>
+          <div className={`fixed ${!isFullScreenPage ? "top-14 lg:top-0" : "top-0"} left-0 lg:left-72 right-0 bottom-0 z-30 bg-gradient-to-tr from-indigo-50/95 via-white/98 to-violet-50/95 backdrop-blur-[8px] flex flex-col items-center justify-center select-none pointer-events-none animate-in fade-in duration-75`}>
             <div className="flex flex-col items-center justify-center gap-4 transform scale-75">
               <div className="premium-loader-container !w-20 !h-20 p-4.5">
                 <div className="premium-loader-ring"></div>

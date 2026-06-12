@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { TrendingUp, Plus, Search, Calendar, DollarSign, X, ReceiptText, Briefcase, CreditCard, AlertCircle, MoreVertical, Pencil, SquarePen, Trash2, Users, Loader2, CalendarDays, Wallet, Clock, Zap, Rocket, Landmark, Banknote, Calculator, Download, Music, Filter } from 'lucide-react';
+import { TrendingUp, Plus, Search, Calendar, DollarSign, X, ReceiptText, Briefcase, CreditCard, AlertCircle, MoreVertical, Pencil, SquarePen, Trash2, Users, Loader2, CalendarDays, Wallet, Clock, Zap, Rocket, Landmark, Banknote, Calculator, Download, Music, Filter, ChevronDown, Check } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { useAppContext } from '../context/AppContext';
@@ -105,6 +105,9 @@ export const Income: React.FC = () => {
 
   // Ref for click outside detection
   const projectInputRef = useRef<HTMLDivElement>(null);
+  const methodDropdownRef = useRef<HTMLDivElement>(null);
+
+  const [showMethodDropdown, setShowMethodDropdown] = useState(false);
 
   const [newPayment, setNewPayment] = useState<any>({
     projectName: '',
@@ -126,6 +129,11 @@ export const Income: React.FC = () => {
       // Close Project Suggestions
       if (projectInputRef.current && !projectInputRef.current.contains(event.target as Node)) {
         setShowSuggestions(false);
+      }
+
+      // Close Method Dropdown
+      if (methodDropdownRef.current && !methodDropdownRef.current.contains(event.target as Node)) {
+        setShowMethodDropdown(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -785,7 +793,7 @@ export const Income: React.FC = () => {
                          <DollarSign size={isGeneratingPDF ? 28 : 20} />
                        </div>
                        <div className="min-w-0">
-                         <h3 className={`font-bold text-slate-800 ${isGeneratingPDF ? 'text-lg mb-1.5' : 'text-sm'} truncate`}>{payment.projectname}</h3>
+                         <h3 className={`font-medium text-slate-800 ${isGeneratingPDF ? 'text-lg mb-1.5' : 'text-sm'} truncate`}>{payment.projectname}</h3>
                          <p className={`${isGeneratingPDF ? 'text-sm' : 'text-xs'} text-slate-500 font-medium`}>{payment.clientname}</p>
                        </div>
                     </div>
@@ -847,8 +855,8 @@ export const Income: React.FC = () => {
                   
                   <div className={`flex justify-between items-end border-t border-slate-50 ${isGeneratingPDF ? 'pt-4 mt-2' : 'pt-3 mt-1'}`}>
                     <div>
-                       <p className={`${isGeneratingPDF ? 'text-xs' : 'text-[10px]'} text-slate-400 font-bold uppercase mb-0.5`}>তারিখ</p>
-                       <p className={`${isGeneratingPDF ? 'text-sm' : 'text-xs'} font-bold text-slate-600 flex items-center gap-1`}>
+                       <p className={`${isGeneratingPDF ? 'text-xs' : 'text-[10px]'} text-slate-400 font-medium uppercase mb-0.5`}>তারিখ</p>
+                       <p className={`${isGeneratingPDF ? 'text-sm' : 'text-xs'} font-medium text-slate-600 flex items-center gap-1`}>
                          <Calendar size={isGeneratingPDF ? 14 : 12} /> {formatPaymentDate(payment.date)}
                        </p>
                     </div>
@@ -960,15 +968,49 @@ export const Income: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                  <div>
+                  <div className="relative" ref={methodDropdownRef}>
                     <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">পদ্ধতি</label>
-                    <select value={newPayment.method} onChange={e => setNewPayment({...newPayment, method: e.target.value})} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500">
-                      <option value="বিকাশ">বিকাশ</option>
-                      <option value="নগদ">নগদ</option>
-                      <option value="রকেট">রকেট</option>
-                      <option value="ব্যাংক">ব্যাংক</option>
-                      <option value="নগদ (ক্যাশ)">ক্যাশ</option>
-                    </select>
+                    <div
+                      onClick={() => setShowMethodDropdown(!showMethodDropdown)}
+                      className={`w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 hover:bg-slate-100 rounded-xl font-bold text-xs text-slate-800 outline-none flex items-center justify-between cursor-pointer transition-all ${
+                        showMethodDropdown ? 'ring-1 ring-emerald-500 border-emerald-500' : ''
+                      }`}
+                      style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
+                    >
+                      <span className="truncate">{newPayment.method || 'বিকাশ'}</span>
+                      <ChevronDown size={14} className={`text-slate-400 transition-transform duration-200 ${showMethodDropdown ? 'rotate-180' : ''}`} />
+                    </div>
+
+                    {showMethodDropdown && (
+                      <div className="absolute top-full mt-1.5 w-full bg-white border border-slate-100 rounded-xl shadow-2xl z-[100] p-1 flex flex-col gap-0.5 animate-in fade-in slide-in-from-top-2 duration-150 origin-top">
+                        {[
+                          { key: 'বিকাশ', label: 'বিকাশ' },
+                          { key: 'নগদ', label: 'নগদ' },
+                          { key: 'রকেট', label: 'রকেট' },
+                          { key: 'ব্যাংক', label: 'ব্যাংক' },
+                          { key: 'নগদ (ক্যাশ)', label: 'ক্যাশ' },
+                        ].map(opt => (
+                          <button
+                            key={opt.key}
+                            type="button"
+                            onClick={() => {
+                              setNewPayment({ ...newPayment, method: opt.key });
+                              setShowMethodDropdown(false);
+                            }}
+                            className={`w-full px-3 py-2 rounded-lg flex items-center justify-between font-bold text-xs transition-colors hover:bg-slate-50 ${
+                              newPayment.method === opt.key ? 'bg-emerald-50/70 text-emerald-700' : 'text-slate-600'
+                            }`}
+                          >
+                            <span>{opt.label}</span>
+                            {newPayment.method === opt.key && (
+                              <div className="w-4 h-4 bg-emerald-600 rounded-full flex items-center justify-center text-white shadow-sm shrink-0">
+                                <Check size={10} />
+                              </div>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <button type="submit" disabled={isSubmitting} className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold text-base shadow-lg shadow-emerald-200 active:scale-95 transition-transform flex items-center justify-center gap-2 mt-4">
