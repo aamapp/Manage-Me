@@ -3770,7 +3770,7 @@ const DuesManager: React.FC<DuesManagerProps> = ({ wallets, adjustWalletBalance,
                  )}
               </div>
               <div className="flex-1 min-w-0 text-left">
-                <h3 className="text-sm font-medium text-slate-800 truncate leading-tight">{person.name}</h3>
+                <h3 className="text-sm font-medium text-slate-800 truncate leading-normal pt-0.5">{person.name}</h3>
                 <p className="text-[10px] text-slate-500 truncate mt-0.5">{person.phone}</p>
               </div>
               <div className={`text-base font-black shrink-0 ${textClass}`}> 

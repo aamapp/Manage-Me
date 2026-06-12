@@ -7,7 +7,7 @@ import {
 import { 
   TrendingUp,
   Wallet,
-  RefreshCcw, Clock, Receipt, Download, Share2, Hexagon, X, AlertCircle, ExternalLink, Copy, Music, Filter,
+  RefreshCcw, Clock, Receipt, Download, Share2, Hexagon, X, AlertCircle, ExternalLink, Copy, Music, Filter, Loader2,
   ChevronRight, ArrowLeft, FileText, ChevronLeft, Calendar, User, Phone, MapPin, Mail, FileDown, FolderOpen,
   Navigation, Compass, Locate
 } from 'lucide-react';
@@ -59,6 +59,91 @@ const ReportAppLogo: React.FC<{ size: number; variant?: 'color' | 'white' | 'tra
   );
 };
 
+const toBnDigits = (num: number | string): string => {
+  const bnDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+  return num.toString().replace(/\d/g, (x) => bnDigits[parseInt(x)]);
+};
+
+interface PageData {
+  pageNumber: number;
+  items: any[];
+  isFirstPage: boolean;
+  isLastPage: boolean;
+}
+
+function paginateData(allLines: any[]): PageData[] {
+  const totalItems = allLines.length;
+  if (totalItems === 0) {
+    return [];
+  }
+  
+  if (totalItems <= 12) {
+    return [{
+      pageNumber: 1,
+      items: allLines,
+      isFirstPage: true,
+      isLastPage: true
+    }];
+  }
+
+  const pages: PageData[] = [];
+  let currentIndex = 0;
+  let pageNumber = 1;
+
+  while (currentIndex < totalItems) {
+    const isFirst = pageNumber === 1;
+    const remaining = totalItems - currentIndex;
+
+    let takeCount = 0;
+    let isLast = false;
+
+    if (isFirst) {
+      if (totalItems <= 22) {
+        // If total is 13 to 22, we split into 2 pages: Page 1 (11) and Page 2 (rest: 2 to 11)
+        takeCount = 11;
+      } else if (totalItems <= 30) {
+        // If total is 23 to 30, we split into 2 pages: Page 1 (16) and Page 2 (rest: 7 to 14)
+        takeCount = 16;
+      } else {
+        // Otherwise, first page is fully packed with 18 items
+        takeCount = 18;
+      }
+    } else {
+      // For subsequent pages (not the first page)
+      if (remaining <= 15) {
+        // If remaining items fit perfectly on the last page with all components
+        takeCount = remaining;
+        isLast = true;
+      } else if (remaining <= 30) {
+        // If remaining items are split into 2 pages: this middle page (18) and last page (rest: 2 to 12)
+        takeCount = 18;
+      } else {
+        // Otherwise, pack this middle page to its safe maximum
+        takeCount = 22;
+      }
+    }
+
+    const pageItems = allLines.slice(currentIndex, currentIndex + takeCount);
+    currentIndex += pageItems.length;
+
+    pages.push({
+      pageNumber,
+      items: pageItems,
+      isFirstPage: isFirst,
+      isLastPage: isLast || currentIndex >= totalItems
+    });
+
+    pageNumber++;
+  }
+
+  // Final safety check to make sure the last page is flagged correctly
+  if (pages.length > 0) {
+    pages[pages.length - 1].isLastPage = true;
+  }
+
+  return pages;
+}
+
 import { supabase } from '@/lib/supabase';
 import { Expense } from '@/types';
 import { DatePicker } from '@/components/DatePicker';
@@ -72,6 +157,19 @@ export const Reports: React.FC = () => {
 
   // Custom PDF Download States and Subview Systems
   const [viewState, setViewState] = useState<'main' | 'download' | 'preview'>('main');
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+
+  useEffect(() => {
+    if (viewState === 'preview') {
+      setIsPreviewLoading(true);
+      const timer = setTimeout(() => {
+        setIsPreviewLoading(false);
+      }, 1600);
+      return () => clearTimeout(timer);
+    } else {
+      setIsPreviewLoading(false);
+    }
+  }, [viewState]);
   
   // Dynamic scaling configurations for mobile responsive preview
   const containerRef = useRef<HTMLDivElement>(null);
@@ -418,6 +516,14 @@ export const Reports: React.FC = () => {
     };
   }, [pdfReportType, pdfTransactions, pdfFilteredProjects, pdfFilteredDues]);
 
+  const getPaginatedPages = useMemo(() => {
+    const listToPaginate = (pdfReportType === 'projects') 
+      ? pdfFilteredProjects 
+      : (pdfReportType === 'dues' ? pdfFilteredDues : pdfTransactions);
+    
+    return paginateData(listToPaginate);
+  }, [pdfReportType, pdfFilteredProjects, pdfFilteredDues, pdfTransactions]);
+
   const formatPdfRowDate = (dateStr: string) => {
     if (!dateStr) return '';
     const d = new Date(dateStr);
@@ -436,10 +542,22 @@ export const Reports: React.FC = () => {
   };
 
   const handleDownloadCustomPDF = async () => {
-    const element = document.getElementById('pdf-report-document-sheet');
-    if (!element) return;
+    const pagesList = getPaginatedPages;
+    if (pagesList.length === 0) return;
     
     setIsGeneratingPDF(true);
+    setPdfProgress(5);
+
+    // Initialize progress animation loop up to 95%
+    let curProgress = 5;
+    const progressInterval = setInterval(() => {
+      const increment = Math.floor(Math.random() * 5) + 2;
+      curProgress = Math.min(95, curProgress + increment);
+      setPdfProgress(curProgress);
+      if (curProgress >= 95) {
+        clearInterval(progressInterval);
+      }
+    }, 150);
     
     // Create an active, visible-to-browser but hidden-to-user fixed-width wrapper to replicate 100% desktop/A4 workspace with correct font rendering
     const wrapper = document.createElement('div');
@@ -448,79 +566,82 @@ export const Reports: React.FC = () => {
     wrapper.style.top = '0px';
     wrapper.style.left = '0px'; // Render in active viewport for proper font family/baseline metrics
     wrapper.style.width = '794px';
-    wrapper.style.height = 'auto';
+    wrapper.style.height = '1122px';
     wrapper.style.zIndex = '-9999'; // Render behind the normal layout hierarchy
     wrapper.style.opacity = '0.01'; // Fully transparent to the user, but active in the rendering tree
     wrapper.style.pointerEvents = 'none';
     wrapper.style.overflow = 'hidden';
 
-    // Create an unscaled, standalone clone of the report sheet
-    const clone = element.cloneNode(true) as HTMLDivElement;
-    
-    // Do not apply any manual top offsets since the true browser-rendered font is now fully active
-    clone.style.position = 'relative';
-    clone.style.top = '0px';
-    clone.style.left = '0px';
-    clone.style.transform = 'none';
-    clone.style.margin = '0px';
-    clone.style.boxShadow = 'none';
-    clone.style.border = 'none';
-    clone.style.borderRadius = '0px'; // clean printable style
-    
-    // Give the clone a unique ID so we can find it in the cloned document
-    clone.id = 'pdf-report-clone-for-export';
-
-    // With html-to-image, the browser's native rendering engine inside SVG foreignObject
-    // renders everything (flexboxes, margins, font alignments, line heights) perfectly.
-    // There is no more baseline font-shifting or layout mismatch, so we don't need any manual offsets!
-    const directHeaderText = clone.querySelector('.pdf-header-left-text') as HTMLElement | null;
-    if (directHeaderText) {
-      directHeaderText.style.position = 'static';
-      directHeaderText.style.top = 'auto';
-    }
-    const directH1 = directHeaderText?.querySelector('h1') as HTMLElement | null;
-    if (directH1) {
-      directH1.style.lineHeight = '1.1';
-    }
-    const directRightName = clone.querySelector('.pdf-header-right-name') as HTMLElement | null;
-    if (directRightName) {
-      directRightName.style.position = 'static';
-      directRightName.style.top = 'auto';
-    }
-
-    wrapper.appendChild(clone);
     document.body.appendChild(wrapper);
-    
-    // Give the engine a quick ticks block to render the fonts and SVG graphics completely
-    await document.fonts.ready;
-    await new Promise(requestAnimationFrame);
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    try {
-      // Use the high-fidelity html-to-image to generate a canvas exactly matching the browser preview
-      const canvas = await toCanvas(clone, {
-        pixelRatio: 2.5, // 2.5x super-sampling for crystal clear text readability in export
-        backgroundColor: '#ffffff',
-        width: 794,
-        height: clone.offsetHeight || 1100,
-        style: {
-          transform: 'none',
-          margin: '0px',
-          position: 'relative'
-        }
-      });
+    const canvases: HTMLCanvasElement[] = [];
 
-      const imgWidth = canvas.width / 2.5;
-      const imgHeight = canvas.height / 2.5;
-      
+    try {
+      for (let i = 0; i < pagesList.length; i++) {
+        const pageElement = document.getElementById(`pdf-report-page-${i}`);
+        if (!pageElement) continue;
+
+        // Create an unscaled, standalone clone of the report sheet page
+        const clone = pageElement.cloneNode(true) as HTMLDivElement;
+        
+        clone.style.position = 'relative';
+        clone.style.top = '0px';
+        clone.style.left = '0px';
+        clone.style.transform = 'none';
+        clone.style.margin = '0px';
+        clone.style.boxShadow = 'none';
+        clone.style.border = 'none';
+        clone.style.borderRadius = '0px'; // clean printable style
+        
+        clone.id = `pdf-report-clone-page-${i}`;
+
+        // Empty current wrapper and add this page's clone
+        wrapper.innerHTML = '';
+        wrapper.appendChild(clone);
+
+        // Give the engine a quick ticks block to render the fonts and SVG graphics completely
+        await document.fonts.ready;
+        await new Promise(requestAnimationFrame);
+        await new Promise(resolve => setTimeout(resolve, 80));
+
+        // Use the high-fidelity html-to-image to generate a canvas exactly matching the browser preview
+        const canvas = await toCanvas(clone, {
+          pixelRatio: 4, // 4x super-sampling for ultra HD clarity in export
+          backgroundColor: '#ffffff',
+          width: 794,
+          height: 1122,
+          style: {
+            transform: 'none',
+            margin: '0px',
+            position: 'relative'
+          }
+        });
+        canvases.push(canvas);
+
+        // Update progress dynamically based on pages processed
+        const pageDoneProgress = Math.floor(((i + 1) / pagesList.length) * 90) + 5;
+        curProgress = Math.max(curProgress, pageDoneProgress);
+        setPdfProgress(Math.min(95, curProgress));
+      }
+
+      if (canvases.length === 0) {
+        throw new Error('কোনো পৃষ্ঠা পাওয়া যায়নি');
+      }
+
+      // Compile canvases into a unified multi-page A4 PDF
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'px',
-        format: [imgWidth, imgHeight]
+        format: [794, 1122]
       });
 
-      const imgData = canvas.toDataURL('image/jpeg', 0.98);
-      pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
+      for (let i = 0; i < canvases.length; i++) {
+        if (i > 0) {
+          pdf.addPage();
+        }
+        const canvas = canvases[i];
+        const imgData = canvas.toDataURL('image/jpeg', 1.0); // 1.0 for MAXIMUM quality
+        pdf.addImage(imgData, 'JPEG', 0, 0, 794, 1122);
+      }
       
       let filename = `financial_report_${pdfStartDate}_to_${pdfEndDate}.pdf`;
       if (pdfReportType === 'projects') {
@@ -532,16 +653,28 @@ export const Reports: React.FC = () => {
           ? `dues_report_${pdfSelectedClientName.replace(/\s+/g, '_')}_${pdfStartDate}_to_${pdfEndDate}.pdf`
           : `all_dues_report_${pdfStartDate}_to_${pdfEndDate}.pdf`;
       }
+
+      // Smoothly jump progress to 100% on complete render cycle
+      clearInterval(progressInterval);
+      setPdfProgress(100);
+      
+      // Give the user a brief moment to visualize the 100% completion before triggering native prompt
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       pdf.save(filename);
     } catch (e) {
       console.error(e);
       alert('পিডিএফ তৈরিতে ত্রুটি দেখা দিয়েছে');
     } finally {
+      clearInterval(progressInterval);
       // Safely sweep and remove the wrapper from the DOM tree
       if (wrapper.parentNode) {
         document.body.removeChild(wrapper);
       }
-      setIsGeneratingPDF(false);
+      setTimeout(() => {
+        setIsGeneratingPDF(false);
+        setPdfProgress(0);
+      }, 400);
     }
   };
 
@@ -554,6 +687,7 @@ export const Reports: React.FC = () => {
   const [endDate, setEndDate] = useState('');
   const [isCapturing, setIsCapturing] = useState(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [pdfProgress, setPdfProgress] = useState(0);
   
   // State for Image Preview Modal (Fallback for Android)
   const [previewImage, setPreviewImage] = useState<string | null>(null);
@@ -801,7 +935,7 @@ export const Reports: React.FC = () => {
       if (!element) return;
       
       const canvas = await html2canvas(element, {
-        scale: 2,
+        scale: 4, // 4x scale for ultra HD
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff',
@@ -849,8 +983,8 @@ export const Reports: React.FC = () => {
         }
       });
 
-      const imgWidth = canvas.width / 2;
-      const imgHeight = canvas.height / 2;
+      const imgWidth = canvas.width / 4;
+      const imgHeight = canvas.height / 4;
       
       const pdf = new jsPDF({
         orientation: 'portrait',
@@ -858,7 +992,7 @@ export const Reports: React.FC = () => {
         format: [imgWidth, imgHeight]
       });
 
-      const imgData = canvas.toDataURL('image/jpeg', 0.8);
+      const imgData = canvas.toDataURL('image/jpeg', 1.0); // Maximum quality HD
       pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
       
       const pdfBlob = pdf.output('blob');
@@ -1460,324 +1594,391 @@ export const Reports: React.FC = () => {
               <div className="bg-slate-100 hover:bg-slate-200/80 px-4 py-2 rounded-full border border-slate-200/50 text-slate-800 shadow-sm text-xs font-bold font-sans">
                 {pdfReportType === 'projects' ? 'প্রজেক্ট' : pdfReportType === 'dues' ? 'বকেয়া' : 'লেনদেন'}: {
                   pdfReportType === 'projects' ? pdfFilteredProjects.length : pdfReportType === 'dues' ? pdfFilteredDues.length : pdfTransactions.length
-                } &nbsp;|&nbsp; পৃষ্ঠা: 1
+                } &nbsp;|&nbsp; মোট পৃষ্ঠা: {toBnDigits(getPaginatedPages.length)}
               </div>
             </div>
-            <p className="text-[11px] text-slate-400 font-semibold pl-1">পৃষ্ঠা 1 এর 1</p>
+            <p className="text-[11px] text-slate-400 font-semibold pl-1">আয় ও ব্যয় রিপোর্ট (A4 সাইজ)</p>
           </div>
+ 
+          {isPreviewLoading ? (
+            <div className="flex-1 flex flex-col items-center justify-center min-h-[50vh] py-16 animate-in fade-in duration-300">
+              <div 
+                className="w-16 h-16 mb-4 flex items-center justify-center"
+                style={{ animation: 'spin 2s linear infinite' }}
+              >
+                <ReportAppLogo size={56} variant="transparent-color" />
+              </div>
+              <p 
+                className="text-slate-500 font-bold text-xs mt-2 text-center"
+                style={{ fontFamily: "'Kohinoor Bangla', sans-serif", letterSpacing: '0.02em' }}
+              >
+                ইনভয়েস সেটিংস লোড হচ্ছে...
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Central A4 Document Frame wrapper styled with dynamic multi-page scaling */}
+              <div 
+                ref={containerRef}
+                className="w-full pb-24 flex flex-col items-center gap-6"
+              >
+                {getPaginatedPages.map((page, index) => (
+                  <div 
+                    key={index}
+                    className="relative overflow-hidden shadow-lg border border-slate-200/60 rounded-3xl"
+                    style={{ width: `${794 * scale}px`, height: `${1122 * scale}px` }}
+                  >
+                    <div 
+                      ref={index === 0 ? sheetRef : undefined}
+                      id={`pdf-report-page-${index}`}
+                      className="bg-white text-slate-800 p-10 font-sans flex flex-col justify-between absolute left-0 top-0 origin-top-left animate-in zoom-in-95 duration-300"
+                      style={{ 
+                        width: '794px', 
+                        height: '1122px',
+                        transform: `scale(${scale})`,
+                      }}
+                    >
+                      {/* Document Inner Area */}
+                      <div className="space-y-6">
+                        {/* 1. Header Banner or Running Header */}
+                        {page.isFirstPage ? (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '24px', marginBottom: '16px' }}>
+                            {/* Left Logo Side */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', textAlign: 'left' }}>
+                              <div style={{ width: '48px', height: '48px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <ReportAppLogo size={48} variant="color" />
+                              </div>
+                              <div className="pdf-header-left-text" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', textAlign: 'left' }}>
+                                <h1 style={{ fontSize: '20px', fontWeight: 900, margin: 0, padding: 0, fontFamily: "'Kohinoor Bangla', sans-serif", lineHeight: 1.1 }} className="text-slate-900 tracking-tight">{APP_NAME}</h1>
+                                <p style={{ fontSize: '10px', fontWeight: 500, margin: '3px 0 0 0', padding: 0, lineHeight: 1, fontFamily: "'Kohinoor Bangla', sans-serif" }} className="text-slate-500 tracking-wide font-sans">প্রতিদিনের হিসাব রাখুন</p>
+                              </div>
+                            </div>
 
-          {/* Central A4 Document Frame wrapper styled with dynamic scaling */}
-          <div 
-            ref={containerRef}
-            className="w-full pb-24 overflow-hidden relative"
-            style={{ height: `${sheetHeight * scale}px` }}
-          >
-            <div 
-              ref={sheetRef}
-              id="pdf-report-document-sheet"
-              className="bg-white text-slate-800 p-10 font-sans shadow-lg border border-slate-200/60 rounded-3xl flex flex-col justify-between absolute animate-in zoom-in-95 duration-300"
-              style={{ 
-                width: '794px', 
-                minHeight: '1100px',
-                transform: `scale(${scale})`,
-                transformOrigin: 'top center',
-                left: '50%',
-                marginLeft: '-397px', // center the 794px div cleanly
-              }}
-            >
-              {/* Document Inner Area */}
-              <div className="space-y-8">
-                {/* 1. Header Banner of Document */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '24px', marginBottom: '24px' }}>
-                  {/* Left Logo Side */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', textAlign: 'left' }}>
-                    <div style={{ width: '48px', height: '48px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <ReportAppLogo size={48} variant="color" />
-                    </div>
-                    <div className="pdf-header-left-text" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', textAlign: 'left' }}>
-                      <h1 style={{ fontSize: '20px', fontWeight: 900, margin: 0, padding: 0, fontFamily: "'Kohinoor Bangla', sans-serif", lineHeight: 1.1 }} className="text-slate-900 tracking-tight">{APP_NAME}</h1>
-                      <p style={{ fontSize: '10px', fontWeight: 500, margin: '3px 0 0 0', padding: 0, lineHeight: 1, fontFamily: "'Kohinoor Bangla', sans-serif" }} className="text-slate-500 tracking-wide font-sans">প্রতিদিনের হিসাব রাখুন</p>
-                    </div>
-                  </div>
-
-                  {/* Right Meta Side */}
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', textAlign: 'right', justifyContent: 'center' }}>
-                    <h1 className="text-2xl font-black text-indigo-600 tracking-widest font-sans" style={{ margin: 0, padding: 0, marginBottom: '6px', lineHeight: 1, fontFamily: "'Kohinoor Bangla', sans-serif" }}>রিপোর্ট</h1>
-                    <div style={{ display: 'flex', alignItems: 'center', fontSize: '9px', lineHeight: 1, marginTop: '6px' }}>
-                      <span className="text-[9px] font-medium tracking-widest text-slate-500 font-sans" style={{ marginRight: '6px', fontFamily: "'Kohinoor Bangla', sans-serif" }}>
-                        পাওয়ার্ড বাই
-                      </span>
-                      <div style={{ width: '11px', height: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: '6px' }}>
-                        <ReportAppLogo size={11} variant="transparent-color" />
-                      </div>
-                      <span className="pdf-header-right-name text-[9px] text-slate-600 font-extrabold tracking-normal" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
-                        {APP_NAME}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Report Type and Parameters Sub-banner */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8fafc', padding: '12px 16px', borderRadius: '12px', border: '1px solid #f1f5f9', marginBottom: '16px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', textAlign: 'left' }}>
-                    <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', fontFamily: "'Kohinoor Bangla', sans-serif" }}>রিপোর্টের খাত ও ধরণ</span>
-                    <span style={{ fontSize: '12px', color: '#1e293b', fontWeight: '900', fontFamily: "'Kohinoor Bangla', sans-serif" }}>
-                      {pdfReportType === 'all' && 'আয় ও ব্যয় রিপোর্ট'}
-                      {pdfReportType === 'income' && 'আয় রিপোর্ট'}
-                      {pdfReportType === 'expense' && 'ব্যয় রিপোর্ট'}
-                      {pdfReportType === 'projects' && (pdfSelectedClientName ? `প্রজেক্ট রিপোর্ট (${pdfSelectedClientName})` : 'সমস্ত প্রজেক্ট রিপোর্ট')}
-                      {pdfReportType === 'dues' && (pdfSelectedClientName ? `বকেয়া রিপোর্ট (${pdfSelectedClientName})` : 'সমস্ত বকেয়া রিপোর্ট')}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px', textAlign: 'right' }}>
-                    <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', fontFamily: "'Kohinoor Bangla', sans-serif" }}>সময়সীমা</span>
-                    <span style={{ fontSize: '11px', color: '#334155', fontWeight: 'bold', fontFamily: 'monospace' }}>
-                      {pdfStartDate ? formatPdfRowDate(pdfStartDate) : 'শুরু'} - {pdfEndDate ? formatPdfRowDate(pdfEndDate) : 'শেষ'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* 2. Document Transaction Table Section */}
-                <div className="space-y-4">
-                  <div className="overflow-hidden border border-slate-100 rounded-xl">
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        {(pdfReportType === 'projects' || pdfReportType === 'dues') ? (
-                          <tr className="bg-slate-50 border-b border-slate-100 text-[10px] text-slate-500 font-extrabold tracking-wider" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
-                            <th className="py-3 px-4 font-bold">প্রজেক্টের নাম</th>
-                            <th className="py-3 px-4 font-bold">ক্লায়েন্ট</th>
-                            <th className="py-3 px-4 font-bold text-right font-sans">বাজেট (৳)</th>
-                            <th className="py-3 px-4 font-bold text-right font-sans">আদায় (৳)</th>
-                            <th className="py-3 px-4 text-right font-bold font-sans">বকেয়া (৳)</th>
-                          </tr>
+                            {/* Right Meta Side */}
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', textAlign: 'right', justifyContent: 'center' }}>
+                              <h1 className="text-2xl font-black text-indigo-600 tracking-widest font-sans" style={{ margin: 0, padding: 0, marginBottom: '6px', lineHeight: 1, fontFamily: "'Kohinoor Bangla', sans-serif" }}>রিপোর্ট</h1>
+                              <div style={{ display: 'flex', alignItems: 'center', fontSize: '9px', lineHeight: 1, marginTop: '6px' }}>
+                                <span className="text-[9px] font-medium tracking-widest text-slate-500 font-sans" style={{ marginRight: '6px', fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                                  পাওয়ার্ড বাই
+                                </span>
+                                <div style={{ width: '11px', height: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: '6px' }}>
+                                  <ReportAppLogo size={11} variant="transparent-color" />
+                                </div>
+                                <span className="pdf-header-right-name text-[9px] text-slate-600 font-extrabold tracking-normal" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                                  {APP_NAME}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
                         ) : (
-                          <tr className="bg-slate-50 border-b border-slate-100 text-[10px] text-slate-500 font-extrabold tracking-wider" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
-                            <th className="py-3 px-4 font-bold">তারিখ</th>
-                            <th className="py-3 px-4 font-bold">সময়</th>
-                            <th className="py-3 px-4 font-bold">বিবরণ</th>
-                            <th className="py-3 px-4 font-bold">ক্যাটাগরি</th>
-                            <th className="py-3 px-4 text-right font-bold font-sans">পরিমাণ (৳)</th>
-                          </tr>
+                          /* Elegant Running Header on secondary pages */
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '12px', marginBottom: '16px' }} className="text-slate-450 text-[10px] font-sans font-extrabold uppercase tracking-wider">
+                            <span style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>{APP_NAME} - রিপোর্ট</span>
+                            <span style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>পৃষ্ঠা {toBnDigits(page.pageNumber)}</span>
+                          </div>
                         )}
-                      </thead>
-                      <tbody className="text-[12px] font-medium text-slate-700 divide-y divide-slate-50">
-                        {(pdfReportType === 'projects' || pdfReportType === 'dues') ? (
-                          (() => {
-                            const activeList = pdfReportType === 'projects' ? pdfFilteredProjects : pdfFilteredDues;
-                            if (activeList.length === 0) {
-                              return (
-                                <tr>
-                                  <td colSpan={5} className="py-12 text-center text-slate-400 bg-slate-50/50">
-                                    <FolderOpen size={24} className="mx-auto text-slate-300 mb-2" />
-                                    <p className="text-xs font-bold" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>কোনো প্রজেক্টের তথ্য পাওয়া যায়নি</p>
-                                  </td>
-                                </tr>
-                              );
-                            }
-                            return activeList.map((p) => (
-                              <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
-                                <td className="py-3 px-4 font-bold text-slate-800" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
-                                  {p.name}
-                                </td>
-                                <td className="py-3 px-4 text-slate-500 font-medium" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
-                                  {p.clientname}
-                                </td>
-                                <td className="py-3 px-4 text-right text-slate-600 font-bold font-sans">
-                                  {p.totalamount.toLocaleString('bn-BD')}
-                                </td>
-                                <td className="py-3 px-4 text-right text-emerald-600 font-bold font-sans">
-                                  {p.paidamount.toLocaleString('bn-BD')}
-                                </td>
-                                <td className={`py-3 px-4 text-right font-bold font-sans ${p.dueamount > 0 ? 'text-rose-600' : 'text-slate-500'}`}>
-                                  {p.dueamount.toLocaleString('bn-BD')}
-                                </td>
-                              </tr>
-                            ));
-                          })()
-                        ) : (
-                          pdfTransactions.length === 0 ? (
-                            <tr>
-                              <td colSpan={5} className="py-12 text-center text-slate-400 bg-slate-50/50">
-                                <Calendar size={24} className="mx-auto text-slate-300 mb-2" />
-                                <p className="text-xs font-bold" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>কোনো লেনদেনের তথ্য পাওয়া যায়নি</p>
-                              </td>
-                            </tr>
-                          ) : (
-                            (() => {
-                              let lastMonthHeader = '';
-                              return pdfTransactions.map((tx) => {
-                                const monthHeader = formatPdfMonthGroupHeader(tx.date);
-                                const renderHeader = lastMonthHeader !== monthHeader;
-                                lastMonthHeader = monthHeader;
 
-                                return (
-                                  <React.Fragment key={tx.id}>
-                                    {renderHeader && (
-                                      <tr className="bg-[#f0f4ff]/50">
-                                        <td colSpan={5} className="py-2.5 px-4">
-                                          <div className="flex items-center gap-1.5 text-[11px] font-bold text-indigo-700 font-sans">
-                                            <span>📅</span>
-                                            <span>{monthHeader}</span>
-                                          </div>
-                                        </td>
-                                      </tr>
-                                    )}
-                                    <tr className="hover:bg-slate-50/50 transition-colors">
-                                      <td className="py-3 px-4 text-slate-500 font-sans text-[11px] font-bold">
-                                        {formatPdfRowDate(tx.date)}
-                                      </td>
-                                      <td className="py-3 px-4 text-slate-400 font-sans text-[11px] font-bold">
-                                        {tx.time ? formatReportTime(tx.time) : '--:--'}
-                                      </td>
-                                      <td className="py-3 px-4 font-normal text-slate-850" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
-                                        {tx.description}
-                                      </td>
-                                      <td className="py-3 px-4 text-slate-400 font-semibold" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
-                                        {tx.category && tx.category !== 'অন্যান্য' ? tx.category : ''}
-                                      </td>
-                                      <td className={`py-3 px-4 text-right font-bold font-sans text-[13px] ${
-                                        tx.type === 'income' ? 'text-emerald-600' : 'text-rose-600'
-                                      }`}>
-                                        {tx.type === 'income' ? '+' : '-'} {tx.amount.toLocaleString('bn-BD')}
+                        {/* Report Type and Parameters Sub-banner - ONLY on page 1 */}
+                        {page.isFirstPage && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8fafc', padding: '12px 16px', borderRadius: '12px', border: '1px solid #f1f5f9', marginBottom: '16px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', textAlign: 'left' }}>
+                              <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', fontFamily: "'Kohinoor Bangla', sans-serif" }}>রিপোর্টের খাত ও ধরণ</span>
+                              <span style={{ fontSize: '12px', color: '#1e293b', fontWeight: '900', fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                                {pdfReportType === 'all' && 'আয় ও ব্যয় রিপোর্ট'}
+                                {pdfReportType === 'income' && 'আয় রিপোর্ট'}
+                                {pdfReportType === 'expense' && 'ব্যয় রিপোর্ট'}
+                                {pdfReportType === 'projects' && (pdfSelectedClientName ? `প্রজেক্ট রিপোর্ট (${pdfSelectedClientName})` : 'সমস্ত প্রজেক্ট রিপোর্ট')}
+                                {pdfReportType === 'dues' && (pdfSelectedClientName ? `বকেয়া রিপোর্ট (${pdfSelectedClientName})` : 'সমস্ত বকেয়া রিপোর্ট')}
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px', textAlign: 'right' }}>
+                              <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', fontFamily: "'Kohinoor Bangla', sans-serif" }}>সময়সীমা</span>
+                              <span style={{ fontSize: '11px', color: '#334155', fontWeight: 'bold', fontFamily: 'monospace' }}>
+                                {pdfStartDate ? formatPdfRowDate(pdfStartDate) : 'শুরু'} - {pdfEndDate ? formatPdfRowDate(pdfEndDate) : 'শেষ'}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 2. Document Table Section */}
+                        <div className="space-y-4">
+                          <div className="overflow-hidden border border-slate-100 rounded-xl">
+                            <table className="w-full text-left border-collapse">
+                              <thead>
+                                {(pdfReportType === 'projects' || pdfReportType === 'dues') ? (
+                                  <tr className="bg-slate-50 border-b border-slate-100 text-[10px] text-slate-500 font-extrabold tracking-wider" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                                    <th className="py-2.5 px-4 font-bold">প্রজেক্টের নাম</th>
+                                    <th className="py-2.5 px-4 font-bold">ক্লায়েন্ট</th>
+                                    <th className="py-2.5 px-4 font-bold text-right font-sans">বাজেট (৳)</th>
+                                    <th className="py-2.5 px-4 font-bold text-right font-sans">আদায় (৳)</th>
+                                    <th className="py-2.5 px-4 text-right font-bold font-sans">বকেয়া (৳)</th>
+                                  </tr>
+                                ) : (
+                                  <tr className="bg-slate-50 border-b border-slate-100 text-[10px] text-slate-500 font-extrabold tracking-wider" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                                    <th className="py-2.5 px-4 font-bold">তারিখ</th>
+                                    <th className="py-2.5 px-4 font-bold">সময়</th>
+                                    <th className="py-2.5 px-4 font-bold">বিবরণ</th>
+                                    <th className="py-2.5 px-4 font-bold">ক্যাটাগরি</th>
+                                    <th className="py-2.5 px-4 text-right font-bold font-sans">পরিমাণ (৳)</th>
+                                  </tr>
+                                )}
+                              </thead>
+                              <tbody className="text-[11px] font-medium text-slate-700 divide-y divide-slate-50">
+                                {(pdfReportType === 'projects' || pdfReportType === 'dues') ? (
+                                  page.items.length === 0 ? (
+                                    <tr>
+                                      <td colSpan={5} className="py-12 text-center text-slate-400 bg-slate-50/50">
+                                        <FolderOpen size={24} className="mx-auto text-slate-300 mb-2" />
+                                        <p className="text-xs font-bold" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>কোনো প্রজেক্টের তথ্য পাওয়া যায়নি</p>
                                       </td>
                                     </tr>
-                                  </React.Fragment>
-                                );
-                              });
-                            })()
-                          )
+                                  ) : (
+                                    page.items.map((p) => (
+                                      <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
+                                        <td className="py-2.5 px-4 font-bold text-slate-800" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                                          {p.name}
+                                        </td>
+                                        <td className="py-2.5 px-4 text-slate-500 font-medium" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                                          {p.clientname}
+                                        </td>
+                                        <td className="py-2.5 px-4 text-right text-slate-600 font-bold font-sans">
+                                          {p.totalamount.toLocaleString('bn-BD')}
+                                        </td>
+                                        <td className="py-2.5 px-4 text-right text-emerald-600 font-bold font-sans">
+                                          {p.paidamount.toLocaleString('bn-BD')}
+                                        </td>
+                                        <td className={`py-2.5 px-4 text-right font-bold font-sans ${p.dueamount > 0 ? 'text-rose-600' : 'text-slate-500'}`}>
+                                          {p.dueamount.toLocaleString('bn-BD')}
+                                        </td>
+                                      </tr>
+                                    ))
+                                  )
+                                ) : (
+                                  page.items.length === 0 ? (
+                                    <tr>
+                                      <td colSpan={5} className="py-12 text-center text-slate-400 bg-slate-50/50">
+                                        <Calendar size={24} className="mx-auto text-slate-300 mb-2" />
+                                        <p className="text-xs font-bold" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>কোনো লেনদেনের তথ্য পাওয়া যায়নি</p>
+                                      </td>
+                                    </tr>
+                                  ) : (
+                                    (() => {
+                                      let lastMonthHeader = '';
+                                      return page.items.map((tx) => {
+                                        const monthHeader = formatPdfMonthGroupHeader(tx.date);
+                                        const renderHeader = lastMonthHeader !== monthHeader;
+                                        lastMonthHeader = monthHeader;
+
+                                        return (
+                                          <React.Fragment key={tx.id}>
+                                            {renderHeader && (
+                                              <tr className="bg-[#f0f4ff]/50">
+                                                <td colSpan={5} className="py-1.5 px-4">
+                                                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-indigo-700 font-sans">
+                                                    <span>📅</span>
+                                                    <span>{monthHeader}</span>
+                                                  </div>
+                                                </td>
+                                              </tr>
+                                            )}
+                                            <tr className="hover:bg-slate-50/50 transition-colors">
+                                              <td className="py-2.5 px-4 text-slate-500 font-sans text-[10px] font-bold">
+                                                {formatPdfRowDate(tx.date)}
+                                              </td>
+                                              <td className="py-2.5 px-4 text-slate-400 font-sans text-[10px] font-bold">
+                                                {tx.time ? formatReportTime(tx.time) : '--:--'}
+                                              </td>
+                                              <td className="py-2.5 px-4 font-normal text-slate-800" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                                                {tx.description}
+                                              </td>
+                                              <td className="py-2.5 px-4 text-slate-400 font-semibold" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                                                {tx.category && tx.category !== 'অন্যান্য' ? tx.category : ''}
+                                              </td>
+                                              <td className={`py-2.5 px-4 text-right font-bold font-sans text-[11px] ${
+                                                tx.type === 'income' ? 'text-emerald-600' : 'text-rose-600'
+                                              }`}>
+                                                {tx.type === 'income' ? '+' : '-'} {tx.amount.toLocaleString('bn-BD')}
+                                              </td>
+                                            </tr>
+                                          </React.Fragment>
+                                        );
+                                      });
+                                    })()
+                                  )
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+
+                          {/* Under table summary bar row - ONLY on last page */}
+                          {page.isLastPage && (
+                            <div className="bg-slate-50 rounded-xl px-4 py-2.5 border border-slate-100 flex items-center justify-between text-[11px] text-slate-600 font-bold font-sans">
+                              {(pdfReportType === 'projects' || pdfReportType === 'dues') ? (
+                                <>
+                                  <span className="text-slate-850" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>টোটাল প্রজেক্ট হিসাব:</span>
+                                  <div className="flex items-center gap-4" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                                    <span>টোটাল বাজেট: <span className="text-slate-800 font-sans">{pdfStats.totalBudget.toLocaleString('bn-BD')} ৳</span></span>
+                                    <span>টোটাল আদায়: <span className="text-emerald-600 font-sans">{pdfStats.totalPaid.toLocaleString('bn-BD')} ৳</span></span>
+                                    <span>টোটাল বকেয়া: <span className="text-rose-600 font-sans">{pdfStats.totalDue.toLocaleString('bn-BD')} ৳</span></span>
+                                  </div>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="text-slate-850" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>মাসিক মোট:</span>
+                                  <div className="flex items-center gap-4" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                                    <span>আয়: <span className="text-emerald-600 font-sans">{pdfStats.totalIncome.toLocaleString('bn-BD')} ৳</span></span>
+                                    <span>ব্যয়: <span className="text-rose-600 font-sans">{pdfStats.totalExpense.toLocaleString('bn-BD')} ৳</span></span>
+                                    <span>ব্য্যালেন্স: <span className="text-blue-600 font-sans">{pdfStats.balance.toLocaleString('bn-BD')} ৳</span></span>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 3. Executive Metrics Blocks - ONLY on Last Page */}
+                        {page.isLastPage && (
+                          <div className="grid grid-cols-3 gap-3">
+                            {/* Total Income or Total Budget */}
+                            <div className="bg-[#f0fdf4] border border-emerald-100 rounded-2xl p-4 flex flex-col justify-between h-20 shadow-xs">
+                              <p className="text-[9px] font-black text-emerald-800 uppercase tracking-widest" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                                {(pdfReportType === 'projects' || pdfReportType === 'dues') ? 'মোট বাজেট:' : 'মোট আয়:'}
+                              </p>
+                              <p className="text-[18px] font-black text-emerald-600 font-sans mt-0.5" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                                {(pdfReportType === 'projects' || pdfReportType === 'dues') 
+                                  ? pdfStats.totalBudget.toLocaleString('bn-BD') 
+                                  : pdfStats.totalIncome.toLocaleString('bn-BD')} ৳
+                              </p>
+                            </div>
+
+                            {/* Total Expense or Total Paid */}
+                            <div className="bg-[#fdf2f2] border border-rose-100 rounded-2xl p-4 flex flex-col justify-between h-20 shadow-xs">
+                              <p className="text-[9px] font-black text-rose-800 uppercase tracking-widest" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                                {(pdfReportType === 'projects' || pdfReportType === 'dues') ? 'মোট আদায়:' : 'মোট খরচ:'}
+                              </p>
+                              <p className="text-[18px] font-black text-rose-600 font-sans mt-0.5" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                                {(pdfReportType === 'projects' || pdfReportType === 'dues') 
+                                  ? pdfStats.totalPaid.toLocaleString('bn-BD') 
+                                  : pdfStats.totalExpense.toLocaleString('bn-BD')} ৳
+                              </p>
+                            </div>
+
+                            {/* Total Balance or Total Due */}
+                            <div className="bg-[#f0f9ff] border border-blue-100 rounded-2xl p-4 flex flex-col justify-between h-20 shadow-xs">
+                              <p className="text-[9px] font-black text-blue-800 uppercase tracking-widest" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                                {(pdfReportType === 'projects' || pdfReportType === 'dues') ? 'মোট বকেয়া:' : 'মোট ব্যালেন্স:'}
+                              </p>
+                              <p className="text-[18px] font-black text-indigo-600 font-sans mt-0.5" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                                {(pdfReportType === 'projects' || pdfReportType === 'dues') 
+                                  ? pdfStats.totalDue.toLocaleString('bn-BD') 
+                                  : pdfStats.balance.toLocaleString('bn-BD')} ৳
+                              </p>
+                            </div>
+                          </div>
                         )}
-                      </tbody>
-                    </table>
-                  </div>
+                      </div>
 
-                  {/* Under table summary bar row exactly like photo */}
-                  <div className="bg-slate-50 rounded-xl px-4 py-3 border border-slate-100 flex items-center justify-between text-xs text-slate-600 font-bold font-sans">
-                    {(pdfReportType === 'projects' || pdfReportType === 'dues') ? (
-                      <>
-                        <span className="text-slate-850" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>টোটাল প্রজেক্ট হিসাব:</span>
-                        <div className="flex items-center gap-4" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
-                          <span>টোটাল বাজেট: <span className="text-slate-800 font-sans">{pdfStats.totalBudget.toLocaleString('bn-BD')} ৳</span></span>
-                          <span>টোটাল আদায়: <span className="text-emerald-600 font-sans">{pdfStats.totalPaid.toLocaleString('bn-BD')} ৳</span></span>
-                          <span>টোটাল বকেয়া: <span className="text-rose-600 font-sans">{pdfStats.totalDue.toLocaleString('bn-BD')} ৳</span></span>
+                      {/* 4. Document Footer coordinates */}
+                      <div className={`border-t ${page.isLastPage ? 'border-slate-100' : 'border-transparent'} pt-6 flex items-end justify-between text-[11px] text-slate-400 font-semibold font-sans mt-auto`}>
+                        {/* Coordinates Left */}
+                        <div className="space-y-1.5 leading-none w-44">
+                          {page.isLastPage && (
+                            <>
+                              {pdfContactPhone && (
+                                <div className="flex items-center gap-1.5">
+                                  <Phone size={12} className="text-slate-400" />
+                                  <span>{pdfContactPhone}</span>
+                                </div>
+                              )}
+                              {pdfContactEmail && (
+                                <div className="flex items-center gap-1.5">
+                                  <Mail size={12} className="text-slate-400" />
+                                  <span>{pdfContactEmail}</span>
+                                </div>
+                              )}
+                              {pdfContactLocation && (
+                                <div className="flex items-center gap-1.5">
+                                  <MapPin size={12} className="text-slate-400" />
+                                  <span>{pdfContactLocation}</span>
+                                </div>
+                              )}
+                            </>
+                          )}
                         </div>
-                      </>
-                    ) : (
-                      <>
-                        <span className="text-slate-850" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>মাসিক মোট:</span>
-                        <div className="flex items-center gap-4" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
-                          <span>আয়: <span className="text-emerald-600 font-sans">{pdfStats.totalIncome.toLocaleString('bn-BD')} ৳</span></span>
-                          <span>ব্যয়: <span className="text-rose-600 font-sans">{pdfStats.totalExpense.toLocaleString('bn-BD')} ৳</span></span>
-                          <span>ব্যালেন্স: <span className="text-blue-600 font-sans">{pdfStats.balance.toLocaleString('bn-BD')} ৳</span></span>
+
+                        {/* Page Numbering Middle */}
+                        <div className="text-center text-[10px] text-slate-400">
+                          পৃষ্ঠা {toBnDigits(page.pageNumber)} এর {toBnDigits(getPaginatedPages.length)}
                         </div>
-                      </>
-                    )}
-                  </div>
-                </div>
 
-                {/* 3. Executive Metrics Blocks */}
-                <div className="grid grid-cols-3 gap-3">
-                  {/* Total Income or Total Budget */}
-                  <div className="bg-[#f0fdf4] border border-emerald-100 rounded-2xl p-4 flex flex-col justify-between h-20 shadow-xs">
-                    <p className="text-[9px] font-black text-emerald-800 uppercase tracking-widest" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
-                      {(pdfReportType === 'projects' || pdfReportType === 'dues') ? 'মোট বাজেট:' : 'মোট আয়:'}
-                    </p>
-                    <p className="text-[18px] font-black text-emerald-600 font-sans mt-1" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
-                      {(pdfReportType === 'projects' || pdfReportType === 'dues') 
-                        ? pdfStats.totalBudget.toLocaleString('bn-BD') 
-                        : pdfStats.totalIncome.toLocaleString('bn-BD')} ৳
-                    </p>
-                  </div>
+                        {/* Signature Right */}
+                        <div className="text-right w-44">
+                          {page.isLastPage && (
+                            <>
+                              {/* Handwritten signature block */}
+                              <div className="pb-1 text-center font-serif italic text-lg leading-tight text-indigo-700 tracking-wider">
+                                {pdfAdminName || 'Administrator'}
+                              </div>
+                              <div className="border-t border-slate-200 pt-1 mt-0.5 text-center text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                                Your Name
+                              </div>
+                              <div className="text-center text-[8px] font-semibold text-slate-400 leading-none">
+                                Administrator
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
 
-                  {/* Total Expense or Total Paid */}
-                  <div className="bg-[#fdf2f2] border border-rose-100 rounded-2xl p-4 flex flex-col justify-between h-20 shadow-xs">
-                    <p className="text-[9px] font-black text-rose-800 uppercase tracking-widest" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
-                      {(pdfReportType === 'projects' || pdfReportType === 'dues') ? 'মোট আদায়:' : 'মোট খরচ:'}
-                    </p>
-                    <p className="text-[18px] font-black text-rose-600 font-sans mt-1" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
-                      {(pdfReportType === 'projects' || pdfReportType === 'dues') 
-                        ? pdfStats.totalPaid.toLocaleString('bn-BD') 
-                        : pdfStats.totalExpense.toLocaleString('bn-BD')} ৳
-                    </p>
+                    </div>
                   </div>
-
-                  {/* Total Balance or Total Due */}
-                  <div className="bg-[#f0f9ff] border border-blue-100 rounded-2xl p-4 flex flex-col justify-between h-20 shadow-xs">
-                    <p className="text-[9px] font-black text-blue-800 uppercase tracking-widest" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
-                      {(pdfReportType === 'projects' || pdfReportType === 'dues') ? 'মোট বকেয়া:' : 'মোট ব্যালেন্স:'}
-                    </p>
-                    <p className="text-[18px] font-black text-indigo-600 font-sans mt-1" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
-                      {(pdfReportType === 'projects' || pdfReportType === 'dues') 
-                        ? pdfStats.totalDue.toLocaleString('bn-BD') 
-                        : pdfStats.balance.toLocaleString('bn-BD')} ৳
-                    </p>
-                  </div>
-                </div>
+                ))}
               </div>
 
-              {/* 4. Document Footer coordinates */}
-              <div className="mt-12 border-t border-slate-100 pt-6 flex items-end justify-between text-[11px] text-slate-400 font-semibold font-sans">
-                {/* Coordinates Left */}
-                <div className="space-y-1.5 leading-none">
-                  {pdfContactPhone && (
-                    <div className="flex items-center gap-1.5">
-                      <Phone size={12} className="text-slate-400" />
-                      <span>{pdfContactPhone}</span>
-                    </div>
-                  )}
-                  {pdfContactEmail && (
-                    <div className="flex items-center gap-1.5">
-                      <Mail size={12} className="text-slate-400" />
-                      <span>{pdfContactEmail}</span>
-                    </div>
-                  )}
-                  {pdfContactLocation && (
-                    <div className="flex items-center gap-1.5">
-                      <MapPin size={12} className="text-slate-400" />
-                      <span>{pdfContactLocation}</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Page Numbering Middle */}
-                <div className="text-center text-[10px] text-slate-400">
-                  পৃষ্ঠা 1 এর 1
-                </div>
-
-                {/* Signature Right */}
-                <div className="text-right w-44">
-                  {/* Handwritten dynamic cursive signature block */}
-                  <div className="pb-1 text-center font-serif italic text-lg leading-tight text-indigo-700 tracking-wider">
-                    {pdfAdminName || 'Administrator'}
-                  </div>
-                  <div className="border-t border-slate-200 pt-1 mt-0.5 text-center text-[9px] font-black text-slate-500 uppercase tracking-widest">
-                    Your Name
-                  </div>
-                  <div className="text-center text-[8px] font-semibold text-slate-400 leading-none">
-                    Administrator
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          </div>
-
-          {/* Sticky Solid Blue PDF Download Button exactly as screenshot */}
+          {/* Sticky Solid Blue PDF Download Button or Progress Bar depending on process state */}
           <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-md border-t border-slate-200/60 z-50 flex justify-center">
-            <button
-              onClick={handleDownloadCustomPDF}
-              className="w-full max-w-lg bg-[#1a73e8] hover:bg-[#155fc0] text-white py-4 px-6 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-200 active:scale-95 transition-all text-sm font-sans"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="animate-pulse">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                <polyline points="14 2 14 8 20 8"></polyline>
-                <line x1="16" y1="13" x2="8" y2="13"></line>
-                <line x1="16" y1="17" x2="8" y2="17"></line>
-                <polyline points="10 9 9 9 8 9"></polyline>
-              </svg>
-              PDF তৈরি করুন - 1 পৃষ্ঠার PDF তৈরি হয়েছে!
-            </button>
+            {isGeneratingPDF ? (
+              <div className="w-full max-w-lg bg-white rounded-2xl p-4 shadow-xl border border-slate-100/80 flex flex-col gap-2.5 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                <div className="flex justify-between items-center text-sm font-sans px-0.5">
+                  <span className="font-extrabold text-[#1a73e8] flex items-center gap-2">
+                    <Loader2 size={15} className="animate-spin text-[#1a73e8]" />
+                    PDF তৈরি হচ্ছে...
+                  </span>
+                  <span className="font-extrabold text-[#1a73e8] text-right min-w-[2.5rem]">
+                    {pdfProgress}%
+                  </span>
+                </div>
+                
+                {/* Custom round progress bar */}
+                <div className="w-full h-3 bg-slate-100/90 rounded-full overflow-hidden p-[2px]">
+                  <div 
+                    className="h-full bg-[#1a73e8] rounded-full transition-all duration-150 ease-out shadow-sm"
+                    style={{ width: `${pdfProgress}%` }}
+                  />
+                </div>
+
+                <div className="text-center text-xs font-bold text-slate-400 font-sans mt-0.5">
+                  PDF তৈরি হচ্ছে...
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={handleDownloadCustomPDF}
+                className="w-full max-w-lg bg-[#1a73e8] hover:bg-[#155fc0] text-white py-4 px-6 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-200 active:scale-95 transition-all text-sm font-sans"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="animate-pulse">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                  <line x1="16" y1="13" x2="8" y2="13"></line>
+                  <line x1="16" y1="17" x2="8" y2="17"></line>
+                  <polyline points="10 9 9 9 8 9"></polyline>
+                </svg>
+                PDF তৈরি করুন - 1 পৃষ্ঠার PDF তৈরি হয়েছে!
+              </button>
+            )}
           </div>
+          </>
+          )}
 
         </div>
       )}
