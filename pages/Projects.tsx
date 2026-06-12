@@ -94,6 +94,12 @@ export const Projects: React.FC = () => {
     notes: ''
   });
 
+  const [visibleLimit, setVisibleLimit] = useState(12);
+
+  useEffect(() => {
+    setVisibleLimit(12);
+  }, [filter, searchTerm, clientFilter, dateRange]);
+
   // Effect to handle navigation from Dashboard or Clients page
   useEffect(() => {
     if (location.state) {
@@ -435,6 +441,10 @@ export const Projects: React.FC = () => {
                           (p.clientname || '').toLowerCase().includes(searchTerm.toLowerCase());
     return matchesFilter && matchesSearch;
   }), [projects, filter, clientFilter, dateRange, searchTerm]);
+
+  const slicedProjects = React.useMemo(() => {
+    return filteredProjects.slice(0, visibleLimit);
+  }, [filteredProjects, visibleLimit]);
 
   const summaryStats = React.useMemo(() => filteredProjects.reduce((acc, p) => {
     acc.total += p.totalamount;
@@ -1011,7 +1021,7 @@ export const Projects: React.FC = () => {
               {clientFilter && <p className="text-xs mt-1">এই ক্লায়েন্টের জন্য কোনো প্রজেক্ট পাওয়া যায়নি</p>}
             </div>
           ) : (
-            filteredProjects.map((p) => (
+            (isGeneratingPDF ? filteredProjects : slicedProjects).map((p) => (
               <div 
                 key={p.id} 
                 className="project-card-pdf"
@@ -1133,6 +1143,18 @@ export const Projects: React.FC = () => {
             ))
           )}
         </div>
+
+        {!isGeneratingPDF && filteredProjects.length > visibleLimit && (
+          <div className="flex justify-center pb-12 -mt-4 animate-in fade-in duration-200" data-html2canvas-ignore="true">
+            <button
+              onClick={() => setVisibleLimit(prev => prev + 12)}
+              className="px-6 py-2.5 rounded-full bg-white text-indigo-600 hover:bg-slate-50 border border-slate-200/80 shadow-sm text-sm font-bold flex items-center gap-2 transition-all active:scale-95"
+              style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
+            >
+              আরো প্রজেক্ট দেখুন (Show More)
+            </button>
+          </div>
+        )}
       </div>
 
         <ConfirmModal 

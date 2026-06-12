@@ -93,6 +93,32 @@ export const Expenses: React.FC = () => {
   const [swipeOffset, setSwipeOffset] = useState(0);
   const [isTabTransitioning, setIsTabTransitioning] = useState(false);
   const [isWalletSubView, setIsWalletSubView] = useState(false);
+  const [visitedTabs, setVisitedTabs] = useState<Record<string, boolean>>({
+    expenses: true,
+  });
+
+  useEffect(() => {
+    setVisitedTabs(prev => {
+      if (prev[activeTabState]) return prev;
+      return { ...prev, [activeTabState]: true };
+    });
+  }, [activeTabState]);
+
+  const tabs = useMemo<('expenses' | 'dues' | 'savings' | 'reports' | 'tasks' | 'wallet')[]>(
+    () => ['expenses', 'dues', 'reports', 'savings', 'tasks', 'wallet'],
+    []
+  );
+
+  const shouldRenderTab = (tabName: string) => {
+    if (visitedTabs[tabName]) return true;
+    if (activeTabState === tabName) return true;
+    if (isSwiping || isTabTransitioning) {
+      const activeIdx = tabs.indexOf(activeTabState);
+      const targetIdx = tabs.indexOf(tabName as any);
+      if (Math.abs(activeIdx - targetIdx) <= 1) return true;
+    }
+    return false;
+  };
 
   useEffect(() => {
     const handleWalletSubview = (e: Event) => {
@@ -103,16 +129,16 @@ export const Expenses: React.FC = () => {
     return () => window.removeEventListener('wallet-subview-changed', handleWalletSubview);
   }, []);
 
+  const isFirstRender = useRef(true);
   useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
     setIsTabTransitioning(true);
     const t = setTimeout(() => setIsTabTransitioning(false), 260);
     return () => clearTimeout(t);
   }, [activeTabState]);
-
-  const tabs = useMemo<('expenses' | 'dues' | 'savings' | 'reports' | 'tasks' | 'wallet')[]>(
-    () => ['expenses', 'dues', 'reports', 'savings', 'tasks', 'wallet'],
-    []
-  );
 
   const tabsContainerRef = useRef<HTMLDivElement>(null);
   const containerWidthRef = useRef<number>(448);
@@ -179,10 +205,30 @@ export const Expenses: React.FC = () => {
 
   const activeTab = activeTabState;
 
+  // Sync active tab with primary Layout header
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent("expense-active-tab-changed", {
+        detail: { activeTab: activeTabState },
+      })
+    );
+  }, [activeTabState]);
+
+  useEffect(() => {
+    const handleSetTab = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail?.tab) {
+        setActiveTab(customEvent.detail.tab);
+      }
+    };
+    window.addEventListener("expense-set-tab", handleSetTab);
+    return () => window.removeEventListener("expense-set-tab", handleSetTab);
+  }, [activeTabState]);
+
   const getSlideClassName = (tabName: string) => {
     const isActive = activeTab === tabName;
     if (isActive || isSwiping || isTabTransitioning) {
-      return "w-full shrink-0 px-3 lg:px-8 pb-4 transition-all duration-150";
+      return "w-full shrink-0 px-3 lg:px-8 pb-4";
     }
     return "w-full shrink-0 px-3 lg:px-8 pb-0 h-0 overflow-hidden opacity-0 pointer-events-none select-none";
   };
@@ -567,6 +613,13 @@ export const Expenses: React.FC = () => {
   const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' });
   const [showDateFilter, setShowDateFilter] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
+
+  const [visibleLimit, setVisibleLimit] = useState(25);
+
+  useEffect(() => {
+    setVisibleLimit(25);
+  }, [searchTerm, listFilter, dateRange]);
+
   const [selectedPeriodOption, setSelectedPeriodOption] = useState<'date' | 'month' | 'year' | 'custom' | ''>('');
   const [modalSubView, setModalSubView] = useState<'main' | 'date' | 'month' | 'year'>('main');
   const [tempCustomDates, setTempCustomDates] = useState<{ start: string; end: string }>({ start: '', end: '' });
@@ -1299,10 +1352,14 @@ export const Expenses: React.FC = () => {
     return unifiedTransactions.filter(t => t.type === 'expense').reduce((acc, curr) => acc + curr.amount, 0);
   }, [unifiedTransactions]);
 
+  const slicedTransactions = useMemo(() => {
+    return isGeneratingPDF ? unifiedTransactions : unifiedTransactions.slice(0, visibleLimit);
+  }, [unifiedTransactions, visibleLimit, isGeneratingPDF]);
+
   // Group by Day for the listing headers
   const groupedTransactions = useMemo(() => {
     const groups: { [d: string]: any[] } = {};
-    unifiedTransactions.forEach(t => {
+    slicedTransactions.forEach(t => {
       const dLabel = t.date.substring(0, 10);
       if (!groups[dLabel]) groups[dLabel] = [];
       groups[dLabel].push(t);
@@ -1321,7 +1378,7 @@ export const Expenses: React.FC = () => {
         expenseTotal: expSum
       };
     });
-  }, [unifiedTransactions]);
+  }, [slicedTransactions]);
 
   const handleDownloadPDF = async () => {
     if (!listRef.current) return;
@@ -1513,16 +1570,16 @@ export const Expenses: React.FC = () => {
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
       onClickCapture={handleClickCapture}
-      className="space-y-3 animate-in fade-in duration-300 overflow-x-clip"
+      className="space-y-3 overflow-x-clip"
     >
       {/* 6-Icon Navigation Tabs */}
-      <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md pt-2 text-slate-800 border-b border-slate-200 shadow-[0_4px_12px_rgba(0,0,0,0.02)] select-none">
-        <div ref={tabsContainerRef} className="flex items-center justify-between w-full max-w-md mx-auto px-4 relative">
+      <div className="hidden lg:block sticky top-0 z-40 bg-white/95 backdrop-blur-md h-14 text-slate-800 border-b border-slate-200 shadow-[0_4px_12px_rgba(0,0,0,0.02)] select-none">
+        <div ref={tabsContainerRef} className="flex items-end justify-between w-full max-w-md mx-auto px-4 relative h-full">
           {/* Tab 1: Expenses / Dashboard / লেনদেন */}
           <button
             onClick={() => setActiveTab('expenses')}
             title="লেনদেন / ড্যাশবোর্ড"
-            className="flex flex-col items-center w-[44px] cursor-pointer group focus:outline-none pb-2 relative"
+            className="flex flex-col items-center w-[44px] cursor-pointer group focus:outline-none pb-2.5 relative"
           >
             <div
               className={`w-[27px] h-[27px] rounded-[8px] flex items-center justify-center transition-all border relative ${
@@ -1551,7 +1608,7 @@ export const Expenses: React.FC = () => {
           <button
             onClick={() => setActiveTab('dues')}
             title="লেনা-দেনা / দেনা-পাওনা"
-            className="flex flex-col items-center w-[44px] cursor-pointer group focus:outline-none pb-2 relative"
+            className="flex flex-col items-center w-[44px] cursor-pointer group focus:outline-none pb-2.5 relative"
           >
             <div
               className={`w-[27px] h-[27px] rounded-[8px] flex items-center justify-center transition-all border relative ${
@@ -1580,7 +1637,7 @@ export const Expenses: React.FC = () => {
           <button
             onClick={() => setActiveTab('reports')}
             title="বজেট"
-            className="flex flex-col items-center w-[44px] cursor-pointer group focus:outline-none pb-2 relative"
+            className="flex flex-col items-center w-[44px] cursor-pointer group focus:outline-none pb-2.5 relative"
           >
             <div
               className={`w-[27px] h-[27px] rounded-[8px] flex items-center justify-center transition-all border relative ${
@@ -1608,7 +1665,7 @@ export const Expenses: React.FC = () => {
           <button
             onClick={() => setActiveTab('savings')}
             title="সঞ্চয় ও লক্ষ্য"
-            className="flex flex-col items-center w-[44px] cursor-pointer group focus:outline-none pb-2 relative"
+            className="flex flex-col items-center w-[44px] cursor-pointer group focus:outline-none pb-2.5 relative"
           >
             <div
               className={`w-[27px] h-[27px] rounded-[8px] flex items-center justify-center transition-all border relative ${
@@ -1625,7 +1682,7 @@ export const Expenses: React.FC = () => {
           <button
             onClick={() => setActiveTab('tasks')}
             title="টাস্ক"
-            className="flex flex-col items-center w-[44px] cursor-pointer group focus:outline-none pb-2 relative"
+            className="flex flex-col items-center w-[44px] cursor-pointer group focus:outline-none pb-2.5 relative"
           >
             <div
               className={`w-[27px] h-[27px] rounded-[8px] flex items-center justify-center transition-all border relative ${
@@ -1642,7 +1699,7 @@ export const Expenses: React.FC = () => {
           <button
             onClick={() => setActiveTab('wallet')}
             title="ওয়ালেট"
-            className="flex flex-col items-center w-[44px] cursor-pointer group focus:outline-none pb-2 relative"
+            className="flex flex-col items-center w-[44px] cursor-pointer group focus:outline-none pb-2.5 relative"
           >
             <div
               className={`w-[27px] h-[27px] rounded-[8px] flex items-center justify-center transition-all border relative ${
@@ -1939,7 +1996,7 @@ export const Expenses: React.FC = () => {
                 </div>
               ) : (
                 groupedTransactions.map((group) => (
-                  <div key={group.date} className="space-y-2.5 animate-in fade-in duration-200">
+                  <div key={group.date} className="space-y-2.5">
                     
                     {/* Day Date Indicator Header */}
                     <div className={`flex items-center justify-between py-2 ${isGeneratingPDF ? 'bg-white' : 'bg-transparent'} select-none`}>
@@ -2054,6 +2111,18 @@ export const Expenses: React.FC = () => {
                 ))
               )}
             </div>
+
+            {!isGeneratingPDF && unifiedTransactions.length > visibleLimit && (
+              <div className="flex justify-center pt-2 pb-16" data-html2canvas-ignore="true">
+                <button
+                  onClick={() => setVisibleLimit(prev => prev + 25)}
+                  className="px-6 py-2.5 rounded-full bg-white text-indigo-600 hover:bg-slate-50 border border-slate-200/80 shadow-sm text-sm font-bold flex items-center gap-2 transition-all active:scale-95"
+                  style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
+                >
+                  আরো লেনদেন দেখুন (Show More)
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Sticky Floating Action Button on Bottom Right is now handled globally at parent level */}
@@ -2396,27 +2465,37 @@ export const Expenses: React.FC = () => {
 
           {/* Slide 2: Dues (Index 1) */}
           <div className={getSlideClassName('dues')}>
-            <DuesManager wallets={wallets} adjustWalletBalance={adjustWalletBalance} activeTab={activeTab} />
+            {shouldRenderTab('dues') && (
+              <DuesManager wallets={wallets} adjustWalletBalance={adjustWalletBalance} activeTab={activeTab} />
+            )}
           </div>
 
           {/* Slide 3: Reports (Index 2) */}
           <div className={getSlideClassName('reports')}>
-            <BudgetManager expenses={expenses} user={user} />
+            {shouldRenderTab('reports') && (
+              <BudgetManager expenses={expenses} user={user} />
+            )}
           </div>
 
           {/* Slide 4: Savings (Index 3) */}
           <div className={getSlideClassName('savings')}>
-            <SavingsManager />
+            {shouldRenderTab('savings') && (
+              <SavingsManager />
+            )}
           </div>
 
           {/* Slide 5: Tasks (Index 4) */}
           <div className={getSlideClassName('tasks')}>
-            <TasksManager expenses={expenses} user={user} />
+            {shouldRenderTab('tasks') && (
+              <TasksManager expenses={expenses} user={user} />
+            )}
           </div>
 
           {/* Slide 6: Wallet (Index 5) */}
           <div className={getSlideClassName('wallet')}>
-            <WalletManager />
+            {shouldRenderTab('wallet') && (
+              <WalletManager />
+            )}
           </div>
         </div>
       </div>

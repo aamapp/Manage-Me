@@ -172,7 +172,7 @@ const AppContent: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50/90 backdrop-blur-sm animate-in fade-in duration-300">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 animate-in fade-in duration-150">
         <div className="flex flex-col items-center justify-center gap-6">
           <div className="premium-loader-container !w-16 !h-16 p-3.5">
             <div className="premium-loader-ring"></div>
@@ -218,7 +218,7 @@ const AppContent: React.FC = () => {
       )}
       
       <Suspense fallback={
-        <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50/90 backdrop-blur-md animate-in fade-in duration-200">
+        <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 animate-in fade-in duration-100">
           <div className="flex flex-col items-center justify-center gap-4">
             <div className="premium-loader-container !w-14 !h-14 p-3 font-normal">
               <div className="premium-loader-ring"></div>

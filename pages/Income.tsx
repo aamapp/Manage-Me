@@ -31,6 +31,55 @@ export const Income: React.FC = () => {
   // Use incomeRecords directly from context (cached data)
   const { projects, incomeRecords, user, showToast, refreshData, adminSelectedUserId, isOnline } = useAppContext();
   const currency = user?.currency || '৳';
+
+  const formatPaymentDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    try {
+      // Check if it's a full ISO timestamp/datetime or has time
+      const hasTime = dateStr.includes('T') || dateStr.includes(' ') || dateStr.length > 10;
+      const dateObj = new Date(dateStr);
+      if (isNaN(dateObj.getTime())) {
+        return dateStr;
+      }
+      
+      // Format the date part nicely
+      const banglaDate = dateObj.toLocaleDateString('bn-BD', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+      });
+      
+      if (!hasTime) {
+        return banglaDate;
+      }
+
+      // Format time part nicely
+      const hours = dateObj.getHours();
+      const minutes = dateObj.getMinutes();
+      
+      // Determine period (সকাল, দুপুর, বিকাল, সন্ধ্যা, রাত)
+      let period = '';
+      if (hours >= 5 && hours < 12) {
+        period = 'সকাল';
+      } else if (hours >= 12 && hours < 15) {
+        period = 'দুপুর';
+      } else if (hours >= 15 && hours < 18) {
+        period = 'বিকাল';
+      } else if (hours >= 18 && hours < 20) {
+        period = 'সন্ধ্যা';
+      } else {
+        period = 'রাত';
+      }
+      
+      const displayHours = hours % 12 || 12;
+      const banglaHours = displayHours.toLocaleString('bn-BD');
+      const banglaMinutes = String(minutes).padStart(2, '0').replace(/[0-9]/g, d => '০১২৩৪৫৬৭৮৯'[d]);
+      
+      return `${banglaDate} • ${period} ${banglaHours}:${banglaMinutes}`;
+    } catch {
+      return dateStr;
+    }
+  };
   
   const [isModalOpen, setModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -318,7 +367,16 @@ export const Income: React.FC = () => {
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [showFilters, setShowFilters] = useState(false);
 
+  const [visibleLimit, setVisibleLimit] = useState(12);
+
+  useEffect(() => {
+    setVisibleLimit(12);
+  }, [searchTerm, methodFilter, dateRange]);
+
   const filteredPayments = React.useMemo(() => incomeRecords.filter(p => {
+    // Only show project-linked payments in the Income tab (skip general income records created in the Expenses tab)
+    if (!p.projectid) return false;
+
     const matchesSearch = (p.projectname || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                           (p.clientname || '').toLowerCase().includes(searchTerm.toLowerCase());
                           
@@ -350,6 +408,10 @@ export const Income: React.FC = () => {
   };
 
   const totalIncome = React.useMemo(() => filteredPayments.reduce((acc, curr) => acc + curr.amount, 0), [filteredPayments]);
+
+  const slicedPayments = React.useMemo(() => {
+    return filteredPayments.slice(0, visibleLimit);
+  }, [filteredPayments, visibleLimit]);
 
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
@@ -702,7 +764,7 @@ export const Income: React.FC = () => {
               <p className="text-sm font-medium">কোনো পেমেন্ট নেই</p>
             </div>
           ) : (
-            filteredPayments.map((payment) => {
+            (isGeneratingPDF ? filteredPayments : slicedPayments).map((payment) => {
               const { style, icon } = getPaymentMethodStyle(payment.method);
               return (
                 <div 
@@ -787,7 +849,7 @@ export const Income: React.FC = () => {
                     <div>
                        <p className={`${isGeneratingPDF ? 'text-xs' : 'text-[10px]'} text-slate-400 font-bold uppercase mb-0.5`}>তারিখ</p>
                        <p className={`${isGeneratingPDF ? 'text-sm' : 'text-xs'} font-bold text-slate-600 flex items-center gap-1`}>
-                         <Calendar size={isGeneratingPDF ? 14 : 12} /> {payment.date}
+                         <Calendar size={isGeneratingPDF ? 14 : 12} /> {formatPaymentDate(payment.date)}
                        </p>
                     </div>
                     <div className="text-right">
@@ -803,6 +865,18 @@ export const Income: React.FC = () => {
             })
           )}
         </div>
+
+        {!isGeneratingPDF && filteredPayments.length > visibleLimit && (
+          <div className="flex justify-center pb-20 -mt-12 animate-in fade-in duration-200" data-html2canvas-ignore="true">
+            <button
+              onClick={() => setVisibleLimit(prev => prev + 12)}
+              className="px-6 py-2.5 rounded-full bg-white text-emerald-600 hover:bg-slate-50 border border-slate-200/80 shadow-sm text-sm font-bold flex items-center gap-2 transition-all active:scale-95"
+              style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
+            >
+              আরো রেকর্ড দেখুন (Show More)
+            </button>
+          </div>
+        )}
       </div>
 
       <ConfirmModal 

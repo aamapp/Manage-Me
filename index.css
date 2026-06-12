@@ -80,7 +80,11 @@ input, textarea {
   color: #4f46e5;
   /* Pure hardware accelerated properties to guarantee NO lag */
   transform-origin: center;
-  animation: logo-spin 1.1s linear infinite;
+  transform: translate3d(0, 0, 0);
+  will-change: transform;
+  backface-visibility: hidden;
+  perspective: 1000px;
+  animation: logo-spin 0.6s linear infinite;
 }
 
 @keyframes smooth-spin {
@@ -97,3 +101,9 @@ input, textarea {
   0%, 100% { transform: scale(0.9); opacity: 0.7; }
   50% { transform: scale(1.1); opacity: 1; text-shadow: 0 0 15px rgba(79, 70, 229, 0.6); }
 }
+
+@keyframes loading-bar {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+

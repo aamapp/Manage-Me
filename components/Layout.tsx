@@ -28,6 +28,9 @@ import {
   ShoppingBag,
   Bot,
   Bell,
+  Plus,
+  ListTodo,
+  Wallet,
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { APP_NAME } from "@/constants";
@@ -51,6 +54,30 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
     "কন্টেন্ট তৈরি হচ্ছে...",
   ); // Dynamic message
   const [isNavigating, setIsNavigating] = useState(false);
+  const [showNavLoader, setShowNavLoader] = useState(false);
+  const [activeExpenseTab, setActiveExpenseTab] = useState<string>("expenses");
+
+  useEffect(() => {
+    const handleActiveTabChange = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail?.activeTab) {
+        setActiveExpenseTab(customEvent.detail.activeTab);
+      }
+    };
+    window.addEventListener("expense-active-tab-changed", handleActiveTabChange);
+    return () =>
+      window.removeEventListener(
+        "expense-active-tab-changed",
+        handleActiveTabChange
+      );
+  }, []);
+
+  const handleExpenseTabClick = (tabName: string) => {
+    setActiveExpenseTab(tabName);
+    window.dispatchEvent(
+      new CustomEvent("expense-set-tab", { detail: { tab: tabName } })
+    );
+  };
 
   // Swipe state
   const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(
@@ -85,26 +112,28 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
       location.pathname + location.search === path ||
       location.pathname === path
     ) {
-      setIsNavigating(true);
-      setTimeout(() => {
-        setIsNavigating(false);
-      }, 50);
       return;
     }
 
     setIsNavigating(true);
-    setTimeout(() => {
-      navigate(path);
-      setTimeout(() => {
-        setIsNavigating(false);
-      }, 50);
-    }, 50);
+    navigate(path);
   };
 
   useEffect(() => {
     setIsNavigating(false);
     setIsReportPreviewOpen(false);
   }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    if (isNavigating) {
+      const timer = setTimeout(() => {
+        setShowNavLoader(true);
+      }, 100); // 100ms threshold to prevent flickering loader on quick page loads
+      return () => clearTimeout(timer);
+    } else {
+      setShowNavLoader(false);
+    }
+  }, [isNavigating]);
 
   useEffect(() => {
     const handleReportPreview = (e: any) => {
@@ -223,20 +252,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
       location.pathname + location.search === path ||
       location.pathname === path
     ) {
-      setIsNavigating(true);
-      setTimeout(() => {
-        setIsNavigating(false);
-      }, 50);
       return;
     }
 
     setIsNavigating(true);
-    setTimeout(() => {
-      navigate(path);
-      setTimeout(() => {
-        setIsNavigating(false);
-      }, 50);
-    }, 50);
+    navigate(path);
   };
 
   const handleBackToUsers = () => {
@@ -439,69 +459,244 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
       </aside>
 
       {/* Mobile Header (App Bar) - Fixed to ensure it stays on top */}
-      {!isFullScreenPage && !isExpensesPage && (
-        <header className="fixed top-0 inset-x-0 h-16 bg-white/90 backdrop-blur-md border-b border-slate-200/80 flex lg:hidden items-center justify-between px-5 z-40 max-w-[100vw] shadow-sm transition-all duration-200">
-          <div className="flex items-center gap-2">
-            {/* Show Back Button for Admin if User Selected */}
-            {isAdmin && adminSelectedUserId ? (
-              <button
-                onClick={handleBackToUsers}
-                className="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center text-slate-600 active:scale-95 transition-transform"
-              >
-                <ArrowLeft size={20} />
-              </button>
-            ) : (
-              <div
-                onClick={() => setAboutOpen(true)}
-                className="flex items-center gap-2.5 cursor-pointer active:opacity-70 transition-opacity group"
-              >
-                <div
-                  className={`w-9 h-9 rounded-xl flex items-center justify-center overflow-hidden shadow-lg transition-all duration-300 ${isProcessing ? "logo-processing" : "group-active:scale-95"}`}
-                >
-                  <AppLogo variant="color" size="100%" />
-                </div>
-                <span className="font-bold text-slate-800 text-lg tracking-tight group-hover:text-indigo-600 transition-colors">
-                  {APP_NAME}
-                </span>
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center gap-3">
+      {!isFullScreenPage && (
+        <header className="fixed top-0 inset-x-0 h-14 bg-white/90 backdrop-blur-md border-b border-slate-200/80 lg:hidden z-40 max-w-[100vw] shadow-sm overflow-hidden">
+          
+          {/* 1. Expenses Tab Header (Dynamic Spreading / Stretching Animation) */}
+          <div
+            className={`absolute inset-y-0 left-4 h-full flex items-center justify-between transition-all duration-500 ease-out ${
+              isExpensesPage
+                ? "right-4 opacity-100 translate-y-0 scale-100 pointer-events-auto"
+                : "right-[130px] opacity-0 translate-y-2 scale-95 pointer-events-none"
+            }`}
+          >
+            {/* Tab 1: Expenses / Dashboard / লেনদেন */}
             <button
-              onClick={() => handleNavigate("/notifications")}
-              className="w-9 h-9 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 hover:text-indigo-600 transition-colors relative"
+              onClick={() => handleExpenseTabClick("expenses")}
+              title="লেনদেন / ড্যাশবোর্ড"
+              className="flex flex-col items-center justify-center h-full w-8 sm:w-10 cursor-pointer group focus:outline-none relative"
             >
-              <Bell size={20} />
-              {notifications && notifications.filter(n => !n.is_read).length > 0 && (
-                <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
+              <div
+                className={`w-7 h-7 sm:w-8 sm:h-8 rounded-[8px] flex items-center justify-center transition-all border relative ${
+                  activeExpenseTab === "expenses"
+                    ? "border-[#1a73e8] text-white bg-[#1a73e8] shadow-xs"
+                    : "border-[#cdd5de] text-[#8e9aa8] hover:border-slate-300 hover:text-slate-600 bg-white"
+                }`}
+              >
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M20 9H4l4.5-4.5" />
+                  <path d="M4 15h16l-4.5 4.5" />
+                </svg>
+              </div>
+              {activeExpenseTab === "expenses" && (
+                <div className="absolute bottom-0 h-[3px] w-7 sm:w-8 bg-[#1a73e8] rounded-t-[3px]" />
               )}
             </button>
-            <div
-              className="flex items-center cursor-pointer active:scale-95 transition-transform"
-              onClick={() => handleNavigate("/profile")}
+
+            {/* Tab 2: Dues / লেনা-দেনা */}
+            <button
+              onClick={() => handleExpenseTabClick("dues")}
+              title="লেনা-দেনা / দেনা-পাওনা"
+              className="flex flex-col items-center justify-center h-full w-8 sm:w-10 cursor-pointer group focus:outline-none relative"
             >
-              {isAdmin && adminSelectedUserId && (
-                <span className="text-[10px] font-bold bg-indigo-50 text-indigo-600 px-2 py-1 rounded-md border border-indigo-100 mr-2">
-                  User View
-                </span>
+              <div
+                className={`w-7 h-7 sm:w-8 sm:h-8 rounded-[8px] flex items-center justify-center transition-all border relative ${
+                  activeExpenseTab === "dues"
+                    ? "border-[#1a73e8] text-white bg-[#1a73e8] shadow-xs"
+                    : "border-[#cdd5de] text-[#8e9aa8] hover:border-slate-300 hover:text-slate-600 bg-white"
+                }`}
+              >
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M9 4v16l-4.5-4.5" />
+                  <path d="M15 20V4l4.5 4.5" />
+                </svg>
+              </div>
+              {activeExpenseTab === "dues" && (
+                <div className="absolute bottom-0 h-[3px] w-7 sm:w-8 bg-[#1a73e8] rounded-t-[3px]" />
               )}
-              {user.avatar_url ? (
-                <img
-                  src={user.avatar_url}
-                  alt={user.name}
-                  className="w-9 h-9 rounded-full border-2 border-white shadow-md object-cover ring-1 ring-slate-100"
-                  referrerPolicy="no-referrer"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || "User")}&background=random`;
-                  }}
-                />
+            </button>
+
+            {/* Tab 3: Reports / বাজেট ও রিপোর্ট */}
+            <button
+              onClick={() => handleExpenseTabClick("reports")}
+              title="বজেট"
+              className="flex flex-col items-center justify-center h-full w-8 sm:w-10 cursor-pointer group focus:outline-none relative"
+            >
+              <div
+                className={`w-7 h-7 sm:w-8 sm:h-8 rounded-[8px] flex items-center justify-center transition-all border relative ${
+                  activeExpenseTab === "reports"
+                    ? "border-[#1a73e8] text-white bg-[#1a73e8] shadow-xs"
+                    : "border-[#cdd5de] text-[#8e9aa8] hover:border-slate-300 hover:text-slate-600 bg-white"
+                }`}
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M 5.5 14.5 C 8 11.5, 9.5 9.5, 11.5 9.5 C 13.5 9.5, 14.5 14.5, 16.5 14.5 C 18 14.5, 19 13, 20 12" />
+                </svg>
+              </div>
+              {activeExpenseTab === "reports" && (
+                <div className="absolute bottom-0 h-[3px] w-7 sm:w-8 bg-[#1a73e8] rounded-t-[3px]" />
+              )}
+            </button>
+
+            {/* Tab 4: Savings / সঞ্চয় ও লক্ষ্য */}
+            <button
+              onClick={() => handleExpenseTabClick("savings")}
+              title="সঞ্চয় ও লক্ষ্য"
+              className="flex flex-col items-center justify-center h-full w-8 sm:w-10 cursor-pointer group focus:outline-none relative"
+            >
+              <div
+                className={`w-7 h-7 sm:w-8 sm:h-8 rounded-[8px] flex items-center justify-center transition-all border relative ${
+                  activeExpenseTab === "savings"
+                    ? "border-[#1a73e8] text-white bg-[#1a73e8] shadow-xs"
+                    : "border-[#cdd5de] text-[#8e9aa8] hover:border-slate-300 hover:text-slate-600 bg-white"
+                }`}
+              >
+                <Plus size={13} strokeWidth={2.5} />
+              </div>
+              {activeExpenseTab === "savings" && (
+                <div className="absolute bottom-0 h-[3px] w-7 sm:w-8 bg-[#1a73e8] rounded-t-[3px]" />
+              )}
+            </button>
+
+            {/* Tab 5: Tasks / টাস্ক */}
+            <button
+              onClick={() => handleExpenseTabClick("tasks")}
+              title="টাস্ক"
+              className="flex flex-col items-center justify-center h-full w-8 sm:w-10 cursor-pointer group focus:outline-none relative"
+            >
+              <div
+                className={`w-7 h-7 sm:w-8 sm:h-8 rounded-[8px] flex items-center justify-center transition-all border relative ${
+                  activeExpenseTab === "tasks"
+                    ? "border-[#1a73e8] text-white bg-[#1a73e8] shadow-xs"
+                    : "border-[#cdd5de] text-[#8e9aa8] hover:border-slate-300 hover:text-slate-600 bg-white"
+                }`}
+              >
+                <ListTodo size={13} strokeWidth={2.5} />
+              </div>
+              {activeExpenseTab === "tasks" && (
+                <div className="absolute bottom-0 h-[3px] w-7 sm:w-8 bg-[#1a73e8] rounded-t-[3px]" />
+              )}
+            </button>
+
+            {/* Tab 6: Wallet / ওয়ালেট */}
+            <button
+              onClick={() => handleExpenseTabClick("wallet")}
+              title="ওয়ালেট"
+              className="flex flex-col items-center justify-center h-full w-8 sm:w-10 cursor-pointer group focus:outline-none relative"
+            >
+              <div
+                className={`w-7 h-7 sm:w-8 sm:h-8 rounded-[8px] flex items-center justify-center transition-all border relative ${
+                  activeExpenseTab === "wallet"
+                    ? "border-[#1a73e8] text-white bg-[#1a73e8] shadow-xs"
+                    : "border-[#cdd5de] text-[#8e9aa8] hover:border-slate-300 hover:text-slate-600 bg-white"
+                }`}
+              >
+                <Wallet size={13} strokeWidth={2.5} />
+              </div>
+              {activeExpenseTab === "wallet" && (
+                <div className="absolute bottom-0 h-[3px] w-7 sm:w-8 bg-[#1a73e8] rounded-t-[3px]" />
+              )}
+            </button>
+          </div>
+
+          {/* 2. Default Header Layer (App Branding, Notifications, Profile) */}
+          <div
+            className={`absolute inset-0 px-4 h-full flex items-center justify-between transition-all duration-300 ease-out ${
+              !isExpensesPage
+                ? "opacity-100 translate-y-0 scale-100 pointer-events-auto"
+                : "opacity-0 -translate-y-2 scale-95 pointer-events-none"
+            }`}
+          >
+            {/* Left Area: Branding */}
+            <div className="flex items-center gap-2.5">
+              {isAdmin && adminSelectedUserId ? (
+                <button
+                  onClick={handleBackToUsers}
+                  className="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center text-slate-600 active:scale-95 transition-transform"
+                >
+                  <ArrowLeft size={18} />
+                </button>
               ) : (
-                <div className="w-9 h-9 bg-indigo-50 border border-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold text-sm shadow-sm">
-                  <User size={18} />
+                <div
+                  onClick={() => setAboutOpen(true)}
+                  className="flex items-center gap-2 cursor-pointer active:opacity-70 transition-opacity group"
+                >
+                  <div
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center overflow-hidden shadow-lg transition-all duration-300 ${isProcessing ? "logo-processing" : "group-active:scale-95"}`}
+                  >
+                    <AppLogo variant="color" size="100%" />
+                  </div>
+                  <span className="font-bold text-slate-800 text-[15px] sm:text-lg tracking-tight group-hover:text-indigo-600 transition-colors">
+                    {APP_NAME}
+                  </span>
                 </div>
               )}
+            </div>
+
+            {/* Right Area: Notifications & Profile */}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => handleNavigate("/notifications")}
+                className="w-9 h-9 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 hover:text-indigo-600 transition-colors relative"
+              >
+                <Bell size={20} />
+                {notifications && notifications.filter(n => !n.is_read).length > 0 && (
+                  <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
+                )}
+              </button>
+              <div
+                className="flex items-center cursor-pointer active:scale-95 transition-transform"
+                onClick={() => handleNavigate("/profile")}
+              >
+                {isAdmin && adminSelectedUserId && (
+                  <span className="text-[10px] font-bold bg-indigo-50 text-indigo-600 px-2 py-1 rounded-md border border-indigo-100 mr-2">
+                    User View
+                  </span>
+                )}
+                {user.avatar_url ? (
+                  <img
+                    src={user.avatar_url}
+                    alt={user.name}
+                    className="w-9 h-9 rounded-full border-2 border-white shadow-md object-cover ring-1 ring-slate-100"
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || "User")}&background=random`;
+                    }}
+                  />
+                ) : (
+                  <div className="w-9 h-9 bg-indigo-50 border border-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold text-sm shadow-sm">
+                    <User size={18} />
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </header>
@@ -513,9 +708,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
           isFullScreenPage
             ? "p-0"
             : isExpensesPage
-            ? "pt-0 pb-[72px] lg:pb-8 px-0"
-            : "pt-[68px] lg:pt-8 pb-[72px] lg:pb-8 px-3 lg:px-8"
-        } animate-in fade-in duration-300 w-full max-w-[100vw] lg:max-w-none ${isExpensesPage ? 'overflow-x-clip' : 'overflow-x-hidden'} lg:ml-72`}
+            ? "pt-14 lg:pt-8 pb-[72px] lg:pb-8 px-0"
+            : "pt-14 lg:pt-8 pb-[72px] lg:pb-8 px-3 lg:px-8"
+        } ${isExpensesPage ? "" : "animate-in fade-in duration-150"} w-full max-w-[100vw] lg:max-w-none ${isExpensesPage ? 'overflow-x-clip' : 'overflow-x-hidden'} lg:ml-72`}
       >
         <div
           className={`max-w-7xl mx-auto w-full ${isFullScreenPage ? "h-[100dvh] lg:h-auto" : ""}`}
@@ -853,7 +1048,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
       {/* Fullscreen Processing Overlay */}
       {isProcessing &&
         createPortal(
-          <div className="fixed inset-0 z-[9999] bg-slate-50/90 backdrop-blur-sm flex flex-col items-center justify-center animate-in fade-in duration-300">
+          <div className="fixed inset-0 z-[9999] bg-slate-50/95 flex flex-col items-center justify-center animate-in fade-in duration-150">
             <div className="flex flex-col items-center justify-center gap-6">
               <div className="premium-loader-container !w-16 !h-16 p-3.5">
                 <div className="premium-loader-ring"></div>
@@ -872,19 +1067,19 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
           document.body,
         )}
 
-      {/* Page Transition Loading Overlay */}
-      {isNavigating &&
+      {/* Page Transition Loading Overlay - Beautiful Centered Rotating Logo as Requested */}
+      {showNavLoader &&
         !isProcessing &&
         createPortal(
-          <div className="fixed inset-0 z-[9998] bg-slate-50/10 backdrop-blur-[8px] flex flex-col items-center justify-center">
-            <div className="flex flex-col items-center justify-center gap-4 drop-shadow-xl transform scale-75">
+          <div className={`fixed ${!isFullScreenPage ? "top-14 lg:top-0" : "top-0"} left-0 lg:left-72 right-0 bottom-0 z-30 bg-gradient-to-tr from-indigo-50/40 via-white/70 to-violet-50/40 backdrop-blur-[5px] flex flex-col items-center justify-center select-none pointer-events-none animate-in fade-in duration-75`}>
+            <div className="flex flex-col items-center justify-center gap-4 transform scale-75">
               <div className="premium-loader-container !w-20 !h-20 p-4.5">
                 <div className="premium-loader-ring"></div>
                 <div className="premium-loader-text w-full h-full flex items-center justify-center">
                   <AppLogo variant="transparent-color" size="100%" />
                 </div>
               </div>
-              <p className="text-indigo-600 font-semibold tracking-widest text-lg md:text-xl uppercase animate-pulse">
+              <p className="text-indigo-600 font-bold tracking-widest text-lg md:text-xl animate-pulse" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
                 লোড হচ্ছে...
               </p>
             </div>

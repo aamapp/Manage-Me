@@ -128,6 +128,14 @@ export const Reports: React.FC = () => {
   const [pdfSelectedStatus, setPdfSelectedStatus] = useState<'All' | 'Pending' | 'In Progress' | 'Completed'>('All');
   const [projectFilterSlideDirection, setProjectFilterSlideDirection] = useState<'forward' | 'backward'>('forward');
 
+  const projectFilterScrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (projectFilterScrollRef.current) {
+      projectFilterScrollRef.current.scrollTop = 0;
+    }
+  }, [projectFilterStep, isProjectFilterModalOpen]);
+
   const uniqueClientNames = useMemo(() => {
     const names = new Set<string>();
     if (clients) {
@@ -165,6 +173,14 @@ export const Reports: React.FC = () => {
   const [locUpazila, setLocUpazila] = useState<string>('');   // name or Object name in Bengali
   const [locSearchQuery, setLocSearchQuery] = useState('');
   const [slideDirection, setSlideDirection] = useState<'forward' | 'backward'>('forward');
+
+  const locFilterScrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (locFilterScrollRef.current) {
+      locFilterScrollRef.current.scrollTop = 0;
+    }
+  }, [locStep, isLocModalOpen]);
 
   // Prevent background scrolling when modals are open
   useEffect(() => {
@@ -2032,7 +2048,7 @@ export const Reports: React.FC = () => {
             )}
 
             {/* Scrollable list of options */}
-            <div className="p-5 flex-1 overflow-x-hidden overflow-y-auto max-h-[40vh] min-h-[25vh] bg-slate-50/20 relative">
+            <div ref={locFilterScrollRef} className="p-5 flex-1 overflow-x-hidden overflow-y-auto max-h-[40vh] min-h-[25vh] bg-slate-50/20 relative">
               <AnimatePresence mode="wait" initial={false}>
                 {locStep === 1 && (
                   <motion.div
@@ -2413,7 +2429,7 @@ export const Reports: React.FC = () => {
             )}
 
             {/* Scrollable list content */}
-            <div className="p-5 flex-1 overflow-x-hidden overflow-y-auto max-h-[42vh] min-h-[30vh] bg-slate-50/10 relative">
+            <div ref={projectFilterScrollRef} className="p-5 flex-1 overflow-x-hidden overflow-y-auto max-h-[42vh] min-h-[30vh] bg-slate-50/10 relative">
               <AnimatePresence mode="wait" initial={false}>
                 {projectFilterStep === 1 && (
                   <motion.div
