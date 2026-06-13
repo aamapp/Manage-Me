@@ -173,6 +173,7 @@ export const Expenses: React.FC = () => {
     refreshData,
     isOnline,
     incomeRecords,
+    setIncomeRecords,
     projects,
   } = useAppContext();
   const location = useLocation();
@@ -1278,14 +1279,13 @@ export const Expenses: React.FC = () => {
     try {
       if (txModalType === "expense") {
         const parsedAmount = Number(safeEval(newExpense.amount)) || 0;
-        let dateToSave = newExpense.date;
-
-        if (dateToSave && dateToSave.length === 10) {
-          const tTime = newExpense.time
-            ? `${newExpense.time}:00`
-            : currentTimeNow;
-          dateToSave = new Date(`${dateToSave}T${tTime}`).toISOString();
-        }
+        let baseDateStr = newExpense.date
+          ? newExpense.date.substring(0, 10)
+          : localToday;
+        const tTime = newExpense.time
+          ? `${newExpense.time}:00`
+          : currentTimeNow;
+        let dateToSave = new Date(`${baseDateStr}T${tTime}`).toISOString();
 
         const selectedWallet = newExpense.wallet || "ক্যাশ";
         const categoryVal = newExpense.category || "অন্যান্য";
@@ -1312,6 +1312,7 @@ export const Expenses: React.FC = () => {
               category: newExpense.category || "অন্যান্য",
               amount: parsedAmount,
               date: dateToSave,
+              createdat: dateToSave, // Update createdat as well to reflect the time change since date col strips time
               notes: finalNotesColumn,
             })
             .eq("id", activeExpenseId);
@@ -1331,6 +1332,7 @@ export const Expenses: React.FC = () => {
             category: newExpense.category || "অন্যান্য",
             amount: parsedAmount,
             date: dateToSave,
+            createdat: dateToSave,
             notes: finalNotesColumn,
             userid: targetUserId,
           });
@@ -1344,14 +1346,11 @@ export const Expenses: React.FC = () => {
       } else {
         // Saving Income (Direct / Standalone)
         const parsedAmount = Number(safeEval(newIncome.amount)) || 0;
-        let dateToSave = newIncome.date;
-
-        if (dateToSave && dateToSave.length === 10) {
-          const tTime = newIncome.time
-            ? `${newIncome.time}:00`
-            : currentTimeNow;
-          dateToSave = new Date(`${dateToSave}T${tTime}`).toISOString();
-        }
+        let baseDateStr = newIncome.date
+          ? newIncome.date.substring(0, 10)
+          : localToday;
+        const tTime = newIncome.time ? `${newIncome.time}:00` : currentTimeNow;
+        let dateToSave = new Date(`${baseDateStr}T${tTime}`).toISOString();
 
         const selectedWallet = newIncome.method || "বিকাশ";
 
@@ -1370,6 +1369,7 @@ export const Expenses: React.FC = () => {
               clientname: newIncome.clientname || "",
               amount: parsedAmount,
               date: dateToSave,
+              createdat: dateToSave, // Update createdat to persist time changes too
               method: selectedWallet,
             })
             .eq("id", activeIncomeId);
@@ -1393,6 +1393,7 @@ export const Expenses: React.FC = () => {
               clientname: newIncome.clientname || "",
               amount: parsedAmount,
               date: dateToSave,
+              createdat: dateToSave,
               method: selectedWallet,
               userid: targetUserId,
             });
@@ -1446,6 +1447,9 @@ export const Expenses: React.FC = () => {
           const parsed = parseExpenseNotes(expenseObj.notes);
           await adjustWalletBalance(parsed.wallet, txToDelete.amount);
         }
+        setExpenses((prev: any[]) =>
+          prev.filter((e) => e.id !== txToDelete.id),
+        );
         showToast("খরচটি রিসাইকেল বিনে পাঠানো হয়েছে", "success");
       } else {
         // Delete Income
@@ -1484,6 +1488,9 @@ export const Expenses: React.FC = () => {
             -txToDelete.amount,
           );
         }
+        setIncomeRecords((prev: any[]) =>
+          prev.filter((i) => i.id !== txToDelete.id),
+        );
         showToast("পেমেন্ট রেকর্ড ডিলিট করা হয়েছে", "success");
       }
       await refreshData();
@@ -1648,8 +1655,12 @@ export const Expenses: React.FC = () => {
       filtered = combined.filter((t) => t.type === "expense");
     }
 
-    // Sort descending by date
-    return filtered.sort((a, b) => b.date.localeCompare(a.date));
+    // Sort descending by exact timestamp when available
+    return filtered.sort((a, b) => {
+      const db = b.rawItem.createdat || b.date;
+      const da = a.rawItem.createdat || a.date;
+      return new Date(db).getTime() - new Date(da).getTime();
+    });
   }, [
     expenses,
     incomeRecords,
@@ -2873,108 +2884,113 @@ export const Expenses: React.FC = () => {
                 )}
 
               {/* PDF Preview Modal */}
-              {pdfPreviewUrl && createPortal(
-                <div className="fixed inset-0 z-[2000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300">
-                  <div className="bg-white rounded-[2.5rem] w-full max-w-lg overflow-hidden shadow-2xl flex flex-col animate-in zoom-in-95 duration-300">
-                    <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center">
-                          <Download size={20} />
+              {pdfPreviewUrl &&
+                createPortal(
+                  <div className="fixed inset-0 z-[2000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300">
+                    <div className="bg-white rounded-[2.5rem] w-full max-w-lg overflow-hidden shadow-2xl flex flex-col animate-in zoom-in-95 duration-300">
+                      <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center">
+                            <Download size={20} />
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-black text-slate-800">
+                              রিপোর্ট তৈরি হয়েছে
+                            </h3>
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                              ডাউনলোড বা শেয়ার করুন
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <h3 className="text-lg font-black text-slate-800">
-                            রিপোর্ট তৈরি হয়েছে
-                          </h3>
-                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                            ডাউনলোড বা শেয়ার করুন
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => {
-                          setPdfPreviewUrl(null);
-                          setPdfPublicUrl(null);
-                        }}
-                        className="p-2 bg-slate-50 text-slate-400 rounded-full hover:bg-slate-100 transition-colors"
-                      >
-                        <X size={20} />
-                      </button>
-                    </div>
-
-                    <div className="p-8 flex flex-col items-center text-center space-y-6">
-                      <div className="w-24 h-24 bg-rose-50 text-rose-600 rounded-3xl flex items-center justify-center shadow-inner">
-                        <Receipt size={48} />
+                        <button
+                          onClick={() => {
+                            setPdfPreviewUrl(null);
+                            setPdfPublicUrl(null);
+                          }}
+                          className="p-2 bg-slate-50 text-slate-400 rounded-full hover:bg-slate-100 transition-colors"
+                        >
+                          <X size={20} />
+                        </button>
                       </div>
 
-                      <div className="flex flex-col w-full gap-3">
-                        {pdfPublicUrl ? (
-                          <button
-                            onClick={() => window.open(pdfPublicUrl, "_blank")}
-                            className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold text-base shadow-lg shadow-emerald-200 active:scale-95 transition-transform flex items-center justify-center gap-2"
-                          >
-                            <ExternalLink size={20} /> ব্রাউজারে ওপেন করুন
-                          </button>
-                        ) : (
-                          <a
-                            href={pdfPreviewUrl}
-                            download={`expenses_${new Date().getTime()}.pdf`}
-                            onClick={() =>
-                              setTimeout(() => setPdfPreviewUrl(null), 500)
-                            }
-                            className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold text-base shadow-lg shadow-emerald-200 active:scale-95 transition-transform flex items-center justify-center gap-2"
-                          >
-                            <Download size={20} /> ডাউনলোড করুন
-                          </a>
-                        )}
+                      <div className="p-8 flex flex-col items-center text-center space-y-6">
+                        <div className="w-24 h-24 bg-rose-50 text-rose-600 rounded-3xl flex items-center justify-center shadow-inner">
+                          <Receipt size={48} />
+                        </div>
 
-                        <div className="grid grid-cols-2 gap-3">
-                          <button
-                            onClick={async () => {
-                              try {
-                                const response = await fetch(pdfPreviewUrl!);
-                                const blob = await response.blob();
-                                const file = new File(
-                                  [blob],
-                                  `expenses_${Date.now()}.pdf`,
-                                  { type: "application/pdf" },
-                                );
-                                if (navigator.share) {
-                                  await navigator.share({
-                                    files: [file],
-                                    title: "Expense Report",
-                                    text: "Manage-Me Expense Report",
-                                  });
-                                } else {
-                                  alert(
-                                    "আপনার ডিভাইসে শেয়ার অপশনটি সাপোর্ট করছে না",
+                        <div className="flex flex-col w-full gap-3">
+                          {pdfPublicUrl ? (
+                            <button
+                              onClick={() =>
+                                window.open(pdfPublicUrl, "_blank")
+                              }
+                              className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold text-base shadow-lg shadow-emerald-200 active:scale-95 transition-transform flex items-center justify-center gap-2"
+                            >
+                              <ExternalLink size={20} /> ব্রাউজারে ওপেন করুন
+                            </button>
+                          ) : (
+                            <a
+                              href={pdfPreviewUrl}
+                              download={`expenses_${new Date().getTime()}.pdf`}
+                              onClick={() =>
+                                setTimeout(() => setPdfPreviewUrl(null), 500)
+                              }
+                              className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold text-base shadow-lg shadow-emerald-200 active:scale-95 transition-transform flex items-center justify-center gap-2"
+                            >
+                              <Download size={20} /> ডাউনলোড করুন
+                            </a>
+                          )}
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <button
+                              onClick={async () => {
+                                try {
+                                  const response = await fetch(pdfPreviewUrl!);
+                                  const blob = await response.blob();
+                                  const file = new File(
+                                    [blob],
+                                    `expenses_${Date.now()}.pdf`,
+                                    { type: "application/pdf" },
                                   );
+                                  if (navigator.share) {
+                                    await navigator.share({
+                                      files: [file],
+                                      title: "Expense Report",
+                                      text: "Manage-Me Expense Report",
+                                    });
+                                  } else {
+                                    alert(
+                                      "আপনার ডিভাইসে শেয়ার অপশনটি সাপোর্ট করছে না",
+                                    );
+                                  }
+                                } catch (e) {
+                                  alert("শেয়ার করা সম্ভব হচ্ছে না");
                                 }
-                              } catch (e) {
-                                alert("শেয়ার করা সম্ভব হচ্ছে না");
-                              }
-                            }}
-                            className="bg-slate-100 text-slate-700 py-4 rounded-2xl font-bold flex justify-center items-center gap-2 text-sm active:scale-95 transition-transform border border-slate-200"
-                          >
-                            <Share2 size={18} /> শেয়ার
-                          </button>
+                              }}
+                              className="bg-slate-100 text-slate-700 py-4 rounded-2xl font-bold flex justify-center items-center gap-2 text-sm active:scale-95 transition-transform border border-slate-200"
+                            >
+                              <Share2 size={18} /> শেয়ার
+                            </button>
 
-                          <button
-                            onClick={() => {
-                              const urlToCopy = pdfPublicUrl || pdfPreviewUrl;
-                              if (urlToCopy) {
-                                navigator.clipboard.writeText(urlToCopy);
-                                showToast("লিঙ্ক কপি করা হয়েছে", "success");
-                              }
-                            }}
-                            className="bg-slate-100 text-slate-700 py-4 rounded-2xl font-bold flex justify-center items-center gap-2 text-sm active:scale-95 transition-transform border border-slate-200"
-                          >
-                            <Copy size={18} /> লিংক কপি
-                          </button>
+                            <button
+                              onClick={() => {
+                                const urlToCopy = pdfPublicUrl || pdfPreviewUrl;
+                                if (urlToCopy) {
+                                  navigator.clipboard.writeText(urlToCopy);
+                                  showToast("লিঙ্ক কপি করা হয়েছে", "success");
+                                }
+                              }}
+                              className="bg-slate-100 text-slate-700 py-4 rounded-2xl font-bold flex justify-center items-center gap-2 text-sm active:scale-95 transition-transform border border-slate-200"
+                            >
+                              <Copy size={18} /> লিংক কপি
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                </div>, document.body)}
+                  </div>,
+                  document.body,
+                )}
             </div>
 
             {/* Slide 2: Dues (Index 1) */}
@@ -3806,6 +3822,15 @@ const DuesManager: React.FC<DuesManagerProps> = ({
       typeof (navigator as any).contacts.select === "function"
     ) {
       try {
+        // If in an iframe (e.g., AI Studio preview), Web Contacts API fails with "top frame" error
+        if (window.self !== window.top) {
+          showToast(
+            "কন্টাক্ট পিকার প্রিভিউ মোডে কাজ করে না। দয়া করে নতুন ট্যাবে অ্যাপটি খুলুন অথবা নম্বরটি ম্যানুয়ালি লিখুন।",
+            "info",
+          );
+          return;
+        }
+
         const contacts = await (navigator as any).contacts.select(["tel"], {
           multiple: false,
         });
@@ -3822,7 +3847,14 @@ const DuesManager: React.FC<DuesManagerProps> = ({
       } catch (err: any) {
         if (err.name !== "AbortError") {
           console.error("Contact Pick Error: ", err);
-          showToast("কন্টাক্ট নির্বাচন করতে সমস্যা হয়েছে", "error");
+          if (err.message && err.message.includes("top frame")) {
+            showToast(
+              "কন্টাক্ট পিকার প্রিভিউ মোডে কাজ করে না। দয়া করে নতুন ট্যাবে অ্যাপটি খুলুন।",
+              "error",
+            );
+          } else {
+            showToast("কন্টাক্ট নির্বাচন করতে সমস্যা হয়েছে", "error");
+          }
         }
       }
     } else {
@@ -4213,13 +4245,13 @@ const DuesManager: React.FC<DuesManagerProps> = ({
     };
 
     const handleDownloadReport = () => {
-      navigate('/reports', {
+      navigate("/reports", {
         state: {
-          action: 'download_preview',
-          reportType: 'personal_dues',
+          action: "download_preview",
+          reportType: "personal_dues",
           personId: person.id,
-          clientName: person.name
-        }
+          clientName: person.name,
+        },
       });
     };
 
@@ -4598,11 +4630,12 @@ const DuesManager: React.FC<DuesManagerProps> = ({
                           }}
                           className={`flex-1 relative cursor-text rounded-[14px] h-[54px] transition-all duration-200 flex items-center px-4 gap-3 ${transactionType === "receive" && (isTxKeypadOpen || txAmount) ? "border-[2px] border-[#3b82f6] bg-white" : "border border-[#f1f5f9] bg-white justify-center"}`}
                         >
-                          {transactionType === "receive" && (isTxKeypadOpen || txAmount) && (
-                            <span className="absolute -top-[12px] left-3 bg-white px-1.5 font-medium text-[15px] text-[#9ca3af]">
-                              পেলাম
-                            </span>
-                          )}
+                          {transactionType === "receive" &&
+                            (isTxKeypadOpen || txAmount) && (
+                              <span className="absolute -top-[12px] left-3 bg-white px-1.5 font-medium text-[15px] text-[#9ca3af]">
+                                পেলাম
+                              </span>
+                            )}
                           <div className="flex items-center justify-center shrink-0">
                             <CustomCoinsIcon
                               size={20}
@@ -4611,7 +4644,8 @@ const DuesManager: React.FC<DuesManagerProps> = ({
                             />
                           </div>
                           <div className="flex items-center flex-1 overflow-hidden">
-                            {transactionType === "receive" && (isTxKeypadOpen || txAmount) ? (
+                            {transactionType === "receive" &&
+                            (isTxKeypadOpen || txAmount) ? (
                               <div className="flex items-center gap-[2px]">
                                 <span className="font-medium text-[20px] text-slate-800">
                                   {txAmount ? txAmount : ""}
@@ -4635,11 +4669,12 @@ const DuesManager: React.FC<DuesManagerProps> = ({
                           }}
                           className={`flex-1 relative cursor-text rounded-[14px] h-[54px] transition-all duration-200 flex items-center px-4 gap-3 ${transactionType === "give" && (isTxKeypadOpen || txAmount) ? "border-[2px] border-[#3b82f6] bg-white" : "border border-[#f1f5f9] bg-white justify-center"}`}
                         >
-                          {transactionType === "give" && (isTxKeypadOpen || txAmount) && (
-                            <span className="absolute -top-[12px] left-3 bg-white px-1.5 font-medium text-[15px] text-[#9ca3af]">
-                              দিলাম
-                            </span>
-                          )}
+                          {transactionType === "give" &&
+                            (isTxKeypadOpen || txAmount) && (
+                              <span className="absolute -top-[12px] left-3 bg-white px-1.5 font-medium text-[15px] text-[#9ca3af]">
+                                দিলাম
+                              </span>
+                            )}
                           <div className="flex items-center justify-center shrink-0">
                             <CustomCoinsIcon
                               size={20}
@@ -4648,7 +4683,8 @@ const DuesManager: React.FC<DuesManagerProps> = ({
                             />
                           </div>
                           <div className="flex items-center flex-1 overflow-hidden">
-                            {transactionType === "give" && (isTxKeypadOpen || txAmount) ? (
+                            {transactionType === "give" &&
+                            (isTxKeypadOpen || txAmount) ? (
                               <div className="flex items-center gap-[2px]">
                                 <span className="font-medium text-[20px] text-slate-800">
                                   {txAmount ? txAmount : ""}
