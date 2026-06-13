@@ -171,22 +171,7 @@ const AppContent: React.FC = () => {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 animate-in fade-in duration-150">
-        <div className="flex flex-col items-center justify-center gap-6">
-          <div className="premium-loader-container !w-16 !h-16 p-3.5">
-            <div className="premium-loader-ring"></div>
-            <div className="premium-loader-text w-full h-full flex items-center justify-center">
-              <AppLogo variant="transparent-color" size="100%" />
-            </div>
-          </div>
-          <div className="flex flex-col items-center gap-1">
-             <p className="text-slate-600 font-medium text-lg tracking-wide animate-pulse">অ্যাপ চালু হচ্ছে...</p>
-             <p className="text-slate-400 text-sm">দয়া করে অপেক্ষা করুন</p>
-          </div>
-        </div>
-      </div>
-    );
+    return <div className="min-h-screen bg-slate-50"></div>;
   }
 
   if (isAppLocked && (appPin || isFingerprintEnabled)) {
@@ -217,19 +202,7 @@ const AppContent: React.FC = () => {
         </div>
       )}
       
-      <Suspense fallback={
-        <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 animate-in fade-in duration-100">
-          <div className="flex flex-col items-center justify-center gap-4">
-            <div className="premium-loader-container !w-14 !h-14 p-3 font-normal">
-              <div className="premium-loader-ring"></div>
-              <div className="premium-loader-text w-full h-full flex items-center justify-center">
-                <AppLogo variant="transparent-color" size="100%" />
-              </div>
-            </div>
-            <p className="text-indigo-600 font-semibold tracking-widest text-sm md:text-base uppercase animate-pulse">লোড হচ্ছে...</p>
-          </div>
-        </div>
-      }>
+      <Suspense fallback={<div className="min-h-screen bg-slate-50"></div>}>
         <Routes>
           <Route 
             path="/login" 

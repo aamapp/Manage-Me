@@ -75,7 +75,12 @@ interface PageData {
 function paginateData(allLines: any[]): PageData[] {
   const totalItems = allLines.length;
   if (totalItems === 0) {
-    return [];
+    return [{
+      pageNumber: 1,
+      items: [],
+      isFirstPage: true,
+      isLastPage: true
+    }];
   }
   
   if (totalItems <= 12) {
@@ -1770,8 +1775,8 @@ export const Reports: React.FC = () => {
                                     <th className="py-2.5 px-4 font-bold">তারিখ</th>
                                     <th className="py-2.5 px-4 font-bold">সময়</th>
                                     <th className="py-2.5 px-4 font-bold">বিবরণ</th>
-                                    <th className="py-2.5 px-4 text-right font-bold font-sans">పাবো (৳)</th>
-                                    <th className="py-2.5 px-4 text-right font-bold font-sans">দিবো (৳)</th>
+                                    <th className="py-2.5 px-4 text-right font-bold font-sans">দিলাম (৳)</th>
+                                    <th className="py-2.5 px-4 text-right font-bold font-sans">পেলাম (৳)</th>
                                   </tr>
                                 ) : (
                                   <tr className="bg-slate-50 border-b border-slate-100 text-[10px] text-slate-500 font-extrabold tracking-wider" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
@@ -1936,9 +1941,9 @@ export const Reports: React.FC = () => {
                                 <>
                                   <span className="text-slate-850" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>ব্যক্তিগত মোট হিসাব:</span>
                                   <div className="flex items-center gap-4" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
-                                    <span>মোট পাবো: <span className="text-emerald-600 font-sans">{pdfStats.totalGive?.toLocaleString('bn-BD') || '0'} ৳</span></span>
-                                    <span>মোট দিবো: <span className="text-rose-600 font-sans">{pdfStats.totalReceive?.toLocaleString('bn-BD') || '0'} ৳</span></span>
-                                    <span>বর্তামন অবস্থা: <span className={`${pdfStats.balance! > 0 ? 'text-rose-600' : 'text-emerald-600'} font-sans`}>{Math.abs(pdfStats.balance || 0).toLocaleString('bn-BD')} ৳ ({pdfStats.balance! > 0 ? 'দিবো' : 'পাবো'})</span></span>
+                                    <span>মোট দিলাম: <span className="text-emerald-600 font-sans">{pdfStats.totalGive?.toLocaleString('bn-BD') || '0'} ৳</span></span>
+                                    <span>মোট পেলাম: <span className="text-rose-600 font-sans">{pdfStats.totalReceive?.toLocaleString('bn-BD') || '0'} ৳</span></span>
+                                    <span>বর্তমান অবস্থা: <span className={`${pdfStats.balance! > 0 ? 'text-rose-600' : 'text-emerald-600'} font-sans`}>{Math.abs(pdfStats.balance || 0).toLocaleString('bn-BD')} ৳ ({pdfStats.balance! > 0 ? 'দিবো' : 'পাবো'})</span></span>
                                   </div>
                                 </>
                               ) : (
@@ -1961,7 +1966,7 @@ export const Reports: React.FC = () => {
                             {/* Total Income or Total Budget */}
                             <div className="bg-[#f0fdf4] border border-emerald-100 rounded-2xl p-4 flex flex-col justify-between h-20 shadow-xs">
                               <p className="text-[9px] font-black text-emerald-800 uppercase tracking-widest" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
-                                {(pdfReportType === 'projects' || pdfReportType === 'dues') ? 'মোট বাজেট:' : pdfReportType === 'personal_dues' ? 'মোট পাবো:' : 'মোট আয়:'}
+                                {(pdfReportType === 'projects' || pdfReportType === 'dues') ? 'মোট বাজেট:' : pdfReportType === 'personal_dues' ? 'মোট দিলাম:' : 'মোট আয়:'}
                               </p>
                               <p className="text-[18px] font-black text-emerald-600 font-sans mt-0.5" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
                                 {(pdfReportType === 'projects' || pdfReportType === 'dues') 
@@ -1974,7 +1979,7 @@ export const Reports: React.FC = () => {
                             {/* Total Expense or Total Paid */}
                             <div className="bg-[#fdf2f2] border border-rose-100 rounded-2xl p-4 flex flex-col justify-between h-20 shadow-xs">
                               <p className="text-[9px] font-black text-rose-800 uppercase tracking-widest" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
-                                {(pdfReportType === 'projects' || pdfReportType === 'dues') ? 'মোট আদায়:' : pdfReportType === 'personal_dues' ? 'মোট দিবো:' : 'মোট খরচ:'}
+                                {(pdfReportType === 'projects' || pdfReportType === 'dues') ? 'মোট আদায়:' : pdfReportType === 'personal_dues' ? 'মোট পেলাম:' : 'মোট খরচ:'}
                               </p>
                               <p className="text-[18px] font-black text-rose-600 font-sans mt-0.5" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
                                 {(pdfReportType === 'projects' || pdfReportType === 'dues') 

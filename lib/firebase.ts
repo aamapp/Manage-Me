@@ -136,10 +136,20 @@ export const setupOnMessageListener = () => {
     console.log('Message received. ', payload);
     // You can show a custom toast or UI notification here
     if (payload.notification) {
+      const title = payload.notification.title || 'New Notification';
+      const body = payload.notification.body;
       const imageUrl = payload.notification.image || (payload.data && payload.data.image);
+
+      // Speak the title
+      if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(title);
+        utterance.lang = 'bn-BD'; // Set language to Bengali (modify if needed)
+        window.speechSynthesis.speak(utterance);
+      }
+
       // Example: Using browser's native notification if app is in foreground
-      new Notification(payload.notification.title || 'New Notification', {
-        body: payload.notification.body,
+      new Notification(title, {
+        body: body,
         icon: '/icon.png',
         image: imageUrl || undefined
       } as NotificationOptions);

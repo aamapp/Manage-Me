@@ -53,7 +53,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   const [processingMessage, setProcessingMessage] = useState(
     "কন্টেন্ট তৈরি হচ্ছে...",
   ); // Dynamic message
-  const [isNavigating, setIsNavigating] = useState(false);
   const [activeExpenseTab, setActiveExpenseTab] = useState<string>("expenses");
 
   useEffect(() => {
@@ -114,14 +113,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
       return;
     }
 
-    setIsNavigating(true);
-    setTimeout(() => {
-      navigate(path);
-    }, 100);
+    navigate(path);
   };
 
   useEffect(() => {
-    setIsNavigating(false);
     setIsReportPreviewOpen(false);
   }, [location.pathname, location.search]);
 
@@ -245,10 +240,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
       return;
     }
 
-    setIsNavigating(true);
-    setTimeout(() => {
-      navigate(path);
-    }, 100);
+    navigate(path);
   };
 
   const handleBackToUsers = () => {
@@ -291,7 +283,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   const onTouchEndHandler = () => {
     if (!touchStart || !touchEnd) return;
 
-    if (isMoreMenuOpen || isAboutOpen || isProcessing || isNavigating) return;
+    if (isMoreMenuOpen || isAboutOpen || isProcessing) return;
 
     const dx = touchStart.x - touchEnd.x;
     const dy = touchStart.y - touchEnd.y;
@@ -1054,26 +1046,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                 </p>
                 <p className="text-slate-400 text-sm">দয়া করে অপেক্ষা করুন</p>
               </div>
-            </div>
-          </div>,
-          document.body,
-        )}
-
-      {/* Page Transition Loading Overlay - Beautiful Centered Rotating Logo as Requested */}
-      {isNavigating &&
-        !isProcessing &&
-        createPortal(
-          <div className={`fixed ${!isFullScreenPage ? "top-14 lg:top-0" : "top-0"} left-0 lg:left-72 right-0 bottom-0 z-30 bg-gradient-to-tr from-indigo-50/95 via-white/98 to-violet-50/95 backdrop-blur-[8px] flex flex-col items-center justify-center select-none pointer-events-none animate-in fade-in duration-75`}>
-            <div className="flex flex-col items-center justify-center gap-4 transform scale-75">
-              <div className="premium-loader-container !w-20 !h-20 p-4.5">
-                <div className="premium-loader-ring"></div>
-                <div className="premium-loader-text w-full h-full flex items-center justify-center">
-                  <AppLogo variant="transparent-color" size="100%" />
-                </div>
-              </div>
-              <p className="text-indigo-600 font-bold tracking-widest text-lg md:text-xl animate-pulse" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
-                লোড হচ্ছে...
-              </p>
             </div>
           </div>,
           document.body,
