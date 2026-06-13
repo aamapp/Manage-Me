@@ -6,9 +6,10 @@ interface TimePickerProps {
   value: string;
   onChange: (val: string) => void;
   placeholder?: string;
+  className?: string;
 }
 
-export const TimePicker: React.FC<TimePickerProps> = ({ value, onChange, placeholder }) => {
+export const TimePicker: React.FC<TimePickerProps> = ({ value, onChange, placeholder, className }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [selectMode, setSelectMode] = useState<'hours' | 'minutes'>('hours');
   
@@ -233,11 +234,11 @@ export const TimePicker: React.FC<TimePickerProps> = ({ value, onChange, placeho
     <div className="relative w-full">
       <div 
         onClick={openPicker}
-        className={`w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 hover:bg-slate-100 rounded-xl font-bold text-xs text-slate-800 outline-none flex items-center justify-start gap-2 cursor-pointer transition-all ${isOpen ? 'ring-1 ring-indigo-500 border-indigo-500' : ''}`}
+        className={className || `w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 hover:bg-slate-100 rounded-xl font-bold text-xs text-slate-800 outline-none flex items-center justify-start gap-2 cursor-pointer transition-all ${isOpen ? 'ring-1 ring-indigo-500 border-indigo-500' : ''}`}
         style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
       >
-        <Clock size={16} strokeWidth={2} className="text-slate-400 shrink-0" />
-        <span className="truncate">
+        <Clock size={16} strokeWidth={2.5} className={className ? "text-[#1a73e8] shrink-0" : "text-slate-400 shrink-0"} />
+        <span className={`truncate ${className ? 'text-[#1a73e8]' : ''}`}>
           {value ? toBnDigits(getDisplayValue()) : placeholder || ''}
         </span>
       </div>
