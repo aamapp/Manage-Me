@@ -117,7 +117,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   };
 
   useEffect(() => {
-    setIsReportPreviewOpen(false);
+    // Relying on `reports:preview` event to manage report preview state.
+    // Removing the explicit reset on location change to prevent race conditions 
+    // where parent's effect runs after child's effect and overwrites its `true` state.
   }, [location.pathname, location.search]);
 
   useEffect(() => {

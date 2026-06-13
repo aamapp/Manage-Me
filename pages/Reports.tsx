@@ -382,10 +382,14 @@ export const Reports: React.FC = () => {
   }, [pdfAdminName, pdfContactPhone, pdfContactEmail, pdfContactLocation]);
 
   useEffect(() => {
-    window.dispatchEvent(new CustomEvent('reports:preview', {
-      detail: { active: viewState === 'preview' }
-    }));
+    const timer = setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('reports:preview', {
+        detail: { active: viewState === 'preview' }
+      }));
+    }, 50);
+
     return () => {
+      clearTimeout(timer);
       window.dispatchEvent(new CustomEvent('reports:preview', {
         detail: { active: false }
       }));
