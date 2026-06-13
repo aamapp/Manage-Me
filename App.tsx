@@ -212,16 +212,7 @@ const AppContent: React.FC = () => {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center">
-        <div className="animate-[spin_0.5s_linear_infinite]">
-          <AppLogo variant="transparent-color" size="80px" />
-        </div>
-        <p className="mt-6 text-slate-500 font-medium font-sans animate-pulse">
-          একটু অপেক্ষা করুন...
-        </p>
-      </div>
-    );
+    return <div className="min-h-screen bg-slate-50"></div>;
   }
 
   if (isAppLocked && (appPin || isFingerprintEnabled)) {

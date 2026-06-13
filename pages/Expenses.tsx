@@ -2506,7 +2506,8 @@ export const Expenses: React.FC = () => {
                                       </button>
 
                                       {activeMenuId === tx.id && (
-                                        <div className="absolute right-0 top-full mt-1.5 w-32 bg-white rounded-xl shadow-xl border border-slate-100 z-20 flex flex-col py-1 animate-in fade-in zoom-in-95 duration-150 origin-top-right">
+                                        <div className="absolute right-0 top-full mt-2 w-32 bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-100 z-30 flex flex-col py-2 animate-in fade-in zoom-in-95 duration-150 origin-top-right">
+                                          <div className="absolute -top-1.5 right-3 w-3 h-3 bg-white border-t border-l border-slate-100 transform rotate-45"></div>
                                           <button
                                             onClick={(e) => {
                                               e.stopPropagation();
@@ -2520,14 +2521,20 @@ export const Expenses: React.FC = () => {
                                               handleOpenEditUnified(tx);
                                             }}
                                             disabled={!isOnline}
-                                            className="w-full px-3 py-2.5 text-left text-xs font-bold flex items-center gap-2 border-b border-slate-50/50 hover:bg-slate-50 text-slate-700"
+                                            className="w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 hover:bg-slate-50 text-slate-800 transition-colors bg-transparent relative z-10 rounded-t-[22px]"
+                                            style={{
+                                              fontFamily:
+                                                "'Kohinoor Bangla', sans-serif",
+                                            }}
                                           >
-                                            <Pencil
-                                              size={13}
-                                              className="text-slate-500"
-                                            />{" "}
+                                            <SquarePen
+                                              size={20}
+                                              className="text-slate-800"
+                                              strokeWidth={1.5}
+                                            />
                                             এডিট
                                           </button>
+                                          <div className="h-[1px] bg-slate-50 w-[85%] mx-auto relative z-10"></div>
                                           <button
                                             onClick={(e) => {
                                               e.stopPropagation();
@@ -2541,12 +2548,17 @@ export const Expenses: React.FC = () => {
                                               initiateDeleteUnified(tx);
                                             }}
                                             disabled={!isOnline}
-                                            className="w-full px-3 py-2.5 text-left text-xs font-bold flex items-center gap-2 hover:bg-rose-50/50 text-rose-500"
+                                            className="w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 hover:bg-rose-50/50 text-rose-500 transition-colors bg-transparent relative z-10 rounded-b-[22px]"
+                                            style={{
+                                              fontFamily:
+                                                "'Kohinoor Bangla', sans-serif",
+                                            }}
                                           >
                                             <Trash2
-                                              size={13}
+                                              size={20}
                                               className="text-rose-500"
-                                            />{" "}
+                                              strokeWidth={1.5}
+                                            />
                                             ডিলিট
                                           </button>
                                         </div>
@@ -4436,10 +4448,12 @@ const DuesManager: React.FC<DuesManagerProps> = ({
                     return (
                       <div
                         key={t.id}
-                        className="relative grid grid-cols-[1.8fr_1fr_1fr] border border-slate-100 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all bg-white"
+                        className={`relative grid grid-cols-[1.8fr_1fr_1fr] border border-slate-100 rounded-xl shadow-sm hover:shadow-md transition-all bg-white ${
+                          activeTxMenuId === t.id ? "z-30" : "z-10"
+                        }`}
                       >
                         {/* Column 1: Transaction details, localized date with running balance pill */}
-                        <div className="p-3 pl-3.5 flex flex-col text-left justify-center min-w-0 pr-8 relative">
+                        <div className="p-3 pl-3.5 flex flex-col text-left justify-center min-w-0 pr-8 relative rounded-l-xl">
                           <span className="font-semibold text-slate-800 text-[13px] leading-snug break-words">
                             {t.description ||
                               (t.type === "receive" ? "পেলাম" : "দিলাম")}
@@ -4470,21 +4484,26 @@ const DuesManager: React.FC<DuesManagerProps> = ({
                             </button>
 
                             {activeTxMenuId === t.id && (
-                              <div className="absolute right-0 top-full mt-1 w-28 bg-white rounded-xl shadow-xl border border-slate-100 z-50 flex flex-col py-0.5 animate-in fade-in zoom-in-95 duration-150 origin-top-right overflow-hidden">
+                              <div className="absolute right-0 top-full mt-2 w-32 bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-100 z-[60] flex flex-col py-2 animate-in fade-in zoom-in-95 duration-150 origin-top-right">
+                                <div className="absolute -top-1.5 right-3 w-3 h-3 bg-white border-t border-l border-slate-100 transform rotate-45"></div>
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleOpenEditTransaction(t);
                                   }}
-                                  className="w-full px-3 py-2 text-left text-xs font-bold flex items-center gap-2 text-slate-700 hover:bg-slate-50 transition-all"
+                                  className="w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 text-slate-800 hover:bg-slate-50 transition-colors bg-transparent relative z-10 rounded-t-[22px]"
+                                  style={{
+                                    fontFamily: "'Kohinoor Bangla', sans-serif",
+                                  }}
                                 >
-                                  <Pencil
-                                    size={12}
-                                    className="text-slate-500"
-                                  />{" "}
+                                  <SquarePen
+                                    size={20}
+                                    className="text-slate-800"
+                                    strokeWidth={1.5}
+                                  />
                                   এডিট
                                 </button>
-                                <div className="h-px bg-slate-50 w-full"></div>
+                                <div className="h-[1px] bg-slate-50 w-[85%] mx-auto relative z-10"></div>
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -4492,9 +4511,16 @@ const DuesManager: React.FC<DuesManagerProps> = ({
                                     setShowTxDeleteModal(true);
                                     setActiveTxMenuId(null);
                                   }}
-                                  className="w-full px-3 py-2 text-left text-xs font-bold flex items-center gap-2 text-rose-500 hover:bg-rose-50 transition-all"
+                                  className="w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 text-rose-500 hover:bg-rose-50 transition-colors bg-transparent relative z-10 rounded-b-[22px]"
+                                  style={{
+                                    fontFamily: "'Kohinoor Bangla', sans-serif",
+                                  }}
                                 >
-                                  <Trash2 size={12} className="text-rose-500" />{" "}
+                                  <Trash2
+                                    size={20}
+                                    className="text-rose-500"
+                                    strokeWidth={1.5}
+                                  />
                                   ডিলিট
                                 </button>
                               </div>
@@ -4510,7 +4536,7 @@ const DuesManager: React.FC<DuesManagerProps> = ({
                         </div>
 
                         {/* Column 3: পেলাম (Received Amount) Row block */}
-                        <div className="bg-[#f0fdf4]/20 text-center flex items-center justify-center font-bold text-[13.5px] text-[#2f855a]">
+                        <div className="bg-[#f0fdf4]/20 text-center flex items-center justify-center font-bold text-[13.5px] text-[#2f855a] rounded-r-xl">
                           {t.type === "receive"
                             ? toBanglaNumbers(t.amount.toLocaleString("en-IN"))
                             : ""}
@@ -4987,18 +5013,24 @@ const DuesManager: React.FC<DuesManagerProps> = ({
                 </button>
 
                 {personActiveMenuId === person.id && (
-                  <div className="absolute right-0 top-full mt-1 w-32 bg-white rounded-xl shadow-xl border border-slate-100 z-[100] flex flex-col py-1 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
+                  <div className="absolute right-0 top-full mt-2 w-32 bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-100 z-[100] flex flex-col py-2 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
+                    <div className="absolute -top-1.5 right-3 w-3 h-3 bg-white border-t border-l border-slate-100 transform rotate-45"></div>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         handleOpenEditPerson(person);
                       }}
-                      className="w-full px-4 py-3 text-left text-sm font-bold flex items-center gap-3 text-slate-700 hover:bg-slate-50 transition-colors"
+                      className="w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 text-slate-800 hover:bg-slate-50 transition-colors bg-transparent relative z-10 rounded-t-[22px]"
                       style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
                     >
-                      <SquarePen size={18} className="text-slate-500" /> এডিট
+                      <SquarePen
+                        size={20}
+                        className="text-slate-800"
+                        strokeWidth={1.5}
+                      />
+                      এডিট
                     </button>
-                    <div className="h-px bg-slate-50 w-full"></div>
+                    <div className="h-[1px] bg-slate-50 w-[85%] mx-auto relative z-10"></div>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -5006,10 +5038,15 @@ const DuesManager: React.FC<DuesManagerProps> = ({
                         setShowPersonDeleteModal(true);
                         setPersonActiveMenuId(null);
                       }}
-                      className="w-full px-4 py-3 text-left text-sm font-bold flex items-center gap-3 text-rose-500 hover:bg-rose-50 transition-colors"
+                      className="w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 text-rose-500 hover:bg-rose-50 transition-colors bg-transparent relative z-10 rounded-b-[22px]"
                       style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
                     >
-                      <Trash2 size={18} className="text-rose-500" /> ডিলিট
+                      <Trash2
+                        size={20}
+                        className="text-rose-500"
+                        strokeWidth={1.5}
+                      />
+                      ডিলিট
                     </button>
                   </div>
                 )}

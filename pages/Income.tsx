@@ -1041,7 +1041,8 @@ export const Income: React.FC = () => {
                           </button>
 
                           {activeMenuId === payment.id && (
-                            <div className="absolute right-0 top-full mt-1 w-36 bg-white rounded-xl shadow-xl border border-slate-100 z-20 flex flex-col py-1.5 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
+                            <div className="absolute right-0 top-full mt-2 w-32 bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-100 z-[60] flex flex-col py-2 animate-in fade-in zoom-in-95 duration-150 origin-top-right">
+                              <div className="absolute -top-1.5 right-3 w-3 h-3 bg-white border-t border-l border-slate-100 transform rotate-45"></div>
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1055,24 +1056,25 @@ export const Income: React.FC = () => {
                                   handleOpenEditModal(payment);
                                 }}
                                 disabled={!isOnline}
-                                className={`w-full px-4 py-3 text-left text-sm font-bold flex items-center gap-3 transition-colors
-                                        ${!isOnline ? "text-slate-300 cursor-not-allowed" : "text-slate-700 hover:bg-slate-50"}
+                                className={`w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 transition-colors bg-transparent relative z-10 rounded-t-[22px]
+                                        ${!isOnline ? "text-slate-300 cursor-not-allowed" : "text-slate-800 hover:bg-slate-50"}
                                       `}
                                 style={{
                                   fontFamily: "'Kohinoor Bangla', sans-serif",
                                 }}
                               >
                                 <SquarePen
-                                  size={18}
+                                  size={20}
+                                  strokeWidth={1.5}
                                   className={
                                     !isOnline
                                       ? "text-slate-300"
-                                      : "text-slate-500"
+                                      : "text-slate-800"
                                   }
-                                />{" "}
+                                />
                                 এডিট
                               </button>
-                              <div className="h-px bg-slate-50 w-full"></div>
+                              <div className="h-[1px] bg-slate-50 w-[85%] mx-auto relative z-10"></div>
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1086,7 +1088,7 @@ export const Income: React.FC = () => {
                                   initiateDelete(payment.id, payment);
                                 }}
                                 disabled={!isOnline}
-                                className={`w-full px-4 py-3 text-left text-sm font-bold flex items-center gap-3 transition-colors
+                                className={`w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 transition-colors bg-transparent relative z-10 rounded-b-[22px]
                                         ${!isOnline ? "text-slate-300 cursor-not-allowed" : "text-rose-500 hover:bg-rose-50"}
                                       `}
                                 style={{
@@ -1094,13 +1096,14 @@ export const Income: React.FC = () => {
                                 }}
                               >
                                 <Trash2
-                                  size={18}
+                                  size={20}
+                                  strokeWidth={1.5}
                                   className={
                                     !isOnline
                                       ? "text-slate-300"
                                       : "text-rose-500"
                                   }
-                                />{" "}
+                                />
                                 ডিলিট
                               </button>
                             </div>
