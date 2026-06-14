@@ -45,6 +45,7 @@ export interface IncomeRecord {
   date: string;
   method: string;
   userid: string;
+  createdat?: string;
 }
 
 export interface User {
