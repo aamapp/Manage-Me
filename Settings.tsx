@@ -1,6 +1,8 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { User as UserIcon, Bell, Shield, Palette, Globe, Save, CheckCircle2, Loader2, Camera, UploadCloud, AlertCircle, Lock, Key, Trash2, Fingerprint } from 'lucide-react';
+import { User as UserIcon, Bell, Shield, Palette, Globe, Save, CheckCircle2, Loader2, Camera, UploadCloud, AlertCircle, Lock, Key, Trash2, Fingerprint, Download, Image as ImageIcon, Check } from 'lucide-react';
+import html2canvas from 'html2canvas';
+import { AppLogo } from '@/components/AppLogo';
 import { APP_NAME } from '../constants';
 import { useAppContext } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
@@ -30,6 +32,39 @@ export const Settings: React.FC = () => {
   const [showClearCacheModal, setShowClearCacheModal] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Logo Download States
+  const [isCapturingLogo, setIsCapturingLogo] = useState(false);
+  const [isLogoDownloadDone, setIsLogoDownloadDone] = useState(false);
+  const logoRef = useRef<HTMLDivElement>(null);
+
+  const downloadLogoHD = async () => {
+    if (!logoRef.current) return;
+    setIsCapturingLogo(true);
+    try {
+      const canvas = await html2canvas(logoRef.current, {
+        width: 1024,
+        height: 1024,
+        scale: 1,
+        backgroundColor: null,
+        logging: false,
+        useCORS: true
+      });
+      const image = canvas.toDataURL("image/png");
+      const link = document.createElement('a');
+      link.href = image;
+      link.download = "icon.png";
+      link.click();
+      setIsLogoDownloadDone(true);
+      showToast('এইচডি লোগো ডাউনলোড সম্পূর্ণ হয়েছে!', 'success');
+      setTimeout(() => setIsLogoDownloadDone(false), 3000);
+    } catch (err) {
+      console.error('Export logo failed:', err);
+      showToast('লোগো ডাউনলোড করতে সমস্যা হয়েছে।', 'error');
+    } finally {
+      setIsCapturingLogo(false);
+    }
+  };
 
   // Sync form data if user updates externally
   useEffect(() => {
@@ -420,6 +455,68 @@ export const Settings: React.FC = () => {
                         {isChangingPass ? <Loader2 size={16} className="animate-spin" /> : 'আপডেট'}
                     </button>
                 </div>
+             </div>
+
+             {/* Logo Download Utility */}
+             <div className="pt-6 mt-6 border-t border-slate-100">
+               <h4 className="font-bold text-slate-800 mb-4 flex items-center gap-2 text-sm">
+                 <ImageIcon size={16} className="text-indigo-600" />
+                 ব্র্যান্ডিং এবং লোগো ডাউনলোড
+               </h4>
+               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                 <div className="flex items-center gap-3">
+                   {/* Mini Logo Preview */}
+                   <div className="w-12 h-12 bg-[#06153a] rounded-xl flex items-center justify-center border-2 border-white shadow-md overflow-hidden shrink-0">
+                     <AppLogo variant="navy-striped" size="100%" />
+                   </div>
+                   <div>
+                     <p className="font-bold text-slate-800 text-sm">অ্যাপ লোগো (HD PNG)</p>
+                     <p className="text-xs text-slate-500">১০২৪x১০২৪ সাইজের এইচডি ফরম্যাটে অ্যান্ড্রয়েড স্টুডিওর জন্য ডাউনলোড করুন।</p>
+                   </div>
+                 </div>
+                 <button 
+                    onClick={downloadLogoHD}
+                    disabled={isCapturingLogo}
+                    className={`px-4 py-2.5 rounded-lg font-bold text-sm text-white flex items-center gap-2 transition-colors whitespace-nowrap leading-none
+                      ${isLogoDownloadDone ? 'bg-green-600' : 'bg-indigo-600 hover:bg-indigo-700'}
+                    `}
+                 >
+                    {isCapturingLogo ? (
+                      <>
+                        <Loader2 className="animate-spin" size={16} />
+                        <span>প্রসেসিং...</span>
+                      </>
+                    ) : isLogoDownloadDone ? (
+                      <>
+                        <Check size={16} />
+                        <span>ডাউনলোড হয়েছে!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Download size={16} />
+                        <span>লোগো ডাউনলোড করুন</span>
+                      </>
+                    )}
+                 </button>
+               </div>
+               
+               {/* Behind the scenes 1024x1024 pixel clean layout for crisp image extraction */}
+               <div className="absolute top-0 left-0 -z-50 pointer-events-none opacity-0 select-none overflow-hidden" style={{ width: '1024px', height: '1024px', overflow: 'hidden' }}>
+                 <div 
+                   ref={logoRef}
+                   style={{ 
+                     width: '1024px', 
+                     height: '1024px', 
+                     backgroundColor: '#06153a', 
+                     display: 'flex', 
+                     alignItems: 'center', 
+                     justifyContent: 'center',
+                     overflow: 'hidden'
+                   }}
+                 >
+                   <AppLogo variant="navy-striped" size="100%" rounded={false} />
+                 </div>
+               </div>
              </div>
 
              {/* Clear Cache Utility */}

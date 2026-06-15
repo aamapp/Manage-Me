@@ -69,7 +69,7 @@ export const IconGenerator: React.FC = () => {
                 style={{ 
                   width: '1024px', 
                   height: '1024px', 
-                  backgroundColor: '#6366f1', 
+                  backgroundColor: '#4f46e5', 
                   borderRadius: '22%', 
                   display: 'flex', 
                   alignItems: 'center', 
@@ -77,16 +77,15 @@ export const IconGenerator: React.FC = () => {
                   position: 'absolute',
                   left: '-9999px',
                   top: '0',
-                  overflow: 'hidden',
-                  padding: '160px'
+                  overflow: 'hidden'
                 }}
               >
-                <AppLogo variant="white" size="100%" />
+                <AppLogo variant="color" size="100%" />
               </div>
 
               {/* Preview Version */}
-              <div className="w-64 h-64 bg-[#6366f1] rounded-[22%] shadow-2xl flex items-center justify-center p-11 border-4 border-white overflow-hidden">
-                <AppLogo variant="white" size="100%" />
+              <div className="w-64 h-64 bg-[#4f46e5] rounded-[22%] shadow-2xl flex items-center justify-center border-4 border-white overflow-hidden">
+                <AppLogo variant="color" size="100%" />
               </div>
             </div>
 

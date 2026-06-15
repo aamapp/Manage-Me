@@ -30,7 +30,8 @@ export const Dashboard: React.FC = () => {
   }, []);
 
   // Calculate Stats
-  const totalCollected = incomeRecords.reduce((acc, curr) => acc + (curr.amount || 0), 0);
+  const projectIncomes = useMemo(() => incomeRecords.filter(r => r.projectid), [incomeRecords]);
+  const totalCollected = projectIncomes.reduce((acc, curr) => acc + (curr.amount || 0), 0);
   const totalBudget = projects.reduce((acc, curr) => acc + (curr.totalamount || 0), 0);
   const totalDue = projects.reduce((acc, curr) => acc + (curr.dueamount || 0), 0);
   const totalProjects = projects.length;
@@ -52,7 +53,7 @@ export const Dashboard: React.FC = () => {
         targetYear -= 1;
       }
 
-      const monthlySum = incomeRecords.filter(record => {
+      const monthlySum = projectIncomes.filter(record => {
         if (!record.date) return false;
         // Parse "YYYY-MM-DD" directly to avoid timezone issues with new Date()
         const [yearStr, monthStr] = record.date.split('-');
