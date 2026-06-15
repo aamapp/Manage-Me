@@ -11,6 +11,7 @@ import { Toast } from "@/components/Toast";
 import { AppLock } from "@/components/AppLock";
 import { ScrollToTop } from "@/components/ScrollToTop";
 import { AppLogo } from "@/components/AppLogo";
+import { AppUpdateChecker } from "@/components/AppUpdateChecker";
 import { AppProvider, useAppContext } from "@/context/AppContext";
 import { supabase, isConfigured } from "@/lib/supabase";
 import {
@@ -229,6 +230,7 @@ const AppContent: React.FC = () => {
     <HashRouter>
       <ScrollToTop />
       <AuthListener />
+      <AppUpdateChecker />
       {toast && (
         <Toast message={toast.message} type={toast.type} onClose={hideToast} />
       )}
