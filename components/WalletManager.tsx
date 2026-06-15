@@ -39,7 +39,17 @@ const parseExpenseNotes = (fullNotes: string): { notes: string; wallet: string }
 };
 
 export const WalletManager: React.FC = () => {
-  const { user, showToast, refreshData, expenses, incomeRecords, duePersons } = useAppContext();
+  const { 
+    user, 
+    showToast, 
+    refreshData, 
+    expenses, 
+    setExpenses,
+    incomeRecords, 
+    setIncomeRecords,
+    duePersons, 
+    setDuePersons 
+  } = useAppContext();
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [isDbAvailable, setIsDbAvailable] = useState<boolean>(true);
@@ -493,11 +503,15 @@ export const WalletManager: React.FC = () => {
 
     if (editingWallet) {
       // Editing Mode: Only name is updated
+      const oldName = editingWallet.name.trim();
+      const newName = formData.name.trim();
+      const isNameChanged = oldName !== newName;
+
       updated = wallets.map(w => {
         if (w.id === editingWallet.id) {
           return {
             ...w,
-            name: formData.name.trim(),
+            name: newName,
             // Maintain balance
             balance: amount,
             lastTransactionDate: 'আজ, ' + new Date().toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -505,6 +519,96 @@ export const WalletManager: React.FC = () => {
         }
         return w;
       });
+
+      if (isNameChanged) {
+        // 1. Update related income records
+        try {
+          if (isDbAvailable) {
+            const { error: incErr } = await supabase
+              .from('income_records')
+              .update({ method: newName })
+              .eq('userid', user.id)
+              .eq('method', oldName);
+            if (incErr) console.error("Database income records update failed:", incErr);
+          }
+
+          // Update local state for income records
+          if (incomeRecords) {
+            setIncomeRecords(prev => prev.map(rec => {
+              if (rec.method?.trim() === oldName) {
+                return { ...rec, method: newName };
+              }
+              return rec;
+            }));
+          }
+        } catch (e) {
+          console.error("Local/DB Income update error:", e);
+        }
+
+        // 2. Update related expense records (matching suffix: [ওয়ালেট: oldName])
+        try {
+          if (expenses) {
+            const updatedExpenses = expenses.map(exp => {
+              const parsed = parseExpenseNotes(exp.notes);
+              if (parsed.wallet.trim() === oldName) {
+                const plainNotes = parsed.notes;
+                const newNotes = `${plainNotes} [ওয়ালেট: ${newName}]`.trim();
+                return { ...exp, notes: newNotes };
+              }
+              return exp;
+            });
+
+            const modifiedExpenses = updatedExpenses.filter((exp, idx) => exp.notes !== expenses[idx].notes);
+            if (modifiedExpenses.length > 0 && isDbAvailable) {
+              const { error: expUpdErr } = await supabase
+                .from('expenses')
+                .upsert(modifiedExpenses);
+              if (expUpdErr) console.error("Database expenses update failed:", expUpdErr);
+            }
+
+            setExpenses(updatedExpenses);
+          }
+        } catch (e) {
+          console.error("Local/DB Expense update error:", e);
+        }
+
+        // 3. Update related due person transactions (transactions list nested walletName field)
+        try {
+          if (duePersons) {
+            const updatedDuePersons = duePersons.map(person => {
+              let hasChanged = false;
+              const updatedTx = person.transactions?.map(tx => {
+                if (tx.walletName?.trim() === oldName) {
+                  hasChanged = true;
+                  return { ...tx, walletName: newName };
+                }
+                return tx;
+              });
+              if (hasChanged) {
+                return { ...person, transactions: updatedTx };
+              }
+              return person;
+            });
+
+            const modifiedDuePersons = updatedDuePersons.filter((dp, idx) => dp !== duePersons[idx]);
+            if (modifiedDuePersons.length > 0 && isDbAvailable) {
+              for (const dp of modifiedDuePersons) {
+                const { error: dpUpdErr } = await supabase
+                  .from('due_persons')
+                  .update({ transactions: dp.transactions })
+                  .eq('id', dp.id)
+                  .eq('userid', user.id);
+                if (dpUpdErr) console.error(`Database due person ${dp.id} update failed:`, dpUpdErr);
+              }
+            }
+
+            setDuePersons(updatedDuePersons);
+          }
+        } catch (e) {
+          console.error("Local/DB Due persons update error:", e);
+        }
+      }
+
       showToast('ওয়ালেটের নাম সফলভাবে পরিবর্তন করা হয়েছে।', 'success');
     } else {
       // Add Mode: Balance is initialized to 0

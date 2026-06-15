@@ -66,6 +66,7 @@ export const Income: React.FC = () => {
   // Use incomeRecords directly from context (cached data)
   const {
     projects,
+    setProjects,
     incomeRecords,
     setIncomeRecords,
     user,
@@ -242,6 +243,18 @@ export const Income: React.FC = () => {
             dueamount: targetProj.totalamount - newPaid,
           })
           .eq("id", targetProj.id);
+
+        setProjects((prev) =>
+          prev.map((p) =>
+            p.id === projectId
+              ? {
+                  ...p,
+                  paidamount: newPaid,
+                  dueamount: targetProj.totalamount - newPaid,
+                }
+              : p,
+          ),
+        );
       }
 
       setIncomeRecords((prev: any[]) =>
@@ -383,6 +396,21 @@ export const Income: React.FC = () => {
 
         if (updErr) throw updErr;
 
+        // Optimistically update incomeRecords locally
+        setIncomeRecords((prev) =>
+          prev.map((rec) =>
+            rec.id === activePaymentId
+              ? {
+                  ...rec,
+                  amount,
+                  date: dateToSave,
+                  createdat: dateToSave,
+                  method: newPayment.method,
+                }
+              : rec,
+          ),
+        );
+
         if (selectedProject) {
           const newPaid = selectedProject.paidamount + delta;
           await supabase
@@ -392,6 +420,19 @@ export const Income: React.FC = () => {
               dueamount: Math.max(0, selectedProject.totalamount - newPaid),
             })
             .eq("id", selectedProjectId);
+
+          // Optimistically update projects locally
+          setProjects((prev) =>
+            prev.map((p) =>
+              p.id === selectedProjectId
+                ? {
+                    ...p,
+                    paidamount: newPaid,
+                    dueamount: Math.max(0, p.totalamount - newPaid),
+                  }
+                : p,
+            ),
+          );
         }
         showToast("রেকর্ড আপডেট করা হয়েছে", "success");
       } else {
@@ -404,18 +445,38 @@ export const Income: React.FC = () => {
           : currentTimeNow;
         let dateToSave = new Date(`${baseDateStr}T${tTime}`).toISOString();
 
-        const { error: insErr } = await supabase.from("income_records").insert({
-          projectid: selectedProjectId,
-          projectname: selectedProject?.name,
-          clientname: selectedProject?.clientname,
-          amount,
-          date: dateToSave,
-          createdat: dateToSave,
-          method: newPayment.method,
-          userid: targetUserId,
-        });
+        const { data: insertedRecords, error: insErr } = await supabase
+          .from("income_records")
+          .insert({
+            projectid: selectedProjectId,
+            projectname: selectedProject?.name,
+            clientname: selectedProject?.clientname,
+            amount,
+            date: dateToSave,
+            createdat: dateToSave,
+            method: newPayment.method,
+            userid: targetUserId,
+          })
+          .select("*");
 
         if (insErr) throw insErr;
+
+        const insertedRecord = (insertedRecords && insertedRecords[0])
+          ? insertedRecords[0]
+          : {
+              id: Math.random().toString(36).substring(7),
+              projectid: selectedProjectId,
+              projectname: selectedProject?.name || newPayment.projectName,
+              clientname: selectedProject?.clientname || newPayment.clientName,
+              amount,
+              date: dateToSave,
+              createdat: dateToSave,
+              method: newPayment.method,
+              userid: targetUserId,
+            };
+
+        // Optimistically append the newly inserted record right away
+        setIncomeRecords((prev) => [insertedRecord, ...prev]);
 
         if (selectedProject) {
           const newPaid = selectedProject.paidamount + amount;
@@ -426,6 +487,19 @@ export const Income: React.FC = () => {
               dueamount: Math.max(0, selectedProject.totalamount - newPaid),
             })
             .eq("id", selectedProjectId);
+
+          // Optimistically update projects locally
+          setProjects((prev) =>
+            prev.map((p) =>
+              p.id === selectedProjectId
+                ? {
+                    ...p,
+                    paidamount: newPaid,
+                    dueamount: Math.max(0, p.totalamount - newPaid),
+                  }
+                : p,
+            ),
+          );
         }
         showToast("নতুন পেমেন্ট রেকর্ড করা হয়েছে", "success");
       }
