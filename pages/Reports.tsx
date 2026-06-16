@@ -1715,7 +1715,53 @@ export const Reports: React.FC = () => {
                 </div>
 
                 {/* Charts Area */}
-                {!isMounted ? null : !hasData ? (
+                {!isMounted ? (
+                  <div className="space-y-4 animate-pulse select-none">
+                    {/* Income Chart Skeleton */}
+                    <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="w-1.5 h-4 bg-slate-200 rounded-full"></div>
+                        <div className="w-40 h-4 bg-slate-200 rounded"></div>
+                      </div>
+                      <div className="h-48 w-full bg-slate-50/50 rounded-xl flex items-end justify-between p-4 gap-2 border border-slate-50">
+                        <div className="w-[12%] bg-slate-200 rounded-t-md h-[40%]"></div>
+                        <div className="w-[12%] bg-slate-200 rounded-t-md h-[70%]"></div>
+                        <div className="w-[12%] bg-slate-100 rounded-t-md h-[55%]"></div>
+                        <div className="w-[12%] bg-slate-200 rounded-t-md h-[80%]"></div>
+                        <div className="w-[12%] bg-slate-200 rounded-t-md h-[30%]"></div>
+                        <div className="w-[12%] bg-slate-100 rounded-t-md h-[60%]"></div>
+                        <div className="w-[12%] bg-slate-200 rounded-t-md h-[45%]"></div>
+                      </div>
+                    </div>
+
+                    {/* Stats & Pie Chart Block Skeleton */}
+                    <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="w-1.5 h-4 bg-slate-200 rounded-full"></div>
+                        <div className="w-40 h-4 bg-slate-200 rounded"></div>
+                      </div>
+
+                      <div className="flex flex-col md:flex-row items-center gap-6">
+                        {/* Chart Skeleton */}
+                        <div className="h-56 w-full md:w-1/2 flex items-center justify-center">
+                          <div className="w-36 h-36 rounded-full border-[16px] border-slate-100/80 animate-pulse"></div>
+                        </div>
+
+                        {/* Stats Text Skeleton */}
+                        <div className="w-full md:w-1/2 flex flex-col gap-3">
+                          <div className="h-16 bg-slate-50 rounded-xl border border-slate-100/50 p-3 flex justify-between items-center">
+                            <div className="w-24 h-4 bg-slate-200 rounded"></div>
+                            <div className="w-12 h-6 bg-slate-200 rounded"></div>
+                          </div>
+                          <div className="h-16 bg-slate-50 rounded-xl border border-slate-100/50 p-3 flex justify-between items-center">
+                            <div className="w-24 h-4 bg-slate-200 rounded"></div>
+                            <div className="w-12 h-6 bg-slate-200 rounded"></div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : !hasData ? (
                   <div className="p-12 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
                     <Hexagon size={32} className="mx-auto mb-2 opacity-20" />
                     <p className="text-xs font-medium">কোনো ডাটা পাওয়া যায়নি</p>

@@ -34,6 +34,8 @@ export interface Expense {
   date: string;
   notes: string;
   userid: string;
+  createdat?: string;
+  created_at?: string;
 }
 
 export interface IncomeRecord {
@@ -46,6 +48,7 @@ export interface IncomeRecord {
   method: string;
   userid: string;
   createdat?: string;
+  created_at?: string;
 }
 
 export interface User {
@@ -107,6 +110,8 @@ export interface DueTransaction {
   date: string;
   time?: string;
   walletName?: string;
+  createdat?: string;
+  created_at?: string;
 }
 
 export interface DuePerson {

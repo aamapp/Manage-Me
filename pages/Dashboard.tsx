@@ -239,7 +239,18 @@ export const Dashboard: React.FC = () => {
           </div>
           
           <div className="h-32 w-full -ml-2 lg:h-40 z-10 focus:outline-none [&_*]:outline-none">
-            {!isMounted ? null : !hasChartData ? (
+            {!isMounted ? (
+              <div className="h-full w-full flex items-end justify-between p-2 animate-pulse ml-2">
+                <div className="w-[10%] bg-slate-100 rounded-t h-[20%]"></div>
+                <div className="w-[10%] bg-slate-100/80 rounded-t h-[45%]"></div>
+                <div className="w-[10%] bg-slate-100/60 rounded-t h-[30%]"></div>
+                <div className="w-[10%] bg-slate-100/80 rounded-t h-[60%]"></div>
+                <div className="w-[10%] bg-slate-100/60 rounded-t h-[40%]"></div>
+                <div className="w-[10%] bg-slate-100/80 rounded-t h-[75%]"></div>
+                <div className="w-[10%] bg-slate-100/60 rounded-t h-[50%]"></div>
+                <div className="w-[10%] bg-slate-100/80 rounded-t h-[90%]"></div>
+              </div>
+            ) : !hasChartData ? (
               <div className="h-full w-full flex flex-col items-center justify-center text-slate-300 gap-3 border-2 border-dashed border-slate-100 rounded-2xl ml-2">
                 <Wallet size={32} className="opacity-50" />
                 <p className="text-xs text-center px-4 font-medium">পেমেন্ট রেকর্ড থাকলে চার্ট দেখা যাবে</p>
@@ -370,7 +381,7 @@ export const Dashboard: React.FC = () => {
                    
                    <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 mb-0.5">
-                         <h4 className="font-bold text-slate-800 text-xs truncate leading-none" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>{p.name}</h4>
+                         <h4 className="font-bold text-slate-800 text-xs truncate leading-normal pt-[3px] pb-[1px]" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>{p.name}</h4>
                          <span className={`w-1.5 h-1.5 rounded-full ring-1 ring-white shrink-0 ${p.status === 'Completed' ? 'bg-emerald-500' : p.status === 'In Progress' ? 'bg-blue-500' : 'bg-amber-500'}`}></span>
                       </div>
                       <p className="text-[10px] text-slate-400 truncate font-bold flex items-center gap-1 mt-1">

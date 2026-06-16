@@ -1056,7 +1056,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
       {/* App Logout Confirmation Modal */}
       {isLogoutConfirmOpen &&
         createPortal(
-          <div className="fixed inset-0 z-[2000] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200 select-none">
+          <div className="fixed inset-0 z-[10050] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200 select-none">
             {/* Overlay background click to close */}
             <div 
               className="absolute inset-0" 

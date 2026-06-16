@@ -5,6 +5,7 @@ import { useAppContext } from '@/context/AppContext';
 import { EXPENSE_CATEGORY_LABELS } from '../constants';
 import { supabase } from '@/lib/supabase';
 import { Wallet } from '@/types';
+import { AppLogo } from './AppLogo';
 import { 
   Wallet as WalletIcon, 
   Plus, 
@@ -74,12 +75,14 @@ export const WalletManager: React.FC = () => {
   const [selectedDetailsWallet, setSelectedDetailsWallet] = useState<Wallet | null>(null);
   const [txSearchQuery, setTxSearchQuery] = useState<string>('');
   const [txTypeFilter, setTxTypeFilter] = useState<'all' | 'income' | 'expense'>('all');
+  const [walletPeriod, setWalletPeriod] = useState<'today' | 'month' | 'all'>('all');
   const [pdfGenerating, setPdfGenerating] = useState<boolean>(false);
 
   useEffect(() => {
     if (selectedDetailsWallet === null) {
       setTxSearchQuery('');
       setTxTypeFilter('all');
+      setWalletPeriod('all');
     }
   }, [selectedDetailsWallet]);
 
@@ -702,10 +705,16 @@ export const WalletManager: React.FC = () => {
     }
   };
 
-  const formatTimeToBangla = (dateStr: string): string => {
+  const formatTimeToBangla = (dateStr: string, createdAtStr?: string): string => {
     if (!dateStr) return '';
     try {
-      const dateObj = new Date(dateStr);
+      let dateObj = new Date(dateStr);
+      if ((isNaN(dateObj.getTime()) || dateStr.length <= 10) && createdAtStr) {
+        const testObj = new Date(createdAtStr);
+        if (!isNaN(testObj.getTime())) {
+          dateObj = testObj;
+        }
+      }
       if (isNaN(dateObj.getTime())) return '';
       
       let hours = dateObj.getHours();
@@ -732,8 +741,9 @@ export const WalletManager: React.FC = () => {
         const method = i.method || 'বিকাশ';
         if (method.trim() === walletName.trim()) {
           let rawDate = new Date();
-          if (i.date) {
-            const parsedD = new Date(i.date);
+          const dateStr = i.createdat || i.created_at || i.date;
+          if (dateStr) {
+            const parsedD = new Date(dateStr);
             if (!isNaN(parsedD.getTime())) rawDate = parsedD;
           }
           list.push({
@@ -741,6 +751,7 @@ export const WalletManager: React.FC = () => {
             type: 'income',
             amount: i.amount,
             date: i.date,
+            createdat: i.createdat || i.created_at || i.date,
             title: i.projectname || 'আয়',
             subtitle: i.clientname || 'সরাসরি ওয়ালেট যোগ',
             rawDate,
@@ -755,8 +766,9 @@ export const WalletManager: React.FC = () => {
         const parsed = parseExpenseNotes(e.notes);
         if (parsed.wallet.trim() === walletName.trim()) {
           let rawDate = new Date();
-          if (e.date) {
-            const parsedD = new Date(e.date);
+          const dateStr = e.createdat || e.created_at || e.date;
+          if (dateStr) {
+            const parsedD = new Date(dateStr);
             if (!isNaN(parsedD.getTime())) rawDate = parsedD;
           }
           const categoryLabel = EXPENSE_CATEGORY_LABELS[e.category] || e.category;
@@ -765,6 +777,7 @@ export const WalletManager: React.FC = () => {
             type: 'expense',
             amount: e.amount,
             date: e.date,
+            createdat: e.createdat || e.created_at || e.date,
             title: parsed.notes || categoryLabel || 'অন্যান্য খরচ',
             subtitle: categoryLabel || 'খরচ',
             rawDate,
@@ -781,8 +794,9 @@ export const WalletManager: React.FC = () => {
             const wName = tx.walletName || 'ক্যাশ';
             if (wName.trim() === walletName.trim()) {
               let rawDate = new Date();
-              if (tx.date) {
-                const parsedD = new Date(tx.date);
+              const dateStr = tx.createdat || tx.created_at || tx.date;
+              if (dateStr) {
+                const parsedD = new Date(dateStr);
                 if (!isNaN(parsedD.getTime())) rawDate = parsedD;
               }
               list.push({
@@ -790,6 +804,7 @@ export const WalletManager: React.FC = () => {
                 type: tx.type === 'receive' ? 'income' : 'expense',
                 amount: tx.amount,
                 date: tx.date,
+                createdat: tx.createdat || tx.created_at || tx.date,
                 title: tx.description || `${tx.type === 'receive' ? 'টাকা গ্রহণ' : 'টাকা প্রদান'}`,
                 subtitle: `দেনাদার/পাওনাদার: ${person.name}`,
                 rawDate,
@@ -807,17 +822,36 @@ export const WalletManager: React.FC = () => {
   if (selectedDetailsWallet) {
     const rawTxList = getWalletTransactions(selectedDetailsWallet.name);
     
-    // Calculate total sums based on raw transactions
-    const totalIncomeValue = rawTxList
+    // Period filter calculations for the statistics dashboard
+    const now = new Date();
+    const currentMonthBengali = [
+      'জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
+      'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'
+    ][now.getMonth()];
+
+    const periodTxList = rawTxList.filter((t) => {
+      if (walletPeriod === 'today') {
+        return new Date(t.date).toDateString() === now.toDateString();
+      }
+      if (walletPeriod === 'month') {
+        const d = new Date(t.date);
+        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      }
+      return true; // 'all'
+    });
+
+    const periodIncome = periodTxList
       .filter((t) => t.type === 'income')
       .reduce((sum, t) => sum + t.amount, 0);
 
-    const totalExpenseValue = rawTxList
+    const periodExpense = periodTxList
       .filter((t) => t.type === 'expense')
       .reduce((sum, t) => sum + t.amount, 0);
 
-    // Apply client filters (search + type)
-    const filteredTxList = rawTxList.filter((tx) => {
+    const periodBalance = walletPeriod === 'all' ? selectedDetailsWallet.balance : (periodIncome - periodExpense);
+
+    // Apply client filters (search + type) for the main ledger list
+    const filteredTxList = periodTxList.filter((tx) => {
       // Filter by type
       if (txTypeFilter === 'income' && tx.type !== 'income') return false;
       if (txTypeFilter === 'expense' && tx.type !== 'expense') return false;
@@ -833,12 +867,11 @@ export const WalletManager: React.FC = () => {
       return true;
     });
 
-    const totalTxCount = rawTxList.length;
+    const totalTxCount = periodTxList.length;
 
     // PDF generation function
     const handleDownloadPdf = () => {
       if (!selectedDetailsWallet) return;
-      showToast('রিপোর্ট প্রিভিউ পেজে নিয়ে যাওয়া হচ্ছে...', 'info');
 
       navigate("/reports", {
         state: {
@@ -850,216 +883,332 @@ export const WalletManager: React.FC = () => {
       });
     };
 
-    return (
-      <div className="w-full max-w-lg mx-auto pb-24 px-1.5 select-none relative animate-in slide-in-from-right duration-300">
+    // Grouping by Date
+    const getGroupedTxList = () => {
+      const groups: { [d: string]: any[] } = {};
+      filteredTxList.forEach((t) => {
+        const dLabel = t.date ? t.date.substring(0, 10) : 'অন্যান্য';
+        if (!groups[dLabel]) groups[dLabel] = [];
+        groups[dLabel].push(t);
+      });
+
+      const sortedDates = Object.keys(groups).sort((a, b) => b.localeCompare(a));
+      return sortedDates.map((dStr) => {
+        const list = groups[dStr];
+        const incSum = list
+          .filter((t) => t.type === 'income')
+          .reduce((s, t) => s + t.amount, 0);
+        const expSum = list
+          .filter((t) => t.type === 'expense')
+          .reduce((s, t) => s + t.amount, 0);
+
+        return {
+          date: dStr,
+          transactions: list,
+          incomeTotal: incSum,
+          expenseTotal: expSum,
+        };
+      });
+    };
+
+    const groupedTxList = getGroupedTxList();
+
+    return createPortal(
+      <div className="fixed inset-0 bg-[#f8fafc] text-slate-800 z-[1000] overflow-y-auto flex flex-col select-none animate-in fade-in zoom-in-95 duration-200">
         
-        {/* Nice Header with Back Button */}
-        <div className="flex items-center justify-between pb-3.5 pt-1.5 mb-4 border-b border-slate-100/90">
+        {/* Sticky Glassy Header with Back Button */}
+        <div className="sticky top-0 bg-white/90 backdrop-blur-md border-b border-slate-200/60 px-4 py-2.5 flex items-center justify-between z-40">
           <button
             type="button"
             onClick={() => setSelectedDetailsWallet(null)}
-            className="flex items-center gap-1.5 text-slate-500 hover:text-slate-800 transition-all font-bold text-[14px] cursor-pointer"
+            className="flex items-center gap-2 text-slate-500 hover:text-slate-800 transition-all font-bold text-sm cursor-pointer"
           >
-            <ArrowLeft size={18} />
-            <span>ফিরে যান</span>
+            <ArrowLeft size={18} className="stroke-[2.5]" />
+            <span className="font-sans text-xs uppercase tracking-wider text-slate-655 font-bold">ফিরে যান</span>
           </button>
           
-          <h3 className="text-[17px] font-black text-slate-800 tracking-tight text-right flex-1 pr-1 truncate">
-            {selectedDetailsWallet.name} - এর লেনদেন
-          </h3>
+          <div className="text-right flex-1 select-none pr-1 truncate">
+            <span className="text-[9px] text-[#1e75eb] font-bold tracking-wider block leading-normal pt-[2px] uppercase">ওয়ালেট ডিটেইলস</span>
+            <h3 className="text-sm font-black text-slate-800 mt-1">
+              {selectedDetailsWallet.name} - লেনদেনসমূহ
+            </h3>
+          </div>
         </div>
 
-        {/* Wallet Info Banner */}
-        <div className="bg-gradient-to-br from-white to-blue-50/20 border border-slate-100 rounded-3xl py-5 px-5 shadow-[0_4px_20px_rgba(30,117,235,0.02)] mb-4">
-          <div className="flex justify-between items-start">
-            <div className="text-left">
-              <span className="text-slate-400 font-bold text-[10px] tracking-widest uppercase">
-                বর্তমান ব্যালেন্স
-              </span>
-              <div className="text-2xl sm:text-3xl font-black text-[#1e75eb] tracking-tight mt-1">
-                ৳ {to_with_sign_digits(selectedDetailsWallet.balance)}/-
+        {/* Responsive Content Container wrapper styled to match expenses page */}
+        <div className="w-full max-w-lg mx-auto px-4 pt-2.5 pb-28 flex-1 flex flex-col gap-2.5">
+          
+          {/* Dynamic Period Stats Card - Unifying Income and Expense - perfectly matching Expenses.tsx */}
+          <div className="bg-[#fafbfd] border border-[#e2e7ec]/80 py-2.5 px-3.5 rounded-[12px] shadow-[0_2px_8px_rgba(0,0,0,0.02)] w-full select-none">
+            {/* Period Segment Tabs matching the image */}
+            <div className="bg-[#f3f5f8] rounded-full flex items-stretch justify-between w-full mb-3 select-none overflow-hidden h-[42px] border border-[#e2e7ec]/60">
+              <button
+                type="button"
+                onClick={() => setWalletPeriod('today')}
+                className={`flex-1 text-center text-[15px] sm:text-[16px] font-medium transition-all h-full cursor-pointer select-none ${
+                  walletPeriod === 'today'
+                    ? 'bg-[#1e75eb] text-white rounded-l-full'
+                    : 'text-[#111827] hover:text-black bg-transparent'
+                }`}
+              >
+                আজ
+              </button>
+              <button
+                type="button"
+                onClick={() => setWalletPeriod('all')}
+                className={`flex-1 text-center text-[15px] sm:text-[16px] font-medium transition-all h-full cursor-pointer select-none ${
+                  walletPeriod === 'all'
+                    ? 'bg-[#1e75eb] text-white'
+                    : 'text-[#111827] hover:text-black bg-transparent'
+                }`}
+              >
+                মোট
+              </button>
+              <button
+                type="button"
+                onClick={() => setWalletPeriod('month')}
+                className={`flex-1 text-center text-[15px] sm:text-[16px] font-medium transition-all h-full cursor-pointer select-none ${
+                  walletPeriod === 'month'
+                    ? 'bg-[#1e75eb] text-white rounded-r-full'
+                    : 'text-[#111827] hover:text-black bg-transparent'
+                }`}
+              >
+                {currentMonthBengali}
+              </button>
+            </div>
+
+            {/* Income, Expense, Net Counts */}
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="flex flex-col items-center justify-center">
+                <p className="text-[12px] font-medium text-[#50AD54] mb-0.5">
+                  আয়
+                </p>
+                <p className="text-sm sm:text-base md:text-[16px] font-medium text-[#50AD54] truncate">
+                  ৳ {toBanglaNumbers(periodIncome.toLocaleString("bn-BD"))}
+                </p>
+              </div>
+              <div className="flex flex-col items-center justify-center">
+                <p className="text-[12px] font-medium text-[#db4437] mb-0.5">
+                  ব্যয়
+                </p>
+                <p className="text-sm sm:text-base md:text-[16px] font-medium text-[#db4437] truncate">
+                  ৳ {toBanglaNumbers(periodExpense.toLocaleString("bn-BD"))}
+                </p>
+              </div>
+              <div className="flex flex-col items-center justify-center">
+                <p className="text-[12px] font-medium text-[#1a73e8] mb-0.5">
+                  ব্যালেন্স
+                </p>
+                <p className="text-sm sm:text-base md:text-[16px] font-medium text-[#1a73e8] truncate">
+                  ৳ {toBanglaNumbers(periodBalance.toLocaleString("bn-BD"))}
+                </p>
               </div>
             </div>
+          </div>
+
+          {/* Interactive Core Filters & Search Deck styled to match expenses page */}
+          <div className="flex flex-col gap-2.5">
             
-            <button
-              type="button"
-              onClick={handleDownloadPdf}
-              disabled={pdfGenerating || totalTxCount === 0}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all border shadow-xs ${
-                totalTxCount === 0
-                  ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed'
-                  : 'bg-rose-50 hover:bg-rose-100 text-rose-600 border-rose-100/60 active:scale-95 cursor-pointer'
-              }`}
-            >
-              {pdfGenerating ? (
-                <Loader2 size={13} className="animate-spin text-rose-500" />
-              ) : (
-                <FileDown size={13} className="text-rose-500" />
-              )}
-              <span>{pdfGenerating ? 'পিডিএফ...' : 'পিডিএফ ডাউনলোড'}</span>
-            </button>
-          </div>
+            {/* Filter segments & PDF row matches reference layout on top */}
+            <div className="bg-[#f0f3f6] p-[3.5px] rounded-[8px] flex items-center justify-between gap-2.5 border border-[#e2e7ec]/50">
+              <div className="flex items-center gap-1 flex-1">
+                {/* TAB 1: সব */}
+                <button
+                   type="button"
+                   onClick={() => setTxTypeFilter('all')}
+                   className={`flex-1 py-1 h-[42px] rounded-[6px] transition-all cursor-pointer select-none flex flex-col items-center justify-center ${
+                     txTypeFilter === 'all'
+                       ? 'bg-[#e2edfc] text-[#1a73e8]'
+                       : 'bg-transparent text-[#8e9aa8] hover:text-[#4b5563]'
+                   }`}
+                >
+                  <span className={`text-[13.5px] font-bold ${txTypeFilter === 'all' ? 'text-[#1a73e8]' : 'text-[#8e9aa8]'}`}>সব</span>
+                  <span className={`text-[10px] font-medium leading-none mt-0.5 ${txTypeFilter === 'all' ? 'text-[#1a73e8]' : 'text-[#8e9aa8]/80'}`}>
+                    ({toBanglaDigits(totalTxCount)})
+                  </span>
+                </button>
 
-          <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-slate-100/60">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                <TrendingUp size={14} />
-              </div>
-              <div>
-                <p className="text-[10px] text-slate-400 font-bold leading-none mb-1">মোট জমা (+)</p>
-                <p className="text-[13px] font-bold text-slate-700 font-mono">৳ {toBanglaDigits(totalIncomeValue)}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 border-l border-slate-100 pl-3">
-              <div className="w-7 h-7 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
-                <TrendingDown size={14} />
-              </div>
-              <div>
-                <p className="text-[10px] text-slate-400 font-bold leading-none mb-1">মোট খরচ (-)</p>
-                <p className="text-[13px] font-bold text-slate-700 font-mono">৳ {toBanglaDigits(totalExpenseValue)}</p>
-              </div>
-            </div>
-          </div>
-        </div>
+                {/* TAB 2: আয় */}
+                <button
+                   type="button"
+                   onClick={() => setTxTypeFilter('income')}
+                   className={`flex-1 py-1 h-[42px] rounded-[6px] transition-all cursor-pointer select-none flex flex-col items-center justify-center ${
+                     txTypeFilter === 'income'
+                       ? 'bg-[#e2fced] text-[#50AD54]'
+                       : 'bg-transparent text-[#8e9aa8] hover:text-[#4b5563]'
+                   }`}
+                >
+                  <span className={`text-[13.5px] font-bold ${txTypeFilter === 'income' ? 'text-[#50AD54]' : 'text-[#8e9aa8]'}`}>আয়</span>
+                  <span className={`text-[10px] font-medium leading-none mt-0.5 ${txTypeFilter === 'income' ? 'text-[#50AD54]' : 'text-[#8e9aa8]/80'}`}>
+                    ({toBanglaDigits(periodTxList.filter(t => t.type === 'income').length)})
+                  </span>
+                </button>
 
-        {/* Search & Filters Controls */}
-        {totalTxCount > 0 && (
-          <div className="space-y-3 mb-4">
-            {/* Search Input */}
+                {/* TAB 3: ব্যয় */}
+                <button
+                   type="button"
+                   onClick={() => setTxTypeFilter('expense')}
+                   className={`flex-1 py-1 h-[42px] rounded-[6px] transition-all cursor-pointer select-none flex flex-col items-center justify-center ${
+                     txTypeFilter === 'expense'
+                       ? 'bg-[#fcedeb] text-[#db4437]'
+                       : 'bg-transparent text-[#8e9aa8] hover:text-[#4b5563]'
+                   }`}
+                >
+                  <span className={`text-[13.5px] font-bold ${txTypeFilter === 'expense' ? 'text-[#db4437]' : 'text-[#8e9aa8]'}`}>ব্যয়</span>
+                  <span className={`text-[10px] font-medium leading-none mt-0.5 ${txTypeFilter === 'expense' ? 'text-[#db4437]' : 'text-[#8e9aa8]/80'}`}>
+                    ({toBanglaDigits(periodTxList.filter(t => t.type === 'expense').length)})
+                  </span>
+                </button>
+              </div>
+
+              {/* Action: PDF download button */}
+              <button
+                type="button"
+                onClick={handleDownloadPdf}
+                disabled={pdfGenerating || totalTxCount === 0}
+                className={`rounded-[6px] border border-[#e2e7ec]/50 bg-white shadow-xs transition-all cursor-pointer flex items-center justify-center h-[42px] w-[42px] shrink-0 ${
+                  totalTxCount === 0
+                    ? 'opacity-50 cursor-not-allowed text-slate-300'
+                    : 'hover:bg-slate-50 text-[#1a73e8] active:scale-95'
+                }`}
+                title="পিডিএফ রিপোর্ট ডাউনলোড করুন"
+              >
+                {pdfGenerating ? (
+                  <Loader2 size={16} className="animate-spin text-[#1a73e8]" />
+                ) : (
+                  <FileDown size={16} className="text-[#1a73e8] stroke-[2.2]" />
+                )}
+              </button>
+            </div>
+
+            {/* Clean White Search bar on the bottom matches layout requested */}
             <div className="relative">
               <input
                 type="text"
                 value={txSearchQuery}
                 onChange={(e) => setTxSearchQuery(e.target.value)}
                 placeholder="লেনদেনের নাম দিয়ে অনুসন্ধান করুন..."
-                className="w-full bg-white border border-slate-200/95 focus:border-[#1e75eb] pl-10 pr-4 py-2.5 rounded-2xl outline-none text-xs font-medium text-slate-700 shadow-xs transition-all animate-none"
+                className="w-full bg-white border border-[#e2e7ec]/85 focus:border-[#1e75eb] focus:bg-white focus:ring-2 focus:ring-[#1e75eb]/10 pl-11 pr-4 py-2.5 rounded-[8px] outline-none text-[13.5px] font-medium text-slate-800 tracking-wide transition-all duration-200 shadow-2xs"
               />
-              <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 stroke-[2.2]" />
               {txSearchQuery && (
                 <button
                   type="button"
                   onClick={() => setTxSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-800 p-0.5 active:scale-95 transition-all"
                 >
-                  <X size={14} />
+                  <X size={16} className="stroke-[2.5]" />
                 </button>
               )}
             </div>
-
-            {/* Filter Chips */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
-              <button
-                type="button"
-                onClick={() => setTxTypeFilter('all')}
-                className={`py-1.5 px-3 rounded-full text-2xs font-bold transition-all border whitespace-nowrap cursor-pointer ${
-                  txTypeFilter === 'all'
-                    ? 'bg-blue-600 border-blue-600 text-white shadow-xs'
-                    : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
-                }`}
-              >
-                সব ({toBanglaDigits(totalTxCount)})
-              </button>
-              <button
-                type="button"
-                onClick={() => setTxTypeFilter('income')}
-                className={`py-1.5 px-3 rounded-full text-2xs font-bold transition-all border whitespace-nowrap cursor-pointer ${
-                  txTypeFilter === 'income'
-                    ? 'bg-emerald-500 border-emerald-500 text-white shadow-xs'
-                    : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
-                }`}
-              >
-                শুধুমাত্র জমা ({toBanglaDigits(rawTxList.filter(t => t.type === 'income').length)})
-              </button>
-              <button
-                type="button"
-                onClick={() => setTxTypeFilter('expense')}
-                className={`py-1.5 px-3 rounded-full text-2xs font-bold transition-all border whitespace-nowrap cursor-pointer ${
-                  txTypeFilter === 'expense'
-                    ? 'bg-rose-500 border-rose-500 text-white shadow-xs'
-                    : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
-                }`}
-              >
-                শুধুমাত্র খরচ ({toBanglaDigits(rawTxList.filter(t => t.type === 'expense').length)})
-              </button>
-            </div>
           </div>
-        )}
 
-        {/* Transactions List */}
-        <div className="space-y-2.5">
-          {totalTxCount === 0 ? (
-            <div className="text-center py-16 bg-white border border-dashed border-slate-200 rounded-3xl p-6">
-              <Banknote size={38} className="mx-auto text-slate-300 mb-2.5" />
-              <p className="text-slate-500 font-bold text-sm mb-1">কোনো লেনদেন পাওয়া যায়নি</p>
-              <p className="text-slate-400 text-xs">এই ওয়ালেটে এখনো কোনো লেনদেন হিসাব করা হয়নি।</p>
-            </div>
-          ) : filteredTxList.length === 0 ? (
-            <div className="text-center py-12 bg-white border border-slate-100 rounded-2xl p-6 shadow-xs">
-              <Filter size={24} className="mx-auto text-slate-300 mb-2" />
-              <p className="text-slate-500 font-bold text-xs">খোঁজা হয়েছে কিন্তু মেলেনি!</p>
-              <p className="text-slate-400 text-2xs mt-1">অনুগ্রহ করে ফিল্টার বা সার্চ কিওয়ার্ড পরিবর্তন করুন।</p>
-            </div>
-          ) : (
-            filteredTxList.map((tx) => {
-              const isIncome = tx.type === 'income';
-              return (
-                <div 
-                  key={tx.id}
-                  className="bg-white border border-slate-100/90 rounded-2xl p-3.5 flex justify-between items-center shadow-[0_2px_8px_rgba(0,0,0,0.01)] hover:shadow-xs hover:border-slate-200 transition-all duration-200 animate-in fade-in zoom-in-95"
-                >
-                  {/* Left Side: Icon, Title & Date */}
-                  <div className="flex items-center gap-3 min-w-0 pr-2">
-                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                      isIncome 
-                        ? 'bg-emerald-50 text-emerald-600' 
-                        : 'bg-rose-50 text-rose-600'
-                    }`}>
-                      {isIncome ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />}
-                    </div>
-                    
-                    <div className="min-w-0 flex-1">
-                      <h4 className="text-[13px] font-bold text-slate-800 leading-tight truncate">
-                        {tx.title}
-                      </h4>
-                      {tx.subtitle && 
-                       tx.subtitle.trim() !== 'অন্যান্য' && 
-                       tx.subtitle.trim() !== 'Others' && 
-                       tx.subtitle.trim() !== 'Other' && 
-                       tx.subtitle.trim() !== 'অন্যান্য খরচ' && 
-                       tx.subtitle.trim() !== 'খরচ' && 
-                       tx.subtitle.trim() !== tx.title && (
-                        <p className="text-[10px] text-slate-400 font-medium mt-0.5 truncate">
-                          {tx.subtitle}
-                        </p>
-                      )}
-                      
-                      <div className="flex items-center gap-2 mt-1.5">
-                        <span className="text-[9.5px] text-slate-400 font-medium flex items-center gap-0.5 shrink-0">
-                          <Calendar size={9} className="text-slate-300" />
-                          {formatDateToBangla(tx.date)}
-                        </span>
-                        <span className="text-[9.5px] text-slate-400 font-medium flex items-center gap-0.5 shrink-0 ml-1.5">
-                          <Clock size={9} className="text-slate-300" />
-                          {formatTimeToBangla(tx.date)}
-                        </span>
-                      </div>
+          {/* Ledger Listing grouped by Date precisely matching Expenses page */}
+          <div className="flex flex-col space-y-4 animate-in fade-in duration-300">
+            {totalTxCount === 0 ? (
+              <div className="text-center py-16 bg-white border border-dashed border-slate-200 rounded-2xl p-6 shadow-2xs">
+                <Banknote size={38} className="mx-auto text-slate-300 mb-2.5" />
+                <p className="text-slate-500 font-bold text-sm mb-1">কোনো লেনদেন পাওয়া যায়নি</p>
+                <p className="text-slate-400 text-xs">এই ওয়ালেটে এখনো কোনো লেনদেন হিসাব করা হয়নি।</p>
+              </div>
+            ) : filteredTxList.length === 0 ? (
+              <div className="text-center py-12 bg-white border border-slate-200 rounded-2xl p-6 shadow-2xs">
+                <Filter size={24} className="mx-auto text-slate-300 mb-2" />
+                <p className="text-slate-500 font-bold text-xs">খোঁজা হয়েছে কিন্তু মেলেনি!</p>
+                <p className="text-slate-400 text-[10px] mt-1 uppercase tracking-wider font-semibold">অনুগ্রহ করে ফিল্টার পরিবর্তন করুন</p>
+              </div>
+            ) : (
+              groupedTxList.map((group) => (
+                <div key={group.date} className="space-y-2.5">
+                  {/* Day Date Indicator Header */}
+                  <div className="flex items-center justify-between py-2 bg-transparent select-none">
+                    <span className="text-[12px] sm:text-[13px] font-medium text-slate-400 whitespace-nowrap">
+                      {formatDateToBangla(group.date)}
+                    </span>
+                    {/* Fine solid line divider */}
+                    <div className="flex-1 mx-3 border-b border-solid border-slate-200/60"></div>
+                    <div className="flex items-center gap-3 text-[12px] sm:text-[13px] font-medium text-slate-400 whitespace-nowrap">
+                      <span>মোট</span>
+                      <span className="text-[#50AD54] font-medium text-[12px] sm:text-[13px]">
+                        {toBanglaNumbers(group.incomeTotal)}
+                      </span>
+                      <span className="text-[#db4437] font-medium text-[12px] sm:text-[13px]">
+                        {toBanglaNumbers(group.expenseTotal)}
+                      </span>
                     </div>
                   </div>
 
-                  {/* Right Side: Amount */}
-                  <div className={`text-[13.5px] sm:text-[14.5px] font-black font-mono tracking-tight shrink-0 text-right ${
-                    isIncome ? 'text-emerald-500' : 'text-rose-500'
-                  }`}>
-                    {isIncome ? '+' : '-'} ৳{toBanglaDigits(tx.amount)}
+                  {/* Day Ledger Items Container */}
+                  <div className="flex flex-col space-y-2.5">
+                    {group.transactions.map((tx) => {
+                      const isIncome = tx.type === 'income';
+                      return (
+                        <div
+                          key={tx.id}
+                          className={`group relative rounded-[12px] px-4 py-2.5 sm:py-3 flex items-center justify-between gap-3 transition-colors duration-200 shadow-[0_2px_6px_rgba(0,0,0,0.01)] border ${
+                            isIncome
+                              ? 'bg-emerald-50/20 border-emerald-500/[0.015]'
+                              : 'bg-rose-50/20 border-rose-500/[0.015]'
+                          }`}
+                        >
+                          {/* Left side: Title, indicator icon, and dynamic details */}
+                          <div className="flex flex-col min-w-0 justify-center text-left">
+                            <h3 className="font-normal text-slate-800 text-[14.5px] sm:text-[15px] leading-normal pt-[3px] pb-[1px] truncate">
+                              {tx.title}
+                            </h3>
+                            <div className="flex items-center gap-1.5 mt-1 select-none">
+                              <span
+                                className={`w-[18px] h-[18px] rounded-full flex items-center justify-center font-bold text-[9px] sm:text-[10px] shrink-0 ${
+                                  isIncome
+                                    ? 'bg-emerald-100 text-[#50AD54]'
+                                    : 'bg-rose-100 text-[#db4437]'
+                                }`}
+                              >
+                                {isIncome ? '+' : '-'}
+                              </span>
+                              <span className="text-[10.5px] sm:text-[11px] font-medium text-slate-400 pr-1">
+                                {formatTimeToBangla(tx.date, tx.createdat)}
+                              </span>
+                              {tx.subtitle && 
+                               tx.subtitle.trim() !== 'অন্যান্য' && 
+                               tx.subtitle.trim() !== 'Others' && 
+                               tx.subtitle.trim() !== 'Other' && 
+                               tx.subtitle.trim() !== 'অন্যান্য খরচ' && 
+                               tx.subtitle.trim() !== 'খরচ' && 
+                               tx.subtitle.trim() !== tx.title && (
+                                 <span className="text-[9px] font-semibold text-[#1e75eb] bg-blue-50/50 border border-blue-100/50 rounded px-1.5 py-0.2 shrink-0">
+                                   {tx.subtitle}
+                                 </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Right side: Amount and layout */}
+                          <div className="flex items-center gap-2.5 shrink-0 my-auto">
+                            <span
+                              className={`font-medium text-[15px] sm:text-[16px] whitespace-nowrap ${
+                                isIncome ? 'text-[#50AD54]' : 'text-[#db4437]'
+                              }`}
+                            >
+                              {toBanglaDigits(tx.amount)}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
-              );
-            })
-          )}
+              ))
+            )}
+          </div>
+
         </div>
-      </div>
+      </div>,
+      document.body
     );
   }
+
+
 
   return (
     <div className="w-full max-w-lg mx-auto pb-24 px-0.5 select-none relative animate-in fade-in duration-300">
@@ -1076,9 +1225,19 @@ export const WalletManager: React.FC = () => {
 
       {/* 2. Wallets Loading View */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-8">
-          <Loader2 className="h-8 w-8 text-blue-500 animate-spin mb-2" />
-          <p className="text-slate-400 text-xs">ওয়ালেট লোড হচ্ছে...</p>
+        <div className="flex flex-col items-center justify-center py-16 animate-in fade-in duration-300">
+          <div className="w-16 h-16 mb-4 flex items-center justify-center animate-spin">
+            <AppLogo variant="transparent-color" size="100%" />
+          </div>
+          <p
+            className="text-slate-500 font-bold text-xs mt-2 text-center"
+            style={{
+              fontFamily: "'Kohinoor Bangla', sans-serif",
+              letterSpacing: "0.02em",
+            }}
+          >
+            ওয়ালেট লোড হচ্ছে...
+          </p>
         </div>
       ) : walletCount === 0 ? (
         <div className="text-center py-12 bg-white border border-dashed border-slate-200 rounded-xl p-5 mx-0.5">

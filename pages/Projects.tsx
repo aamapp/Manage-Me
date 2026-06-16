@@ -1342,7 +1342,7 @@ export const Projects: React.FC = () => {
                       </div>
                       <div className="min-w-0 flex-1">
                         <h3
-                          className={`font-medium text-slate-800 ${isGeneratingPDF ? "text-lg mb-1.5" : "text-sm"} truncate leading-snug`}
+                          className={`font-medium text-slate-800 ${isGeneratingPDF ? "text-lg mb-1.5 pt-[3px] pb-[1px]" : "text-sm pt-[3px] pb-[1px]"} truncate leading-normal`}
                           style={{
                             fontFamily: "'Kohinoor Bangla', sans-serif",
                           }}

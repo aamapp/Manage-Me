@@ -180,6 +180,7 @@ export const Expenses: React.FC = () => {
   const navigate = useNavigate();
   const [isModalOpen, setModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTabState, setActiveTabState] = useState<
     "expenses" | "dues" | "savings" | "reports" | "tasks" | "wallet"
@@ -2201,20 +2202,31 @@ export const Expenses: React.FC = () => {
                 </div>
               )}
 
-              {/* Search Inputs & Category Option Filters (Combining both) */}
-              <div className="space-y-2.5 w-full max-w-lg mx-auto">
-                {searchTerm && (
-                  <div className="bg-white px-4 py-3 rounded-[10px] border border-slate-200/80 shadow-xs flex items-center gap-2">
-                    <Search size={18} className="text-slate-400" />
-                    <input
-                      type="text"
-                      placeholder="বিবরণ বা ক্যাটাগরি দিয়ে খুঁজুন..."
-                      className="w-full bg-transparent outline-none text-sm font-bold text-slate-800 placeholder:text-slate-400"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                  </div>
-                )}
+               {/* Search Inputs & Category Option Filters (Combining both) */}
+               <div className="space-y-2.5 w-full max-w-lg mx-auto">
+                 {(searchTerm || showSearch) && (
+                   <div className="bg-white px-4 py-3 rounded-[10px] border border-slate-200/80 shadow-xs flex items-center gap-2 relative">
+                     <Search size={18} className="text-slate-400" />
+                     <input
+                       type="text"
+                       autoFocus
+                       placeholder="বিবরণ বা ক্যাটাগরি দিয়ে খুঁজুন..."
+                       className="w-full bg-transparent outline-none text-sm font-bold text-slate-800 placeholder:text-slate-400 pr-6"
+                       value={searchTerm}
+                       onChange={(e) => setSearchTerm(e.target.value)}
+                     />
+                     <button
+                       type="button"
+                       onClick={() => {
+                         setSearchTerm("");
+                         setShowSearch(false);
+                       }}
+                       className="absolute right-3.5 text-slate-400 hover:text-slate-600 transition-colors"
+                     >
+                       <X size={16} />
+                     </button>
+                   </div>
+                 )}
 
                 {/* Gray filter bar stretching across exactly like the image */}
                 <div className="bg-[#f0f3f6] rounded-[8px] p-[3px] flex items-center justify-between w-full select-none border border-slate-100">
@@ -2329,13 +2341,12 @@ export const Expenses: React.FC = () => {
 
                     <button
                       onClick={() => {
-                        const searchBox = prompt("খুঁজতে টাইপ করুন:");
-                        if (searchBox !== null) setSearchTerm(searchBox);
+                        setShowSearch((prev) => !prev);
                       }}
-                      className={`transition-colors shrink-0 ${searchTerm ? "text-[#1a73e8]" : "text-[#8e9aa8] md:hover:text-slate-700"}`}
+                      className={`transition-colors shrink-0 ${searchTerm || showSearch ? "text-[#1a73e8]" : "text-[#8e9aa8] md:hover:text-slate-700"}`}
                       title="অনুসন্ধান"
                     >
-                      <Shapes size={19} />
+                      <Search size={19} />
                     </button>
                   </div>
                 </div>
@@ -2453,7 +2464,7 @@ export const Expenses: React.FC = () => {
                               >
                                 {/* Left side: Title and circular badge with Time detail */}
                                 <div className="flex flex-col min-w-0 justify-center">
-                                  <h3 className="font-normal text-slate-800 text-[14.5px] sm:text-[15px] leading-snug truncate">
+                                  <h3 className="font-normal text-slate-800 text-[14.5px] sm:text-[15px] leading-normal pt-[3px] pb-[1px] truncate">
                                     {tx.title}
                                   </h3>
                                   <div className="flex items-center gap-1.5 mt-1 select-none">
