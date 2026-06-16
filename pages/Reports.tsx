@@ -102,7 +102,7 @@ interface PageData {
   isLastPage: boolean;
 }
 
-function paginateData(allLines: any[]): PageData[] {
+function paginateData(allLines: any[], isWallet: boolean = false): PageData[] {
   const totalItems = allLines.length;
   if (totalItems === 0) {
     return [
@@ -115,7 +115,10 @@ function paginateData(allLines: any[]): PageData[] {
     ];
   }
 
-  if (totalItems <= 12) {
+  // If wallet, we make the limits safer to prevent overflow cut-offs
+  const firstPageLimit = isWallet ? 10 : 12;
+
+  if (totalItems <= firstPageLimit) {
     return [
       {
         pageNumber: 1,
@@ -138,28 +141,49 @@ function paginateData(allLines: any[]): PageData[] {
     let isLast = false;
 
     if (isFirst) {
-      if (totalItems <= 22) {
-        // If total is 13 to 22, we split into 2 pages: Page 1 (11) and Page 2 (rest: 2 to 11)
-        takeCount = 11;
-      } else if (totalItems <= 30) {
-        // If total is 23 to 30, we split into 2 pages: Page 1 (16) and Page 2 (rest: 7 to 14)
-        takeCount = 16;
+      if (isWallet) {
+        if (totalItems <= 18) {
+          takeCount = 9;
+        } else if (totalItems <= 25) {
+          takeCount = 12;
+        } else {
+          takeCount = 13;
+        }
       } else {
-        // Otherwise, first page is fully packed with 18 items
-        takeCount = 18;
+        if (totalItems <= 22) {
+          // If total is 13 to 22, we split into 2 pages: Page 1 (11) and Page 2 (rest: 2 to 11)
+          takeCount = 11;
+        } else if (totalItems <= 30) {
+          // If total is 23 to 30, we split into 2 pages: Page 1 (16) and Page 2 (rest: 7 to 14)
+          takeCount = 16;
+        } else {
+          // Otherwise, first page is fully packed with 18 items
+          takeCount = 18;
+        }
       }
     } else {
       // For subsequent pages (not the first page)
-      if (remaining <= 15) {
-        // If remaining items fit perfectly on the last page with all components
-        takeCount = remaining;
-        isLast = true;
-      } else if (remaining <= 30) {
-        // If remaining items are split into 2 pages: this middle page (18) and last page (rest: 2 to 12)
-        takeCount = 18;
+      if (isWallet) {
+        if (remaining <= 12) {
+          takeCount = remaining;
+          isLast = true;
+        } else if (remaining <= 24) {
+          takeCount = 13;
+        } else {
+          takeCount = 16;
+        }
       } else {
-        // Otherwise, pack this middle page to its safe maximum
-        takeCount = 22;
+        if (remaining <= 15) {
+          // If remaining items fit perfectly on the last page with all components
+          takeCount = remaining;
+          isLast = true;
+        } else if (remaining <= 30) {
+          // If remaining items are split into 2 pages: this middle page (18) and last page (rest: 2 to 12)
+          takeCount = 18;
+        } else {
+          // Otherwise, pack this middle page to its safe maximum
+          takeCount = 22;
+        }
       }
     }
 
@@ -224,9 +248,11 @@ export const Reports: React.FC = () => {
       | "expense"
       | "projects"
       | "dues"
-      | "personal_dues";
+      | "personal_dues"
+      | "wallet";
     clientName?: string;
     personId?: string;
+    walletName?: string;
   } | null;
 
   // Custom PDF Download States and Subview Systems
@@ -298,15 +324,98 @@ export const Reports: React.FC = () => {
     };
   }, [viewState, expenses, incomeRecords]);
   const [pdfReportType, setPdfReportType] = useState<
-    "all" | "income" | "expense" | "projects" | "dues" | "personal_dues"
+    "all" | "income" | "expense" | "projects" | "dues" | "personal_dues" | "wallet"
   >(
     initialState?.action === "download_preview" && initialState.reportType
-      ? initialState.reportType
+      ? (initialState.reportType as any)
       : "all",
   );
   const [personalDuePersonId, setPersonalDuePersonId] = useState<string | null>(
     initialState?.personId || null,
   );
+  const [walletName, setWalletName] = useState<string | null>(
+    initialState?.action === "download_preview" ? initialState.walletName || null : null
+  );
+
+  const [wallets, setWallets] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    
+    const loadWallets = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("wallets")
+          .select("*")
+          .eq("userid", user.id);
+          
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          const sorted = [...data].sort((a, b) => {
+            if (a.isDefault && !b.isDefault) return -1;
+            if (!a.isDefault && b.isDefault) return 1;
+            return new Date(b.createdAt || b.created_at || 0).getTime() - new Date(a.createdAt || a.created_at || 0).getTime();
+          });
+          setWallets(sorted);
+          
+          if (!walletName) {
+            setWalletName(sorted[0].name);
+          }
+        } else {
+          const cached = localStorage.getItem(`manage_me_wallets_${user.id}`);
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            setWallets(parsed);
+            if (!walletName && parsed.length > 0) {
+              setWalletName(parsed[0].name);
+            }
+          } else {
+            const defaults = [
+              {
+                id: `wallet-cash-${user.id}`,
+                name: "ক্যাশ",
+                balance: 0,
+                isDefault: true,
+                userid: user.id,
+                createdAt: new Date().toISOString()
+              }
+            ];
+            setWallets(defaults);
+            if (!walletName) {
+              setWalletName("ক্যাশ");
+            }
+          }
+        }
+      } catch (err) {
+        const cached = localStorage.getItem(`manage_me_wallets_${user.id}`);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          setWallets(parsed);
+          if (!walletName && parsed.length > 0) {
+            setWalletName(parsed[0].name);
+          }
+        } else {
+          const defaults = [
+            {
+              id: `wallet-cash-${user.id}`,
+              name: "ক্যাশ",
+              balance: 0,
+              isDefault: true,
+              userid: user.id,
+              createdAt: new Date().toISOString()
+            }
+          ];
+          setWallets(defaults);
+          if (!walletName) {
+            setWalletName("ক্যাশ");
+          }
+        }
+      }
+    };
+    
+    loadWallets();
+  }, [user, walletName]);
 
   // Project & Dues report filtering popup states
   const [isProjectFilterModalOpen, setIsProjectFilterModalOpen] =
@@ -460,6 +569,15 @@ export const Reports: React.FC = () => {
       return fullNotes.substring(0, idx).trim();
     }
     return fullNotes.trim();
+  };
+
+  const parseReportExpenseNotes = (fullNotes: string): { notes: string; wallet: string } => {
+    if (!fullNotes) return { notes: "", wallet: "ক্যাশ" };
+    const match = fullNotes.match(/(.*)\s*\[ওয়ালেট:\s*(.*)\]$/);
+    if (match) {
+      return { notes: match[1].trim(), wallet: match[2].trim() };
+    }
+    return { notes: fullNotes.trim(), wallet: "ক্যাশ" };
   };
 
   const formatReportTime = (timeStr: string): string => {
@@ -637,6 +755,7 @@ export const Reports: React.FC = () => {
             date: t.date,
             time: t.time || "10:00",
             description:
+              t.description ||
               t.notes ||
               (t.type === "give"
                 ? "পেমেন্ট দেওয়া হয়েছে"
@@ -648,10 +767,74 @@ export const Reports: React.FC = () => {
       }
     }
 
+    // Get wallet transactions
+    if (pdfReportType === "wallet" && walletName && duePersons) {
+      // 1. Incomes
+      incomeRecords.forEach((r: any) => {
+        const method = r.method || "বিকাশ";
+        if (method.trim() === walletName.trim()) {
+          if (pdfStartDate && r.date < pdfStartDate) return;
+          if (pdfEndDate && r.date > pdfEndDate) return;
+
+          list.push({
+            id: `income-${r.id}`,
+            type: "income",
+            date: r.date,
+            time: r.time || "08:00",
+            description: r.projectname || r.notes || "আয়",
+            category: r.clientname || "সরাসরি ওয়ালেট যোগ",
+            amount: Number(r.amount) || 0,
+          });
+        }
+      });
+
+      // 2. Expenses
+      expenses.forEach((e: any) => {
+        const parsed = parseReportExpenseNotes(e.notes || "");
+        if (parsed.wallet.trim() === walletName.trim()) {
+          if (pdfStartDate && e.date < pdfStartDate) return;
+          if (pdfEndDate && e.date > pdfEndDate) return;
+
+          list.push({
+            id: `expense-${e.id}`,
+            type: "expense",
+            date: e.date,
+            time: e.time || "10:00",
+            description: parsed.notes || e.category || "ব্যয়",
+            category: e.category || "ব্যয়",
+            amount: Number(e.amount) || 0,
+          });
+        }
+      });
+
+      // 3. Due transactions (i.e. due persons transactions)
+      duePersons.forEach((person: any) => {
+        if (person.transactions) {
+          person.transactions.forEach((tx: any) => {
+            const wName = tx.walletName || "ক্যাশ";
+            if (wName.trim() === walletName.trim()) {
+              if (pdfStartDate && tx.date < pdfStartDate) return;
+              if (pdfEndDate && tx.date > pdfEndDate) return;
+
+              list.push({
+                id: `dues-${tx.id}`,
+                type: tx.type === "receive" ? "income" : "expense",
+                date: tx.date,
+                time: tx.time || "10:00",
+                description: tx.description || (tx.type === "receive" ? "টাকা গ্রহণ" : "টাকা প্রদান"),
+                category: `দেনাদার/পাওনাদার: ${person.name}`,
+                amount: Number(tx.amount) || 0,
+              });
+            }
+          });
+        }
+      });
+    }
+
     return list.sort(
       (a, b) =>
-        (a.date || "").localeCompare(b.date || "") ||
-        (a.time || "").localeCompare(b.time || ""),
+        (b.date || "").localeCompare(a.date || "") ||
+        (b.time || "").localeCompare(a.time || ""),
     );
   }, [
     pdfReportType,
@@ -661,6 +844,7 @@ export const Reports: React.FC = () => {
     expenses,
     personalDuePersonId,
     duePersons,
+    walletName,
   ]);
 
   const pdfStats = useMemo(() => {
@@ -706,6 +890,26 @@ export const Reports: React.FC = () => {
       };
     }
 
+    if (pdfReportType === "wallet") {
+      let totalIncome = 0;
+      let totalExpense = 0;
+      pdfTransactions.forEach((t) => {
+        if (t.type === "income") {
+          totalIncome += t.amount;
+        } else {
+          totalExpense += t.amount;
+        }
+      });
+      return {
+        totalBudget: 0,
+        totalPaid: 0,
+        totalDue: 0,
+        totalIncome,
+        totalExpense,
+        balance: totalIncome - totalExpense,
+      };
+    }
+
     let totalIncome = 0;
     let totalExpense = 0;
 
@@ -735,7 +939,7 @@ export const Reports: React.FC = () => {
           ? pdfFilteredDues
           : pdfTransactions;
 
-    return paginateData(listToPaginate);
+    return paginateData(listToPaginate, pdfReportType === "wallet");
   }, [pdfReportType, pdfFilteredProjects, pdfFilteredDues, pdfTransactions]);
 
   const formatPdfRowDate = (dateStr: string) => {
@@ -898,6 +1102,8 @@ export const Reports: React.FC = () => {
           duePersons?.find((p: any) => p.id === personalDuePersonId)?.name ||
           "all";
         filename = `personal_dues_report_${personName.replace(/\s+/g, "_")}.pdf`;
+      } else if (pdfReportType === "wallet") {
+        filename = `wallet_report_${walletName ? walletName.replace(/\s+/g, "_") : "wallet"}.pdf`;
       }
 
       // Smoothly jump progress to 100% on complete render cycle
@@ -1741,7 +1947,7 @@ export const Reports: React.FC = () => {
               <label className="text-xs font-black text-slate-700 block uppercase tracking-wider">
                 রিপোর্টের খাত ও ধরণ
               </label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -1810,7 +2016,7 @@ export const Reports: React.FC = () => {
                     setProjectFilterSlideDirection("forward");
                     setIsProjectFilterModalOpen(true);
                   }}
-                  className={`py-3 px-4 rounded-xl font-bold text-xs transition-all border col-span-2 sm:col-span-1 ${
+                  className={`py-3 px-4 rounded-xl font-bold text-xs transition-all border ${
                     pdfReportType === "dues"
                       ? "bg-amber-600 border-amber-600 text-white shadow-md shadow-amber-100"
                       : "bg-slate-50 border-slate-200/80 text-slate-600 hover:bg-slate-100"
@@ -1818,7 +2024,83 @@ export const Reports: React.FC = () => {
                 >
                   বকেয়া রিপোর্ট
                 </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPdfReportType("personal_dues");
+                    setPdfSelectedClientName(null);
+                    if (duePersons && duePersons.length > 0 && !personalDuePersonId) {
+                      setPersonalDuePersonId(duePersons[0].id);
+                    }
+                  }}
+                  className={`py-3 px-4 rounded-xl font-bold text-xs transition-all border ${
+                    pdfReportType === "personal_dues"
+                      ? "bg-purple-600 border-purple-600 text-white shadow-md shadow-purple-100"
+                      : "bg-slate-50 border-slate-200/80 text-slate-600 hover:bg-slate-100"
+                  }`}
+                >
+                  ব্যক্তিগত হিসেব
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPdfReportType("wallet");
+                    setPdfSelectedClientName(null);
+                    if (wallets && wallets.length > 0 && !walletName) {
+                      setWalletName(wallets[0].name);
+                    }
+                  }}
+                  className={`py-3 px-4 rounded-xl font-bold text-xs transition-all border ${
+                    pdfReportType === "wallet"
+                      ? "bg-teal-600 border-teal-600 text-white shadow-md shadow-teal-100"
+                      : "bg-slate-50 border-slate-200/80 text-slate-600 hover:bg-slate-100"
+                  }`}
+                >
+                  ওয়ালেট লেনদেন
+                </button>
               </div>
+
+              {pdfReportType === "personal_dues" && (
+                <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2 duration-200 mt-4">
+                  <label className="text-xs font-black text-slate-700 block uppercase tracking-wider">
+                    দেনা-পাওনা ব্যক্তি নির্বাচন করুন
+                  </label>
+                  <select
+                    value={personalDuePersonId || ""}
+                    onChange={(e) => setPersonalDuePersonId(e.target.value)}
+                    className="w-full text-slate-800 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3 font-bold text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                    style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
+                  >
+                    <option value="" disabled>ব্যক্তি সিলেক্ট করুন</option>
+                    {duePersons && duePersons.map((p: any) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.type === "give" ? "পাবো" : "দিবো"})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {pdfReportType === "wallet" && (
+                <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2 duration-200 mt-4">
+                  <label className="text-xs font-black text-slate-700 block uppercase tracking-wider">
+                    ওয়ালেট নির্বাচন করুন
+                  </label>
+                  <select
+                    value={walletName || ""}
+                    onChange={(e) => setWalletName(e.target.value)}
+                    className="w-full text-slate-800 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3 font-bold text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                    style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
+                  >
+                    <option value="" disabled>ওয়ালেট সিলেক্ট করুন</option>
+                    {wallets && wallets.map((w: any) => (
+                      <option key={w.id} value={w.name}>
+                        {w.name} (ব্যালেন্স: ৳{w.balance.toLocaleString("bn-BD")}/-)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {(pdfSelectedClientName || pdfSelectedStatus !== "All") &&
                 (pdfReportType === "projects" || pdfReportType === "dues") && (
@@ -2078,7 +2360,9 @@ export const Reports: React.FC = () => {
                     ? "বকেয়া"
                     : pdfReportType === "personal_dues"
                       ? "ব্যক্তিগত লেনদেন"
-                      : "লেনদেন"}
+                      : pdfReportType === "wallet"
+                        ? "ওয়ালেট লেনদেন"
+                        : "লেনদেন"}
                 :{" "}
                 {pdfReportType === "projects"
                   ? pdfFilteredProjects.length
@@ -2361,6 +2645,8 @@ export const Reports: React.FC = () => {
                                     : "সমস্ত বকেয়া রিপোর্ট")}
                                 {pdfReportType === "personal_dues" &&
                                   `ব্যক্তিগত হিসাব স্টেটমেন্ট (${duePersons?.find((p: any) => p.id === personalDuePersonId)?.name || ""})`}
+                                 {pdfReportType === "wallet" &&
+                                   `ওয়ালেট লেনদেন প্রতিবেদন (${walletName || ""})`}
                               </span>
                             </div>
                             <div
@@ -2456,6 +2742,30 @@ export const Reports: React.FC = () => {
                                     </th>
                                     <th className="py-2.5 px-4 text-right font-bold font-sans">
                                       পেলাম (৳)
+                                    </th>
+                                  </tr>
+                                ) : pdfReportType === "wallet" ? (
+                                  <tr
+                                    className="bg-slate-50 border-b border-slate-100 text-[10px] text-slate-500 font-extrabold tracking-wider"
+                                    style={{
+                                      fontFamily:
+                                        "'Kohinoor Bangla', sans-serif",
+                                    }}
+                                  >
+                                    <th className="py-2.5 px-4 text-left font-bold">
+                                      তারিখ
+                                    </th>
+                                    <th className="py-2.5 px-4 text-left font-bold">
+                                      সময়
+                                    </th>
+                                    <th className="py-2.5 px-4 text-left font-bold">
+                                      লেনদেনের বিবরণ / বিবরণী
+                                    </th>
+                                    <th className="py-2.5 px-4 text-left font-bold">
+                                      ধরন / উৎস
+                                    </th>
+                                    <th className="py-2.5 px-4 text-right font-bold font-sans">
+                                      পরিমাণ (৳)
                                     </th>
                                   </tr>
                                 ) : (
@@ -2626,6 +2936,96 @@ export const Reports: React.FC = () => {
                                                       "bn-BD",
                                                     )
                                                   : "-"}
+                                              </td>
+                                            </tr>
+                                          </React.Fragment>
+                                        );
+                                      });
+                                    })()
+                                  )
+                                ) : pdfReportType === "wallet" ? (
+                                  page.items.length === 0 ? (
+                                    <tr>
+                                      <td
+                                        colSpan={5}
+                                        className="py-12 text-center text-slate-400 bg-slate-50/50"
+                                      >
+                                        <Calendar
+                                          size={24}
+                                          className="mx-auto text-slate-300 mb-2"
+                                        />
+                                        <p
+                                          className="text-xs font-bold"
+                                          style={{
+                                            fontFamily:
+                                              "'Kohinoor Bangla', sans-serif",
+                                          }}
+                                        >
+                                          কোনো লেনদেনের তথ্য পাওয়া যায়নি
+                                        </p>
+                                      </td>
+                                    </tr>
+                                  ) : (
+                                    (() => {
+                                      let lastMonthHeader = "";
+                                      return page.items.map((tx) => {
+                                        const monthHeader =
+                                          formatPdfMonthGroupHeader(tx.date);
+                                        const renderHeader =
+                                          lastMonthHeader !== monthHeader;
+                                        lastMonthHeader = monthHeader;
+
+                                        return (
+                                          <React.Fragment key={tx.id}>
+                                            {renderHeader && (
+                                              <tr className="bg-[#f0f4ff]/50">
+                                                <td
+                                                  colSpan={5}
+                                                  className="py-1.5 px-4"
+                                                >
+                                                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-indigo-700 font-sans">
+                                                    <span>📅</span>
+                                                    <span>{monthHeader}</span>
+                                                  </div>
+                                                </td>
+                                              </tr>
+                                            )}
+                                            <tr className="hover:bg-slate-50/50 transition-colors">
+                                              <td className="py-2.5 px-4 text-slate-500 font-sans text-[10px] font-bold text-left">
+                                                {formatPdfRowDate(tx.date)}
+                                              </td>
+                                              <td className="py-2.5 px-4 text-slate-400 font-sans text-[10px] font-bold text-left">
+                                                {tx.time
+                                                  ? formatReportTime(tx.time)
+                                                  : "--:--"}
+                                              </td>
+                                              <td
+                                                className="py-2.5 px-4 font-bold text-slate-800 text-left"
+                                                style={{
+                                                  fontFamily:
+                                                    "'Kohinoor Bangla', sans-serif",
+                                                }}
+                                              >
+                                                {tx.description}
+                                              </td>
+                                              <td
+                                                className="py-2.5 px-4 font-normal text-slate-600 text-left"
+                                                style={{
+                                                  fontFamily:
+                                                    "'Kohinoor Bangla', sans-serif",
+                                                }}
+                                              >
+                                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${tx.type === 'income' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
+                                                  {tx.type === 'income' ? 'জমা' : 'খরচ'}
+                                                </span>
+                                                {tx.category && (
+                                                  <div className="text-[9.5px] text-slate-400 font-medium font-sans mt-0.5">
+                                                    {tx.category}
+                                                  </div>
+                                                )}
+                                              </td>
+                                              <td className={`py-2.5 px-4 text-right font-black font-sans text-[11px] ${tx.type === 'income' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                                {tx.type === 'income' ? '+' : '-'} {tx.amount.toLocaleString("bn-BD")}
                                               </td>
                                             </tr>
                                           </React.Fragment>
@@ -2835,6 +3235,53 @@ export const Reports: React.FC = () => {
                                     </span>
                                   </div>
                                 </>
+                              ) : pdfReportType === "wallet" ? (
+                                <>
+                                  <span
+                                    className="text-slate-850"
+                                    style={{
+                                      fontFamily:
+                                        "'Kohinoor Bangla', sans-serif",
+                                    }}
+                                  >
+                                    ওয়ালেট মোট হিসাব:
+                                  </span>
+                                  <div
+                                    className="flex items-center gap-4"
+                                    style={{
+                                      fontFamily:
+                                        "'Kohinoor Bangla', sans-serif",
+                                    }}
+                                  >
+                                    <span>
+                                      মোট প্রাপ্তি:{" "}
+                                      <span className="text-emerald-600 font-sans">
+                                        {pdfStats.totalIncome?.toLocaleString(
+                                          "bn-BD",
+                                        ) || "0"}{" "}
+                                        ৳
+                                      </span>
+                                    </span>
+                                    <span>
+                                      মোট খরচ:{" "}
+                                      <span className="text-rose-600 font-sans">
+                                        {pdfStats.totalExpense?.toLocaleString(
+                                          "bn-BD",
+                                        ) || "0"}{" "}
+                                        ৳
+                                      </span>
+                                    </span>
+                                    <span>
+                                      ওয়ালেট ব্যালেন্স:{" "}
+                                      <span
+                                        className={`${pdfStats.balance! >= 0 ? "text-emerald-600" : "text-rose-600"} font-sans`}
+                                      >
+                                        {pdfStats.balance?.toLocaleString("bn-BD")}{" "}
+                                        ৳
+                                      </span>
+                                    </span>
+                                  </div>
+                                </>
                               ) : (
                                 <>
                                   <span
@@ -2903,7 +3350,9 @@ export const Reports: React.FC = () => {
                                   ? "মোট বাজেট:"
                                   : pdfReportType === "personal_dues"
                                     ? "মোট দিলাম:"
-                                    : "মোট আয়:"}
+                                    : pdfReportType === "wallet"
+                                      ? "মোট জমা:"
+                                      : "মোট আয়:"}
                               </p>
                               <p
                                 className="text-[18px] font-black text-emerald-600 font-sans mt-0.5"
@@ -2918,9 +3367,13 @@ export const Reports: React.FC = () => {
                                     ? (pdfStats.totalGive || 0).toLocaleString(
                                         "bn-BD",
                                       )
-                                    : pdfStats.totalIncome.toLocaleString(
-                                        "bn-BD",
-                                      )}{" "}
+                                    : pdfReportType === "wallet"
+                                      ? (pdfStats.totalIncome || 0).toLocaleString(
+                                          "bn-BD",
+                                        )
+                                      : pdfStats.totalIncome.toLocaleString(
+                                          "bn-BD",
+                                        )}{" "}
                                 ৳
                               </p>
                             </div>
@@ -2938,7 +3391,9 @@ export const Reports: React.FC = () => {
                                   ? "মোট আদায়:"
                                   : pdfReportType === "personal_dues"
                                     ? "মোট পেলাম:"
-                                    : "মোট খরচ:"}
+                                    : pdfReportType === "wallet"
+                                      ? "মোট খরচ:"
+                                      : "মোট খরচ:"}
                               </p>
                               <p
                                 className="text-[18px] font-black text-rose-600 font-sans mt-0.5"
@@ -2953,19 +3408,23 @@ export const Reports: React.FC = () => {
                                     ? (
                                         pdfStats.totalReceive || 0
                                       ).toLocaleString("bn-BD")
-                                    : pdfStats.totalExpense.toLocaleString(
-                                        "bn-BD",
-                                      )}{" "}
+                                    : pdfReportType === "wallet"
+                                      ? (pdfStats.totalExpense || 0).toLocaleString(
+                                          "bn-BD",
+                                        )
+                                      : pdfStats.totalExpense.toLocaleString(
+                                          "bn-BD",
+                                        )}{" "}
                                 ৳
                               </p>
                             </div>
 
                             {/* Total Balance or Total Due */}
                             <div
-                              className={`border rounded-2xl p-4 flex flex-col justify-between h-20 shadow-xs ${pdfReportType === "personal_dues" ? (pdfStats.balance! > 0 ? "bg-[#fdf2f2] border-rose-100" : "bg-[#f0fdf4] border-emerald-100") : "bg-[#f0f9ff] border-blue-100"}`}
+                              className={`border rounded-2xl p-4 flex flex-col justify-between h-20 shadow-xs ${pdfReportType === "personal_dues" ? (pdfStats.balance! > 0 ? "bg-[#fdf2f2] border-rose-100" : "bg-[#f0fdf4] border-emerald-100") : pdfReportType === "wallet" ? (pdfStats.balance! >= 0 ? "bg-[#f0fdf4] border-emerald-100" : "bg-[#fdf2f2] border-rose-100") : "bg-[#f0f9ff] border-blue-100"}`}
                             >
                               <p
-                                className={`text-[9px] font-black uppercase tracking-widest ${pdfReportType === "personal_dues" ? (pdfStats.balance! > 0 ? "text-rose-800" : "text-emerald-800") : "text-blue-800"}`}
+                                className={`text-[9px] font-black uppercase tracking-widest ${pdfReportType === "personal_dues" ? (pdfStats.balance! > 0 ? "text-rose-800" : "text-emerald-800") : pdfReportType === "wallet" ? (pdfStats.balance! >= 0 ? "text-emerald-800 font-bold" : "text-rose-800 font-bold") : "text-blue-800"}`}
                                 style={{
                                   fontFamily: "'Kohinoor Bangla', sans-serif",
                                 }}
@@ -2975,10 +3434,12 @@ export const Reports: React.FC = () => {
                                   ? "মোট বকেয়া:"
                                   : pdfReportType === "personal_dues"
                                     ? "বর্তমান অবস্থা:"
-                                    : "মোট ব্যালেন্স:"}
+                                    : pdfReportType === "wallet"
+                                      ? "ওয়ালেট ব্যালেন্স:"
+                                      : "মোট ব্যালেন্স:"}
                               </p>
                               <p
-                                className={`text-[18px] font-black font-sans mt-0.5 ${pdfReportType === "personal_dues" ? (pdfStats.balance! > 0 ? "text-rose-600" : "text-emerald-600") : "text-blue-600"}`}
+                                className={`text-[18px] font-black font-sans mt-0.5 ${pdfReportType === "personal_dues" ? (pdfStats.balance! > 0 ? "text-rose-600" : "text-emerald-600") : pdfReportType === "wallet" ? (pdfStats.balance! >= 0 ? "text-emerald-600" : "text-rose-600") : "text-blue-600"}`}
                                 style={{
                                   fontFamily: "'Kohinoor Bangla', sans-serif",
                                 }}
@@ -2988,9 +3449,11 @@ export const Reports: React.FC = () => {
                                   ? pdfStats.totalDue.toLocaleString("bn-BD")
                                   : pdfReportType === "personal_dues"
                                     ? `${Math.abs(pdfStats.balance || 0).toLocaleString("bn-BD")} (${pdfStats.balance! > 0 ? "দিবো" : "পাবো"})`
-                                    : pdfStats.balance.toLocaleString(
-                                        "bn-BD",
-                                      )}{" "}
+                                    : pdfReportType === "wallet"
+                                      ? pdfStats.balance.toLocaleString("bn-BD")
+                                      : pdfStats.balance.toLocaleString(
+                                          "bn-BD",
+                                        )}{" "}
                                 ৳
                               </p>
                             </div>

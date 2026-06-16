@@ -682,12 +682,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
             d.name.startsWith("[TRASH]"),
           );
 
+          const nowMs = Date.now();
+          const missingIncome = (incomeRecords || []).filter((localItem) => {
+            if (iData.some((dbItem) => dbItem.id === localItem.id)) return false;
+            const created = localItem.createdat ? new Date(localItem.createdat).getTime() : nowMs;
+            return nowMs - created < 60000;
+          });
+          const mergedUserIncome = [...missingIncome, ...userIncome];
+
+          const missingExpenses = (expenses || []).filter((localItem) => {
+            if (eData.some((dbItem) => dbItem.id === localItem.id)) return false;
+            const created = (localItem as any).createdat ? new Date((localItem as any).createdat).getTime() : nowMs;
+            return nowMs - created < 60000;
+          });
+          const mergedUserExpenses = [...missingExpenses, ...userExpenses];
+
           setProjects(userProjects);
           setTrashedProjects(userTrashedProjects);
           setClients(userClients);
           setTrashedClients(userTrashedClients);
-          setIncomeRecords(userIncome);
-          setExpenses(userExpenses);
+          setIncomeRecords(mergedUserIncome);
+          setExpenses(mergedUserExpenses);
           setTrashedExpenses(userTrashedExpenses);
           setGhazalNotes(userGhazals);
           setTrashedGhazalNotes(userTrashedGhazals);
@@ -705,8 +720,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
               trashedProjects: userTrashedProjects,
               clients: userClients,
               trashedClients: userTrashedClients,
-              incomeRecords: userIncome,
-              expenses: userExpenses,
+              incomeRecords: mergedUserIncome,
+              expenses: mergedUserExpenses,
               trashedExpenses: userTrashedExpenses,
               ghazalNotes: userGhazals,
               trashedGhazalNotes: userTrashedGhazals,
