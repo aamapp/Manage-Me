@@ -11,7 +11,7 @@ function createWindow() {
       contextIsolation: false,
     },
     icon: path.join(__dirname, '..', 'public', 'icon.png'),
-    title: "Audio Balance",
+    title: "Manage-Me",
     autoHideMenuBar: true
   });
 

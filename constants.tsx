@@ -12,7 +12,7 @@ import {
   UserCog
 } from 'lucide-react';
 
-export const APP_NAME = "অডিও ব্যালেন্স";
+export const APP_NAME = "ম্যানেজ মি";
 export const CURRENCY = "৳";
 
 export const NAVIGATION = [
