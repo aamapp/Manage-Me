@@ -115,12 +115,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   const isNotifications = location.pathname === "/notifications";
   const isReports = location.pathname === "/reports";
   const isSettings = location.pathname === "/settings";
+  const isProjectsBackup = location.pathname === "/projects-backup";
   const isFullScreenPage =
     isAiAssistant ||
     isNotifications ||
     isReportPreviewOpen ||
     isReports ||
-    isSettings;
+    isSettings ||
+    isProjectsBackup;
   const isExpensesPage = location.pathname === "/expenses";
 
   const handleNavigate = (path: string) => {
