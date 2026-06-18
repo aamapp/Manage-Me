@@ -257,7 +257,7 @@ export const Reports: React.FC = () => {
 
   // Custom PDF Download States and Subview Systems
   const [viewState, setViewState] = useState<"main" | "download" | "preview">(
-    initialState?.action === "download_preview" ? "preview" : "main",
+    initialState?.action === "download_preview" ? "preview" : "download",
   );
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
 
@@ -1522,8 +1522,8 @@ export const Reports: React.FC = () => {
   };
 
   return (
-    <div className="pb-20">
-      {viewState === "main" && (
+    <div className="p-4 sm:p-6 lg:p-8 pb-24 max-w-lg mx-auto bg-slate-50/50 min-h-screen">
+      {false && (
         <div className="space-y-6 animate-in fade-in duration-300">
           <div className="flex items-start justify-between">
             <div>
@@ -1972,7 +1972,9 @@ export const Reports: React.FC = () => {
         <div className="space-y-6 animate-in fade-in duration-300">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => setViewState("main")}
+              onClick={() => {
+                navigate("/");
+              }}
               className="w-10 h-10 rounded-full border border-slate-200 bg-white flex items-center justify-center text-slate-600 active:scale-95 transition-transform"
             >
               <ArrowLeft size={20} />

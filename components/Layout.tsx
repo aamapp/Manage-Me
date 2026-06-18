@@ -63,11 +63,24 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
       }
     };
     window.addEventListener("expense-active-tab-changed", handleActiveTabChange);
-    return () =>
+    
+    const handleToggleMoreMenu = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail && typeof customEvent.detail.open === "boolean") {
+        setMoreMenuOpen(customEvent.detail.open);
+      } else {
+        setMoreMenuOpen(prev => !prev);
+      }
+    };
+    window.addEventListener("toggle-more-menu", handleToggleMoreMenu);
+
+    return () => {
       window.removeEventListener(
         "expense-active-tab-changed",
         handleActiveTabChange
       );
+      window.removeEventListener("toggle-more-menu", handleToggleMoreMenu);
+    };
   }, []);
 
   const handleExpenseTabClick = (tabName: string) => {
@@ -100,7 +113,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   const navigate = useNavigate();
   const isAiAssistant = location.pathname === "/ai-assistant";
   const isNotifications = location.pathname === "/notifications";
-  const isFullScreenPage = isAiAssistant || isNotifications || isReportPreviewOpen;
+  const isReports = location.pathname === "/reports";
+  const isFullScreenPage = isAiAssistant || isNotifications || isReportPreviewOpen || isReports;
   const isExpensesPage = location.pathname === "/expenses";
 
   const handleNavigate = (path: string) => {

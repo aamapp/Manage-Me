@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { User as UserIcon, Bell, Shield, Palette, Globe, Save, CheckCircle2, Loader2, Camera, UploadCloud, AlertCircle, Lock, Key, Trash2, Fingerprint, Download, Image as ImageIcon, Check } from 'lucide-react';
+import { User as UserIcon, Bell, Shield, Palette, Globe, Save, CheckCircle2, Loader2, Camera, UploadCloud, AlertCircle, Lock, Key, Trash2, Fingerprint, Download, Image as ImageIcon, Check, RefreshCw } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { AppLogo } from '@/components/AppLogo';
 import { APP_NAME } from '../constants';
@@ -22,6 +22,7 @@ export const Settings: React.FC = () => {
   });
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   
   // Security State
   const [newPassword, setNewPassword] = useState('');
@@ -64,6 +65,29 @@ export const Settings: React.FC = () => {
     } finally {
       setIsCapturingLogo(false);
     }
+  };
+
+  const handleCheckUpdate = () => {
+    if (!isOnline) {
+      showToast('অফলাইনে আপডেট চেক করা সম্ভব নয়', 'error');
+      return;
+    }
+    setIsCheckingUpdate(true);
+    const checkEvent = new CustomEvent('check-app-update-manually', {
+      detail: {
+        callback: (res: { success: boolean; updateAvailable?: boolean; error?: string }) => {
+          setIsCheckingUpdate(false);
+          if (!res.success) {
+            showToast(res.error || 'আপডেট চেক করতে সমস্যা হয়েছে', 'error');
+          } else if (res.updateAvailable) {
+            showToast('নতুন আপডেট উপলব্ধ রয়েছে!', 'success');
+          } else {
+            showToast('আপনার অ্যাপটি ইতিমধ্যেই আপ-টু-ডেট রয়েছে!', 'success');
+          }
+        }
+      }
+    });
+    window.dispatchEvent(checkEvent);
   };
 
   // Sync form data if user updates externally
@@ -516,6 +540,39 @@ export const Settings: React.FC = () => {
                  >
                    <AppLogo variant="navy-striped" size="100%" rounded={false} />
                  </div>
+               </div>
+             </div>
+
+             {/* App Update Checker subsection */}
+             <div className="pt-6 mt-6 border-t border-slate-100 font-sans">
+               <h4 className="font-bold text-slate-800 mb-4 flex items-center gap-2 text-sm">
+                 <RefreshCw size={16} className="text-[#4e46dc]" />
+                 অ্যাপ আপডেট
+               </h4>
+               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+                 <div className="flex items-center gap-3 w-full sm:w-auto">
+                   <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center border border-slate-100 shadow-sm shrink-0">
+                     <RefreshCw size={20} className={isCheckingUpdate ? "animate-spin animate-spin-slow" : ""} />
+                   </div>
+                   <div>
+                     <p className="font-bold text-slate-800 text-sm">সিস্টেম আপডেট</p>
+                     <p className="text-xs text-slate-500">বর্তমানে কোনো নতুন সংস্করণ উপলব্ধ আছে কিনা পরীক্ষা করুন।</p>
+                   </div>
+                 </div>
+                 <button 
+                    onClick={handleCheckUpdate}
+                    disabled={isCheckingUpdate}
+                    className="w-full sm:w-auto px-5 py-2.5 rounded-lg font-bold text-sm text-white bg-[#4e46dc] hover:bg-[#3f37c9] disabled:bg-indigo-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                 >
+                    {isCheckingUpdate ? (
+                      <>
+                        <Loader2 className="animate-spin" size={16} />
+                        <span>চেক হচ্ছে...</span>
+                      </>
+                    ) : (
+                      <span>আপডেট চেক করুন</span>
+                    )}
+                 </button>
                </div>
              </div>
 

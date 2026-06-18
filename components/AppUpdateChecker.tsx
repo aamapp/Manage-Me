@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Download, AlertTriangle, CheckCircle2, RefreshCw, X, Loader2 } from 'lucide-react';
+import { Download, AlertTriangle, CheckCircle2, RefreshCw, X, Loader2, Info } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { AppLogo } from '@/components/AppLogo';
 
 interface AppUpdate {
   id: number;
@@ -75,11 +76,12 @@ export const AppUpdateChecker: React.FC = () => {
       return null;
     };
 
-    const localVersion = getVersionFromUrl();
-    if (localVersion !== null) {
-      setCurrentVersionCode(localVersion);
-      checkForUpdate(localVersion);
+    const localVersion = getVersionFromUrl() || 10;
+    if (!localStorage.getItem('android_app_version_code')) {
+      localStorage.setItem('android_app_version_code', '10');
     }
+    setCurrentVersionCode(localVersion);
+    checkForUpdate(localVersion);
 
     // Android WebView রিয়েল-টাইমCallbacks রেজিস্টার করা
     window.setUpdateProgress = (progress: number) => {
@@ -108,6 +110,49 @@ export const AppUpdateChecker: React.FC = () => {
       delete window.setUpdateComplete;
     };
   }, []);
+
+  // Listen for manual update check triggers from the Settings panel
+  useEffect(() => {
+    const handleManualCheck = async (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const callback = customEvent.detail?.callback;
+      const localVersion = currentVersionCode || 10;
+      
+      try {
+        const { data, error } = await supabase
+          .from('app_updates')
+          .select('*')
+          .order('version_code', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (error) {
+          if (callback) callback({ success: false, error: 'সার্ভার থেকে তথ্য পাওয়া যায়নি।' });
+          return;
+        }
+
+        if (data) {
+          const update = data as AppUpdate;
+          if (update.version_code > localVersion) {
+            setUpdateInfo(update);
+            setShowModal(true);
+            if (callback) callback({ success: true, updateAvailable: true, update });
+          } else {
+            if (callback) callback({ success: true, updateAvailable: false, update });
+          }
+        } else {
+          if (callback) callback({ success: true, updateAvailable: false });
+        }
+      } catch (err) {
+        if (callback) callback({ success: false, error: 'ত্রুটি ঘটেছে।' });
+      }
+    };
+
+    window.addEventListener('check-app-update-manually', handleManualCheck);
+    return () => {
+      window.removeEventListener('check-app-update-manually', handleManualCheck);
+    };
+  }, [currentVersionCode]);
 
   const checkForUpdate = async (localVersion: number) => {
     try {
@@ -247,64 +292,69 @@ export const AppUpdateChecker: React.FC = () => {
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+      <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-900/65 backdrop-blur-sm">
         <motion.div
-          initial={{ opacity: 0, scale: 0.9, y: 20 }}
+          initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.9, y: 20 }}
-          transition={{ type: 'spring', duration: 0.5 }}
-          className="relative w-full max-w-md overflow-hidden bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl animate-fade-in"
+          exit={{ opacity: 0, scale: 0.95, y: 20 }}
+          transition={{ type: 'spring', duration: 0.4 }}
+          className="relative w-full max-w-[350px] md:max-w-md overflow-hidden bg-white border border-slate-100 rounded-[2.5rem] shadow-2xl p-8"
         >
-          {/* Top warning stripe if force update */}
-          <div className={`h-2 w-full ${updateInfo.is_force_update ? 'bg-amber-500' : 'bg-emerald-500'}`} />
-
           {/* Close button (Only show if not a force update and not currently downloading) */}
           {!updateInfo.is_force_update && !isDownloading && (
             <button
               onClick={handleClose}
-              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white rounded-full hover:bg-slate-800 transition"
+              className="absolute top-5 right-5 p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-50 transition"
               id="update-dialog-close"
             >
-              <X size={20} />
+              <X size={18} />
             </button>
           )}
 
-          <div className="p-6 md:p-8 flex flex-col items-center text-center">
+          <div className="flex flex-col items-center text-center">
             {/* Visual Indicator Icon states */}
-            <div className={`p-4 rounded-2xl mb-5 ${updateInfo.is_force_update ? 'bg-amber-500/10 text-amber-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
-              {isDownloading ? (
-                <Loader2 size={36} className="animate-spin text-emerald-400" />
-              ) : updateInfo.is_force_update ? (
-                <AlertTriangle size={36} className="animate-bounce" />
-              ) : (
-                <Download size={36} className="animate-pulse" />
-              )}
+            <div className="w-24 h-24 rounded-full bg-[#06153a] flex items-center justify-center mb-6 shadow-lg shadow-indigo-950/10 mx-auto transform hover:scale-105 transition-transform duration-200">
+              <AppLogo variant="white" size="52%" />
             </div>
 
             {/* Typography */}
-            <h2 className="text-2xl font-bold font-sans text-white mb-2 leading-tight">
-              {isDownloading ? 'আপডেট ডাউনলোড হচ্ছে...' : updateInfo.is_force_update ? 'জরুরী আপডেট উপলব্ধ!' : 'নতুন সংস্করণ অবমুক্ত!'}
+            <h2 className="text-xl md:text-2xl font-extrabold text-[#06153a] mb-2 leading-tight tracking-tight font-sans">
+              নতুন আপডেট উপলব্ধ!
             </h2>
-            <p className="text-sm font-mono text-slate-400 mb-4 bg-slate-800/50 px-3 py-1 rounded-full border border-slate-800 inline-block">
+            <p className="text-xs font-mono text-slate-400 mb-4 bg-slate-50 px-3 py-1 rounded-full border border-slate-100 inline-block">
               ভার্সন {updateInfo.version_name} (Build {updateInfo.version_code})
             </p>
 
+            <p className="text-sm md:text-base font-normal text-slate-500/90 leading-relaxed max-w-[280px] mb-6">
+              অ্যাপটির একটি নতুন সংস্করণ উপলব্ধ রয়েছে। অনুগ্রহ করে অ্যাপটি আপডেট করুন।
+            </p>
+
+            {/* If has specific update notes and not downloading, show a toggle or small box */}
+            {!isDownloading && updateInfo.update_message && (
+              <div className="w-full text-left bg-slate-50 border border-slate-100 rounded-2xl p-3.5 mb-5 max-h-[100px] overflow-y-auto custom-scrollbar">
+                <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider block mb-1">কী নতুন:</span>
+                <p className="text-xs text-slate-500 leading-relaxed font-sans whitespace-pre-wrap">
+                  {updateInfo.update_message}
+                </p>
+              </div>
+            )}
+
             {/* If downloading, show progress, else show release notes */}
-            {isDownloading ? (
-              <div className="w-full flex flex-col items-stretch text-left bg-slate-950/40 border border-slate-800/40 rounded-2xl p-5 mb-6">
-                <div className="flex justify-between items-center mb-2.5">
-                  <span className="text-sm font-medium text-emerald-400 flex items-center gap-1.5 font-sans">
-                    <Loader2 size={14} className="animate-spin" /> {downloadStatus || 'ডাউনলোড হচ্ছে...'}
+            {isDownloading && (
+              <div className="w-full flex flex-col items-stretch text-left bg-slate-50 border border-slate-100 rounded-2xl p-4.5 mb-6">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-xs font-semibold text-indigo-600 flex items-center gap-1.5 font-sans animate-pulse">
+                    <Loader2 size={13} className="animate-spin" /> {downloadStatus || 'ডাউনলোড হচ্ছে...'}
                   </span>
-                  <span className="text-base font-bold font-mono text-white">
+                  <span className="text-sm font-bold font-mono text-slate-700">
                     {downloadProgress}%
                   </span>
                 </div>
 
                 {/* Outer Progress bar */}
-                <div className="w-full h-3 bg-slate-800 rounded-full overflow-hidden mb-2 shadow-inner">
+                <div className="w-full h-2 rounded-full overflow-hidden bg-slate-200 mb-2 shadow-inner">
                   <motion.div 
-                    className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full"
+                    className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-full"
                     initial={{ width: '0%' }}
                     animate={{ width: `${downloadProgress}%` }}
                     transition={{ duration: 0.1 }}
@@ -313,60 +363,44 @@ export const AppUpdateChecker: React.FC = () => {
 
                 {/* Byte Counter Text */}
                 {dowloadedSizeText && totalSizeText && (
-                  <div className="flex justify-end text-xs font-mono text-slate-500">
+                  <div className="flex justify-end text-[10px] font-mono text-slate-400">
                     <span>{dowloadedSizeText} / {totalSizeText}</span>
                   </div>
                 )}
                 
-                <p className="text-xs text-slate-400 mt-3 text-center leading-relaxed">
+                <p className="text-[10px] text-slate-400 mt-2 text-center leading-relaxed">
                   অনুগ্রহ করে অপেক্ষা করুন। ডাউনলোড চলাকালীন অ্যাপটি বন্ধ করবেন না।
                 </p>
               </div>
-            ) : (
-              <>
-                {/* Change log / Message Container */}
-                <div className="w-full text-left bg-slate-950/80 border border-slate-800/80 rounded-2xl p-4 mb-6 max-h-[160px] overflow-y-auto custom-scrollbar">
-                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-1">আপডেট বার্তা:</span>
-                  <p className="text-sm text-slate-300 leading-relaxed font-sans whitespace-pre-wrap">
-                    {updateInfo.update_message || 'বাগ ফিক্সিং এবং পারফরম্যান্স ইমপ্রুভমেন্ট করা হয়েছে।'}
-                  </p>
-                </div>
-
-                {/* Notice for Force Updates */}
-                {updateInfo.is_force_update && (
-                  <p className="text-xs text-amber-400/80 mb-6 font-sans flex items-center justify-center gap-1.5 bg-amber-950/20 border border-amber-900/30 w-full py-2.5 rounded-xl px-2">
-                    <AlertTriangle size={14} /> এই আপডেটটি ব্যতিরেকে অ্যাপ ব্যবহার করা যাবে না।
-                  </p>
-                )}
-              </>
             )}
 
             {/* Actions */}
-            <div className="flex flex-col gap-3 w-full">
+            <div className="w-full">
               {!isDownloading ? (
-                <button
-                  onClick={handleDownload}
-                  className="w-full py-4 px-6 text-white text-base font-semibold rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/20"
-                  id="update-download-btn"
-                >
-                  <Download size={20} />
-                  এখনই আপডেট করুন
-                </button>
-              ) : (
-                <div className="w-full py-4 px-6 text-slate-500 text-sm font-medium rounded-2xl bg-slate-800/20 border border-slate-800/30 flex items-center justify-center gap-2">
-                  <RefreshCw size={16} className="animate-spin" />
-                  ডাউনলোড হচ্ছে, অনুগ্রহ করে অপেক্ষা করুন...
+                <div className="flex gap-4 w-full justify-between items-center">
+                  {!updateInfo.is_force_update && (
+                    <button
+                      onClick={handleClose}
+                      className="flex-1 py-3.5 px-4 bg-slate-100 hover:bg-slate-200 active:scale-[0.98] transition-all text-slate-700 font-bold text-sm md:text-base rounded-2xl cursor-pointer"
+                      id="update-later-btn"
+                    >
+                      পরে করব
+                    </button>
+                  )}
+                  <button
+                    onClick={handleDownload}
+                    className="flex-1 py-3.5 px-4 bg-[#4e46dc] hover:bg-[#3f37c9] active:scale-[0.98] transition-all text-white font-bold text-sm md:text-base rounded-2xl cursor-pointer shadow-lg shadow-indigo-100 flex items-center justify-center gap-2"
+                    id="update-download-btn"
+                  >
+                    <Download size={18} />
+                    আপডেট করুন
+                  </button>
                 </div>
-              )}
-
-              {!updateInfo.is_force_update && !isDownloading && (
-                <button
-                  onClick={handleClose}
-                  className="w-full py-3.5 px-6 text-slate-400 hover:text-white text-sm font-medium rounded-2xl bg-transparent hover:bg-slate-800/50 active:scale-[0.98] transition"
-                  id="update-later-btn"
-                >
-                  পরবর্তীতে মনে করান
-                </button>
+              ) : (
+                <div className="w-full py-4 px-6 text-slate-500 text-sm font-medium rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center gap-2">
+                  <RefreshCw size={16} className="animate-spin text-indigo-600" />
+                  <span>ডাউনলোড হচ্ছে, অনুগ্রহ করে অপেক্ষা করুন...</span>
+                </div>
               )}
             </div>
           </div>

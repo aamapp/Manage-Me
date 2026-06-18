@@ -117,6 +117,60 @@ export const Projects: React.FC = () => {
   // New: State for View Details Modal
   const [viewProject, setViewProject] = useState<Project | null>(null);
 
+  // Helper to calculate duration since project creation to today (in months & days)
+  const calculateDuration = (startDateStr: string | number | Date) => {
+    if (!startDateStr) return null;
+    const startDate = new Date(startDateStr);
+    const endDate = new Date(); // today
+    
+    // Clear hours/minutes to get clean date difference
+    startDate.setHours(0,0,0,0);
+    endDate.setHours(0,0,0,0);
+    
+    if (endDate < startDate) {
+      return { months: 0, days: 0 };
+    }
+    
+    let years = endDate.getFullYear() - startDate.getFullYear();
+    let months = endDate.getMonth() - startDate.getMonth();
+    let days = endDate.getDate() - startDate.getDate();
+    
+    if (days < 0) {
+      months -= 1;
+      const prevMonth = new Date(endDate.getFullYear(), endDate.getMonth(), 0);
+      days += prevMonth.getDate();
+    }
+    
+    if (months < 0) {
+      years -= 1;
+      months += 12;
+    }
+    
+    const totalMonths = years * 12 + months;
+    return { months: totalMonths, days: days };
+  };
+
+  const getBengaliDurationText = (startDateStr: any) => {
+    const duration = calculateDuration(startDateStr);
+    if (!duration) return "";
+    const { months, days } = duration;
+    
+    const toBn = (num: number) => num.toLocaleString("bn-BD");
+    
+    if (months === 0 && days === 0) {
+      return "আজকেই";
+    }
+    
+    let parts = [];
+    if (months > 0) {
+      parts.push(`${toBn(months)} মাস`);
+    }
+    if (days > 0) {
+      parts.push(`${toBn(days)} দিন`);
+    }
+    return parts.join(" ");
+  };
+
   // Date Range State
   const [dateRange, setDateRange] = useState<{ start: string; end: string }>({
     start: "",
@@ -1326,7 +1380,8 @@ export const Projects: React.FC = () => {
                 }
               >
                 <div
-                  className={`bg-white rounded-2xl border border-slate-100 shadow-sm relative ${isGeneratingPDF ? "" : "animate-in slide-in-from-bottom-2 duration-300"}`}
+                  onClick={() => setViewProject(p)}
+                  className={`bg-white rounded-2xl border border-slate-100 shadow-sm relative ${isGeneratingPDF ? "" : "animate-in slide-in-from-bottom-2 duration-300"} cursor-pointer hover:shadow-md hover:border-slate-200 transition-all duration-200 active:scale-[0.99]`}
                 >
                   {/* Minimal Card Layout */}
                   <div
@@ -1570,8 +1625,14 @@ export const Projects: React.FC = () => {
       {/* View Project Details Modal (Popup) */}
       {viewProject &&
         createPortal(
-          <div className="fixed inset-0 z-[1000] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-            <div className="bg-white w-full max-w-sm flex flex-col max-h-[90vh] rounded-[2rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-100">
+          <div
+            onClick={() => setViewProject(null)}
+            className="fixed inset-0 z-[1000] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white w-full max-w-sm flex flex-col max-h-[90vh] rounded-[2rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-100"
+            >
               <div className="flex-1 overflow-y-auto overscroll-contain custom-scrollbar">
                 <div
                   ref={detailsRef}
@@ -1727,6 +1788,21 @@ export const Projects: React.FC = () => {
                         </span>
                       </div>
                     </div>
+
+                    {/* Due Duration Notice */}
+                    {viewProject.dueamount > 0 && (
+                      <div className="bg-amber-50/70 border border-amber-200/50 rounded-xl p-3.5 flex items-start gap-2.5">
+                        <Clock size={16} className="text-amber-600 mt-0.5 shrink-0" />
+                        <div>
+                          <p className="text-[10px] font-bold text-amber-800" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                            বকেয়ার মেয়াদ:
+                          </p>
+                          <p className="text-xs font-semibold text-amber-700/90 mt-1 leading-relaxed" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                            প্রজেক্টটি যুক্ত করার পর থেকে আজ পর্যন্ত মোট <span className="font-extrabold text-amber-900 bg-amber-100 px-1.5 py-0.5 rounded font-sans leading-none">{getBengaliDurationText(viewProject.createdat)}</span> ধরে বকেয়া টাকা অবশিষ্ট রয়েছে।
+                          </p>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Tracking History */}
                     <div className="space-y-3">
