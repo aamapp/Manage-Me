@@ -34,6 +34,7 @@ export const AppUpdateChecker: React.FC = () => {
   const [currentVersionCode, setCurrentVersionCode] = useState<number | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
+  const [isDemoMode, setIsDemoMode] = useState(false);
 
   // Download & Progress State
   const [isDownloading, setIsDownloading] = useState(false);
@@ -154,6 +155,33 @@ export const AppUpdateChecker: React.FC = () => {
     };
   }, [currentVersionCode]);
 
+  // Listen for demo mock updates trigger
+  useEffect(() => {
+    const handleDemoTrigger = () => {
+      setIsDemoMode(true);
+      setUpdateInfo({
+        id: 0,
+        version_code: 99,
+        version_name: '2.5.0 (ডেমো)',
+        download_url: '#',
+        update_message: '✨ সম্পূর্ণ নতুন ও আধুনিক ইউজার ইন্টারফেস (UI/UX) ডিজাইন\n⚡ অপ্টিমাইজড ডাউনলোড ও ইনস্টলেশন স্পিড\n🛠️ অফলাইন ট্র্যাকিং সিস্টেম ও পারফরম্যান্স ইমপ্রুভমেন্ট\n📊 ডার্ক এবং লাইট মোড ইন্টারফেস ফিক্স সমূহ',
+        is_force_update: false,
+        created_at: new Date().toISOString()
+      });
+      setShowModal(true);
+      setIsDownloading(false);
+      setDownloadProgress(0);
+      setDownloadStatus('');
+      setDownloadedSizeText('');
+      setTotalSizeText('');
+    };
+
+    window.addEventListener('trigger-demo-update-modal', handleDemoTrigger);
+    return () => {
+      window.removeEventListener('trigger-demo-update-modal', handleDemoTrigger);
+    };
+  }, []);
+
   const checkForUpdate = async (localVersion: number) => {
     try {
       // সুপাবেজ থেকে সর্বশেষ আপডেট তথ্য আনা
@@ -198,6 +226,11 @@ export const AppUpdateChecker: React.FC = () => {
   const handleDownload = () => {
     if (!updateInfo) return;
 
+    if (isDemoMode) {
+      startSimulatedDemoDownload();
+      return;
+    }
+
     // ১. চেক করা যে কোনো এন্ড্রয়েড ইন্টারফেস উপলব্ধ আছে কিনা (WebView context)
     const androidInterface = window.Android || window.AndroidInterface;
 
@@ -216,6 +249,42 @@ export const AppUpdateChecker: React.FC = () => {
       // ২. স্ট্যান্ডার্ড ওয়েব ডাউনলোডার প্রগ্রেস বারসহ (FallBack)
       startWebStandardDownload();
     }
+  };
+
+  const startSimulatedDemoDownload = () => {
+    setIsDownloading(true);
+    setDownloadProgress(0);
+    setDownloadStatus('ডাউনলোড প্রস্তুত করা হচ্ছে (ডেমো)...');
+    setDownloadedSizeText('0 Bytes');
+    setTotalSizeText('14.2 MB');
+
+    let percent = 0;
+    const totalBytes = 14.2 * 1024 * 1024;
+    const interval = setInterval(() => {
+      percent += Math.floor(Math.random() * 8) + 4;
+      if (percent >= 100) {
+        percent = 100;
+        clearInterval(interval);
+        setDownloadProgress(100);
+        setDownloadedSizeText(formatBytes(totalBytes));
+        setDownloadStatus('ডাউনলোড সম্পন্ন হয়েছে!');
+        
+        setTimeout(() => {
+          setDownloadStatus('সংস্করণ ইনস্টল করা হচ্ছে...');
+          setTimeout(() => {
+            setIsDownloading(false);
+            setDownloadProgress(0);
+            setShowModal(false);
+            setIsDemoMode(false);
+          }, 2000);
+        }, 1200);
+      } else {
+        const currentBytes = Math.floor((percent / 100) * totalBytes);
+        setDownloadProgress(percent);
+        setDownloadedSizeText(formatBytes(currentBytes));
+        setDownloadStatus(`ডাউনলোড হচ্ছে... ${percent}%`);
+      }
+    }, 150);
   };
 
   const startWebStandardDownload = () => {
@@ -283,7 +352,9 @@ export const AppUpdateChecker: React.FC = () => {
     if (isDownloading) return; // ডাউনলোড চলাকালীন ক্লোজ করা যাবে না
     setShowModal(false);
     setIsDismissed(true);
-    if (updateInfo) {
+    if (isDemoMode) {
+      setIsDemoMode(false);
+    } else if (updateInfo) {
       sessionStorage.setItem(`update_dismissed_${updateInfo.version_code}`, 'true');
     }
   };
@@ -298,7 +369,7 @@ export const AppUpdateChecker: React.FC = () => {
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
           transition={{ type: 'spring', duration: 0.4 }}
-          className="relative w-full max-w-[350px] md:max-w-md overflow-hidden bg-white border border-slate-100 rounded-[2.5rem] shadow-2xl p-8"
+          className="relative w-full max-w-[350px] md:max-w-md overflow-hidden bg-white border border-slate-100 rounded-3xl shadow-2xl p-8"
         >
           {/* Close button (Only show if not a force update and not currently downloading) */}
           {!updateInfo.is_force_update && !isDownloading && (
@@ -313,8 +384,10 @@ export const AppUpdateChecker: React.FC = () => {
 
           <div className="flex flex-col items-center text-center">
             {/* Visual Indicator Icon states */}
-            <div className="w-24 h-24 rounded-full bg-[#06153a] flex items-center justify-center mb-6 shadow-lg shadow-indigo-950/10 mx-auto transform hover:scale-105 transition-transform duration-200">
-              <AppLogo variant="white" size="52%" />
+            <div className={`w-24 h-24 rounded-full bg-[#06153a] flex items-center justify-center mb-6 shadow-lg shadow-indigo-950/10 mx-auto transform hover:scale-105 transition-transform duration-200 ${isDownloading ? 'ring-4 ring-indigo-50 ring-offset-2 animate-pulse' : ''}`}>
+              <div className={isDownloading ? "animate-spin" : ""}>
+                <AppLogo variant="white" size="52px" />
+              </div>
             </div>
 
             {/* Typography */}
@@ -331,9 +404,9 @@ export const AppUpdateChecker: React.FC = () => {
 
             {/* If has specific update notes and not downloading, show a toggle or small box */}
             {!isDownloading && updateInfo.update_message && (
-              <div className="w-full text-left bg-slate-50 border border-slate-100 rounded-2xl p-3.5 mb-5 max-h-[100px] overflow-y-auto custom-scrollbar">
-                <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider block mb-1">কী নতুন:</span>
-                <p className="text-xs text-slate-500 leading-relaxed font-sans whitespace-pre-wrap">
+              <div className="w-full text-left bg-slate-50/80 border border-slate-100 rounded-2xl py-2.5 px-3.5 mb-4 max-h-[140px] overflow-y-auto custom-scrollbar">
+                <span className="text-[10px] font-extrabold text-indigo-600 uppercase tracking-wider block mb-1">কী নতুন:</span>
+                <p className="text-[11px] md:text-xs text-slate-600 leading-normal font-sans whitespace-pre-wrap">
                   {updateInfo.update_message}
                 </p>
               </div>
@@ -341,7 +414,7 @@ export const AppUpdateChecker: React.FC = () => {
 
             {/* If downloading, show progress, else show release notes */}
             {isDownloading && (
-              <div className="w-full flex flex-col items-stretch text-left bg-slate-50 border border-slate-100 rounded-2xl p-4.5 mb-6">
+              <div className="w-full flex flex-col items-stretch text-left bg-slate-50 border border-slate-100 rounded-2xl p-5 mb-6">
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-xs font-semibold text-indigo-600 flex items-center gap-1.5 font-sans animate-pulse">
                     <Loader2 size={13} className="animate-spin" /> {downloadStatus || 'ডাউনলোড হচ্ছে...'}
@@ -376,31 +449,15 @@ export const AppUpdateChecker: React.FC = () => {
 
             {/* Actions */}
             <div className="w-full">
-              {!isDownloading ? (
-                <div className="flex gap-4 w-full justify-between items-center">
-                  {!updateInfo.is_force_update && (
-                    <button
-                      onClick={handleClose}
-                      className="flex-1 py-3.5 px-4 bg-slate-100 hover:bg-slate-200 active:scale-[0.98] transition-all text-slate-700 font-bold text-sm md:text-base rounded-2xl cursor-pointer"
-                      id="update-later-btn"
-                    >
-                      পরে করব
-                    </button>
-                  )}
-                  <button
-                    onClick={handleDownload}
-                    className="flex-1 py-3.5 px-4 bg-[#4e46dc] hover:bg-[#3f37c9] active:scale-[0.98] transition-all text-white font-bold text-sm md:text-base rounded-2xl cursor-pointer shadow-lg shadow-indigo-100 flex items-center justify-center gap-2"
-                    id="update-download-btn"
-                  >
-                    <Download size={18} />
-                    আপডেট করুন
-                  </button>
-                </div>
-              ) : (
-                <div className="w-full py-4 px-6 text-slate-500 text-sm font-medium rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center gap-2">
-                  <RefreshCw size={16} className="animate-spin text-indigo-600" />
-                  <span>ডাউনলোড হচ্ছে, অনুগ্রহ করে অপেক্ষা করুন...</span>
-                </div>
+              {!isDownloading && (
+                <button
+                  onClick={handleDownload}
+                  className="w-full h-[52px] flex items-center justify-center gap-2 px-4 bg-[#4e46dc] hover:bg-[#3f37c9] active:scale-[0.98] transition-all text-white font-bold text-sm md:text-base rounded-2xl cursor-pointer shadow-lg shadow-indigo-100/30"
+                  id="update-download-btn"
+                >
+                  <Download size={18} />
+                  আপডেট করুন
+                </button>
               )}
             </div>
           </div>
