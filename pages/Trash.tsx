@@ -1,18 +1,36 @@
 import React, { useState } from 'react';
-import { Trash2, RotateCcw, FolderOpen, Music, Receipt, Calendar, User, Clock, CheckCircle2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { 
+  Trash2, 
+  RotateCcw, 
+  Receipt, 
+  Calendar, 
+  Clock, 
+  CheckCircle2, 
+  ArrowLeft,
+  Briefcase,
+  Users,
+  BookOpen,
+  ShoppingBag,
+  Coins,
+  User
+} from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import { supabase } from '@/lib/supabase';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { motion, AnimatePresence } from 'motion/react';
 
-type TrashTab = 'projects' | 'expenses' | 'ghazal_notes' | 'clients';
+type TrashTab = 'projects' | 'clients' | 'expenses' | 'ghazal_notes' | 'shopping_lists' | 'due_persons';
 
 const Trash: React.FC = () => {
+  const navigate = useNavigate();
   const { 
     trashedProjects, 
     trashedExpenses, 
     trashedGhazalNotes, 
     trashedClients,
+    trashedShoppingLists,
+    trashedDuePersons,
     showToast, refreshData, isOnline
   } = useAppContext();
   
@@ -46,6 +64,14 @@ const Trash: React.FC = () => {
         table = 'clients';
         const client = trashedClients.find(c => c.id === selectedItem.id);
         updateData = { contact: client?.contact?.replace('[TRASH]', '').trim() || '' };
+      } else if (selectedItem.type === 'shopping_lists') {
+        table = 'shopping_lists';
+        const list = trashedShoppingLists.find(s => s.id === selectedItem.id);
+        updateData = { title: list?.title?.replace('[TRASH]', '').trim() || '' };
+      } else if (selectedItem.type === 'due_persons') {
+        table = 'due_persons';
+        const person = trashedDuePersons.find(d => d.id === selectedItem.id);
+        updateData = { name: person?.name?.replace('[TRASH]', '').trim() || '' };
       }
 
       const { error } = await supabase
@@ -71,7 +97,9 @@ const Trash: React.FC = () => {
     try {
       const table = selectedItem.type === 'projects' ? 'projects' : 
                     selectedItem.type === 'expenses' ? 'expenses' : 
-                    selectedItem.type === 'clients' ? 'clients' : 'ghazal_notes';
+                    selectedItem.type === 'clients' ? 'clients' : 
+                    selectedItem.type === 'ghazal_notes' ? 'ghazal_notes' :
+                    selectedItem.type === 'shopping_lists' ? 'shopping_lists' : 'due_persons';
 
       const { error } = await supabase
         .from(table)
@@ -111,145 +139,55 @@ const Trash: React.FC = () => {
   };
 
   const renderProjects = () => (
-    <div className="space-y-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {trashedProjects.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-xl border border-dashed border-gray-300">
-          <FolderOpen className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500">কোন ডিলিট করা প্রজেক্ট নেই</p>
+        <div className="col-span-full text-center py-12 bg-white rounded-2xl border border-dashed border-slate-200">
+          <Briefcase className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+          <p className="text-slate-500 font-medium">কোন ডিলিট করা প্রজেক্ট নেই</p>
         </div>
       ) : (
         trashedProjects.map((project) => (
-          <div key={project.id} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex justify-between items-start">
-              <div className="flex-1">
-                <h3 className="font-bold text-gray-900 text-lg mb-1">{project.name}</h3>
-                <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
-                  <div className="flex items-center gap-1">
-                    <User className="w-4 h-4" /> {project.clientname || 'Unknown Client'}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Receipt className="w-4 h-4" /> বাজেট: ৳{project.totalamount}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <CheckCircle2 className="w-4 h-4 text-green-500" /> পেইড: ৳{project.paidamount}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Clock className="w-4 h-4 text-orange-500" /> ডিউ: ৳{project.dueamount}
-                  </div>
+          <div key={project.id} className="bg-white p-5 rounded-2xl border border-slate-150 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                  <Briefcase className="w-4 h-4" />
+                </div>
+                <h3 className="font-bold text-slate-800 text-lg line-clamp-1">{project.name}</h3>
+              </div>
+              <div className="grid grid-cols-2 gap-2.5 text-sm text-slate-600 mb-4">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <User className="w-4 h-4 text-slate-400 shrink-0" /> 
+                  <span className="truncate">{project.clientname || 'Unknown Client'}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Receipt className="w-4 h-4 text-slate-400 shrink-0" /> <span>বাজেট: ৳{project.totalamount}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" /> <span>পেইড: ৳{project.paidamount}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-amber-500 shrink-0" /> <span>ডিউ: ৳{project.dueamount}</span>
                 </div>
               </div>
-              <div className="flex gap-2 ml-4">
-                <button
-                  onClick={() => openConfirm(project.id, 'projects', 'restore')}
-                  disabled={!isOnline}
-                  className={`p-2 rounded-lg transition-colors ${!isOnline ? 'text-slate-300 cursor-not-allowed' : 'text-blue-600 hover:bg-blue-50'}`}
-                  title="Restore"
-                >
-                  <RotateCcw className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={() => openConfirm(project.id, 'projects', 'delete')}
-                  disabled={!isOnline}
-                  className={`p-2 rounded-lg transition-colors ${!isOnline ? 'text-slate-300 cursor-not-allowed' : 'text-red-600 hover:bg-red-50'}`}
-                  title="Permanent Delete"
-                >
-                  <Trash2 className="w-5 h-5" />
-                </button>
-              </div>
             </div>
-          </div>
-        ))
-      )}
-    </div>
-  );
-
-  const renderExpenses = () => (
-    <div className="space-y-4">
-      {trashedExpenses.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-xl border border-dashed border-gray-300">
-          <Receipt className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500">কোন ডিলিট করা খরচ নেই</p>
-        </div>
-      ) : (
-        trashedExpenses.map((expense) => (
-          <div key={expense.id} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex justify-between items-start">
-              <div className="flex-1">
-                <h3 className="font-bold text-gray-900 text-lg mb-1">{expense.category}</h3>
-                <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
-                  <div className="flex items-center gap-1">
-                    <Receipt className="w-4 h-4" /> পরিমাণ: ৳{expense.amount}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Calendar className="w-4 h-4" /> তারিখ: {new Date(expense.date).toLocaleDateString('bn-BD')}
-                  </div>
-                </div>
-                {expense.notes && (
-                  <p className="mt-2 text-sm text-gray-500 italic">
-                    {expense.notes.replace('[TRASH]', '').trim()}
-                  </p>
-                )}
-              </div>
-              <div className="flex gap-2 ml-4">
-                <button
-                  onClick={() => openConfirm(expense.id, 'expenses', 'restore')}
-                  disabled={!isOnline}
-                  className={`p-2 rounded-lg transition-colors ${!isOnline ? 'text-slate-300 cursor-not-allowed' : 'text-blue-600 hover:bg-blue-50'}`}
-                  title="Restore"
-                >
-                  <RotateCcw className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={() => openConfirm(expense.id, 'expenses', 'delete')}
-                  disabled={!isOnline}
-                  className={`p-2 rounded-lg transition-colors ${!isOnline ? 'text-slate-300 cursor-not-allowed' : 'text-red-600 hover:bg-red-50'}`}
-                  title="Permanent Delete"
-                >
-                  <Trash2 className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-          </div>
-        ))
-      )}
-    </div>
-  );
-
-  const renderGhazalNotes = () => (
-    <div className="space-y-4">
-      {trashedGhazalNotes.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-xl border border-dashed border-gray-300">
-          <Music className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500">কোন ডিলিট করা গজল নোট নেই</p>
-        </div>
-      ) : (
-        trashedGhazalNotes.map((note) => (
-          <div key={note.id} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex justify-between items-start">
-              <div className="flex-1">
-                <h3 className="font-bold text-gray-900 text-lg mb-1">{note.title}</h3>
-                <p className="text-sm text-gray-600 line-clamp-2">
-                  {note.lyrics.replace('[TRASH]', '').trim()}
-                </p>
-              </div>
-              <div className="flex gap-2 ml-4">
-                <button
-                  onClick={() => openConfirm(note.id, 'ghazal_notes', 'restore')}
-                  disabled={!isOnline}
-                  className={`p-2 rounded-lg transition-colors ${!isOnline ? 'text-slate-300 cursor-not-allowed' : 'text-blue-600 hover:bg-blue-50'}`}
-                  title="Restore"
-                >
-                  <RotateCcw className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={() => openConfirm(note.id, 'ghazal_notes', 'delete')}
-                  disabled={!isOnline}
-                  className={`p-2 rounded-lg transition-colors ${!isOnline ? 'text-slate-300 cursor-not-allowed' : 'text-red-600 hover:bg-red-50'}`}
-                  title="Permanent Delete"
-                >
-                  <Trash2 className="w-5 h-5" />
-                </button>
-              </div>
+            <div className="flex justify-end gap-2 mt-2 pt-4 border-t border-slate-100 font-sans">
+              <button
+                onClick={() => openConfirm(project.id, 'projects', 'restore')}
+                disabled={!isOnline}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold tracking-wide uppercase transition-colors duration-200 cursor-pointer ${!isOnline ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-blue-600 bg-blue-50 hover:bg-blue-100'}`}
+                title="Restore"
+              >
+                <RotateCcw className="w-4 h-4" /> রিস্টোর
+              </button>
+              <button
+                onClick={() => openConfirm(project.id, 'projects', 'delete')}
+                disabled={!isOnline}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold tracking-wide uppercase transition-colors duration-200 cursor-pointer ${!isOnline ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-red-600 bg-red-50 hover:bg-red-100'}`}
+                title="Permanent Delete"
+              >
+                <Trash2 className="w-4 h-4" /> ডিলিট
+              </button>
             </div>
           </div>
         ))
@@ -258,40 +196,43 @@ const Trash: React.FC = () => {
   );
 
   const renderClients = () => (
-    <div className="space-y-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {trashedClients.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-xl border border-dashed border-gray-300">
-          <User className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500">কোন ডিলিট করা ক্লায়েন্ট নেই</p>
+        <div className="col-span-full text-center py-12 bg-white rounded-2xl border border-dashed border-slate-200">
+          <Users className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+          <p className="text-slate-500 font-medium">কোন ডিলিট করা ক্লায়েন্ট নেই</p>
         </div>
       ) : (
         trashedClients.map((client) => (
-          <div key={client.id} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex justify-between items-start">
-              <div className="flex-1">
-                <h3 className="font-bold text-gray-900 text-lg mb-1">{client.name}</h3>
-                <p className="text-sm text-gray-600">
-                  {client.contact.replace('[TRASH]', '').trim()}
-                </p>
+          <div key={client.id} className="bg-white p-5 rounded-2xl border border-slate-150 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                  <Users className="w-4 h-4" />
+                </div>
+                <h3 className="font-bold text-slate-800 text-lg line-clamp-1">{client.name}</h3>
               </div>
-              <div className="flex gap-2 ml-4">
-                <button
-                  onClick={() => openConfirm(client.id, 'clients', 'restore')}
-                  disabled={!isOnline}
-                  className={`p-2 rounded-lg transition-colors ${!isOnline ? 'text-slate-300 cursor-not-allowed' : 'text-blue-600 hover:bg-blue-50'}`}
-                  title="Restore"
-                >
-                  <RotateCcw className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={() => openConfirm(client.id, 'clients', 'delete')}
-                  disabled={!isOnline}
-                  className={`p-2 rounded-lg transition-colors ${!isOnline ? 'text-slate-300 cursor-not-allowed' : 'text-red-600 hover:bg-red-50'}`}
-                  title="Permanent Delete"
-                >
-                  <Trash2 className="w-5 h-5" />
-                </button>
-              </div>
+              <p className="text-sm text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 font-mono break-all mt-2 max-h-32 overflow-y-auto">
+                {client.contact.replace('[TRASH]', '').trim()}
+              </p>
+            </div>
+            <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-slate-100">
+              <button
+                onClick={() => openConfirm(client.id, 'clients', 'restore')}
+                disabled={!isOnline}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold tracking-wide uppercase transition-colors duration-200 cursor-pointer ${!isOnline ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-blue-600 bg-blue-50 hover:bg-blue-100'}`}
+                title="Restore"
+              >
+                <RotateCcw className="w-4 h-4" /> রিস্টোর
+              </button>
+              <button
+                onClick={() => openConfirm(client.id, 'clients', 'delete')}
+                disabled={!isOnline}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold tracking-wide uppercase transition-colors duration-200 cursor-pointer ${!isOnline ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-red-600 bg-red-50 hover:bg-red-100'}`}
+                title="Permanent Delete"
+              >
+                <Trash2 className="w-4 h-4" /> ডিলিট
+              </button>
             </div>
           </div>
         ))
@@ -299,82 +240,493 @@ const Trash: React.FC = () => {
     </div>
   );
 
+  const renderExpenses = () => (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {trashedExpenses.length === 0 ? (
+        <div className="col-span-full text-center py-12 bg-white rounded-2xl border border-dashed border-slate-200">
+          <Receipt className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+          <p className="text-slate-500 font-medium">কোন ডিলিট করা খরচ নেই</p>
+        </div>
+      ) : (
+        trashedExpenses.map((expense) => (
+          <div key={expense.id} className="bg-white p-5 rounded-2xl border border-slate-150 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                  <Receipt className="w-4 h-4" />
+                </div>
+                <h3 className="font-bold text-slate-800 text-lg line-clamp-1">{expense.category}</h3>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-sm text-slate-500 mb-2">
+                <div className="flex items-center gap-1.5">
+                  <Receipt className="w-4 h-4 text-slate-400" /> <span>পরিমাণ: ৳{expense.amount}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Calendar className="w-4 h-4 text-slate-400" /> <span>তারিখ: {new Date(expense.date).toLocaleDateString('bn-BD')}</span>
+                </div>
+              </div>
+              {expense.notes && (
+                <div className="mt-2 text-sm text-slate-500 italic bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                  "{expense.notes.replace('[TRASH]', '').trim()}"
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-slate-100">
+              <button
+                onClick={() => openConfirm(expense.id, 'expenses', 'restore')}
+                disabled={!isOnline}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold tracking-wide uppercase transition-colors duration-200 cursor-pointer ${!isOnline ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-blue-600 bg-blue-50 hover:bg-blue-100'}`}
+                title="Restore"
+              >
+                <RotateCcw className="w-4 h-4" /> রিস্টোর
+              </button>
+              <button
+                onClick={() => openConfirm(expense.id, 'expenses', 'delete')}
+                disabled={!isOnline}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold tracking-wide uppercase transition-colors duration-200 cursor-pointer ${!isOnline ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-red-600 bg-red-50 hover:bg-red-100'}`}
+                title="Permanent Delete"
+              >
+                <Trash2 className="w-4 h-4" /> ডিলিট
+              </button>
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  );
+
+  const renderGhazalNotes = () => (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {trashedGhazalNotes.length === 0 ? (
+        <div className="col-span-full text-center py-12 bg-white rounded-2xl border border-dashed border-slate-200">
+          <BookOpen className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+          <p className="text-slate-500 font-medium">কোন ডিলিট করা গজল নোট নেই</p>
+        </div>
+      ) : (
+        trashedGhazalNotes.map((note) => (
+          <div key={note.id} className="bg-white p-5 rounded-2xl border border-slate-150 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center shrink-0">
+                  <BookOpen className="w-4 h-4" />
+                </div>
+                <h3 className="font-bold text-slate-800 text-lg line-clamp-1">{note.title}</h3>
+              </div>
+              <p className="text-sm text-slate-600 line-clamp-3 bg-slate-50 p-3 rounded-xl border border-slate-100 whitespace-pre-line font-serif">
+                {note.lyrics.replace('[TRASH]', '').trim()}
+              </p>
+            </div>
+            <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-slate-100">
+              <button
+                onClick={() => openConfirm(note.id, 'ghazal_notes', 'restore')}
+                disabled={!isOnline}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold tracking-wide uppercase transition-colors duration-200 cursor-pointer ${!isOnline ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-blue-600 bg-blue-50 hover:bg-blue-100'}`}
+                title="Restore"
+              >
+                <RotateCcw className="w-4 h-4" /> রিস্টোর
+              </button>
+              <button
+                onClick={() => openConfirm(note.id, 'ghazal_notes', 'delete')}
+                disabled={!isOnline}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold tracking-wide uppercase transition-colors duration-200 cursor-pointer ${!isOnline ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-red-600 bg-red-50 hover:bg-red-100'}`}
+                title="Permanent Delete"
+              >
+                <Trash2 className="w-4 h-4" /> ডিলিট
+              </button>
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  );
+
+  const renderShoppingLists = () => (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {trashedShoppingLists.length === 0 ? (
+        <div className="col-span-full text-center py-12 bg-white rounded-2xl border border-dashed border-slate-200">
+          <ShoppingBag className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+          <p className="text-slate-500 font-medium">কোন ডিলিট করা শপিং লিস্ট নেই</p>
+        </div>
+      ) : (
+        trashedShoppingLists.map((list) => (
+          <div key={list.id} className="bg-white p-5 rounded-2xl border border-slate-150 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center shrink-0">
+                  <ShoppingBag className="w-4 h-4" />
+                </div>
+                <h3 className="font-bold text-slate-800 text-lg line-clamp-1">{list.title.replace('[TRASH]', '').trim()}</h3>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-sm text-slate-500 mb-3">
+                <div className="flex items-center gap-1.5">
+                  <Calendar className="w-4 h-4 text-slate-400" /> <span>তারিখ: {new Date(list.date).toLocaleDateString('bn-BD')}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Receipt className="w-4 h-4 text-slate-400" /> <span>{list.items?.length || 0} টি পণ্য</span>
+                </div>
+              </div>
+              <div className="text-slate-700 font-semibold bg-slate-50 px-3 py-1.5 rounded-lg inline-block text-sm border border-slate-100">
+                মোট বাজেট: ৳{list.totalamount}
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-slate-100">
+              <button
+                onClick={() => openConfirm(list.id, 'shopping_lists', 'restore')}
+                disabled={!isOnline}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold tracking-wide uppercase transition-colors duration-200 cursor-pointer ${!isOnline ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-blue-600 bg-blue-50 hover:bg-blue-100'}`}
+                title="Restore"
+              >
+                <RotateCcw className="w-4 h-4" /> রিস্টোর
+              </button>
+              <button
+                onClick={() => openConfirm(list.id, 'shopping_lists', 'delete')}
+                disabled={!isOnline}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold tracking-wide uppercase transition-colors duration-200 cursor-pointer ${!isOnline ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-red-600 bg-red-50 hover:bg-red-100'}`}
+                title="Permanent Delete"
+              >
+                <Trash2 className="w-4 h-4" /> ডিলিট
+              </button>
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  );
+
+  const renderDuePersons = () => (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {trashedDuePersons.length === 0 ? (
+        <div className="col-span-full text-center py-12 bg-white rounded-2xl border border-dashed border-slate-200">
+          <svg
+            className="w-12 h-12 text-slate-300 mx-auto mb-3"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M9 4v16l-4.5-4.5" />
+            <path d="M15 20V4l4.5 4.5" />
+          </svg>
+          <p className="text-slate-500 font-medium">কোন ডিলিট করা দেনা-পাওনা হিসাব নেই</p>
+        </div>
+      ) : (
+        trashedDuePersons.map((person) => {
+          const balance = person.transactions ? person.transactions.reduce((acc: number, tx: any) => {
+            if (tx.type === 'receive') return acc + tx.amount;
+            if (tx.type === 'give') return acc - tx.amount;
+            return acc;
+          }, 0) : 0;
+
+          return (
+            <div key={person.id} className="bg-white p-5 rounded-2xl border border-slate-150 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M9 4v16l-4.5-4.5" />
+                      <path d="M15 20V4l4.5 4.5" />
+                    </svg>
+                  </div>
+                  <h3 className="font-bold text-slate-800 text-lg line-clamp-1">{person.name.replace('[TRASH]', '').trim()}</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-sm text-slate-500 mb-3">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <User className="w-4 h-4 text-slate-400 shrink-0" /> <span className="truncate">{person.phone || 'ফোন নম্বর নেই'}</span>
+                  </div>
+                  {person.address && (
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <Clock className="w-4 h-4 text-slate-400 shrink-0" /> <span className="truncate">{person.address}</span>
+                    </div>
+                  )}
+                </div>
+                <div className={`text-sm font-semibold px-3 py-1.5 rounded-lg inline-block border ${
+                  balance >= 0 ? 'text-emerald-700 bg-emerald-50 border-emerald-100' : 'text-rose-700 bg-rose-50 border-rose-100'
+                }`}>
+                  {balance >= 0 ? `পাবেন: ৳${balance}` : `দেবেন: ৳${Math.abs(balance)}`}
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-slate-100 font-sans">
+                <button
+                  onClick={() => openConfirm(person.id, 'due_persons', 'restore')}
+                  disabled={!isOnline}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold tracking-wide uppercase transition-colors duration-200 cursor-pointer ${!isOnline ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-blue-600 bg-blue-50 hover:bg-blue-100'}`}
+                  title="Restore"
+                >
+                  <RotateCcw className="w-4 h-4" /> রিস্টোর
+                </button>
+                <button
+                  onClick={() => openConfirm(person.id, 'due_persons', 'delete')}
+                  disabled={!isOnline}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold tracking-wide uppercase transition-colors duration-200 cursor-pointer ${!isOnline ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-red-600 bg-red-50 hover:bg-red-100'}`}
+                  title="Permanent Delete"
+                >
+                  <Trash2 className="w-4 h-4" /> ডিলিট
+                </button>
+              </div>
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+
   return (
-    <div className="max-w-4xl mx-auto px-4 pb-6">
-      <div className="mb-4">
-        <h1 className="text-xl font-bold text-gray-900 mb-1">রিসাইকেল বিন</h1>
-        <p className="text-sm text-gray-500">মুছে ফেলা আইটেমগুলো এখান থেকে রিস্টোর বা স্থায়ীভাবে ডিলিট করতে পারেন।</p>
+    <div className="p-4 sm:p-6 lg:p-8 pb-24 min-h-screen bg-slate-50/50 font-sans">
+      {/* Header Content */}
+      <div className="flex items-center justify-between mb-2.5 max-w-5xl mx-auto border-b border-slate-200/60 pb-3">
+        <div className="flex items-center gap-3.5">
+          <button
+            onClick={() => navigate('/')}
+            className="w-11 h-11 rounded-full border border-slate-200 bg-white flex items-center justify-center text-slate-800 active:scale-95 transition-all hover:bg-slate-100 hover:border-slate-300 cursor-pointer shrink-0 shadow-sm"
+            title="ড্যাশবোর্ডে ফিরে যান"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <div>
+            <h1 className="text-2xl font-black text-slate-900 tracking-tight">রিসাইকেল বিন</h1>
+          </div>
+        </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex flex-wrap gap-2 mb-6 bg-gray-100 p-1 rounded-xl">
-        <button
-          onClick={() => setActiveTab('projects')}
-          className={`flex-1 min-w-[120px] py-2.5 px-4 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${
-            activeTab === 'projects' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          <FolderOpen className="w-4 h-4" />
-          প্রজেক্ট ({trashedProjects.length})
-        </button>
-        <button
-          onClick={() => setActiveTab('clients')}
-          className={`flex-1 min-w-[120px] py-2.5 px-4 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${
-            activeTab === 'clients' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          <User className="w-4 h-4" />
-          ক্লায়েন্ট ({trashedClients.length})
-        </button>
-        <button
-          onClick={() => setActiveTab('expenses')}
-          className={`flex-1 min-w-[120px] py-2.5 px-4 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${
-            activeTab === 'expenses' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          <Receipt className="w-4 h-4" />
-          খরচ ({trashedExpenses.length})
-        </button>
-        <button
-          onClick={() => setActiveTab('ghazal_notes')}
-          className={`flex-1 min-w-[120px] py-2.5 px-4 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${
-            activeTab === 'ghazal_notes' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          <Music className="w-4 h-4" />
-          গজল নোট ({trashedGhazalNotes.length})
-        </button>
+      <div className="max-w-5xl mx-auto">
+        {/* Header Tabs styled like Expenses Page */}
+        <div className="max-w-2xl mx-auto sticky top-0 z-40 bg-white/95 backdrop-blur-md h-14 text-slate-800 border sm:border sm:rounded-2xl border-slate-200/80 shadow-[0_4px_12px_rgba(0,0,0,0.02)] select-none mb-4">
+          <div className="flex items-center justify-between w-full h-full px-2 relative">
+            
+            {/* Tab 1: Projects */}
+            <button
+              onClick={() => setActiveTab('projects')}
+              title="ডিলিট করা প্রজেক্ট সমূহ"
+              className="flex flex-col items-center justify-center h-full w-[44px] cursor-pointer group focus:outline-none relative"
+            >
+              <div
+                className={`w-[28px] h-[28px] rounded-[8px] flex items-center justify-center transition-all border relative ${
+                  activeTab === 'projects'
+                    ? "border-[#1a73e8] text-white bg-[#1a73e8] shadow-xs"
+                    : "border-[#cdd5de] text-[#8e9aa8] hover:border-slate-300 hover:text-slate-600 bg-white"
+                }`}
+              >
+                <Briefcase size={14} strokeWidth={2.4} />
+                {trashedProjects.length > 0 && (
+                  <span className={`absolute -top-1.5 -right-1.5 min-w-[15px] h-3.5 px-0.5 rounded-full text-[8.5px] font-sans font-bold flex items-center justify-center border ${
+                    activeTab === 'projects' ? 'bg-white text-[#1a73e8] border-[#1a73e8]' : 'bg-[#eff6ff] text-[#1a73e8] border-[#dbeafe]'
+                  }`}>
+                    {trashedProjects.length}
+                  </span>
+                )}
+              </div>
+              {activeTab === 'projects' && (
+                <div className="absolute bottom-0 h-[3px] w-7 bg-[#1a73e8] rounded-t-[3px]" />
+              )}
+            </button>
+
+            {/* Tab 2: Clients */}
+            <button
+              onClick={() => setActiveTab('clients')}
+              title="ডিলিট করা ক্লায়েন্ট সমূহ"
+              className="flex flex-col items-center justify-center h-full w-[44px] cursor-pointer group focus:outline-none relative"
+            >
+              <div
+                className={`w-[28px] h-[28px] rounded-[8px] flex items-center justify-center transition-all border relative ${
+                  activeTab === 'clients'
+                    ? "border-[#1a73e8] text-white bg-[#1a73e8] shadow-xs"
+                    : "border-[#cdd5de] text-[#8e9aa8] hover:border-slate-300 hover:text-slate-600 bg-white"
+                }`}
+              >
+                <Users size={14} strokeWidth={2.4} />
+                {trashedClients.length > 0 && (
+                  <span className={`absolute -top-1.5 -right-1.5 min-w-[15px] h-3.5 px-0.5 rounded-full text-[8.5px] font-sans font-bold flex items-center justify-center border ${
+                    activeTab === 'clients' ? 'bg-white text-[#1a73e8] border-[#1a73e8]' : 'bg-[#eff6ff] text-[#1a73e8] border-[#dbeafe]'
+                  }`}>
+                    {trashedClients.length}
+                  </span>
+                )}
+              </div>
+              {activeTab === 'clients' && (
+                <div className="absolute bottom-0 h-[3px] w-7 bg-[#1a73e8] rounded-t-[3px]" />
+              )}
+            </button>
+
+            {/* Tab 3: Expenses */}
+            <button
+              onClick={() => setActiveTab('expenses')}
+              title="ডিলিট করা খরচ সমূহ"
+              className="flex flex-col items-center justify-center h-full w-[44px] cursor-pointer group focus:outline-none relative"
+            >
+              <div
+                className={`w-[28px] h-[28px] rounded-[8px] flex items-center justify-center transition-all border relative ${
+                  activeTab === 'expenses'
+                    ? "border-[#1a73e8] text-white bg-[#1a73e8] shadow-xs"
+                    : "border-[#cdd5de] text-[#8e9aa8] hover:border-slate-300 hover:text-slate-600 bg-white"
+                }`}
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M20 9H4l4.5-4.5" />
+                  <path d="M4 15h16l-4.5 4.5" />
+                </svg>
+                {trashedExpenses.length > 0 && (
+                  <span className={`absolute -top-1.5 -right-1.5 min-w-[15px] h-3.5 px-0.5 rounded-full text-[8.5px] font-sans font-bold flex items-center justify-center border ${
+                    activeTab === 'expenses' ? 'bg-white text-[#1a73e8] border-[#1a73e8]' : 'bg-[#eff6ff] text-[#1a73e8] border-[#dbeafe]'
+                  }`}>
+                    {trashedExpenses.length}
+                  </span>
+                )}
+              </div>
+              {activeTab === 'expenses' && (
+                <div className="absolute bottom-0 h-[3px] w-7 bg-[#1a73e8] rounded-t-[3px]" />
+              )}
+            </button>
+
+            {/* Tab 4: Due Persons */}
+            <button
+              onClick={() => setActiveTab('due_persons')}
+              title="ডিলিট করা দেনা-পাওনা হিসাব"
+              className="flex flex-col items-center justify-center h-full w-[44px] cursor-pointer group focus:outline-none relative"
+            >
+              <div
+                className={`w-[28px] h-[28px] rounded-[8px] flex items-center justify-center transition-all border relative ${
+                  activeTab === 'due_persons'
+                    ? "border-[#1a73e8] text-white bg-[#1a73e8] shadow-xs"
+                    : "border-[#cdd5de] text-[#8e9aa8] hover:border-slate-300 hover:text-slate-600 bg-white"
+                }`}
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M9 4v16l-4.5-4.5" />
+                  <path d="M15 20V4l4.5 4.5" />
+                </svg>
+                {trashedDuePersons.length > 0 && (
+                  <span className={`absolute -top-1.5 -right-1.5 min-w-[15px] h-3.5 px-0.5 rounded-full text-[8.5px] font-sans font-bold flex items-center justify-center border ${
+                    activeTab === 'due_persons' ? 'bg-white text-[#1a73e8] border-[#1a73e8]' : 'bg-[#eff6ff] text-[#1a73e8] border-[#dbeafe]'
+                  }`}>
+                    {trashedDuePersons.length}
+                  </span>
+                )}
+              </div>
+              {activeTab === 'due_persons' && (
+                <div className="absolute bottom-0 h-[3px] w-7 bg-[#1a73e8] rounded-t-[3px]" />
+              )}
+            </button>
+
+            {/* Tab 5: Ghazal Notes */}
+            <button
+              onClick={() => setActiveTab('ghazal_notes')}
+              title="ডিলিট করা গজল নোট সমূহ"
+              className="flex flex-col items-center justify-center h-full w-[44px] cursor-pointer group focus:outline-none relative"
+            >
+              <div
+                className={`w-[28px] h-[28px] rounded-[8px] flex items-center justify-center transition-all border relative ${
+                  activeTab === 'ghazal_notes'
+                    ? "border-[#1a73e8] text-white bg-[#1a73e8] shadow-xs"
+                    : "border-[#cdd5de] text-[#8e9aa8] hover:border-slate-300 hover:text-slate-600 bg-white"
+                }`}
+              >
+                <BookOpen size={14} strokeWidth={2.4} />
+                {trashedGhazalNotes.length > 0 && (
+                  <span className={`absolute -top-1.5 -right-1.5 min-w-[15px] h-3.5 px-0.5 rounded-full text-[8.5px] font-sans font-bold flex items-center justify-center border ${
+                    activeTab === 'ghazal_notes' ? 'bg-white text-[#1a73e8] border-[#1a73e8]' : 'bg-[#eff6ff] text-[#1a73e8] border-[#dbeafe]'
+                  }`}>
+                    {trashedGhazalNotes.length}
+                  </span>
+                )}
+              </div>
+              {activeTab === 'ghazal_notes' && (
+                <div className="absolute bottom-0 h-[3px] w-7 bg-[#1a73e8] rounded-t-[3px]" />
+              )}
+            </button>
+
+            {/* Tab 6: Shopping Lists */}
+            <button
+              onClick={() => setActiveTab('shopping_lists')}
+              title="ডিলিট করা বাজার লিস্ট"
+              className="flex flex-col items-center justify-center h-full w-[44px] cursor-pointer group focus:outline-none relative"
+            >
+              <div
+                className={`w-[28px] h-[28px] rounded-[8px] flex items-center justify-center transition-all border relative ${
+                  activeTab === 'shopping_lists'
+                    ? "border-[#1a73e8] text-white bg-[#1a73e8] shadow-xs"
+                    : "border-[#cdd5de] text-[#8e9aa8] hover:border-slate-300 hover:text-slate-600 bg-white"
+                }`}
+              >
+                <ShoppingBag size={14} strokeWidth={2.4} />
+                {trashedShoppingLists.length > 0 && (
+                  <span className={`absolute -top-1.5 -right-1.5 min-w-[15px] h-3.5 px-0.5 rounded-full text-[8.5px] font-sans font-bold flex items-center justify-center border ${
+                    activeTab === 'shopping_lists' ? 'bg-white text-[#1a73e8] border-[#1a73e8]' : 'bg-[#eff6ff] text-[#1a73e8] border-[#dbeafe]'
+                  }`}>
+                    {trashedShoppingLists.length}
+                  </span>
+                )}
+              </div>
+              {activeTab === 'shopping_lists' && (
+                <div className="absolute bottom-0 h-[3px] w-7 bg-[#1a73e8] rounded-t-[3px]" />
+              )}
+            </button>
+
+          </div>
+        </div>
+
+
+
+        {/* Content with dynamic transition */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, scale: 0.98, y: 15 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.98, y: -15 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+          >
+            {activeTab === 'projects' && renderProjects()}
+            {activeTab === 'clients' && renderClients()}
+            {activeTab === 'expenses' && renderExpenses()}
+            {activeTab === 'ghazal_notes' && renderGhazalNotes()}
+            {activeTab === 'shopping_lists' && renderShoppingLists()}
+            {activeTab === 'due_persons' && renderDuePersons()}
+          </motion.div>
+        </AnimatePresence>
+
+        {/* Confirmation Modal */}
+        <ConfirmModal
+          isOpen={showConfirm}
+          onClose={() => setShowConfirm(false)}
+          onConfirm={confirmAction === 'restore' ? handleRestore : handlePermanentDelete}
+          title={confirmAction === 'restore' ? "রিস্টোর নিশ্চিত করুন" : "স্থায়ীভাবে ডিলিট নিশ্চিত করুন"}
+          message={confirmAction === 'restore' 
+            ? "আপনি কি এই আইটেমটি রিস্টোর করতে চান?" 
+            : "এটি স্থায়ীভাবে মুছে ফেলা হবে এবং আর ফিরে পাওয়া যাবে না। আপনি কি নিশ্চিত?"}
+          confirmText={confirmAction === 'restore' ? "রিস্টোর করুন" : "ডিলিট করুন"}
+          type={confirmAction === 'restore' ? "primary" : "danger"}
+          isProcessing={confirmAction === 'restore' ? isRestoring : isDeleting}
+        />
       </div>
-
-      {/* Content */}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={activeTab}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={{ duration: 0.2 }}
-        >
-          {activeTab === 'projects' && renderProjects()}
-          {activeTab === 'clients' && renderClients()}
-          {activeTab === 'expenses' && renderExpenses()}
-          {activeTab === 'ghazal_notes' && renderGhazalNotes()}
-        </motion.div>
-      </AnimatePresence>
-
-      {/* Confirmation Modal */}
-      <ConfirmModal
-        isOpen={showConfirm}
-        onClose={() => setShowConfirm(false)}
-        onConfirm={confirmAction === 'restore' ? handleRestore : handlePermanentDelete}
-        title={confirmAction === 'restore' ? "রিস্টোর নিশ্চিত করুন" : "স্থায়ীভাবে ডিলিট নিশ্চিত করুন"}
-        message={confirmAction === 'restore' 
-          ? "আপনি কি এই আইটেমটি রিস্টোর করতে চান?" 
-          : "এটি স্থায়ীভাবে মুছে ফেলা হবে এবং আর ফিরে পাওয়া যাবে না। আপনি কি নিশ্চিত?"}
-        confirmText={confirmAction === 'restore' ? "রিস্টোর করুন" : "ডিলিট করুন"}
-        type={confirmAction === 'restore' ? "primary" : "danger"}
-        isProcessing={confirmAction === 'restore' ? isRestoring : isDeleting}
-      />
     </div>
   );
 };

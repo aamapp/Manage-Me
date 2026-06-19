@@ -5,14 +5,11 @@
   "description": "অডিও সাউন্ড ডিজাইন প্রজেক্ট ম্যানেজমেন্ট সিস্টেম",
   "author": "Abdullah Al Mamun",
   "type": "module",
-  "main_desktop": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "tsc --noEmit",
-    "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:3000 && electron .\"",
-    "electron:build": "npm run build && electron-builder"
+    "lint": "tsc --noEmit"
   },
   "dependencies": {
     "@google/genai": "^1.46.0",
@@ -36,11 +33,7 @@
   "devDependencies": {
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
-    "concurrently": "^9.2.1",
-    "electron": "^41.0.4",
-    "electron-builder": "^26.8.1",
     "typescript": "~5.8.2",
-    "vite": "^6.2.0",
-    "wait-on": "^9.0.4"
+    "vite": "^6.2.0"
   }
 }

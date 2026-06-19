@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
+import { useNavigate } from "react-router-dom";
 import {
   Search,
   Plus,
@@ -15,6 +16,7 @@ import {
   MoreVertical,
   Pencil,
   SquarePen,
+  ArrowLeft,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { supabase } from "@/lib/supabase";
@@ -22,6 +24,7 @@ import { useAppContext } from "@/context/AppContext";
 import { GhazalNote } from "@/types";
 
 export const GhazalNotes: React.FC = () => {
+  const navigate = useNavigate();
   const {
     user,
     showToast,
@@ -170,44 +173,49 @@ export const GhazalNotes: React.FC = () => {
   };
 
   return (
-    <div className="space-y-4 pb-10">
-      {/* Header & Add Button */}
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold text-slate-800">গজল তালিকা</h1>
-            <div className="p-1.5 bg-slate-100 text-slate-500 rounded-lg">
-              <BookOpen size={18} />
+    <div className="p-4 sm:p-6 lg:p-8 pb-24 min-h-screen bg-slate-50/50 font-sans">
+      <div className="max-w-5xl mx-auto space-y-6">
+        {/* Header Content */}
+        <div className="flex items-center justify-between mb-6 border-b border-slate-200/60 pb-3">
+          <div className="flex items-center gap-3.5">
+            <button
+              onClick={() => navigate('/')}
+              className="w-11 h-11 rounded-full border border-slate-200 bg-white flex items-center justify-center text-slate-800 active:scale-95 transition-all hover:bg-slate-100 hover:border-slate-300 cursor-pointer shrink-0 shadow-sm"
+              title="ড্যাশবোর্ডে ফিরে যান"
+            >
+              <ArrowLeft size={20} />
+            </button>
+            <div>
+              <h1 className="text-2xl font-black text-slate-900 tracking-tight">গজল তালিকা </h1>
+              <p className="text-xs text-slate-500 font-medium">
+                {filteredNotes.length} টি গজল পাওয়া গেছে
+              </p>
             </div>
           </div>
-          <p className="text-xs text-slate-500 font-medium">
-            {filteredNotes.length} টি গজল পাওয়া গেছে
-          </p>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={openAddModal}
+              disabled={!isOnline}
+              className={`bg-indigo-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-indigo-200 active:scale-90 transition-transform ${!isOnline ? "opacity-50 cursor-not-allowed" : ""}`}
+            >
+              <Plus size={22} />
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={openAddModal}
-            disabled={!isOnline}
-            className={`bg-indigo-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-indigo-200 active:scale-90 transition-transform ${!isOnline ? "opacity-50 cursor-not-allowed" : ""}`}
-          >
-            <Plus size={22} />
-          </button>
-        </div>
-      </div>
 
-      {/* Search Bar */}
-      <div className="flex gap-2">
-        <div className="flex-1 bg-white rounded-2xl border border-slate-200 px-4 py-2.5 flex items-center gap-2 shadow-sm focus-within:ring-2 focus-within:ring-indigo-100 transition-shadow">
-          <Search size={18} className="text-slate-400" />
-          <input
-            type="text"
-            placeholder="সার্চ..."
-            className="w-full bg-transparent outline-none text-sm font-bold text-slate-800 placeholder:text-slate-400"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+        {/* Search Bar */}
+        <div className="flex gap-2">
+          <div className="flex-1 bg-white rounded-2xl border border-slate-200 px-4 py-2.5 flex items-center gap-2 shadow-sm focus-within:ring-2 focus-within:ring-indigo-100 transition-shadow">
+            <Search size={18} className="text-slate-400" />
+            <input
+              type="text"
+              placeholder="সার্চ..."
+              className="w-full bg-transparent outline-none text-sm font-bold text-slate-800 placeholder:text-slate-400"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
         </div>
-      </div>
 
       {/* Notes List */}
       {loading ? (
@@ -562,6 +570,7 @@ export const GhazalNotes: React.FC = () => {
         </AnimatePresence>,
         document.body,
       )}
+      </div>
     </div>
   );
 };

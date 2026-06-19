@@ -1,5 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Plus, 
   Search, 
@@ -25,6 +26,7 @@ import { supabase } from '@/lib/supabase';
 import { ConfirmModal } from '@/components/ConfirmModal';
 
 const ShoppingLists: React.FC = () => {
+  const navigate = useNavigate();
   const { 
     shoppingLists, 
     user, 
@@ -322,27 +324,28 @@ const ShoppingLists: React.FC = () => {
 
   if (isDetailView && selectedList) {
     return (
-      <div className="p-4 pb-24">
-        <div className="flex items-center justify-between mb-6">
-          <button 
-            onClick={handleBackToLists}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-          >
-            <ArrowLeft className="w-6 h-6 text-gray-600" />
-          </button>
-          <div className="text-center flex-1">
-            <h1 className="text-xl font-bold text-gray-900">{selectedList.title}</h1>
-            <p className="text-sm text-gray-500 flex items-center justify-center gap-1">
-              <Calendar className="w-3 h-3" /> {selectedList.date}
-            </p>
+      <div className="p-4 sm:p-6 lg:p-8 pb-24 min-h-screen bg-slate-50/50 font-sans">
+        <div className="max-w-5xl mx-auto">
+          <div className="flex items-center justify-between mb-6 border-b border-slate-200/60 pb-3">
+            <button 
+              onClick={handleBackToLists}
+              className="w-11 h-11 rounded-full border border-slate-200 bg-white flex items-center justify-center text-slate-800 active:scale-95 transition-all hover:bg-slate-100 hover:border-slate-300 cursor-pointer shrink-0 shadow-sm"
+            >
+              <ArrowLeft className="w-5 h-5 text-gray-600" />
+            </button>
+            <div className="text-center flex-1">
+              <h1 className="text-xl font-bold text-gray-900 font-sans">{selectedList.title}</h1>
+              <p className="text-sm text-gray-500 flex items-center justify-center gap-1">
+                <Calendar className="w-3 h-3" /> {selectedList.date}
+              </p>
+            </div>
+            <button 
+              onClick={(e) => handleDeleteList(selectedList.id, e)}
+              className="w-11 h-11 rounded-full border border-red-200 bg-red-50 flex items-center justify-center text-red-500 active:scale-95 transition-all hover:bg-red-100 hover:border-red-300 cursor-pointer shrink-0 shadow-sm"
+            >
+              <Trash2 className="w-5 h-5" />
+            </button>
           </div>
-          <button 
-            onClick={(e) => handleDeleteList(selectedList.id, e)}
-            className="p-2 hover:bg-red-50 rounded-full transition-colors text-red-500"
-          >
-            <Trash2 className="w-5 h-5" />
-          </button>
-        </div>
 
         <div className="bg-blue-50 rounded-xl p-4 mb-6 flex items-center justify-between">
           <div>
@@ -510,21 +513,33 @@ const ShoppingLists: React.FC = () => {
             </div>
           )}
         </AnimatePresence>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-4 pb-24">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">ফর্দি (Shopping List)</h1>
-          <p className="text-sm text-gray-500">আপনার বাজারের তালিকা ম্যানেজ করুন</p>
+    <div className="p-4 sm:p-6 lg:p-8 pb-24 min-h-screen bg-slate-50/50 font-sans">
+      <div className="max-w-5xl mx-auto">
+        {/* Header Content */}
+        <div className="flex items-center justify-between mb-6 border-b border-slate-200/60 pb-3">
+          <div className="flex items-center gap-3.5">
+            <button
+              onClick={() => navigate('/')}
+              className="w-11 h-11 rounded-full border border-slate-200 bg-white flex items-center justify-center text-slate-800 active:scale-95 transition-all hover:bg-slate-100 hover:border-slate-300 cursor-pointer shrink-0 shadow-sm"
+              title="ড্যাশবোর্ডে ফিরে যান"
+            >
+              <ArrowLeft size={20} />
+            </button>
+            <div>
+              <h1 className="text-2xl font-black text-slate-900 tracking-tight">ফর্দি (Shopping List)</h1>
+              <p className="text-sm text-gray-500">আপনার বাজারের তালিকা ম্যানেজ করুন</p>
+            </div>
+          </div>
+          <div className="bg-blue-100 p-3 rounded-2xl shrink-0">
+            <ShoppingBag className="w-6 h-6 text-blue-600" />
+          </div>
         </div>
-        <div className="bg-blue-100 p-3 rounded-2xl">
-          <ShoppingBag className="w-6 h-6 text-blue-600" />
-        </div>
-      </div>
 
       {/* Search Bar */}
       <div className="relative mb-6">
@@ -698,6 +713,7 @@ const ShoppingLists: React.FC = () => {
         title="আইটেম ডিলিট"
         message="আপনি কি নিশ্চিতভাবে এই আইটেমটি ডিলিট করতে চান?"
       />
+      </div>
     </div>
   );
 };

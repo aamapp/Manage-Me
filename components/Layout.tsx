@@ -116,13 +116,19 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   const isReports = location.pathname === "/reports";
   const isSettings = location.pathname === "/settings";
   const isProjectsBackup = location.pathname === "/projects-backup";
+  const isTrash = location.pathname === "/trash";
+  const isGhazalNotes = location.pathname === "/ghazal-notes";
+  const isShoppingLists = location.pathname === "/shopping-lists";
   const isFullScreenPage =
     isAiAssistant ||
     isNotifications ||
     isReportPreviewOpen ||
     isReports ||
     isSettings ||
-    isProjectsBackup;
+    isProjectsBackup ||
+    isTrash ||
+    isGhazalNotes ||
+    isShoppingLists;
   const isExpensesPage = location.pathname === "/expenses";
 
   const handleNavigate = (path: string) => {
@@ -335,7 +341,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   return (
     <div className={`min-h-screen bg-[#fafbfd] font-sans w-full selection:bg-indigo-100 selection:text-indigo-700 flex flex-col lg:flex-row ${isExpensesPage ? 'overflow-x-clip' : 'overflow-x-hidden'}`}>
       {/* Desktop Sidebar - Visible only on LG screens */}
-      <aside className="hidden lg:flex flex-col w-72 bg-white border-r border-slate-200 h-screen lg:fixed lg:top-0 lg:left-0 z-50">
+      {!isTrash && (
+        <aside className="hidden lg:flex flex-col w-72 bg-white border-r border-slate-200 h-screen lg:fixed lg:top-0 lg:left-0 z-50">
         <div className="p-6 border-b border-slate-100">
           <div
             onClick={() => setAboutOpen(true)}
@@ -465,6 +472,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
           </button>
         </div>
       </aside>
+      )}
 
       {/* Mobile Header (App Bar) - Fixed to ensure it stays on top */}
       {!isFullScreenPage && (
@@ -718,7 +726,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
             : isExpensesPage
             ? "pt-14 lg:pt-8 pb-[72px] lg:pb-8 px-0"
             : "pt-14 lg:pt-8 pb-[72px] lg:pb-8 px-3 lg:px-8"
-        } ${isExpensesPage ? "" : "animate-in fade-in duration-150"} w-full max-w-[100vw] lg:max-w-none ${isExpensesPage ? 'overflow-x-clip' : 'overflow-x-hidden'} lg:ml-72`}
+        } ${isExpensesPage ? "" : "animate-in fade-in duration-150"} w-full max-w-[100vw] lg:max-w-none ${isExpensesPage ? 'overflow-x-clip' : 'overflow-x-hidden'} ${isTrash ? "" : "lg:ml-72"}`}
       >
         <div
           className={`max-w-7xl mx-auto w-full ${isFullScreenPage ? "h-[100dvh] lg:h-auto" : ""}`}
