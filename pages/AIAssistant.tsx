@@ -108,6 +108,7 @@ export const AIAssistant: React.FC = () => {
         totalDue,
         totalIncome,
         totalExpense,
+        currency: user?.currency || '৳',
         projectsList: projects.map((p) => ({
           name: p.name,
           client: p.clientname,

@@ -65,7 +65,7 @@ export const StatCard: React.FC<StatCardProps> = ({ title, value, icon, isCurren
     >
         <div className="flex justify-between items-center w-full">
             <div className="flex flex-col min-w-0 pr-2">
-                <p className="text-slate-500 text-[14px] font-semibold tracking-wide mb-1" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>{title}</p>
+                <p className="text-slate-500 text-[14px] font-medium tracking-wide mb-1" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>{title}</p>
         
                 <h3 className="text-[17px] sm:text-[19px] font-black text-slate-800 tracking-tight leading-none truncate">
                     {isCurrency ? (
