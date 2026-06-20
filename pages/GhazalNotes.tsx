@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import {
@@ -34,6 +34,67 @@ export const GhazalNotes: React.FC = () => {
   } = useAppContext();
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Scroll to hide/show FAB refs and helpers
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mainFabRef = useRef<HTMLButtonElement>(null);
+  const isMainFabVisibleRef = useRef(true);
+  const lastGlobalScrollY = useRef(0);
+
+  const setMainFabVisibleDirectly = (visible: boolean) => {
+    if (isMainFabVisibleRef.current === visible) return;
+    isMainFabVisibleRef.current = visible;
+
+    const el = mainFabRef.current;
+    if (!el) return;
+
+    if (visible) {
+      el.style.opacity = "1";
+      el.style.transform = "translateY(0) scale(1)";
+      el.style.pointerEvents = "auto";
+    } else {
+      el.style.opacity = "0";
+      el.style.transform = "translateY(32px) scale(0.9)";
+      el.style.pointerEvents = "none";
+    }
+  };
+
+  useEffect(() => {
+    isMainFabVisibleRef.current = true;
+    if (mainFabRef.current) {
+      mainFabRef.current.style.opacity = "1";
+      mainFabRef.current.style.transform = "translateY(0) scale(1)";
+      mainFabRef.current.style.pointerEvents = "auto";
+    }
+
+    const container = containerRef.current;
+    if (!container) return;
+
+    lastGlobalScrollY.current = container.scrollTop;
+
+    const handleScroll = () => {
+      const currentScrollY = container.scrollTop;
+      const diffScrollY = currentScrollY - lastGlobalScrollY.current;
+
+      if (Math.abs(diffScrollY) > 10) {
+        if (diffScrollY > 0) {
+          setMainFabVisibleDirectly(false);
+        } else if (diffScrollY < 0) {
+          setMainFabVisibleDirectly(true);
+        }
+        lastGlobalScrollY.current = currentScrollY;
+      }
+
+      if (currentScrollY < 30) {
+        setMainFabVisibleDirectly(true);
+      }
+    };
+
+    container.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      container.removeEventListener("scroll", handleScroll);
+    };
+  }, []);
 
   // Modal states
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -173,10 +234,10 @@ export const GhazalNotes: React.FC = () => {
   };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 pb-24 min-h-screen bg-slate-50/50 font-sans">
+    <div ref={containerRef} className="px-4 sm:px-6 lg:px-8 pb-24 pt-0 min-h-screen bg-slate-50/50 font-sans h-screen overflow-y-auto">
       <div className="max-w-5xl mx-auto space-y-6">
         {/* Header Content */}
-        <div className="flex items-center justify-between mb-6 border-b border-slate-200/60 pb-3">
+        <div className="sticky top-0 z-40 bg-slate-50/95 backdrop-blur-md flex items-center justify-between mb-6 border-b border-slate-200/60 h-14 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
           <div className="flex items-center gap-3.5">
             <button
               onClick={() => navigate('/')}
@@ -193,13 +254,7 @@ export const GhazalNotes: React.FC = () => {
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={openAddModal}
-              disabled={!isOnline}
-              className={`bg-indigo-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-indigo-200 active:scale-90 transition-transform ${!isOnline ? "opacity-50 cursor-not-allowed" : ""}`}
-            >
-              <Plus size={22} />
-            </button>
+            {/* FAB button is moved to bottom right */}
           </div>
         </div>
 
@@ -245,7 +300,7 @@ export const GhazalNotes: React.FC = () => {
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
-                className="group bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl hover:border-indigo-100 transition-all duration-300 flex flex-col relative"
+                className="group bg-white rounded-3xl border border-slate-100 shadow-sm hover:border-indigo-100 transition-all duration-300 flex flex-col relative"
               >
                 <div className="p-5 flex-1">
                   <div className="flex items-center gap-3 mb-3">
@@ -570,6 +625,21 @@ export const GhazalNotes: React.FC = () => {
         </AnimatePresence>,
         document.body,
       )}
+      {/* Scroll-to-Hide FAB */}
+      <button
+        ref={mainFabRef}
+        onClick={openAddModal}
+        disabled={!isOnline}
+        className={`fixed bottom-6 right-6 z-50 bg-indigo-600 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-2xl active:scale-95 transition-all duration-300 md:bottom-8 md:right-8 ${
+          !isOnline ? "opacity-50 cursor-not-allowed" : "hover:bg-indigo-700"
+        }`}
+        title="নতুন নোট যোগ করুন"
+        style={{
+          transition: "transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s ease-in-out",
+        }}
+      >
+        <Plus size={28} />
+      </button>
       </div>
     </div>
   );

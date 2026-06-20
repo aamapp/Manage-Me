@@ -147,7 +147,7 @@ const Trash: React.FC = () => {
         </div>
       ) : (
         trashedProjects.map((project) => (
-          <div key={project.id} className="bg-white p-5 rounded-2xl border border-slate-150 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+          <div key={project.id} className="bg-white p-5 rounded-2xl border border-slate-150 shadow-sm transition-all flex flex-col justify-between">
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
@@ -204,7 +204,7 @@ const Trash: React.FC = () => {
         </div>
       ) : (
         trashedClients.map((client) => (
-          <div key={client.id} className="bg-white p-5 rounded-2xl border border-slate-150 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+          <div key={client.id} className="bg-white p-5 rounded-2xl border border-slate-150 shadow-sm transition-all flex flex-col justify-between">
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
@@ -249,7 +249,7 @@ const Trash: React.FC = () => {
         </div>
       ) : (
         trashedExpenses.map((expense) => (
-          <div key={expense.id} className="bg-white p-5 rounded-2xl border border-slate-150 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+          <div key={expense.id} className="bg-white p-5 rounded-2xl border border-slate-150 shadow-sm transition-all flex flex-col justify-between">
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
@@ -304,7 +304,7 @@ const Trash: React.FC = () => {
         </div>
       ) : (
         trashedGhazalNotes.map((note) => (
-          <div key={note.id} className="bg-white p-5 rounded-2xl border border-slate-150 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+          <div key={note.id} className="bg-white p-5 rounded-2xl border border-slate-150 shadow-sm transition-all flex flex-col justify-between">
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-8 h-8 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center shrink-0">
@@ -349,7 +349,7 @@ const Trash: React.FC = () => {
         </div>
       ) : (
         trashedShoppingLists.map((list) => (
-          <div key={list.id} className="bg-white p-5 rounded-2xl border border-slate-150 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+          <div key={list.id} className="bg-white p-5 rounded-2xl border border-slate-150 shadow-sm transition-all flex flex-col justify-between">
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-8 h-8 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center shrink-0">
@@ -420,7 +420,7 @@ const Trash: React.FC = () => {
           }, 0) : 0;
 
           return (
-            <div key={person.id} className="bg-white p-5 rounded-2xl border border-slate-150 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+            <div key={person.id} className="bg-white p-5 rounded-2xl border border-slate-150 shadow-sm transition-all flex flex-col justify-between">
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
@@ -482,9 +482,9 @@ const Trash: React.FC = () => {
   );
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 pb-24 min-h-screen bg-slate-50/50 font-sans">
+    <div className="px-4 sm:px-6 lg:px-8 pb-24 pt-0 min-h-screen bg-slate-50/50 font-sans">
       {/* Header Content */}
-      <div className="flex items-center justify-between mb-2.5 max-w-5xl mx-auto border-b border-slate-200/60 pb-3">
+      <div className="sticky top-0 z-50 bg-slate-50/95 backdrop-blur-md flex items-center justify-between mb-2.5 max-w-5xl mx-auto border-b border-slate-200/60 h-14 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
         <div className="flex items-center gap-3.5">
           <button
             onClick={() => navigate('/')}
@@ -501,7 +501,7 @@ const Trash: React.FC = () => {
 
       <div className="max-w-5xl mx-auto">
         {/* Header Tabs styled like Expenses Page */}
-        <div className="max-w-2xl mx-auto sticky top-0 z-40 bg-white/95 backdrop-blur-md h-14 text-slate-800 border sm:border sm:rounded-2xl border-slate-200/80 shadow-[0_4px_12px_rgba(0,0,0,0.02)] select-none mb-4">
+        <div className="max-w-2xl mx-auto sticky top-14 z-40 bg-white/95 backdrop-blur-md h-14 text-slate-800 border sm:border sm:rounded-2xl border-slate-200/80 shadow-[0_4px_12px_rgba(0,0,0,0.02)] select-none mb-4">
           <div className="flex items-center justify-between w-full h-full px-2 relative">
             
             {/* Tab 1: Projects */}

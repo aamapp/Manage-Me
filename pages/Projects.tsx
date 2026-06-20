@@ -307,10 +307,6 @@ export const Projects: React.FC = () => {
   };
 
   const handleOpenEditModal = (project: Project) => {
-    if (!isOnline) {
-      showToast("অফলাইনে প্রজেক্ট এডিট করা যাবে না", "error");
-      return;
-    }
     setIsEditing(true);
     setFormError(null);
     setActiveProjectId(project.id);
@@ -1380,15 +1376,15 @@ export const Projects: React.FC = () => {
                 }
               >
                 <div
-                  onClick={() => setViewProject(p)}
-                  className={`bg-white rounded-2xl border border-slate-100 shadow-sm relative ${isGeneratingPDF ? "" : "animate-in slide-in-from-bottom-2 duration-300"} cursor-pointer hover:shadow-md hover:border-slate-200 transition-all duration-200 active:scale-[0.99]`}
+                  className={`bg-white rounded-2xl border border-slate-100 shadow-sm relative ${isGeneratingPDF ? "" : "animate-in slide-in-from-bottom-2 duration-300"} hover:border-slate-200 transition-all duration-200`}
                 >
                   {/* Minimal Card Layout */}
                   <div
                     className={`${isGeneratingPDF ? "px-6 py-6" : "px-2 py-4"} flex justify-between items-center`}
                   >
                     <div
-                      className={`flex items-center ${isGeneratingPDF ? "gap-4" : "gap-1.5"} flex-1 min-w-0 mr-1`}
+                      onClick={() => setViewProject(p)}
+                      className={`flex items-center ${isGeneratingPDF ? "gap-4" : "gap-1.5"} flex-1 min-w-0 mr-1 cursor-pointer hover:opacity-95 active:scale-[0.995] transition-all duration-150`}
                     >
                       <div
                         className={`${isGeneratingPDF ? "w-14 h-14 rounded-2xl" : "w-10 h-10 rounded-xl"} bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0`}
@@ -1504,7 +1500,10 @@ export const Projects: React.FC = () => {
 
                         {/* Dropdown Menu */}
                         {activeCardMenuId === p.id && (
-                          <div className="absolute right-0 top-full mt-2 w-32 bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-100 z-30 flex flex-col py-2 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
+                          <div 
+                            onClick={(e) => e.stopPropagation()}
+                            className="absolute right-0 top-full mt-2 w-32 bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-100 z-30 flex flex-col py-2 animate-in fade-in zoom-in-95 duration-200 origin-top-right"
+                          >
                             <div className="absolute -top-1.5 right-3 w-3 h-3 bg-white border-t border-l border-slate-100 transform rotate-45"></div>
                             <button
                               onClick={(e) => {
@@ -1528,19 +1527,9 @@ export const Projects: React.FC = () => {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                if (!isOnline) {
-                                  showToast(
-                                    "অফলাইনে প্রজেক্ট এডিট করা যাবে না",
-                                    "error",
-                                  );
-                                  return;
-                                }
                                 handleOpenEditModal(p);
                               }}
-                              disabled={!isOnline}
-                              className={`w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 transition-colors bg-transparent relative z-10
-                                        ${!isOnline ? "text-slate-300 cursor-not-allowed" : "text-slate-800 hover:bg-slate-50"}
-                                      `}
+                              className="w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 transition-colors bg-transparent relative z-10 text-slate-800 hover:bg-slate-50"
                               style={{
                                 fontFamily: "'Kohinoor Bangla', sans-serif",
                               }}
@@ -1569,7 +1558,6 @@ export const Projects: React.FC = () => {
                                 }
                                 initiateDelete(p.id);
                               }}
-                              disabled={!isOnline}
                               className={`w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 transition-colors bg-transparent relative z-10 rounded-b-[22px]
                                         ${!isOnline ? "text-slate-300 cursor-not-allowed" : "text-rose-500 hover:bg-rose-50"}
                                       `}

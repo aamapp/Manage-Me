@@ -1522,7 +1522,7 @@ export const Reports: React.FC = () => {
   };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 pb-24 max-w-lg mx-auto bg-slate-50/50 min-h-screen">
+    <div className="px-4 sm:px-6 lg:px-8 pb-24 pt-0 max-w-lg mx-auto bg-slate-50/50 min-h-screen">
       {false && (
         <div className="space-y-6 animate-in fade-in duration-300">
           <div className="flex items-start justify-between">
@@ -1970,7 +1970,7 @@ export const Reports: React.FC = () => {
       {/* VIEW: DOWNLOAD CONFIGURATION PAGE */}
       {viewState === "download" && (
         <div className="space-y-6 animate-in fade-in duration-300">
-          <div className="flex items-center gap-3">
+          <div className="sticky top-0 z-40 bg-slate-50/95 backdrop-blur-md flex items-center gap-3 border-b border-slate-200/50 h-14 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 mb-4">
             <button
               onClick={() => {
                 navigate("/");
@@ -2378,51 +2378,51 @@ export const Reports: React.FC = () => {
 
       {/* VIEW: REPORT PREVIEW SHEET & PDF MAKER */}
       {viewState === "preview" && (
-        <div className="min-h-screen bg-slate-100/70 -mx-4 px-4 py-6 flex flex-col space-y-6 relative select-none animate-in fade-in duration-300">
+        <div className="min-h-screen bg-slate-100/70 -mx-4 px-4 pb-6 pt-0 flex flex-col space-y-6 relative select-none animate-in fade-in duration-300">
           {/* Header Controller */}
-          <div className="flex flex-col space-y-2 pb-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    if (initialState?.action === "download_preview") {
-                      navigate(-1);
-                    } else {
-                      setViewState("download");
-                    }
-                  }}
-                  className="p-1 text-slate-800 hover:text-slate-950 active:scale-90 transition-all"
-                >
-                  <ArrowLeft size={24} />
-                </button>
-                <h1 className="text-xl font-black text-slate-800 font-sans">
+          <div className="sticky top-0 z-40 bg-slate-100/95 backdrop-blur-md flex items-center justify-between border-b border-slate-200/50 h-14 -mx-4 px-4">
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => {
+                  if (initialState?.action === "download_preview") {
+                    navigate(-1);
+                  } else {
+                    setViewState("download");
+                  }
+                }}
+                className="p-1 text-slate-800 hover:text-slate-950 active:scale-95 transition-all"
+              >
+                <ArrowLeft size={24} />
+              </button>
+              <div className="flex flex-col justify-center leading-tight pl-1">
+                <h1 className="text-sm font-bold text-slate-800 font-sans">
                   প্রিভিউ
                 </h1>
-              </div>
-
-              {/* Transactions / Page count state pill exactly like screenshot */}
-              <div className="bg-slate-100 hover:bg-slate-200/80 px-4 py-2 rounded-full border border-slate-200/50 text-slate-800 shadow-sm text-xs font-bold font-sans">
-                {pdfReportType === "projects"
-                  ? "প্রজেক্ট"
-                  : pdfReportType === "dues"
-                    ? "বকেয়া"
-                    : pdfReportType === "personal_dues"
-                      ? "ব্যক্তিগত লেনদেন"
-                      : pdfReportType === "wallet"
-                        ? "ওয়ালেট লেনদেন"
-                        : "লেনদেন"}
-                :{" "}
-                {pdfReportType === "projects"
-                  ? pdfFilteredProjects.length
-                  : pdfReportType === "dues"
-                    ? pdfFilteredDues.length
-                    : pdfTransactions.length}{" "}
-                &nbsp;|&nbsp; মোট পৃষ্ঠা: {toBnDigits(getPaginatedPages.length)}
+                <p className="text-[9px] text-slate-400 font-semibold">
+                  আয় ও ব্যয় রিপোর্ট (A4 সাইজ)
+                </p>
               </div>
             </div>
-            <p className="text-[11px] text-slate-400 font-semibold pl-1">
-              আয় ও ব্যয় রিপোর্ট (A4 সাইজ)
-            </p>
+
+            {/* Transactions / Page count state pill exactly like screenshot */}
+            <div className="bg-slate-100/80 hover:bg-slate-200/80 px-3 py-1 rounded-full border border-slate-200/50 text-slate-800 shadow-sm text-[10px] font-bold font-sans shrink-0">
+              {pdfReportType === "projects"
+                ? "প্রজেক্ট"
+                : pdfReportType === "dues"
+                  ? "বকেয়া"
+                  : pdfReportType === "personal_dues"
+                    ? "ব্যক্তিগত লেনদেন"
+                    : pdfReportType === "wallet"
+                      ? "ওয়ালেট লেনদেন"
+                      : "লেনদেন"}
+              :{" "}
+              {pdfReportType === "projects"
+                ? pdfFilteredProjects.length
+                : pdfReportType === "dues"
+                  ? pdfFilteredDues.length
+                  : pdfTransactions.length}{" "}
+              &nbsp;|&nbsp; পৃষ্ঠা: {toBnDigits(getPaginatedPages.length)}
+            </div>
           </div>
 
           {isPreviewLoading ? (

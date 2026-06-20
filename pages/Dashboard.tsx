@@ -371,7 +371,7 @@ export const Dashboard: React.FC = () => {
               <div 
                 key={p.id} 
                 onClick={() => navigate('/projects')}
-                className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm hover:shadow-md hover:border-indigo-100 active:scale-[0.98] transition-all flex items-center justify-between group cursor-pointer"
+                className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm hover:border-indigo-100 active:scale-[0.98] transition-all flex items-center justify-between group cursor-pointer"
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0 mr-2">
                    {/* Smart Icon */}

@@ -119,6 +119,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   const isTrash = location.pathname === "/trash";
   const isGhazalNotes = location.pathname === "/ghazal-notes";
   const isShoppingLists = location.pathname === "/shopping-lists";
+  const isClients = location.pathname === "/clients";
   const isFullScreenPage =
     isAiAssistant ||
     isNotifications ||
@@ -128,7 +129,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
     isProjectsBackup ||
     isTrash ||
     isGhazalNotes ||
-    isShoppingLists;
+    isShoppingLists ||
+    isClients;
   const isExpensesPage = location.pathname === "/expenses";
 
   const handleNavigate = (path: string) => {

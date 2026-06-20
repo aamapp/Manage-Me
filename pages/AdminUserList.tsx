@@ -218,7 +218,7 @@ export const AdminUserList: React.FC = () => {
                         <div 
                             key={u.id}
                             onClick={() => handleSelectUser(u.id)}
-                            className={`bg-white p-4 rounded-2xl border ${isUnknown ? 'border-amber-200 bg-amber-50/30' : 'border-slate-100'} shadow-sm active:scale-[0.98] transition-all hover:border-indigo-200 hover:shadow-md cursor-pointer group relative`}
+                            className={`bg-white p-4 rounded-2xl border ${isUnknown ? 'border-amber-200 bg-amber-50/30' : 'border-slate-100'} shadow-sm active:scale-[0.98] transition-all hover:border-indigo-200 cursor-pointer group relative`}
                         >
                             <div className="flex items-center justify-between mb-3">
                                 <div className="flex items-center gap-3">

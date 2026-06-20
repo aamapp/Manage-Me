@@ -4459,7 +4459,7 @@ const DuesManager: React.FC<DuesManagerProps> = ({
                     return (
                       <div
                         key={t.id}
-                        className={`relative grid grid-cols-[1.8fr_1fr_1fr] border border-slate-100 rounded-xl shadow-sm hover:shadow-md transition-all bg-white ${
+                        className={`relative grid grid-cols-[1.8fr_1fr_1fr] border border-slate-100 rounded-xl shadow-sm transition-all bg-white ${
                           activeTxMenuId === t.id ? "z-30" : "z-10"
                         }`}
                       >
@@ -4986,7 +4986,7 @@ const DuesManager: React.FC<DuesManagerProps> = ({
                 setSelectedPersonId(person.id);
                 setActiveView("details");
               }}
-              className={`p-2.5 rounded-xl flex items-center gap-3 border border-slate-50 shadow-sm cursor-pointer hover:shadow-md transition-all relative ${bgClass}`}
+              className={`p-2.5 rounded-xl flex items-center gap-3 border border-slate-50 shadow-sm cursor-pointer transition-all relative ${bgClass}`}
             >
               <div className="w-11 h-11 rounded-full overflow-hidden shrink-0 flex items-center justify-center bg-indigo-100">
                 {person.avatar ? (
@@ -6988,7 +6988,7 @@ const BudgetManager: React.FC<{ expenses: any[]; user: any }> = ({
                       setSelectedCategory(bud.category);
                       setActiveView("details");
                     }}
-                    className="bg-white p-5 rounded-2xl border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.01)] space-y-3.5 relative overflow-hidden text-left hover:shadow-md transition-shadow duration-300 cursor-pointer"
+                    className="bg-white p-5 rounded-2xl border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.01)] space-y-3.5 relative overflow-hidden text-left transition-shadow duration-300 cursor-pointer"
                   >
                     <div className="flex justify-between items-start">
                       <div>

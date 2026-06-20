@@ -12,6 +12,7 @@ import {
   Loader2,
   ChevronRight,
   SquarePen,
+  ArrowLeft,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { CURRENCY } from "../constants";
@@ -37,6 +38,67 @@ export const Clients: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+
+  // Scroll to hide/show FAB refs and helpers
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mainFabRef = useRef<HTMLButtonElement>(null);
+  const isMainFabVisibleRef = useRef(true);
+  const lastGlobalScrollY = useRef(0);
+
+  const setMainFabVisibleDirectly = (visible: boolean) => {
+    if (isMainFabVisibleRef.current === visible) return;
+    isMainFabVisibleRef.current = visible;
+
+    const el = mainFabRef.current;
+    if (!el) return;
+
+    if (visible) {
+      el.style.opacity = "1";
+      el.style.transform = "translateY(0) scale(1)";
+      el.style.pointerEvents = "auto";
+    } else {
+      el.style.opacity = "0";
+      el.style.transform = "translateY(32px) scale(0.9)";
+      el.style.pointerEvents = "none";
+    }
+  };
+
+  useEffect(() => {
+    isMainFabVisibleRef.current = true;
+    if (mainFabRef.current) {
+      mainFabRef.current.style.opacity = "1";
+      mainFabRef.current.style.transform = "translateY(0) scale(1)";
+      mainFabRef.current.style.pointerEvents = "auto";
+    }
+
+    const container = containerRef.current;
+    if (!container) return;
+
+    lastGlobalScrollY.current = container.scrollTop;
+
+    const handleScroll = () => {
+      const currentScrollY = container.scrollTop;
+      const diffScrollY = currentScrollY - lastGlobalScrollY.current;
+
+      if (Math.abs(diffScrollY) > 10) {
+        if (diffScrollY > 0) {
+          setMainFabVisibleDirectly(false);
+        } else if (diffScrollY < 0) {
+          setMainFabVisibleDirectly(true);
+        }
+        lastGlobalScrollY.current = currentScrollY;
+      }
+
+      if (currentScrollY < 30) {
+        setMainFabVisibleDirectly(true);
+      }
+    };
+
+    container.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      container.removeEventListener("scroll", handleScroll);
+    };
+  }, []);
 
   // Delete Modal State
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -223,216 +285,240 @@ export const Clients: React.FC = () => {
   );
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-slate-800">ক্লায়েন্ট তালিকা</h1>
-          <p className="text-xs text-slate-500 font-medium">
-            {clients.length} জন ক্লায়েন্ট
-          </p>
-        </div>
-        <button
-          onClick={handleOpenAddModal}
-          disabled={!isOnline}
-          className={`bg-indigo-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-indigo-200 active:scale-90 transition-transform ${!isOnline ? "opacity-50 cursor-not-allowed" : ""}`}
-        >
-          <Plus size={24} />
-        </button>
-      </div>
-
-      <div className="bg-white px-4 py-2.5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-2">
-        <Search size={18} className="text-slate-400" />
-        <input
-          type="text"
-          placeholder="ক্লায়েন্ট খুঁজুন..."
-          className="w-full bg-transparent outline-none text-sm font-bold text-slate-800 placeholder:text-slate-400"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pb-20">
-        {filteredClients.length === 0 ? (
-          <div className="col-span-full py-20 text-center text-slate-400">
-            <Users size={48} className="mx-auto mb-4 opacity-20" />
-            <p className="text-sm font-medium">কোনো ক্লায়েন্ট নেই</p>
-          </div>
-        ) : (
-          filteredClients.map((client) => {
-            // Dynamic calculation for display
-            const stats = getClientStats(client.name);
-
-            return (
-              <div
-                key={client.id}
-                className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm relative animate-in slide-in-from-bottom-2 duration-300"
-              >
-                <div className="flex justify-between items-start">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-lg">
-                      {client.name ? client.name[0] : "C"}
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-slate-800 text-base">
-                        {client.name}
-                      </h3>
-                    </div>
-                  </div>
-
-                  {/* Floating Action Menu */}
-                  <div className="relative action-menu-container">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActiveMenuId(
-                          activeMenuId === client.id ? null : client.id,
-                        );
-                      }}
-                      className={`p-2 -mr-2 rounded-full transition-colors ${activeMenuId === client.id ? "bg-indigo-50 text-indigo-600" : "text-slate-300 hover:text-indigo-600 active:bg-slate-50"}`}
-                    >
-                      <MoreHorizontal size={20} />
-                    </button>
-
-                    {activeMenuId === client.id && (
-                      <div className="absolute right-0 top-full mt-2 w-32 bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-100 z-[60] flex flex-col py-2 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
-                        <div className="absolute -top-1.5 right-3 w-3 h-3 bg-white border-t border-l border-slate-100 transform rotate-45"></div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenEditModal(client);
-                          }}
-                          className="w-full px-4 py-2.5 text-left text-[15px] font-medium text-slate-800 hover:bg-slate-50 flex items-center gap-3 transition-colors bg-transparent relative z-10 rounded-t-[22px]"
-                        >
-                          <SquarePen
-                            size={20}
-                            className="text-slate-800"
-                            strokeWidth={1.5}
-                          />{" "}
-                          এডিট
-                        </button>
-                        <div className="h-[1px] bg-slate-50 w-[85%] mx-auto relative z-10"></div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (!isOnline) {
-                              showToast(
-                                "অফলাইনে ক্লায়েন্ট ডিলিট করা যাবে না",
-                                "error",
-                              );
-                              return;
-                            }
-                            initiateDelete(client.id);
-                          }}
-                          disabled={!isOnline}
-                          className={`w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 transition-colors bg-transparent relative z-10 rounded-b-[22px]
-                                    ${!isOnline ? "text-slate-300 cursor-not-allowed" : "text-rose-500 hover:bg-rose-50"}
-                                  `}
-                        >
-                          <Trash2
-                            size={20}
-                            strokeWidth={1.5}
-                            className={
-                              !isOnline ? "text-slate-300" : "text-rose-500"
-                            }
-                          />{" "}
-                          ডিলিট
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 mt-4 bg-slate-50 p-3 rounded-xl">
-                  {/* Clickable Projects Stat */}
-                  <div
-                    onClick={() => handleViewClientProjects(client.name)}
-                    className="text-center border-r border-slate-200 cursor-pointer active:opacity-60 transition-opacity"
-                  >
-                    <p className="text-[10px] text-slate-400 font-bold uppercase mb-0.5 flex items-center justify-center gap-1">
-                      প্রজেক্ট <ChevronRight size={10} />
-                    </p>
-                    <p className="font-bold text-slate-800 text-base">
-                      {stats.totalProjects} টি
-                    </p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-[10px] text-slate-400 font-bold uppercase mb-0.5">
-                      মোট আয়
-                    </p>
-                    <p className="font-bold text-indigo-600 text-base">
-                      {CURRENCY} {stats.totalEarnings.toLocaleString("bn-BD")}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
-
-      <ConfirmModal
-        isOpen={showDeleteModal}
-        onClose={() => setShowDeleteModal(false)}
-        onConfirm={handleConfirmDelete}
-        title="ক্লায়েন্ট ডিলিট"
-        message="আপনি কি নিশ্চিত? ক্লায়েন্ট ডিলিট করলে ডাটাবেস থেকে মুছে যাবে এবং পুনরুদ্ধার করা যাবে না।"
-        isProcessing={isDeleting}
-      />
-
-      {/* Full Screen Modal with Portal */}
-      {isModalOpen &&
-        createPortal(
-          <div className="fixed inset-0 z-[1000] bg-white flex flex-col h-[100dvh] animate-in fade-in duration-200">
-            {/* Header */}
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-10">
-              <h2 className="text-xl font-bold text-slate-800">
-                {isEditing ? "ক্লায়েন্ট এডিট" : "নতুন ক্লায়েন্ট"}
-              </h2>
-              <button
-                disabled={isSubmitting}
-                onClick={() => setModalOpen(false)}
-                className="p-2 bg-slate-50 rounded-full text-slate-500 hover:bg-slate-100 transition-colors"
-              >
-                <X size={24} />
-              </button>
+    <div ref={containerRef} className="px-4 sm:px-6 lg:px-8 pb-24 pt-0 min-h-screen bg-slate-50/50 font-sans h-screen overflow-y-auto">
+      <div className="max-w-5xl mx-auto space-y-6">
+        {/* Header Content */}
+        <div className="sticky top-0 z-40 bg-slate-50/95 backdrop-blur-md flex items-center justify-between mb-6 border-b border-slate-200/60 h-14 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+          <div className="flex items-center gap-3.5">
+            <button
+              onClick={() => navigate('/')}
+              className="w-11 h-11 rounded-full border border-slate-200 bg-white flex items-center justify-center text-slate-800 active:scale-95 transition-all hover:bg-slate-100 hover:border-slate-300 cursor-pointer shrink-0 shadow-sm"
+              title="ড্যাশবোর্ডে ফিরে যান"
+            >
+              <ArrowLeft size={20} />
+            </button>
+            <div>
+              <h1 className="text-xl font-bold text-slate-800 animate-in fade-in duration-300">ক্লায়েন্ট তালিকা</h1>
+              <p className="text-xs text-slate-500 font-medium">
+                {clients.length} জন ক্লায়েন্ট পাওয়া গেছে
+              </p>
             </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {/* FAB button is moved to bottom right */}
+          </div>
+        </div>
 
-            {/* Form */}
-            <div className="flex-1 overflow-y-auto">
-              <form onSubmit={handleSubmit} className="p-6 space-y-5 pb-24">
-                <div>
-                  <label className="text-sm font-bold text-slate-600 mb-2 block">
-                    নাম
-                  </label>
-                  <input
-                    required
-                    type="text"
-                    value={newClient.name}
-                    onChange={(e) =>
-                      setNewClient({ ...newClient, name: e.target.value })
-                    }
-                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none text-base"
-                    placeholder="ক্লায়েন্ট নাম..."
-                  />
+        <div className="bg-white px-4 py-2.5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-2">
+          <Search size={18} className="text-slate-400" />
+          <input
+            type="text"
+            placeholder="ক্লায়েন্ট খুঁজুন..."
+            className="w-full bg-transparent outline-none text-sm font-bold text-slate-800 placeholder:text-slate-400"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pb-20">
+          {filteredClients.length === 0 ? (
+            <div className="col-span-full py-20 text-center text-slate-400">
+              <Users size={48} className="mx-auto mb-4 opacity-20 animate-bounce duration-1000" />
+              <p className="text-sm font-medium">কোনো ক্লায়েন্ট নেই</p>
+            </div>
+          ) : (
+            filteredClients.map((client) => {
+              // Dynamic calculation for display
+              const stats = getClientStats(client.name);
+
+              return (
+                <div
+                  key={client.id}
+                  className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm relative animate-in slide-in-from-bottom-2 duration-300 hover:border-slate-200 transition-all"
+                >
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-lg border border-indigo-100">
+                        {client.name ? client.name[0] : "C"}
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-slate-800 text-base">
+                          {client.name}
+                        </h3>
+                      </div>
+                    </div>
+
+                    {/* Floating Action Menu */}
+                    <div className="relative action-menu-container">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveMenuId(
+                            activeMenuId === client.id ? null : client.id,
+                          );
+                        }}
+                        className={`p-2 -mr-2 rounded-full transition-colors ${activeMenuId === client.id ? "bg-indigo-50 text-indigo-600" : "text-slate-300 hover:text-indigo-600 active:bg-slate-50"}`}
+                      >
+                        <MoreHorizontal size={20} />
+                      </button>
+
+                      {activeMenuId === client.id && (
+                        <div className="absolute right-0 top-full mt-2 w-32 bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-100 z-[60] flex flex-col py-2 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
+                          <div className="absolute -top-1.5 right-3 w-3 h-3 bg-white border-t border-l border-slate-100 transform rotate-45"></div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenEditModal(client);
+                            }}
+                            className="w-full px-4 py-2.5 text-left text-[15px] font-medium text-slate-800 hover:bg-slate-50 flex items-center gap-3 transition-colors bg-transparent relative z-10 rounded-t-[22px]"
+                          >
+                            <SquarePen
+                              size={20}
+                              className="text-slate-800"
+                              strokeWidth={1.5}
+                            />{" "}
+                            এডিট
+                          </button>
+                          <div className="h-[1px] bg-slate-50 w-[85%] mx-auto relative z-10"></div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!isOnline) {
+                                showToast(
+                                  "অফলাইনে ক্লায়েন্ট ডিলিট করা যাবে না",
+                                  "error",
+                                );
+                                return;
+                              }
+                              initiateDelete(client.id);
+                            }}
+                            disabled={!isOnline}
+                            className={`w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 transition-colors bg-transparent relative z-10 rounded-b-[22px]
+                                      ${!isOnline ? "text-slate-300 cursor-not-allowed" : "text-rose-500 hover:bg-rose-50"}
+                                    `}
+                          >
+                            <Trash2
+                              size={20}
+                              strokeWidth={1.5}
+                              className={
+                                !isOnline ? "text-slate-300" : "text-rose-500"
+                              }
+                            />{" "}
+                            ডিলিট
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 mt-4 bg-slate-50 p-3 rounded-xl">
+                    {/* Clickable Projects Stat */}
+                    <div
+                      onClick={() => handleViewClientProjects(client.name)}
+                      className="text-center border-r border-slate-200 cursor-pointer active:opacity-60 transition-opacity"
+                    >
+                      <p className="text-[10px] text-slate-400 font-bold uppercase mb-0.5 flex items-center justify-center gap-1">
+                        প্রজেক্ট <ChevronRight size={10} />
+                      </p>
+                      <p className="font-bold text-slate-800 text-base">
+                        {stats.totalProjects} টি
+                      </p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-[10px] text-slate-400 font-bold uppercase mb-0.5">
+                        মোট আয়
+                      </p>
+                      <p className="font-bold text-indigo-600 text-base">
+                        {CURRENCY} {stats.totalEarnings.toLocaleString("bn-BD")}
+                      </p>
+                    </div>
+                  </div>
                 </div>
+              );
+            })
+          )}
+        </div>
 
-                {/* Contact Input Removed */}
+        <ConfirmModal
+          isOpen={showDeleteModal}
+          onClose={() => setShowDeleteModal(false)}
+          onConfirm={handleConfirmDelete}
+          title="ক্লায়েন্ট ডিলিট"
+          message="আপনি কি নিশ্চিত? ক্লায়েন্ট ডিলিট করলে ডাটাবেস থেকে মুছে যাবে এবং পুনরুদ্ধার করা যাবে না।"
+          isProcessing={isDeleting}
+        />
 
+        {/* Full Screen Modal with Portal */}
+        {isModalOpen &&
+          createPortal(
+            <div className="fixed inset-0 z-[1000] bg-white flex flex-col h-[100dvh] animate-in fade-in duration-200">
+              {/* Header */}
+              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-10">
+                <h2 className="text-xl font-bold text-slate-800">
+                  {isEditing ? "ক্লায়েন্ট এডিট" : "নতুন ক্লায়েন্ট"}
+                </h2>
                 <button
                   disabled={isSubmitting}
-                  type="submit"
-                  className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg shadow-indigo-200 active:scale-95 transition-transform flex items-center justify-center gap-2 mt-4"
+                  onClick={() => setModalOpen(false)}
+                  className="p-2 bg-slate-50 rounded-full text-slate-500 hover:bg-slate-100 transition-colors"
                 >
-                  {isSubmitting && (
-                    <Loader2 size={24} className="animate-spin" />
-                  )}
-                  সেভ করুন
+                  <X size={24} />
                 </button>
-              </form>
-            </div>
-          </div>,
-          document.body,
-        )}
+              </div>
+
+              {/* Form */}
+              <div className="flex-1 overflow-y-auto">
+                <form onSubmit={handleSubmit} className="p-6 space-y-5 pb-24">
+                  <div>
+                    <label className="text-sm font-bold text-slate-600 mb-2 block">
+                      নাম
+                    </label>
+                    <input
+                      required
+                      type="text"
+                      value={newClient.name}
+                      onChange={(e) =>
+                        setNewClient({ ...newClient, name: e.target.value })
+                      }
+                      className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none text-base"
+                      placeholder="ক্লায়েন্ট নাম..."
+                    />
+                  </div>
+
+                  {/* Contact Input Removed */}
+
+                  <button
+                    disabled={isSubmitting}
+                    type="submit"
+                    className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg shadow-indigo-200 active:scale-95 transition-transform flex items-center justify-center gap-2 mt-4"
+                  >
+                    {isSubmitting && (
+                      <Loader2 size={24} className="animate-spin" />
+                    )}
+                    সেভ করুন
+                  </button>
+                </form>
+              </div>
+            </div>,
+            document.body,
+          )}
+
+        {/* Scroll-to-Hide FAB */}
+        <button
+          ref={mainFabRef}
+          onClick={handleOpenAddModal}
+          disabled={!isOnline}
+          className={`fixed bottom-6 right-6 z-50 bg-indigo-600 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-2xl active:scale-95 transition-all duration-300 md:bottom-8 md:right-8 ${
+            !isOnline ? "opacity-50 cursor-not-allowed" : "hover:bg-indigo-700"
+          }`}
+          title="নতুন ক্লায়েন্ট যোগ করুন"
+          style={{
+            transition: "transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s ease-in-out",
+          }}
+        >
+          <Plus size={28} />
+        </button>
+      </div>
     </div>
   );
 };

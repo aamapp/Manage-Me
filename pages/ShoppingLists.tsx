@@ -324,9 +324,9 @@ const ShoppingLists: React.FC = () => {
 
   if (isDetailView && selectedList) {
     return (
-      <div className="p-4 sm:p-6 lg:p-8 pb-24 min-h-screen bg-slate-50/50 font-sans">
+      <div className="px-4 sm:px-6 lg:px-8 pb-24 pt-0 min-h-screen bg-slate-50/50 font-sans">
         <div className="max-w-5xl mx-auto">
-          <div className="flex items-center justify-between mb-6 border-b border-slate-200/60 pb-3">
+          <div className="sticky top-0 z-40 bg-slate-50/95 backdrop-blur-md flex items-center justify-between mb-6 border-b border-slate-200/60 h-14 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
             <button 
               onClick={handleBackToLists}
               className="w-11 h-11 rounded-full border border-slate-200 bg-white flex items-center justify-center text-slate-800 active:scale-95 transition-all hover:bg-slate-100 hover:border-slate-300 cursor-pointer shrink-0 shadow-sm"
@@ -519,10 +519,10 @@ const ShoppingLists: React.FC = () => {
   }
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 pb-24 min-h-screen bg-slate-50/50 font-sans">
+    <div className="px-4 sm:px-6 lg:px-8 pb-24 pt-0 min-h-screen bg-slate-50/50 font-sans">
       <div className="max-w-5xl mx-auto">
         {/* Header Content */}
-        <div className="flex items-center justify-between mb-6 border-b border-slate-200/60 pb-3">
+        <div className="sticky top-0 z-40 bg-slate-50/95 backdrop-blur-md flex items-center justify-between mb-6 border-b border-slate-200/60 h-14 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
           <div className="flex items-center gap-3.5">
             <button
               onClick={() => navigate('/')}

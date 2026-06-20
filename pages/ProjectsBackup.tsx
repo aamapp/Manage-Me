@@ -90,7 +90,7 @@ export const ProjectsBackup: React.FC = () => {
     };
 
     return (
-        <div className="p-4 sm:p-6 lg:p-8 pb-24 min-h-screen bg-slate-50/50 font-sans">
+        <div className="px-4 sm:px-6 lg:px-8 pb-24 pt-0 min-h-screen bg-slate-50/50 font-sans">
             {/* Smart Spinner Overlay */}
             {isFiltering && (
                 <div className="fixed inset-0 z-[150] bg-white/60 backdrop-blur-[2px] flex items-center justify-center animate-in fade-in duration-200">
@@ -102,7 +102,7 @@ export const ProjectsBackup: React.FC = () => {
             )}
 
             {/* Header Content */}
-            <div className="flex items-center justify-between mb-8 max-w-5xl mx-auto border-b border-slate-200/50 pb-4">
+            <div className="sticky top-0 z-40 bg-slate-50/95 backdrop-blur-md flex items-center justify-between mb-8 max-w-5xl mx-auto border-b border-slate-200/50 h-14 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
                 <div className="flex items-center gap-3">
                     <button
                         onClick={() => navigate('/')}
