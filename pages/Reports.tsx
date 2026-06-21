@@ -1970,7 +1970,7 @@ export const Reports: React.FC = () => {
       {/* VIEW: DOWNLOAD CONFIGURATION PAGE */}
       {viewState === "download" && (
         <div className="space-y-6 animate-in fade-in duration-300">
-          <div className="sticky top-0 z-40 bg-slate-50/95 backdrop-blur-md flex items-center gap-3 border-b border-slate-200/50 h-14 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 mb-4">
+          <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md flex items-center gap-3 border-b border-slate-200/50 h-14 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 mb-4">
             <button
               onClick={() => {
                 navigate("/");
@@ -2380,7 +2380,7 @@ export const Reports: React.FC = () => {
       {viewState === "preview" && (
         <div className="min-h-screen bg-slate-100/70 -mx-4 px-4 pb-6 pt-0 flex flex-col space-y-6 relative select-none animate-in fade-in duration-300">
           {/* Header Controller */}
-          <div className="sticky top-0 z-40 bg-slate-100/95 backdrop-blur-md flex items-center justify-between border-b border-slate-200/50 h-14 -mx-4 px-4">
+          <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md flex items-center justify-between border-b border-slate-200/50 h-14 -mx-4 px-4">
             <div className="flex items-center gap-1">
               <button
                 onClick={() => {

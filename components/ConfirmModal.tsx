@@ -30,7 +30,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   return createPortal(
     <div className="fixed inset-0 z-[2000] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
       <div
-        className="bg-white rounded-[28px] shadow-xl max-w-[310px] w-full p-6 animate-in zoom-in-95 duration-200"
+        className="bg-white rounded-2xl shadow-xl max-w-[310px] w-full p-6 animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         <div

@@ -5,15 +5,17 @@ interface AppLogoProps {
   size?: number | string;
   variant?: 'color' | 'white' | 'transparent-color' | 'navy-striped';
   rounded?: boolean;
+  strokeColor?: string;
 }
 
 export const AppLogo: React.FC<AppLogoProps> = ({ 
   className = '', 
   size = '100%', 
   variant = 'color',
-  rounded = true
+  rounded = true,
+  strokeColor: customStrokeColor
 }) => {
-  const strokeColor = variant === 'transparent-color' ? '#4f46e5' : '#FFFFFF';
+  const strokeColor = customStrokeColor || (variant === 'transparent-color' ? '#4f46e5' : '#FFFFFF');
   const rxValue = rounded ? "24" : "0";
 
   return (

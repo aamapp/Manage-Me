@@ -76,6 +76,7 @@ import { TimePicker } from "@/components/TimePicker";
 import { WalletManager } from "@/components/WalletManager";
 import { ImageCropper } from "@/components/ImageCropper";
 import { AppLogo } from "@/components/AppLogo";
+import { CustomEditIcon, CustomDeleteIcon } from "@/components/CustomMenuIcons";
 import {
   DuePerson,
   DueTransaction,
@@ -83,6 +84,43 @@ import {
   BudgetTransaction,
   TodoTask,
 } from "../types";
+
+const dropdownVariants = {
+  hidden: {
+    scaleY: 0,
+    opacity: 0,
+    transition: {
+      type: "tween" as const,
+      ease: "easeInOut" as const,
+      duration: 0.18,
+    }
+  },
+  visible: {
+    scaleY: 1,
+    opacity: 1,
+    transition: {
+      type: "spring" as const,
+      duration: 0.32,
+      bounce: 0.1,
+      staggerChildren: 0.05,
+      delayChildren: 0.04
+    }
+  }
+};
+
+const itemVariants = {
+  hidden: { 
+    opacity: 0, 
+    y: -8,
+    scaleY: 0.8
+  },
+  visible: { 
+    opacity: 1, 
+    y: 0,
+    scaleY: 1,
+    transition: { type: "spring" as const, stiffness: 400, damping: 26 }
+  }
+};
 
 const CustomCoinsIcon = ({
   size = 20,
@@ -760,10 +798,12 @@ export const Expenses: React.FC = () => {
   const [showDateFilter, setShowDateFilter] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
 
-  const [visibleLimit, setVisibleLimit] = useState(25);
+  const [visibleLimit, setVisibleLimit] = useState(5);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const loaderRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setVisibleLimit(25);
+    setVisibleLimit(5);
   }, [searchTerm, listFilter, dateRange]);
 
   const [selectedPeriodOption, setSelectedPeriodOption] = useState<
@@ -1672,6 +1712,45 @@ export const Expenses: React.FC = () => {
     adminSelectedUserId,
   ]);
 
+  // Infinite Scroll Observer Effect
+  useEffect(() => {
+    if (visibleLimit >= unifiedTransactions.length || isLoadingMore) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setIsLoadingMore(true);
+        }
+      },
+      { rootMargin: "150px" }
+    );
+
+    const currentLoader = loaderRef.current;
+    if (currentLoader) {
+      observer.observe(currentLoader);
+    }
+
+    return () => {
+      if (currentLoader) {
+        observer.unobserve(currentLoader);
+      }
+    };
+  }, [unifiedTransactions.length, visibleLimit, isLoadingMore]);
+
+  // Loading Timer Effect
+  useEffect(() => {
+    if (!isLoadingMore) return;
+
+    const timeoutId = setTimeout(() => {
+      setVisibleLimit((prev) => prev + 5);
+      setIsLoadingMore(false);
+    }, 1500);
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [isLoadingMore]);
+
   const totalExpenseFiltered = useMemo(() => {
     return unifiedTransactions
       .filter((t) => t.type === "expense")
@@ -2427,8 +2506,18 @@ export const Expenses: React.FC = () => {
                       </p>
                     </div>
                   ) : (
-                    groupedTransactions.map((group) => (
-                      <div key={group.date} className="space-y-2.5">
+                    groupedTransactions.map((group, groupIdx) => {
+                      const GroupWrapper = isGeneratingPDF ? "div" : motion.div;
+                      return (
+                        <GroupWrapper
+                          key={group.date}
+                          {...(!isGeneratingPDF ? {
+                            initial: { opacity: 0, y: 16 },
+                            animate: { opacity: 1, y: 0 },
+                            transition: { duration: 0.35, delay: Math.min(groupIdx * 0.05, 0.2), ease: [0.22, 1, 0.36, 1] }
+                          } : {})}
+                          className="space-y-2.5"
+                        >
                         {/* Day Date Indicator Header */}
                         <div
                           className={`flex items-center justify-between py-2 ${isGeneratingPDF ? "bg-white" : "bg-transparent"} select-none`}
@@ -2516,64 +2605,72 @@ export const Expenses: React.FC = () => {
                                         <MoreVertical size={16} />
                                       </button>
 
-                                      {activeMenuId === tx.id && (
-                                        <div className="absolute right-0 top-full mt-2 w-32 bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-100 z-30 flex flex-col py-2 animate-in fade-in zoom-in-95 duration-150 origin-top-right">
-                                          <div className="absolute -top-1.5 right-3 w-3 h-3 bg-white border-t border-l border-slate-100 transform rotate-45"></div>
-                                          <button
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              if (!isOnline) {
-                                                showToast(
-                                                  "অফলাইনে রেকর্ড করা যাবে না",
-                                                  "error",
-                                                );
-                                                return;
-                                              }
-                                              handleOpenEditUnified(tx);
-                                            }}
-                                            disabled={!isOnline}
-                                            className="w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 hover:bg-slate-50 text-slate-800 transition-colors bg-transparent relative z-10 rounded-t-[22px]"
-                                            style={{
-                                              fontFamily:
-                                                "'Kohinoor Bangla', sans-serif",
-                                            }}
+                                      <AnimatePresence>
+                                        {activeMenuId === tx.id && (
+                                          <motion.div
+                                            variants={dropdownVariants}
+                                            initial="hidden"
+                                            animate="visible"
+                                            exit="hidden"
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="absolute right-0 top-full mt-2 w-32 bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-100 z-30 flex flex-col py-2 origin-top"
                                           >
-                                            <SquarePen
-                                              size={20}
-                                              className="text-slate-800"
-                                              strokeWidth={1.5}
-                                            />
-                                            এডিট
-                                          </button>
-                                          <div className="h-[1px] bg-slate-50 w-[85%] mx-auto relative z-10"></div>
-                                          <button
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              if (!isOnline) {
-                                                showToast(
-                                                  "অফলাইনে রেকর্ড ডিলিট করা যাবে না",
-                                                  "error",
-                                                );
-                                                return;
-                                              }
-                                              initiateDeleteUnified(tx);
-                                            }}
-                                            disabled={!isOnline}
-                                            className="w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 hover:bg-rose-50/50 text-rose-500 transition-colors bg-transparent relative z-10 rounded-b-[22px]"
-                                            style={{
-                                              fontFamily:
-                                                "'Kohinoor Bangla', sans-serif",
-                                            }}
-                                          >
-                                            <Trash2
-                                              size={20}
-                                              className="text-rose-500"
-                                              strokeWidth={1.5}
-                                            />
-                                            ডিলিট
-                                          </button>
-                                        </div>
-                                      )}
+                                            <motion.button
+                                              variants={itemVariants}
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (!isOnline) {
+                                                  showToast(
+                                                    "অফলাইনে রেকর্ড করা যাবে না",
+                                                    "error",
+                                                  );
+                                                  return;
+                                                }
+                                                handleOpenEditUnified(tx);
+                                              }}
+                                              disabled={!isOnline}
+                                              className="w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 hover:bg-slate-50 text-slate-800 transition-colors bg-transparent relative z-10 rounded-t-[14px]"
+                                              style={{
+                                                fontFamily:
+                                                  "'Kohinoor Bangla', sans-serif",
+                                              }}
+                                            >
+                                              <CustomEditIcon
+                                                size={20}
+                                                className="text-slate-800"
+                                              />
+                                              এডিট
+                                            </motion.button>
+                                            <motion.div variants={itemVariants} className="h-[1px] bg-slate-50 w-[85%] mx-auto relative z-10"></motion.div>
+                                            <motion.button
+                                              variants={itemVariants}
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (!isOnline) {
+                                                  showToast(
+                                                    "অফলাইনে রেকর্ড ডিলিট করা যাবে না",
+                                                    "error",
+                                                  );
+                                                  return;
+                                                }
+                                                initiateDeleteUnified(tx);
+                                              }}
+                                              disabled={!isOnline}
+                                              className="w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 hover:bg-rose-50/50 text-rose-500 transition-colors bg-transparent relative z-10 rounded-b-[14px]"
+                                              style={{
+                                                fontFamily:
+                                                  "'Kohinoor Bangla', sans-serif",
+                                              }}
+                                            >
+                                              <CustomDeleteIcon
+                                                size={20}
+                                                className="text-rose-500"
+                                              />
+                                              ডিলিট
+                                            </motion.button>
+                                          </motion.div>
+                                        )}
+                                      </AnimatePresence>
                                     </div>
                                   )}
                                 </div>
@@ -2581,24 +2678,37 @@ export const Expenses: React.FC = () => {
                             );
                           })}
                         </div>
-                      </div>
-                    ))
+                        </GroupWrapper>
+                      );
+                    })
                   )}
                 </div>
 
                 {!isGeneratingPDF &&
-                  unifiedTransactions.length > visibleLimit && (
+                  (unifiedTransactions.length > visibleLimit || isLoadingMore) && (
                     <div
-                      className="flex justify-center pt-2 pb-16"
+                      ref={loaderRef}
+                      className="w-full space-y-6 py-8 pb-16 animate-in fade-in duration-500"
                       data-html2canvas-ignore="true"
                     >
-                      <button
-                        onClick={() => setVisibleLimit((prev) => prev + 25)}
-                        className="px-6 py-2.5 rounded-full bg-white text-indigo-600 hover:bg-slate-50 border border-slate-200/80 shadow-sm text-sm font-bold flex items-center gap-2 transition-all active:scale-95"
-                        style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
-                      >
-                        আরো লেনদেন দেখুন (Show More)
-                      </button>
+                      {/* Premium Shimmer Ledger Skeleton */}
+                      <div className="flex flex-col space-y-3 opacity-60">
+                        {[1, 2].slice(0, Math.max(1, Math.min(2, unifiedTransactions.length - visibleLimit))).map((i) => (
+                          <div
+                            key={i}
+                            className="bg-white/40 backdrop-blur-sm p-4 rounded-2xl border border-slate-100/60 flex items-center justify-between shadow-xs animate-pulse"
+                          >
+                            <div className="flex items-center gap-3 w-2/3">
+                              <div className="w-10 h-10 bg-slate-100 rounded-xl shrink-0 animate-pulse"></div>
+                              <div className="space-y-2 w-full">
+                                <div className="h-4 bg-slate-200/60 rounded-lg w-2/3"></div>
+                                <div className="h-3 bg-slate-100/60 rounded-lg w-1/3"></div>
+                              </div>
+                            </div>
+                            <div className="h-5 bg-slate-150/85 rounded-lg w-16"></div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
               </div>
@@ -4494,48 +4604,56 @@ const DuesManager: React.FC<DuesManagerProps> = ({
                               <MoreVertical size={16} />
                             </button>
 
-                            {activeTxMenuId === t.id && (
-                              <div className="absolute right-0 top-full mt-2 w-32 bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-100 z-[60] flex flex-col py-2 animate-in fade-in zoom-in-95 duration-150 origin-top-right">
-                                <div className="absolute -top-1.5 right-3 w-3 h-3 bg-white border-t border-l border-slate-100 transform rotate-45"></div>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleOpenEditTransaction(t);
-                                  }}
-                                  className="w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 text-slate-800 hover:bg-slate-50 transition-colors bg-transparent relative z-10 rounded-t-[22px]"
-                                  style={{
-                                    fontFamily: "'Kohinoor Bangla', sans-serif",
-                                  }}
+                            <AnimatePresence>
+                              {activeTxMenuId === t.id && (
+                                <motion.div
+                                  variants={dropdownVariants}
+                                  initial="hidden"
+                                  animate="visible"
+                                  exit="hidden"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="absolute right-0 top-full mt-2 w-32 bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-100 z-[60] flex flex-col py-2 origin-top"
                                 >
-                                  <SquarePen
-                                    size={20}
-                                    className="text-slate-800"
-                                    strokeWidth={1.5}
-                                  />
-                                  এডিট
-                                </button>
-                                <div className="h-[1px] bg-slate-50 w-[85%] mx-auto relative z-10"></div>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setTxToDeleteId(t.id);
-                                    setShowTxDeleteModal(true);
-                                    setActiveTxMenuId(null);
-                                  }}
-                                  className="w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 text-rose-500 hover:bg-rose-50 transition-colors bg-transparent relative z-10 rounded-b-[22px]"
-                                  style={{
-                                    fontFamily: "'Kohinoor Bangla', sans-serif",
-                                  }}
-                                >
-                                  <Trash2
-                                    size={20}
-                                    className="text-rose-500"
-                                    strokeWidth={1.5}
-                                  />
-                                  ডিলিট
-                                </button>
-                              </div>
-                            )}
+                                  <motion.button
+                                    variants={itemVariants}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenEditTransaction(t);
+                                    }}
+                                    className="w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 text-slate-800 hover:bg-slate-50 transition-colors bg-transparent relative z-10 rounded-t-[14px]"
+                                    style={{
+                                      fontFamily: "'Kohinoor Bangla', sans-serif",
+                                    }}
+                                  >
+                                    <CustomEditIcon
+                                      size={20}
+                                      className="text-slate-800"
+                                    />
+                                    এডিট
+                                  </motion.button>
+                                  <motion.div variants={itemVariants} className="h-[1px] bg-slate-50 w-[85%] mx-auto relative z-10"></motion.div>
+                                  <motion.button
+                                    variants={itemVariants}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setTxToDeleteId(t.id);
+                                      setShowTxDeleteModal(true);
+                                      setActiveTxMenuId(null);
+                                    }}
+                                    className="w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 text-rose-500 hover:bg-rose-50 transition-colors bg-transparent relative z-10 rounded-b-[14px]"
+                                    style={{
+                                      fontFamily: "'Kohinoor Bangla', sans-serif",
+                                    }}
+                                  >
+                                    <CustomDeleteIcon
+                                      size={20}
+                                      className="text-rose-500"
+                                    />
+                                    ডিলিট
+                                  </motion.button>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
                           </div>
                         </div>
 
@@ -5023,44 +5141,52 @@ const DuesManager: React.FC<DuesManagerProps> = ({
                   <MoreVertical size={16} />
                 </button>
 
-                {personActiveMenuId === person.id && (
-                  <div className="absolute right-0 top-full mt-2 w-32 bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-100 z-[100] flex flex-col py-2 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
-                    <div className="absolute -top-1.5 right-3 w-3 h-3 bg-white border-t border-l border-slate-100 transform rotate-45"></div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOpenEditPerson(person);
-                      }}
-                      className="w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 text-slate-800 hover:bg-slate-50 transition-colors bg-transparent relative z-10 rounded-t-[22px]"
-                      style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
+                <AnimatePresence>
+                  {personActiveMenuId === person.id && (
+                    <motion.div
+                      variants={dropdownVariants}
+                      initial="hidden"
+                      animate="visible"
+                      exit="hidden"
+                      onClick={(e) => e.stopPropagation()}
+                      className="absolute right-0 top-full mt-2 w-32 bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-100 z-[100] flex flex-col py-2 origin-top"
                     >
-                      <SquarePen
-                        size={20}
-                        className="text-slate-800"
-                        strokeWidth={1.5}
-                      />
-                      এডিট
-                    </button>
-                    <div className="h-[1px] bg-slate-50 w-[85%] mx-auto relative z-10"></div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setPersonToDeleteId(person.id);
-                        setShowPersonDeleteModal(true);
-                        setPersonActiveMenuId(null);
-                      }}
-                      className="w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 text-rose-500 hover:bg-rose-50 transition-colors bg-transparent relative z-10 rounded-b-[22px]"
-                      style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
-                    >
-                      <Trash2
-                        size={20}
-                        className="text-rose-500"
-                        strokeWidth={1.5}
-                      />
-                      ডিলিট
-                    </button>
-                  </div>
-                )}
+                      <motion.button
+                        variants={itemVariants}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenEditPerson(person);
+                        }}
+                        className="w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 text-slate-800 hover:bg-slate-50 transition-colors bg-transparent relative z-10 rounded-t-[14px]"
+                        style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
+                      >
+                        <CustomEditIcon
+                          size={20}
+                          className="text-slate-800"
+                        />
+                        এডিট
+                      </motion.button>
+                      <motion.div variants={itemVariants} className="h-[1px] bg-slate-50 w-[85%] mx-auto relative z-10"></motion.div>
+                      <motion.button
+                        variants={itemVariants}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPersonToDeleteId(person.id);
+                          setShowPersonDeleteModal(true);
+                          setPersonActiveMenuId(null);
+                        }}
+                        className="w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 text-rose-500 hover:bg-rose-50 transition-colors bg-transparent relative z-10 rounded-b-[14px]"
+                        style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
+                      >
+                        <CustomDeleteIcon
+                          size={20}
+                          className="text-rose-500"
+                        />
+                        ডিলিট
+                      </motion.button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </div>
           );

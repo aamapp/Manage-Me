@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import { createPortal } from "react-dom";
 import {
   TrendingUp,
@@ -40,6 +41,45 @@ import { NumericKeypad } from "@/components/NumericKeypad";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { DatePicker } from "@/components/DatePicker";
 import { TimePicker } from "@/components/TimePicker";
+import { AppLogo } from "@/components/AppLogo";
+import { CustomEditIcon, CustomDeleteIcon } from "@/components/CustomMenuIcons";
+
+const dropdownVariants = {
+  hidden: {
+    scaleY: 0,
+    opacity: 0,
+    transition: {
+      type: "tween" as const,
+      ease: "easeInOut" as const,
+      duration: 0.18,
+    }
+  },
+  visible: {
+    scaleY: 1,
+    opacity: 1,
+    transition: {
+      type: "spring" as const,
+      duration: 0.32,
+      bounce: 0.1,
+      staggerChildren: 0.05,
+      delayChildren: 0.04
+    }
+  }
+};
+
+const itemVariants = {
+  hidden: { 
+    opacity: 0, 
+    y: -8,
+    scaleY: 0.8
+  },
+  visible: { 
+    opacity: 1, 
+    y: 0,
+    scaleY: 1,
+    transition: { type: "spring" as const, stiffness: 400, damping: 26 }
+  }
+};
 
 // Custom Bkash Icon to match the brand logo shape (Origami Bird)
 const BkashIcon = ({
@@ -546,10 +586,12 @@ export const Income: React.FC = () => {
   const [dateRange, setDateRange] = useState({ start: "", end: "" });
   const [showFilters, setShowFilters] = useState(false);
 
-  const [visibleLimit, setVisibleLimit] = useState(12);
+  const [visibleLimit, setVisibleLimit] = useState(5);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const loaderRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setVisibleLimit(12);
+    setVisibleLimit(5);
   }, [searchTerm, methodFilter, dateRange]);
 
   const filteredPayments = React.useMemo(
@@ -587,6 +629,45 @@ export const Income: React.FC = () => {
         }),
     [incomeRecords, searchTerm, methodFilter, dateRange],
   );
+
+  // Infinite Scroll Observer Effect
+  useEffect(() => {
+    if (visibleLimit >= filteredPayments.length || isLoadingMore) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setIsLoadingMore(true);
+        }
+      },
+      { rootMargin: "150px" }
+    );
+
+    const currentLoader = loaderRef.current;
+    if (currentLoader) {
+      observer.observe(currentLoader);
+    }
+
+    return () => {
+      if (currentLoader) {
+        observer.unobserve(currentLoader);
+      }
+    };
+  }, [filteredPayments.length, visibleLimit, isLoadingMore]);
+
+  // Loading Timer Effect
+  useEffect(() => {
+    if (!isLoadingMore) return;
+
+    const timeoutId = setTimeout(() => {
+      setVisibleLimit((prev) => prev + 5);
+      setIsLoadingMore(false);
+    }, 1500);
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [isLoadingMore]);
 
   // Filter: Match name AND ensure Due Amount > 0
   const projectSuggestions = React.useMemo(
@@ -1060,11 +1141,17 @@ export const Income: React.FC = () => {
             </div>
           ) : (
             (isGeneratingPDF ? filteredPayments : slicedPayments).map(
-              (payment) => {
+              (payment, index) => {
                 const { style, icon } = getPaymentMethodStyle(payment.method);
+                const CardWrapper = isGeneratingPDF ? "div" : motion.div;
                 return (
-                  <div
+                  <CardWrapper
                     key={payment.id}
+                    {...(!isGeneratingPDF ? {
+                      initial: { opacity: 0, y: 16 },
+                      animate: { opacity: 1, y: 0 },
+                      transition: { duration: 0.35, delay: Math.min((index % 5) * 0.04, 0.15), ease: [0.22, 1, 0.36, 1] }
+                    } : {})}
                     className={`income-card-pdf bg-white p-4 rounded-2xl border border-slate-100 shadow-sm relative ${isGeneratingPDF ? "" : "animate-in slide-in-from-bottom-2 duration-300"}`}
                     style={
                       isGeneratingPDF
@@ -1114,74 +1201,82 @@ export const Income: React.FC = () => {
                             <MoreVertical size={20} />
                           </button>
 
-                          {activeMenuId === payment.id && (
-                            <div className="absolute right-0 top-full mt-2 w-32 bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-100 z-[60] flex flex-col py-2 animate-in fade-in zoom-in-95 duration-150 origin-top-right">
-                              <div className="absolute -top-1.5 right-3 w-3 h-3 bg-white border-t border-l border-slate-100 transform rotate-45"></div>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (!isOnline) {
-                                    showToast(
-                                      "অফলাইনে আয় এডিট করা যাবে না",
-                                      "error",
-                                    );
-                                    return;
-                                  }
-                                  handleOpenEditModal(payment);
-                                }}
-                                disabled={!isOnline}
-                                className={`w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 transition-colors bg-transparent relative z-10 rounded-t-[22px]
-                                        ${!isOnline ? "text-slate-300 cursor-not-allowed" : "text-slate-800 hover:bg-slate-50"}
-                                      `}
-                                style={{
-                                  fontFamily: "'Kohinoor Bangla', sans-serif",
-                                }}
+                          <AnimatePresence>
+                            {activeMenuId === payment.id && (
+                              <motion.div
+                                variants={dropdownVariants}
+                                initial="hidden"
+                                animate="visible"
+                                exit="hidden"
+                                onClick={(e) => e.stopPropagation()}
+                                className="absolute right-0 top-full mt-2 w-32 bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-100 z-[60] flex flex-col py-2 origin-top"
                               >
-                                <SquarePen
-                                  size={20}
-                                  strokeWidth={1.5}
-                                  className={
-                                    !isOnline
-                                      ? "text-slate-300"
-                                      : "text-slate-800"
-                                  }
-                                />
-                                এডিট
-                              </button>
-                              <div className="h-[1px] bg-slate-50 w-[85%] mx-auto relative z-10"></div>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (!isOnline) {
-                                    showToast(
-                                      "অফলাইনে আয় ডিলিট করা যাবে না",
-                                      "error",
-                                    );
-                                    return;
-                                  }
-                                  initiateDelete(payment.id, payment);
-                                }}
-                                disabled={!isOnline}
-                                className={`w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 transition-colors bg-transparent relative z-10 rounded-b-[22px]
-                                        ${!isOnline ? "text-slate-300 cursor-not-allowed" : "text-rose-500 hover:bg-rose-50"}
-                                      `}
-                                style={{
-                                  fontFamily: "'Kohinoor Bangla', sans-serif",
-                                }}
-                              >
-                                <Trash2
-                                  size={20}
-                                  strokeWidth={1.5}
-                                  className={
-                                    !isOnline
-                                      ? "text-slate-300"
-                                      : "text-rose-500"
-                                  }
-                                />
-                                ডিলিট
-                              </button>
-                            </div>
-                          )}
+                                <motion.button
+                                  variants={itemVariants}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (!isOnline) {
+                                      showToast(
+                                        "অফলাইনে আয় এডিট করা যাবে না",
+                                        "error",
+                                      );
+                                      return;
+                                    }
+                                    handleOpenEditModal(payment);
+                                  }}
+                                  disabled={!isOnline}
+                                  className={`w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 transition-colors bg-transparent relative z-10 rounded-t-[14px]
+                                          ${!isOnline ? "text-slate-300 cursor-not-allowed" : "text-slate-800 hover:bg-slate-50"}
+                                        `}
+                                  style={{
+                                    fontFamily: "'Kohinoor Bangla', sans-serif",
+                                  }}
+                                >
+                                  <CustomEditIcon
+                                    size={20}
+                                    className={
+                                      !isOnline
+                                        ? "text-slate-300"
+                                        : "text-slate-800"
+                                    }
+                                  />
+                                  এডিট
+                                </motion.button>
+                                <motion.div variants={itemVariants} className="h-[1px] bg-slate-50 w-[85%] mx-auto relative z-10"></motion.div>
+                                <motion.button
+                                  variants={itemVariants}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (!isOnline) {
+                                      showToast(
+                                        "অফলাইনে আয় ডিলিট করা যাবে না",
+                                        "error",
+                                      );
+                                      return;
+                                    }
+                                    initiateDelete(payment.id, payment);
+                                  }}
+                                  disabled={!isOnline}
+                                  className={`w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 transition-colors bg-transparent relative z-10 rounded-b-[14px]
+                                          ${!isOnline ? "text-slate-300 cursor-not-allowed" : "text-rose-500 hover:bg-rose-50"}
+                                        `}
+                                  style={{
+                                    fontFamily: "'Kohinoor Bangla', sans-serif",
+                                  }}
+                                >
+                                  <CustomDeleteIcon
+                                    size={20}
+                                    className={
+                                      !isOnline
+                                        ? "text-slate-300"
+                                        : "text-rose-500"
+                                    }
+                                  />
+                                  ডিলিট
+                                </motion.button>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
                         </div>
                       )}
                     </div>
@@ -1216,25 +1311,44 @@ export const Income: React.FC = () => {
                         </p>
                       </div>
                     </div>
-                  </div>
+                  </CardWrapper>
                 );
               },
             )
           )}
         </div>
 
-        {!isGeneratingPDF && filteredPayments.length > visibleLimit && (
+        {!isGeneratingPDF && (filteredPayments.length > visibleLimit || isLoadingMore) && (
           <div
-            className="flex justify-center pb-20 -mt-12 animate-in fade-in duration-200"
+            ref={loaderRef}
+            className="w-full space-y-6 py-8 pb-20 -mt-2 animate-in fade-in duration-500"
             data-html2canvas-ignore="true"
+            style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
           >
-            <button
-              onClick={() => setVisibleLimit((prev) => prev + 12)}
-              className="px-6 py-2.5 rounded-full bg-white text-emerald-600 hover:bg-slate-50 border border-slate-200/80 shadow-sm text-sm font-bold flex items-center gap-2 transition-all active:scale-95"
-              style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
-            >
-              আরো রেকর্ড দেখুন (Show More)
-            </button>
+            {/* Emerald Glowing Shimmer Skeleton Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 opacity-50">
+              {[1, 2, 3].slice(0, Math.max(1, Math.min(3, filteredPayments.length - visibleLimit))).map((i) => (
+                <div
+                  key={i}
+                  className="bg-white/40 backdrop-blur-xs rounded-2xl border border-slate-100/60 p-5 space-y-4 shadow-xs animate-pulse"
+                >
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-3 w-3/5">
+                      <div className="w-10 h-10 bg-slate-150/80 rounded-xl shrink-0 animate-pulse"></div>
+                      <div className="space-y-2 w-full">
+                        <div className="h-4 bg-slate-200/50 rounded-lg w-full"></div>
+                        <div className="h-3 bg-slate-100/50 rounded-lg w-2/3"></div>
+                      </div>
+                    </div>
+                    <div className="h-6 w-16 bg-slate-100/60 rounded-full animate-pulse"></div>
+                  </div>
+                  <div className="pt-2 flex justify-between items-center border-t border-slate-100/55">
+                    <div className="h-4 bg-slate-100/50 rounded-lg w-1/4"></div>
+                    <div className="h-5 bg-emerald-100/40 rounded-lg w-1/3"></div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

@@ -20,6 +20,45 @@ import { Client } from "../types";
 import { useAppContext } from "../context/AppContext";
 import { supabase } from "../lib/supabase";
 import { ConfirmModal } from "@/components/ConfirmModal";
+import { CustomEditIcon, CustomDeleteIcon } from "@/components/CustomMenuIcons";
+import { motion, AnimatePresence } from "motion/react";
+
+const dropdownVariants = {
+  hidden: {
+    scaleY: 0,
+    opacity: 0,
+    transition: {
+      type: "tween" as const,
+      ease: "easeInOut" as const,
+      duration: 0.18,
+    }
+  },
+  visible: {
+    scaleY: 1,
+    opacity: 1,
+    transition: {
+      type: "spring" as const,
+      duration: 0.32,
+      bounce: 0.1,
+      staggerChildren: 0.05,
+      delayChildren: 0.04
+    }
+  }
+};
+
+const itemVariants = {
+  hidden: { 
+    opacity: 0, 
+    y: -8,
+    scaleY: 0.8
+  },
+  visible: { 
+    opacity: 1, 
+    y: 0,
+    scaleY: 1,
+    transition: { type: "spring" as const, stiffness: 400, damping: 26 }
+  }
+};
 
 export const Clients: React.FC = () => {
   const {
@@ -288,7 +327,7 @@ export const Clients: React.FC = () => {
     <div ref={containerRef} className="px-4 sm:px-6 lg:px-8 pb-24 pt-0 min-h-screen bg-slate-50/50 font-sans h-screen overflow-y-auto">
       <div className="max-w-5xl mx-auto space-y-6">
         {/* Header Content */}
-        <div className="sticky top-0 z-40 bg-slate-50/95 backdrop-blur-md flex items-center justify-between mb-6 border-b border-slate-200/60 h-14 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+        <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md flex items-center justify-between mb-6 border-b border-slate-200/60 h-14 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
           <div className="flex items-center gap-3.5">
             <button
               onClick={() => navigate('/')}
@@ -362,52 +401,60 @@ export const Clients: React.FC = () => {
                         <MoreHorizontal size={20} />
                       </button>
 
-                      {activeMenuId === client.id && (
-                        <div className="absolute right-0 top-full mt-2 w-32 bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-100 z-[60] flex flex-col py-2 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
-                          <div className="absolute -top-1.5 right-3 w-3 h-3 bg-white border-t border-l border-slate-100 transform rotate-45"></div>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenEditModal(client);
-                            }}
-                            className="w-full px-4 py-2.5 text-left text-[15px] font-medium text-slate-800 hover:bg-slate-50 flex items-center gap-3 transition-colors bg-transparent relative z-10 rounded-t-[22px]"
+                      <AnimatePresence>
+                        {activeMenuId === client.id && (
+                          <motion.div
+                            variants={dropdownVariants}
+                            initial="hidden"
+                            animate="visible"
+                            exit="hidden"
+                            onClick={(e) => e.stopPropagation()}
+                            className="absolute right-0 top-full mt-2 w-32 bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-100 z-[60] flex flex-col py-2 origin-top"
                           >
-                            <SquarePen
-                              size={20}
-                              className="text-slate-800"
-                              strokeWidth={1.5}
-                            />{" "}
-                            এডিট
-                          </button>
-                          <div className="h-[1px] bg-slate-50 w-[85%] mx-auto relative z-10"></div>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (!isOnline) {
-                                showToast(
-                                  "অফলাইনে ক্লায়েন্ট ডিলিট করা যাবে না",
-                                  "error",
-                                );
-                                return;
-                              }
-                              initiateDelete(client.id);
-                            }}
-                            disabled={!isOnline}
-                            className={`w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 transition-colors bg-transparent relative z-10 rounded-b-[22px]
-                                      ${!isOnline ? "text-slate-300 cursor-not-allowed" : "text-rose-500 hover:bg-rose-50"}
-                                    `}
-                          >
-                            <Trash2
-                              size={20}
-                              strokeWidth={1.5}
-                              className={
-                                !isOnline ? "text-slate-300" : "text-rose-500"
-                              }
-                            />{" "}
-                            ডিলিট
-                          </button>
-                        </div>
-                      )}
+                            <motion.button
+                              variants={itemVariants}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenEditModal(client);
+                              }}
+                              className="w-full px-4 py-2.5 text-left text-[15px] font-medium text-slate-800 hover:bg-slate-50 flex items-center gap-3 transition-colors bg-transparent relative z-10 rounded-t-[14px]"
+                            >
+                              <CustomEditIcon
+                                size={20}
+                                className="text-slate-800"
+                              />{" "}
+                              এডিট
+                            </motion.button>
+                            <motion.div variants={itemVariants} className="h-[1px] bg-slate-50 w-[85%] mx-auto relative z-10"></motion.div>
+                            <motion.button
+                              variants={itemVariants}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (!isOnline) {
+                                  showToast(
+                                    "অফলাইনে ক্লায়েন্ট ডিলিট করা যাবে না",
+                                    "error",
+                                  );
+                                  return;
+                                }
+                                initiateDelete(client.id);
+                              }}
+                              disabled={!isOnline}
+                              className={`w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 transition-colors bg-transparent relative z-10 rounded-b-[14px]
+                                        ${!isOnline ? "text-slate-300 cursor-not-allowed" : "text-rose-500 hover:bg-rose-50"}
+                                      `}
+                            >
+                              <CustomDeleteIcon
+                                size={20}
+                                className={
+                                  !isOnline ? "text-slate-300" : "text-rose-500"
+                                }
+                              />{" "}
+                              ডিলিট
+                            </motion.button>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
                   </div>
 
