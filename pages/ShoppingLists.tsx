@@ -616,14 +616,16 @@ const ShoppingLists: React.FC = () => {
       </div>
 
       {/* Floating Action Button */}
-      <motion.button 
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        onClick={handleOpenAddModal}
-        className="fixed right-6 bottom-24 w-14 h-14 bg-blue-600 text-white rounded-2xl shadow-lg shadow-blue-200 flex items-center justify-center z-50"
-      >
-        <Plus className="w-8 h-8" />
-      </motion.button>
+      {isOnline && (
+        <motion.button 
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={handleOpenAddModal}
+          className="fixed right-6 bottom-[84px] w-14 h-14 bg-blue-600 text-white rounded-2xl shadow-lg shadow-blue-200 flex items-center justify-center z-50 transition-all duration-300"
+        >
+          <Plus className="w-8 h-8" />
+        </motion.button>
+      )}
 
       {/* Add/Edit List Modal */}
       <AnimatePresence>

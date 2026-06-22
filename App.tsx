@@ -27,7 +27,6 @@ import { Projects } from "@/pages/Projects";
 import { Clients } from "@/pages/Clients";
 import { Income } from "@/pages/Income";
 import { Expenses } from "@/pages/Expenses";
-import { Categories } from "@/pages/Categories";
 import { Reports } from "@/pages/Reports";
 import { Settings } from "@/pages/Settings";
 import { UpdatePassword } from "@/pages/UpdatePassword";
@@ -306,7 +305,6 @@ const AppContent: React.FC = () => {
                     <Route path="/clients" element={<Clients />} />
                     <Route path="/income" element={<Income />} />
                     <Route path="/expenses" element={<Expenses />} />
-                    <Route path="/categories" element={<Categories />} />
                     <Route path="/reports" element={<Reports />} />
                     <Route path="/settings" element={<Settings />} />
                     <Route path="/profile" element={<Profile />} />

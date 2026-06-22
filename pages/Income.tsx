@@ -52,7 +52,7 @@ const dropdownVariants = {
       type: "tween" as const,
       ease: "easeInOut" as const,
       duration: 0.18,
-    }
+    },
   },
   visible: {
     scaleY: 1,
@@ -62,23 +62,23 @@ const dropdownVariants = {
       duration: 0.32,
       bounce: 0.1,
       staggerChildren: 0.05,
-      delayChildren: 0.04
-    }
-  }
+      delayChildren: 0.04,
+    },
+  },
 };
 
 const itemVariants = {
-  hidden: { 
-    opacity: 0, 
+  hidden: {
+    opacity: 0,
     y: -8,
-    scaleY: 0.8
+    scaleY: 0.8,
   },
-  visible: { 
-    opacity: 1, 
+  visible: {
+    opacity: 1,
     y: 0,
     scaleY: 1,
-    transition: { type: "spring" as const, stiffness: 400, damping: 26 }
-  }
+    transition: { type: "spring" as const, stiffness: 400, damping: 26 },
+  },
 };
 
 // Custom Bkash Icon to match the brand logo shape (Origami Bird)
@@ -200,6 +200,64 @@ export const Income: React.FC = () => {
   const projectInputRef = useRef<HTMLDivElement>(null);
   const methodDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Floating Action Button scroll helper
+  const mainFabRef = useRef<HTMLButtonElement>(null);
+  const isMainFabVisibleRef = useRef(true);
+  const lastGlobalScrollY = useRef(0);
+
+  const setMainFabVisibleDirectly = (visible: boolean) => {
+    if (isMainFabVisibleRef.current === visible) return;
+    isMainFabVisibleRef.current = visible;
+
+    const el = mainFabRef.current;
+    if (!el) return;
+
+    if (visible) {
+      el.style.opacity = "1";
+      el.style.transform = "translateY(0) scale(1)";
+      el.style.pointerEvents = "auto";
+    } else {
+      el.style.opacity = "0";
+      el.style.transform = "translateY(32px) scale(0.9)";
+      el.style.pointerEvents = "none";
+    }
+  };
+
+  useEffect(() => {
+    isMainFabVisibleRef.current = true;
+    if (mainFabRef.current) {
+      mainFabRef.current.style.opacity = "1";
+      mainFabRef.current.style.transform = "translateY(0) scale(1)";
+      mainFabRef.current.style.pointerEvents = "auto";
+    }
+
+    lastGlobalScrollY.current = window.scrollY;
+
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      const diffScrollY = currentScrollY - lastGlobalScrollY.current;
+
+      if (Math.abs(diffScrollY) > 10) {
+        if (diffScrollY > 0) {
+          setMainFabVisibleDirectly(false);
+        } else if (diffScrollY < 0) {
+          setMainFabVisibleDirectly(true);
+        }
+        lastGlobalScrollY.current = currentScrollY;
+      }
+
+      if (currentScrollY < 30) {
+        setMainFabVisibleDirectly(true);
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, []);
+
   const [showMethodDropdown, setShowMethodDropdown] = useState(false);
 
   const [newPayment, setNewPayment] = useState<any>({
@@ -243,6 +301,10 @@ export const Income: React.FC = () => {
   }, [activeMenuId]);
 
   const initiateDelete = (id: string, payment: any) => {
+    if (!isOnline) {
+      showToast("অফলাইনে আয়ের রেকর্ড ডিলিট করা যাবে না", "error");
+      return;
+    }
     setPaymentToDelete({ id, payment });
     setShowDeleteModal(true);
     setActiveMenuId(null);
@@ -501,19 +563,21 @@ export const Income: React.FC = () => {
 
         if (insErr) throw insErr;
 
-        const insertedRecord = (insertedRecords && insertedRecords[0])
-          ? insertedRecords[0]
-          : {
-              id: Math.random().toString(36).substring(7),
-              projectid: selectedProjectId,
-              projectname: selectedProject?.name || newPayment.projectName,
-              clientname: selectedProject?.clientname || newPayment.clientName,
-              amount,
-              date: dateToSave,
-              createdat: dateToSave,
-              method: newPayment.method,
-              userid: targetUserId,
-            };
+        const insertedRecord =
+          insertedRecords && insertedRecords[0]
+            ? insertedRecords[0]
+            : {
+                id: Math.random().toString(36).substring(7),
+                projectid: selectedProjectId,
+                projectname: selectedProject?.name || newPayment.projectName,
+                clientname:
+                  selectedProject?.clientname || newPayment.clientName,
+                amount,
+                date: dateToSave,
+                createdat: dateToSave,
+                method: newPayment.method,
+                userid: targetUserId,
+              };
 
         // Optimistically append the newly inserted record right away
         setIncomeRecords((prev) => [insertedRecord, ...prev]);
@@ -640,7 +704,7 @@ export const Income: React.FC = () => {
           setIsLoadingMore(true);
         }
       },
-      { rootMargin: "150px" }
+      { rootMargin: "150px" },
     );
 
     const currentLoader = loaderRef.current;
@@ -941,14 +1005,6 @@ export const Income: React.FC = () => {
             </span>
           </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={handleOpenAddModal}
-            className="bg-emerald-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-emerald-200 active:scale-90 transition-transform"
-          >
-            <Plus size={24} />
-          </button>
-        </div>
       </div>
 
       {/* Filter UI */}
@@ -1147,11 +1203,17 @@ export const Income: React.FC = () => {
                 return (
                   <CardWrapper
                     key={payment.id}
-                    {...(!isGeneratingPDF ? {
-                      initial: { opacity: 0, y: 16 },
-                      animate: { opacity: 1, y: 0 },
-                      transition: { duration: 0.35, delay: Math.min((index % 5) * 0.04, 0.15), ease: [0.22, 1, 0.36, 1] }
-                    } : {})}
+                    {...(!isGeneratingPDF
+                      ? {
+                          initial: { opacity: 0, y: 16 },
+                          animate: { opacity: 1, y: 0 },
+                          transition: {
+                            duration: 0.35,
+                            delay: Math.min((index % 5) * 0.04, 0.15),
+                            ease: [0.22, 1, 0.36, 1],
+                          },
+                        }
+                      : {})}
                     className={`income-card-pdf bg-white p-4 rounded-2xl border border-slate-100 shadow-sm relative ${isGeneratingPDF ? "" : "animate-in slide-in-from-bottom-2 duration-300"}`}
                     style={
                       isGeneratingPDF
@@ -1224,25 +1286,21 @@ export const Income: React.FC = () => {
                                     }
                                     handleOpenEditModal(payment);
                                   }}
-                                  disabled={!isOnline}
-                                  className={`w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 transition-colors bg-transparent relative z-10 rounded-t-[14px]
-                                          ${!isOnline ? "text-slate-300 cursor-not-allowed" : "text-slate-800 hover:bg-slate-50"}
-                                        `}
+                                  className="w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 transition-colors bg-transparent relative z-10 rounded-t-[14px] text-slate-800 hover:bg-slate-50"
                                   style={{
                                     fontFamily: "'Kohinoor Bangla', sans-serif",
                                   }}
                                 >
                                   <CustomEditIcon
                                     size={20}
-                                    className={
-                                      !isOnline
-                                        ? "text-slate-300"
-                                        : "text-slate-800"
-                                    }
+                                    className="text-slate-800"
                                   />
                                   এডিট
                                 </motion.button>
-                                <motion.div variants={itemVariants} className="h-[1px] bg-slate-50 w-[85%] mx-auto relative z-10"></motion.div>
+                                <motion.div
+                                  variants={itemVariants}
+                                  className="h-[1px] bg-slate-50 w-[85%] mx-auto relative z-10"
+                                ></motion.div>
                                 <motion.button
                                   variants={itemVariants}
                                   onClick={(e) => {
@@ -1256,21 +1314,14 @@ export const Income: React.FC = () => {
                                     }
                                     initiateDelete(payment.id, payment);
                                   }}
-                                  disabled={!isOnline}
-                                  className={`w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 transition-colors bg-transparent relative z-10 rounded-b-[14px]
-                                          ${!isOnline ? "text-slate-300 cursor-not-allowed" : "text-rose-500 hover:bg-rose-50"}
-                                        `}
+                                  className="w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 transition-colors bg-transparent relative z-10 rounded-b-[14px] text-rose-500 hover:bg-rose-50"
                                   style={{
                                     fontFamily: "'Kohinoor Bangla', sans-serif",
                                   }}
                                 >
                                   <CustomDeleteIcon
                                     size={20}
-                                    className={
-                                      !isOnline
-                                        ? "text-slate-300"
-                                        : "text-rose-500"
-                                    }
+                                    className="text-rose-500"
                                   />
                                   ডিলিট
                                 </motion.button>
@@ -1318,39 +1369,48 @@ export const Income: React.FC = () => {
           )}
         </div>
 
-        {!isGeneratingPDF && (filteredPayments.length > visibleLimit || isLoadingMore) && (
-          <div
-            ref={loaderRef}
-            className="w-full space-y-6 py-8 pb-20 -mt-2 animate-in fade-in duration-500"
-            data-html2canvas-ignore="true"
-            style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
-          >
-            {/* Emerald Glowing Shimmer Skeleton Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 opacity-50">
-              {[1, 2, 3].slice(0, Math.max(1, Math.min(3, filteredPayments.length - visibleLimit))).map((i) => (
-                <div
-                  key={i}
-                  className="bg-white/40 backdrop-blur-xs rounded-2xl border border-slate-100/60 p-5 space-y-4 shadow-xs animate-pulse"
-                >
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-3 w-3/5">
-                      <div className="w-10 h-10 bg-slate-150/80 rounded-xl shrink-0 animate-pulse"></div>
-                      <div className="space-y-2 w-full">
-                        <div className="h-4 bg-slate-200/50 rounded-lg w-full"></div>
-                        <div className="h-3 bg-slate-100/50 rounded-lg w-2/3"></div>
+        {!isGeneratingPDF &&
+          (filteredPayments.length > visibleLimit || isLoadingMore) && (
+            <div
+              ref={loaderRef}
+              className="w-full space-y-6 py-8 pb-20 -mt-2 animate-in fade-in duration-500"
+              data-html2canvas-ignore="true"
+              style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
+            >
+              {/* Emerald Glowing Shimmer Skeleton Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 opacity-50">
+                {[1, 2, 3]
+                  .slice(
+                    0,
+                    Math.max(
+                      1,
+                      Math.min(3, filteredPayments.length - visibleLimit),
+                    ),
+                  )
+                  .map((i) => (
+                    <div
+                      key={i}
+                      className="bg-white/40 backdrop-blur-xs rounded-2xl border border-slate-100/60 p-5 space-y-4 shadow-xs animate-pulse"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-3 w-3/5">
+                          <div className="w-10 h-10 bg-slate-150/80 rounded-xl shrink-0 animate-pulse"></div>
+                          <div className="space-y-2 w-full">
+                            <div className="h-4 bg-slate-200/50 rounded-lg w-full"></div>
+                            <div className="h-3 bg-slate-100/50 rounded-lg w-2/3"></div>
+                          </div>
+                        </div>
+                        <div className="h-6 w-16 bg-slate-100/60 rounded-full animate-pulse"></div>
+                      </div>
+                      <div className="pt-2 flex justify-between items-center border-t border-slate-100/55">
+                        <div className="h-4 bg-slate-100/50 rounded-lg w-1/4"></div>
+                        <div className="h-5 bg-emerald-100/40 rounded-lg w-1/3"></div>
                       </div>
                     </div>
-                    <div className="h-6 w-16 bg-slate-100/60 rounded-full animate-pulse"></div>
-                  </div>
-                  <div className="pt-2 flex justify-between items-center border-t border-slate-100/55">
-                    <div className="h-4 bg-slate-100/50 rounded-lg w-1/4"></div>
-                    <div className="h-5 bg-emerald-100/40 rounded-lg w-1/3"></div>
-                  </div>
-                </div>
-              ))}
+                  ))}
+              </div>
             </div>
-          </div>
-        )}
+          )}
       </div>
 
       <ConfirmModal
@@ -1556,6 +1616,22 @@ export const Income: React.FC = () => {
           </div>,
           document.body,
         )}
+
+      {/* Floating Action Button */}
+      {isOnline && (
+        <button
+          ref={mainFabRef}
+          onClick={handleOpenAddModal}
+          className="fixed right-6 bottom-[84px] md:bottom-8 z-50 bg-emerald-600 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-2xl active:scale-95 transition-all duration-300 md:right-8 hover:bg-emerald-700"
+          title="নতুন আয় যোগ করুন"
+          style={{
+            transition:
+              "transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s ease-in-out",
+          }}
+        >
+          <Plus size={28} />
+        </button>
+      )}
     </div>
   );
 };

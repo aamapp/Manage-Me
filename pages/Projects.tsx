@@ -63,7 +63,7 @@ const dropdownVariants = {
       type: "tween" as const,
       ease: "easeInOut" as const,
       duration: 0.18,
-    }
+    },
   },
   visible: {
     scaleY: 1,
@@ -73,23 +73,23 @@ const dropdownVariants = {
       duration: 0.32,
       bounce: 0.1,
       staggerChildren: 0.05,
-      delayChildren: 0.04
-    }
-  }
+      delayChildren: 0.04,
+    },
+  },
 };
 
 const itemVariants = {
-  hidden: { 
-    opacity: 0, 
+  hidden: {
+    opacity: 0,
     y: -8,
-    scaleY: 0.8
+    scaleY: 0.8,
   },
-  visible: { 
-    opacity: 1, 
+  visible: {
+    opacity: 1,
     y: 0,
     scaleY: 1,
-    transition: { type: "spring" as const, stiffness: 400, damping: 26 }
-  }
+    transition: { type: "spring" as const, stiffness: 400, damping: 26 },
+  },
 };
 
 export const Projects: React.FC = () => {
@@ -122,6 +122,64 @@ export const Projects: React.FC = () => {
   const [filter, setFilter] = useState<ProjectStatus | "All" | "Due">("All");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
+
+  // Floating Action Button scroll helper
+  const mainFabRef = useRef<HTMLButtonElement>(null);
+  const isMainFabVisibleRef = useRef(true);
+  const lastGlobalScrollY = useRef(0);
+
+  const setMainFabVisibleDirectly = (visible: boolean) => {
+    if (isMainFabVisibleRef.current === visible) return;
+    isMainFabVisibleRef.current = visible;
+
+    const el = mainFabRef.current;
+    if (!el) return;
+
+    if (visible) {
+      el.style.opacity = "1";
+      el.style.transform = "translateY(0) scale(1)";
+      el.style.pointerEvents = "auto";
+    } else {
+      el.style.opacity = "0";
+      el.style.transform = "translateY(32px) scale(0.9)";
+      el.style.pointerEvents = "none";
+    }
+  };
+
+  useEffect(() => {
+    isMainFabVisibleRef.current = true;
+    if (mainFabRef.current) {
+      mainFabRef.current.style.opacity = "1";
+      mainFabRef.current.style.transform = "translateY(0) scale(1)";
+      mainFabRef.current.style.pointerEvents = "auto";
+    }
+
+    lastGlobalScrollY.current = window.scrollY;
+
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      const diffScrollY = currentScrollY - lastGlobalScrollY.current;
+
+      if (Math.abs(diffScrollY) > 10) {
+        if (diffScrollY > 0) {
+          setMainFabVisibleDirectly(false);
+        } else if (diffScrollY < 0) {
+          setMainFabVisibleDirectly(true);
+        }
+        lastGlobalScrollY.current = currentScrollY;
+      }
+
+      if (currentScrollY < 30) {
+        setMainFabVisibleDirectly(true);
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -162,30 +220,30 @@ export const Projects: React.FC = () => {
     if (!startDateStr) return null;
     const startDate = new Date(startDateStr);
     const endDate = new Date(); // today
-    
+
     // Clear hours/minutes to get clean date difference
-    startDate.setHours(0,0,0,0);
-    endDate.setHours(0,0,0,0);
-    
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setHours(0, 0, 0, 0);
+
     if (endDate < startDate) {
       return { months: 0, days: 0 };
     }
-    
+
     let years = endDate.getFullYear() - startDate.getFullYear();
     let months = endDate.getMonth() - startDate.getMonth();
     let days = endDate.getDate() - startDate.getDate();
-    
+
     if (days < 0) {
       months -= 1;
       const prevMonth = new Date(endDate.getFullYear(), endDate.getMonth(), 0);
       days += prevMonth.getDate();
     }
-    
+
     if (months < 0) {
       years -= 1;
       months += 12;
     }
-    
+
     const totalMonths = years * 12 + months;
     return { months: totalMonths, days: days };
   };
@@ -194,13 +252,13 @@ export const Projects: React.FC = () => {
     const duration = calculateDuration(startDateStr);
     if (!duration) return "";
     const { months, days } = duration;
-    
+
     const toBn = (num: number) => num.toLocaleString("bn-BD");
-    
+
     if (months === 0 && days === 0) {
       return "আজকেই";
     }
-    
+
     let parts = [];
     if (months > 0) {
       parts.push(`${toBn(months)} মাস`);
@@ -349,6 +407,10 @@ export const Projects: React.FC = () => {
   };
 
   const handleOpenEditModal = (project: Project) => {
+    if (!isOnline) {
+      showToast("অফলাইনে প্রজেক্ট এডিট করা যাবে না", "error");
+      return;
+    }
     setIsEditing(true);
     setFormError(null);
     setActiveProjectId(project.id);
@@ -656,7 +718,7 @@ export const Projects: React.FC = () => {
           setIsLoadingMore(true);
         }
       },
-      { rootMargin: "150px" }
+      { rootMargin: "150px" },
     );
 
     const currentLoader = loaderRef.current;
@@ -1081,14 +1143,6 @@ export const Projects: React.FC = () => {
             {filteredProjects.length} টি প্রজেক্ট পাওয়া গেছে
           </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={handleOpenAddModal}
-            className="bg-indigo-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-indigo-200 active:scale-90 transition-transform"
-          >
-            <Plus size={22} />
-          </button>
-        </div>
       </div>
 
       {/* Date Range Filter UI */}
@@ -1439,281 +1493,299 @@ export const Projects: React.FC = () => {
               )}
             </div>
           ) : (
-            (isGeneratingPDF ? filteredProjects : slicedProjects).map((p, index) => {
-              const CardWrapper = isGeneratingPDF ? "div" : motion.div;
-              return (
-                <CardWrapper
-                  key={p.id}
-                  {...(!isGeneratingPDF ? {
-                    initial: { opacity: 0, y: 16 },
-                    animate: { opacity: 1, y: 0 },
-                    transition: { duration: 0.35, delay: Math.min((index % 5) * 0.04, 0.15), ease: [0.22, 1, 0.36, 1] }
-                  } : {})}
-                  className="project-card-pdf"
-                  style={
-                    isGeneratingPDF
+            (isGeneratingPDF ? filteredProjects : slicedProjects).map(
+              (p, index) => {
+                const CardWrapper = isGeneratingPDF ? "div" : motion.div;
+                return (
+                  <CardWrapper
+                    key={p.id}
+                    {...(!isGeneratingPDF
                       ? {
-                          breakInside: "avoid",
-                          pageBreakInside: "avoid",
-                          width: "100%",
-                          display: "block",
-                          paddingBottom: "20px",
-                          marginBottom: "0",
+                          initial: { opacity: 0, y: 16 },
+                          animate: { opacity: 1, y: 0 },
+                          transition: {
+                            duration: 0.35,
+                            delay: Math.min((index % 5) * 0.04, 0.15),
+                            ease: [0.22, 1, 0.36, 1],
+                          },
                         }
-                      : {}
-                  }
-                >
-                <div
-                  className={`bg-white rounded-2xl border border-slate-100 shadow-sm relative ${isGeneratingPDF ? "" : "animate-in slide-in-from-bottom-2 duration-300"} hover:border-slate-200 transition-all duration-200`}
-                >
-                  {/* Minimal Card Layout */}
-                  <div
-                    className={`${isGeneratingPDF ? "px-6 py-6" : "px-2 py-4"} flex justify-between items-center`}
+                      : {})}
+                    className="project-card-pdf"
+                    style={
+                      isGeneratingPDF
+                        ? {
+                            breakInside: "avoid",
+                            pageBreakInside: "avoid",
+                            width: "100%",
+                            display: "block",
+                            paddingBottom: "20px",
+                            marginBottom: "0",
+                          }
+                        : {}
+                    }
                   >
                     <div
-                      onClick={() => setViewProject(p)}
-                      className={`flex items-center ${isGeneratingPDF ? "gap-4" : "gap-1.5"} flex-1 min-w-0 mr-1 cursor-pointer hover:opacity-95 active:scale-[0.995] transition-all duration-150`}
+                      className={`bg-white rounded-2xl border border-slate-100 shadow-sm relative ${isGeneratingPDF ? "" : "animate-in slide-in-from-bottom-2 duration-300"} hover:border-slate-200 transition-all duration-200`}
                     >
+                      {/* Minimal Card Layout */}
                       <div
-                        className={`${isGeneratingPDF ? "w-14 h-14 rounded-2xl" : "w-10 h-10 rounded-xl"} bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0`}
+                        className={`${isGeneratingPDF ? "px-6 py-6" : "px-2 py-4"} flex justify-between items-center`}
                       >
-                        <Music size={isGeneratingPDF ? 28 : 20} />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <h3
-                          className={`font-medium text-slate-800 ${isGeneratingPDF ? "text-lg mb-1.5 pt-[3px] pb-[1px]" : "text-sm pt-[3px] pb-[1px]"} truncate leading-normal`}
-                          style={{
-                            fontFamily: "'Kohinoor Bangla', sans-serif",
-                          }}
-                        >
-                          {p.name}
-                        </h3>
-                        <p
-                          className={`${isGeneratingPDF ? "text-sm" : "text-[11px]"} text-slate-500 font-medium truncate flex items-center gap-1.5 ${isGeneratingPDF ? "mb-3" : "mt-1"}`}
-                        >
-                          <Users
-                            size={isGeneratingPDF ? 14 : 10}
-                            className="shrink-0"
-                          />{" "}
-                          {p.clientname}
-                        </p>
                         <div
-                          className={`flex items-center ${isGeneratingPDF ? "gap-2" : "gap-1 mt-2.5"} overflow-x-auto no-scrollbar pb-1`}
+                          onClick={() => setViewProject(p)}
+                          className={`flex items-center ${isGeneratingPDF ? "gap-4" : "gap-1.5"} flex-1 min-w-0 mr-1 cursor-pointer hover:opacity-95 active:scale-[0.995] transition-all duration-150`}
                         >
                           <div
-                            className={`flex items-center ${isGeneratingPDF ? "gap-1.5 px-3 py-1.5 rounded-xl" : "gap-1 px-1.5 py-1 rounded-lg"} bg-slate-50 shrink-0`}
+                            className={`${isGeneratingPDF ? "w-14 h-14 rounded-2xl" : "w-10 h-10 rounded-xl"} bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0`}
                           >
-                            <span
-                              className={`${isGeneratingPDF ? "text-xs" : "text-[10px]"} font-normal text-slate-500`}
-                            >
-                              বাজেট
-                            </span>
-                            <span
-                              className={`${isGeneratingPDF ? "text-sm" : "text-xs"} font-medium text-slate-700`}
-                            >
-                              {currency}
-                              {p.totalamount.toLocaleString("bn-BD")}
-                            </span>
+                            <Music size={isGeneratingPDF ? 28 : 20} />
                           </div>
-                          <div
-                            className={`flex items-center ${isGeneratingPDF ? "gap-1.5 px-3 py-1.5 rounded-xl" : "gap-1 px-1.5 py-1 rounded-lg"} bg-emerald-50 shrink-0`}
-                          >
-                            <span
-                              className={`${isGeneratingPDF ? "text-xs" : "text-[10px]"} font-normal text-emerald-600`}
+                          <div className="min-w-0 flex-1">
+                            <h3
+                              className={`font-medium text-slate-800 ${isGeneratingPDF ? "text-lg mb-1.5 pt-[3px] pb-[1px]" : "text-sm pt-[3px] pb-[1px]"} truncate leading-normal`}
+                              style={{
+                                fontFamily: "'Kohinoor Bangla', sans-serif",
+                              }}
                             >
-                              আদায়
-                            </span>
-                            <span
-                              className={`${isGeneratingPDF ? "text-sm" : "text-xs"} font-medium text-emerald-600`}
+                              {p.name}
+                            </h3>
+                            <p
+                              className={`${isGeneratingPDF ? "text-sm" : "text-[11px]"} text-slate-500 font-medium truncate flex items-center gap-1.5 ${isGeneratingPDF ? "mb-3" : "mt-1"}`}
                             >
-                              {currency}
-                              {p.paidamount.toLocaleString("bn-BD")}
-                            </span>
+                              <Users
+                                size={isGeneratingPDF ? 14 : 10}
+                                className="shrink-0"
+                              />{" "}
+                              {p.clientname}
+                            </p>
+                            <div
+                              className={`flex items-center ${isGeneratingPDF ? "gap-2" : "gap-1 mt-2.5"} overflow-x-auto no-scrollbar pb-1`}
+                            >
+                              <div
+                                className={`flex items-center ${isGeneratingPDF ? "gap-1.5 px-3 py-1.5 rounded-xl" : "gap-1 px-1.5 py-1 rounded-lg"} bg-slate-50 shrink-0`}
+                              >
+                                <span
+                                  className={`${isGeneratingPDF ? "text-xs" : "text-[10px]"} font-normal text-slate-500`}
+                                >
+                                  বাজেট
+                                </span>
+                                <span
+                                  className={`${isGeneratingPDF ? "text-sm" : "text-xs"} font-medium text-slate-700`}
+                                >
+                                  {currency}
+                                  {p.totalamount.toLocaleString("bn-BD")}
+                                </span>
+                              </div>
+                              <div
+                                className={`flex items-center ${isGeneratingPDF ? "gap-1.5 px-3 py-1.5 rounded-xl" : "gap-1 px-1.5 py-1 rounded-lg"} bg-emerald-50 shrink-0`}
+                              >
+                                <span
+                                  className={`${isGeneratingPDF ? "text-xs" : "text-[10px]"} font-normal text-emerald-600`}
+                                >
+                                  আদায়
+                                </span>
+                                <span
+                                  className={`${isGeneratingPDF ? "text-sm" : "text-xs"} font-medium text-emerald-600`}
+                                >
+                                  {currency}
+                                  {p.paidamount.toLocaleString("bn-BD")}
+                                </span>
+                              </div>
+                              <div
+                                className={`flex items-center ${isGeneratingPDF ? "gap-1.5 px-3 py-1.5 rounded-xl" : "gap-1 px-1.5 py-1 rounded-lg"} shrink-0 ${p.dueamount > 0 ? "bg-rose-50" : "bg-slate-50"}`}
+                              >
+                                <span
+                                  className={`${isGeneratingPDF ? "text-xs" : "text-[10px]"} font-normal ${p.dueamount > 0 ? "text-rose-500" : "text-slate-400"}`}
+                                >
+                                  বকেয়া
+                                </span>
+                                <span
+                                  className={`${isGeneratingPDF ? "text-sm" : "text-xs"} font-medium ${p.dueamount > 0 ? "text-rose-600" : "text-slate-500"}`}
+                                >
+                                  {currency}
+                                  {p.dueamount.toLocaleString("bn-BD")}
+                                </span>
+                              </div>
+                            </div>
                           </div>
+                        </div>
+
+                        {/* Actions: Menu & Status Icon */}
+                        <div
+                          className="flex flex-col items-center self-start pt-0.5"
+                          data-html2canvas-ignore="true"
+                        >
+                          {/* Tiny Status Icon */}
                           <div
-                            className={`flex items-center ${isGeneratingPDF ? "gap-1.5 px-3 py-1.5 rounded-xl" : "gap-1 px-1.5 py-1 rounded-lg"} shrink-0 ${p.dueamount > 0 ? "bg-rose-50" : "bg-slate-50"}`}
+                            className={`p-1 rounded-md bg-slate-50 border border-slate-100 shadow-sm mb-1`}
                           >
-                            <span
-                              className={`${isGeneratingPDF ? "text-xs" : "text-[10px]"} font-normal ${p.dueamount > 0 ? "text-rose-500" : "text-slate-400"}`}
+                            {p.status === "Completed" ? (
+                              <CheckCircle2
+                                size={10}
+                                className="text-emerald-500"
+                              />
+                            ) : p.status === "In Progress" ? (
+                              <Play
+                                size={10}
+                                className="text-blue-500 fill-blue-500"
+                              />
+                            ) : (
+                              <Clock size={10} className="text-amber-500" />
+                            )}
+                          </div>
+
+                          <div className="relative action-menu-container">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveCardMenuId(
+                                  activeCardMenuId === p.id ? null : p.id,
+                                );
+                              }}
+                              className={`p-2 rounded-full transition-colors ${activeCardMenuId === p.id ? "bg-indigo-50 text-indigo-600" : "text-slate-300 hover:text-indigo-600 bg-slate-50"}`}
                             >
-                              বকেয়া
-                            </span>
-                            <span
-                              className={`${isGeneratingPDF ? "text-sm" : "text-xs"} font-medium ${p.dueamount > 0 ? "text-rose-600" : "text-slate-500"}`}
-                            >
-                              {currency}
-                              {p.dueamount.toLocaleString("bn-BD")}
-                            </span>
+                              <MoreVertical size={18} />
+                            </button>
+
+                            {/* Dropdown Menu */}
+                            <AnimatePresence>
+                              {activeCardMenuId === p.id && (
+                                <motion.div
+                                  variants={dropdownVariants}
+                                  initial="hidden"
+                                  animate="visible"
+                                  exit="hidden"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="absolute right-0 top-full mt-2 w-32 bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-100 z-30 flex flex-col py-2 origin-top"
+                                >
+                                  <motion.button
+                                    variants={itemVariants}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setViewProject(p);
+                                      setActiveCardMenuId(null);
+                                    }}
+                                    className="w-full px-4 py-2.5 text-left text-[15px] font-medium text-slate-800 hover:bg-slate-50 flex items-center gap-3 transition-colors bg-transparent relative z-10 rounded-t-[14px]"
+                                    style={{
+                                      fontFamily:
+                                        "'Kohinoor Bangla', sans-serif",
+                                    }}
+                                  >
+                                    <Eye
+                                      size={20}
+                                      className="text-slate-800"
+                                      strokeWidth={1.5}
+                                    />{" "}
+                                    বিস্তারিত
+                                  </motion.button>
+                                  <motion.div
+                                    variants={itemVariants}
+                                    className="h-[1px] bg-slate-50 w-[85%] mx-auto relative z-10"
+                                  ></motion.div>
+                                  <motion.button
+                                    variants={itemVariants}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenEditModal(p);
+                                    }}
+                                    className="w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 transition-colors bg-transparent relative z-10 text-slate-800 hover:bg-slate-50"
+                                    style={{
+                                      fontFamily:
+                                        "'Kohinoor Bangla', sans-serif",
+                                    }}
+                                  >
+                                    <CustomEditIcon
+                                      size={20}
+                                      className="text-slate-800"
+                                    />{" "}
+                                    এডিট
+                                  </motion.button>
+                                  <motion.div
+                                    variants={itemVariants}
+                                    className="h-[1px] bg-slate-50 w-[85%] mx-auto relative z-10"
+                                  ></motion.div>
+                                  <motion.button
+                                    variants={itemVariants}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (!isOnline) {
+                                        showToast(
+                                          "অফলাইনে প্রজেক্ট ডিলিট করা যাবে না",
+                                          "error",
+                                        );
+                                        return;
+                                      }
+                                      initiateDelete(p.id);
+                                    }}
+                                    className="w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 transition-colors bg-transparent relative z-10 rounded-b-[14px] text-rose-500 hover:bg-rose-50"
+                                    style={{
+                                      fontFamily:
+                                        "'Kohinoor Bangla', sans-serif",
+                                    }}
+                                  >
+                                    <CustomDeleteIcon
+                                      size={20}
+                                      className="text-rose-500"
+                                    />{" "}
+                                    ডিলিট
+                                  </motion.button>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
                           </div>
                         </div>
                       </div>
                     </div>
-
-                    {/* Actions: Menu & Status Icon */}
-                    <div
-                      className="flex flex-col items-center self-start pt-0.5"
-                      data-html2canvas-ignore="true"
-                    >
-                      {/* Tiny Status Icon */}
-                      <div
-                        className={`p-1 rounded-md bg-slate-50 border border-slate-100 shadow-sm mb-1`}
-                      >
-                        {p.status === "Completed" ? (
-                          <CheckCircle2
-                            size={10}
-                            className="text-emerald-500"
-                          />
-                        ) : p.status === "In Progress" ? (
-                          <Play
-                            size={10}
-                            className="text-blue-500 fill-blue-500"
-                          />
-                        ) : (
-                          <Clock size={10} className="text-amber-500" />
-                        )}
-                      </div>
-
-                      <div className="relative action-menu-container">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setActiveCardMenuId(
-                              activeCardMenuId === p.id ? null : p.id,
-                            );
-                          }}
-                          className={`p-2 rounded-full transition-colors ${activeCardMenuId === p.id ? "bg-indigo-50 text-indigo-600" : "text-slate-300 hover:text-indigo-600 bg-slate-50"}`}
-                        >
-                          <MoreVertical size={18} />
-                        </button>
-
-                        {/* Dropdown Menu */}
-                        <AnimatePresence>
-                          {activeCardMenuId === p.id && (
-                            <motion.div
-                              variants={dropdownVariants}
-                              initial="hidden"
-                              animate="visible"
-                              exit="hidden"
-                              onClick={(e) => e.stopPropagation()}
-                              className="absolute right-0 top-full mt-2 w-32 bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-100 z-30 flex flex-col py-2 origin-top"
-                            >
-                              <motion.button
-                                variants={itemVariants}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setViewProject(p);
-                                  setActiveCardMenuId(null);
-                                }}
-                                className="w-full px-4 py-2.5 text-left text-[15px] font-medium text-slate-800 hover:bg-slate-50 flex items-center gap-3 transition-colors bg-transparent relative z-10 rounded-t-[14px]"
-                                style={{
-                                  fontFamily: "'Kohinoor Bangla', sans-serif",
-                                }}
-                              >
-                                <Eye
-                                  size={20}
-                                  className="text-slate-800"
-                                  strokeWidth={1.5}
-                                />{" "}
-                                বিস্তারিত
-                              </motion.button>
-                              <motion.div variants={itemVariants} className="h-[1px] bg-slate-50 w-[85%] mx-auto relative z-10"></motion.div>
-                              <motion.button
-                                variants={itemVariants}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleOpenEditModal(p);
-                                }}
-                                className="w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 transition-colors bg-transparent relative z-10 text-slate-800 hover:bg-slate-50"
-                                style={{
-                                  fontFamily: "'Kohinoor Bangla', sans-serif",
-                                }}
-                              >
-                                <CustomEditIcon
-                                  size={20}
-                                  className={
-                                    !isOnline
-                                      ? "text-slate-300"
-                                      : "text-slate-800"
-                                  }
-                                />{" "}
-                                এডিট
-                              </motion.button>
-                              <motion.div variants={itemVariants} className="h-[1px] bg-slate-50 w-[85%] mx-auto relative z-10"></motion.div>
-                              <motion.button
-                                variants={itemVariants}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (!isOnline) {
-                                    showToast(
-                                      "অফলাইনে প্রজেক্ট ডিলিট করা যাবে না",
-                                      "error",
-                                    );
-                                    return;
-                                  }
-                                  initiateDelete(p.id);
-                                }}
-                                className={`w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 transition-colors bg-transparent relative z-10 rounded-b-[14px]
-                                          ${!isOnline ? "text-slate-300 cursor-not-allowed" : "text-rose-500 hover:bg-rose-50"}
-                                        `}
-                                style={{
-                                  fontFamily: "'Kohinoor Bangla', sans-serif",
-                                }}
-                              >
-                                <CustomDeleteIcon
-                                  size={20}
-                                  className={
-                                    !isOnline ? "text-slate-300" : "text-rose-500"
-                                  }
-                                />{" "}
-                                ডিলিট
-                              </motion.button>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardWrapper>
-            );
-          })
-        )}
+                  </CardWrapper>
+                );
+              },
+            )
+          )}
         </div>
 
-        {!isGeneratingPDF && (filteredProjects.length > visibleLimit || isLoadingMore) && (
-          <div
-            ref={loaderRef}
-            className="w-full space-y-6 py-8 pb-20 animate-in fade-in duration-500"
-            data-html2canvas-ignore="true"
-            style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
-          >
-            {/* Shimmer Skeleton Cards aligned to the screen grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 opacity-50">
-              {[1, 2, 3].slice(0, Math.max(1, Math.min(3, filteredProjects.length - visibleLimit))).map((i) => (
-                <div
-                  key={i}
-                  className="bg-white/40 backdrop-blur-xs rounded-2xl border border-slate-100/60 p-5 space-y-4 shadow-xs animate-pulse"
-                >
-                  <div className="flex justify-between items-center">
-                    <div className="space-y-2 w-3/5">
-                      <div className="h-4 bg-slate-200/60 rounded-lg w-full"></div>
-                      <div className="h-3 bg-slate-100/60 rounded-lg w-2/3"></div>
+        {!isGeneratingPDF &&
+          (filteredProjects.length > visibleLimit || isLoadingMore) && (
+            <div
+              ref={loaderRef}
+              className="w-full space-y-6 py-8 pb-20 animate-in fade-in duration-500"
+              data-html2canvas-ignore="true"
+              style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
+            >
+              {/* Shimmer Skeleton Cards aligned to the screen grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 opacity-50">
+                {[1, 2, 3]
+                  .slice(
+                    0,
+                    Math.max(
+                      1,
+                      Math.min(3, filteredProjects.length - visibleLimit),
+                    ),
+                  )
+                  .map((i) => (
+                    <div
+                      key={i}
+                      className="bg-white/40 backdrop-blur-xs rounded-2xl border border-slate-100/60 p-5 space-y-4 shadow-xs animate-pulse"
+                    >
+                      <div className="flex justify-between items-center">
+                        <div className="space-y-2 w-3/5">
+                          <div className="h-4 bg-slate-200/60 rounded-lg w-full"></div>
+                          <div className="h-3 bg-slate-100/60 rounded-lg w-2/3"></div>
+                        </div>
+                        <div className="h-6 w-16 bg-slate-200/60 rounded-full"></div>
+                      </div>
+                      <div className="pt-2 flex gap-2">
+                        <div className="h-7 w-20 bg-slate-100/60 rounded-lg animate-pulse"></div>
+                        <div className="h-7 w-24 bg-slate-100/60 rounded-lg animate-pulse"></div>
+                      </div>
+                      <div className="pt-3 border-t border-slate-100/50 flex justify-between items-center">
+                        <div className="h-4 bg-slate-100/55 rounded-lg w-1/3"></div>
+                        <div className="h-5 bg-slate-200/60 rounded-lg w-1/4"></div>
+                      </div>
                     </div>
-                    <div className="h-6 w-16 bg-slate-200/60 rounded-full"></div>
-                  </div>
-                  <div className="pt-2 flex gap-2">
-                    <div className="h-7 w-20 bg-slate-100/60 rounded-lg animate-pulse"></div>
-                    <div className="h-7 w-24 bg-slate-100/60 rounded-lg animate-pulse"></div>
-                  </div>
-                  <div className="pt-3 border-t border-slate-100/50 flex justify-between items-center">
-                    <div className="h-4 bg-slate-100/55 rounded-lg w-1/3"></div>
-                    <div className="h-5 bg-slate-200/60 rounded-lg w-1/4"></div>
-                  </div>
-                </div>
-              ))}
+                  ))}
+              </div>
             </div>
-          </div>
-        )}
+          )}
       </div>
 
       <ConfirmModal
@@ -1895,13 +1967,30 @@ export const Projects: React.FC = () => {
                     {/* Due Duration Notice */}
                     {viewProject.dueamount > 0 && (
                       <div className="bg-amber-50/70 border border-amber-200/50 rounded-xl p-3.5 flex items-start gap-2.5">
-                        <Clock size={16} className="text-amber-600 mt-0.5 shrink-0" />
+                        <Clock
+                          size={16}
+                          className="text-amber-600 mt-0.5 shrink-0"
+                        />
                         <div>
-                          <p className="text-[10px] font-bold text-amber-800" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                          <p
+                            className="text-[10px] font-bold text-amber-800"
+                            style={{
+                              fontFamily: "'Kohinoor Bangla', sans-serif",
+                            }}
+                          >
                             বকেয়ার মেয়াদ:
                           </p>
-                          <p className="text-xs font-semibold text-amber-700/90 mt-1 leading-relaxed" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
-                            প্রজেক্টটি যুক্ত করার পর থেকে আজ পর্যন্ত মোট <span className="font-extrabold text-amber-900 bg-amber-100 px-1.5 py-0.5 rounded font-sans leading-none">{getBengaliDurationText(viewProject.createdat)}</span> ধরে বকেয়া টাকা অবশিষ্ট রয়েছে।
+                          <p
+                            className="text-xs font-semibold text-amber-700/90 mt-1 leading-relaxed"
+                            style={{
+                              fontFamily: "'Kohinoor Bangla', sans-serif",
+                            }}
+                          >
+                            প্রজেক্টটি যুক্ত করার পর থেকে আজ পর্যন্ত মোট{" "}
+                            <span className="font-extrabold text-amber-900 bg-amber-100 px-1.5 py-0.5 rounded font-sans leading-none">
+                              {getBengaliDurationText(viewProject.createdat)}
+                            </span>{" "}
+                            ধরে বকেয়া টাকা অবশিষ্ট রয়েছে।
                           </p>
                         </div>
                       </div>
@@ -2346,6 +2435,22 @@ export const Projects: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Floating Action Button */}
+      {isOnline && (
+        <button
+          ref={mainFabRef}
+          onClick={handleOpenAddModal}
+          className="fixed right-6 bottom-[84px] md:bottom-8 z-50 bg-indigo-600 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-2xl active:scale-95 transition-all duration-300 md:right-8 hover:bg-indigo-700"
+          title="নতুন প্রজেক্ট যোগ করুন"
+          style={{
+            transition:
+              "transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s ease-in-out",
+          }}
+        >
+          <Plus size={28} />
+        </button>
       )}
     </div>
   );

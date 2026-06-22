@@ -31,7 +31,7 @@ const dropdownVariants = {
       type: "tween" as const,
       ease: "easeInOut" as const,
       duration: 0.18,
-    }
+    },
   },
   visible: {
     scaleY: 1,
@@ -41,23 +41,23 @@ const dropdownVariants = {
       duration: 0.32,
       bounce: 0.1,
       staggerChildren: 0.05,
-      delayChildren: 0.04
-    }
-  }
+      delayChildren: 0.04,
+    },
+  },
 };
 
 const itemVariants = {
-  hidden: { 
-    opacity: 0, 
+  hidden: {
+    opacity: 0,
     y: -8,
-    scaleY: 0.8
+    scaleY: 0.8,
   },
-  visible: { 
-    opacity: 1, 
+  visible: {
+    opacity: 1,
     y: 0,
     scaleY: 1,
-    transition: { type: "spring" as const, stiffness: 400, damping: 26 }
-  }
+    transition: { type: "spring" as const, stiffness: 400, damping: 26 },
+  },
 };
 
 export const Clients: React.FC = () => {
@@ -176,6 +176,10 @@ export const Clients: React.FC = () => {
   };
 
   const initiateDelete = (id: string) => {
+    if (!isOnline) {
+      showToast("অফলাইনে ক্লায়েন্ট ডিলিট করা যাবে না", "error");
+      return;
+    }
     setClientToDelete(id);
     setShowDeleteModal(true);
     setActiveMenuId(null);
@@ -324,20 +328,25 @@ export const Clients: React.FC = () => {
   );
 
   return (
-    <div ref={containerRef} className="px-4 sm:px-6 lg:px-8 pb-24 pt-0 min-h-screen bg-slate-50/50 font-sans h-screen overflow-y-auto">
+    <div
+      ref={containerRef}
+      className="px-4 sm:px-6 lg:px-8 pb-24 pt-0 min-h-screen bg-slate-50/50 font-sans h-screen overflow-y-auto"
+    >
       <div className="max-w-5xl mx-auto space-y-6">
         {/* Header Content */}
         <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md flex items-center justify-between mb-6 border-b border-slate-200/60 h-14 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
           <div className="flex items-center gap-3.5">
             <button
-              onClick={() => navigate('/')}
+              onClick={() => navigate("/")}
               className="w-11 h-11 rounded-full border border-slate-200 bg-white flex items-center justify-center text-slate-800 active:scale-95 transition-all hover:bg-slate-100 hover:border-slate-300 cursor-pointer shrink-0 shadow-sm"
               title="ড্যাশবোর্ডে ফিরে যান"
             >
               <ArrowLeft size={20} />
             </button>
             <div>
-              <h1 className="text-xl font-bold text-slate-800 animate-in fade-in duration-300">ক্লায়েন্ট তালিকা</h1>
+              <h1 className="text-xl font-bold text-slate-800 animate-in fade-in duration-300">
+                ক্লায়েন্ট তালিকা
+              </h1>
               <p className="text-xs text-slate-500 font-medium">
                 {clients.length} জন ক্লায়েন্ট পাওয়া গেছে
               </p>
@@ -362,7 +371,10 @@ export const Clients: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pb-20">
           {filteredClients.length === 0 ? (
             <div className="col-span-full py-20 text-center text-slate-400">
-              <Users size={48} className="mx-auto mb-4 opacity-20 animate-bounce duration-1000" />
+              <Users
+                size={48}
+                className="mx-auto mb-4 opacity-20 animate-bounce duration-1000"
+              />
               <p className="text-sm font-medium">কোনো ক্লায়েন্ট নেই</p>
             </div>
           ) : (
@@ -425,7 +437,10 @@ export const Clients: React.FC = () => {
                               />{" "}
                               এডিট
                             </motion.button>
-                            <motion.div variants={itemVariants} className="h-[1px] bg-slate-50 w-[85%] mx-auto relative z-10"></motion.div>
+                            <motion.div
+                              variants={itemVariants}
+                              className="h-[1px] bg-slate-50 w-[85%] mx-auto relative z-10"
+                            ></motion.div>
                             <motion.button
                               variants={itemVariants}
                               onClick={(e) => {
@@ -439,16 +454,11 @@ export const Clients: React.FC = () => {
                                 }
                                 initiateDelete(client.id);
                               }}
-                              disabled={!isOnline}
-                              className={`w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 transition-colors bg-transparent relative z-10 rounded-b-[14px]
-                                        ${!isOnline ? "text-slate-300 cursor-not-allowed" : "text-rose-500 hover:bg-rose-50"}
-                                      `}
+                              className="w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 transition-colors bg-transparent relative z-10 rounded-b-[14px] text-rose-500 hover:bg-rose-50"
                             >
                               <CustomDeleteIcon
                                 size={20}
-                                className={
-                                  !isOnline ? "text-slate-300" : "text-rose-500"
-                                }
+                                className="text-rose-500"
                               />{" "}
                               ডিলিট
                             </motion.button>
@@ -551,20 +561,20 @@ export const Clients: React.FC = () => {
           )}
 
         {/* Scroll-to-Hide FAB */}
-        <button
-          ref={mainFabRef}
-          onClick={handleOpenAddModal}
-          disabled={!isOnline}
-          className={`fixed bottom-6 right-6 z-50 bg-indigo-600 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-2xl active:scale-95 transition-all duration-300 md:bottom-8 md:right-8 ${
-            !isOnline ? "opacity-50 cursor-not-allowed" : "hover:bg-indigo-700"
-          }`}
-          title="নতুন ক্লায়েন্ট যোগ করুন"
-          style={{
-            transition: "transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s ease-in-out",
-          }}
-        >
-          <Plus size={28} />
-        </button>
+        {isOnline && (
+          <button
+            ref={mainFabRef}
+            onClick={handleOpenAddModal}
+            className="fixed right-6 bottom-[84px] md:bottom-8 z-50 bg-indigo-600 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-2xl active:scale-95 transition-all duration-300 md:right-8 hover:bg-indigo-700"
+            title="নতুন ক্লায়েন্ট যোগ করুন"
+            style={{
+              transition:
+                "transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s ease-in-out",
+            }}
+          >
+            <Plus size={28} />
+          </button>
+        )}
       </div>
     </div>
   );
