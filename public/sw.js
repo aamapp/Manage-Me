@@ -9,12 +9,18 @@ const ASSETS_TO_CACHE = [
   'https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&display=swap'
 ];
 
-// Install Event - Pre-cache essential assets
+// Install Event - Pre-cache essential assets resiliently
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('Pre-caching assets...');
-      return cache.addAll(ASSETS_TO_CACHE);
+      console.log('Pre-caching assets in background...');
+      // Safe dynamic caching: if one asset fails to fetch, others will still cache and SW will install successfully!
+      const cachePromises = ASSETS_TO_CACHE.map((asset) => {
+        return cache.add(asset).catch((err) => {
+          console.warn(`Pre-cache failed for asset: ${asset}. Service Worker will still continue.`, err);
+        });
+      });
+      return Promise.all(cachePromises);
     })
   );
   self.skipWaiting();
@@ -37,39 +43,47 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch Event - Stale-While-Revalidate Strategy
-// This serves from cache immediately for speed/offline, but updates in background
+// Fetch Event - Stale-While-Revalidate with resilient fallbacks
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
   const url = new URL(event.request.url);
 
-  // CRITICAL FIX: NEVER cache Supabase API calls. Always go to network.
-  // This prevents the "stale data" issue when adding/deleting records.
+  // CRITICAL: NEVER cache Supabase API calls. Always go to network.
   if (url.hostname.includes('supabase.co')) {
     event.respondWith(fetch(event.request));
     return;
   }
 
-  // Static Assets & External Libraries - Cache First, then Network
+  // Bypass chrome-extension or other non-http schemes
+  if (!event.request.url.startsWith('http')) return;
+
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
-      const fetchPromise = fetch(event.request).then((networkResponse) => {
-        if (networkResponse.status === 200 || networkResponse.status === 0) {
-          const responseClone = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseClone);
-          });
-        }
-        return networkResponse;
-      }).catch(() => {
-        // If network fails and no cache, return index.html for navigation
-        if (event.request.mode === 'navigate') {
-          return caches.match('/');
-        }
-      });
+      const fetchPromise = fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse.status === 200 || networkResponse.status === 0) {
+            const responseClone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseClone);
+            });
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          // If we are completely offline and network fetch fails, we return cachedResponse if present
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          // If no cache and it's navigation, return fallback index routing
+          if (event.request.mode === 'navigate') {
+            return caches.match('/');
+          }
+        });
 
-      return cachedResponse || fetchPromise || caches.match('/');
+      // Serve from cache immediately if available, otherwise fetch from network
+      return cachedResponse || fetchPromise;
     })
   );
 });
+
