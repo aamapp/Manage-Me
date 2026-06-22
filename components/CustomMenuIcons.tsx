@@ -21,11 +21,11 @@ export const CustomEditIcon: React.FC<IconProps> = ({ className, size = 20 }) =>
       {/* Outer container: a beautifully rounded squircle with a perfect, clean top-right opening */}
       <path d="M 13 4 H 9 A 5 5 0 0 0 4 9 V 15 A 5 5 0 0 0 9 20 H 15 A 5 5 0 0 0 20 15 V 12" />
       {/* Slanted pencil body: a mathematically perfect, stout 45-degree elegant outline sticking out of the border with a symmetric pointy tip */}
-      <path d="M 9 15 L 9.5 11.5 L 15.5 5.5 A 2.12 2.12 0 0 1 18.5 8.5 L 12.5 14.5 Z" />
+      <path d="M 8 16 L 9.5 11.5 L 15.5 5.5 A 2.12 2.12 0 0 1 18.5 8.5 L 12.5 14.5 Z" />
       {/* Pencil tip separator */}
       <path d="M 9.5 11.5 L 12.5 14.5" />
       {/* Pencil cap/eraser separator */}
-      <path d="M 14 7 L 17 10" />
+      <path d="M 13.5 7.5 L 16.5 10.5" />
     </svg>
   );
 };
