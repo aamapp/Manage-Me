@@ -13,19 +13,19 @@ export const CustomEditIcon: React.FC<IconProps> = ({ className, size = 20 }) =>
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth={1.5}
+      strokeWidth={1.8} // Decreased thickness for a clean, thinner outline
       strokeLinecap="round"
       strokeLinejoin="round"
       className={className}
     >
-      {/* Outer container: a beautifully rounded squircle with a perfect, clean top-right opening */}
-      <path d="M 13 4 H 9 A 5 5 0 0 0 4 9 V 15 A 5 5 0 0 0 9 20 H 15 A 5 5 0 0 0 20 15 V 12" />
-      {/* Slanted pencil body: a mathematically perfect, stout 45-degree elegant outline sticking out of the border with a symmetric pointy tip */}
-      <path d="M 10 14 L 9.5 11.5 L 15.5 5.5 A 2.12 2.12 0 0 1 18.5 8.5 L 12.5 14.5 Z" />
-      {/* Pencil tip separator */}
-      <path d="M 9.5 11.5 L 12.5 14.5" />
-      {/* Pencil cap/eraser separator */}
-      <path d="M 13.5 7.5 L 16.5 10.5" />
+      {/* বাইরের চারকোণা স্কয়ার ফ্রেম (কোণাগুলোর বাঁকানো ভাব আরো বাড়িয়ে ৫ করা হয়েছে) */}
+      <path d="M12 4H8a5 5 0 0 0-5 5v6a5 5 0 0 0 5 5h7a5 5 0 0 0 5-5v-3" />
+      
+      {/* ভেতরের পেন্সিল বা এডিট আইকন */}
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+      
+      {/* পেন্সিলের উপরের ক্যাপ সেপারেটর ব্যান্ড (নিখুঁত ডায়াগোনাল এবং দৈর্ঘ্য কমানো হয়েছে) */}
+      <path d="M16 5l3 3" />
     </svg>
   );
 };
