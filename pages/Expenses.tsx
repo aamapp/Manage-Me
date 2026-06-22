@@ -93,7 +93,7 @@ const dropdownVariants = {
       type: "tween" as const,
       ease: "easeInOut" as const,
       duration: 0.18,
-    },
+    }
   },
   visible: {
     scaleY: 1,
@@ -103,23 +103,23 @@ const dropdownVariants = {
       duration: 0.32,
       bounce: 0.1,
       staggerChildren: 0.05,
-      delayChildren: 0.04,
-    },
-  },
+      delayChildren: 0.04
+    }
+  }
 };
 
 const itemVariants = {
-  hidden: {
-    opacity: 0,
+  hidden: { 
+    opacity: 0, 
     y: -8,
-    scaleY: 0.8,
+    scaleY: 0.8
   },
-  visible: {
-    opacity: 1,
+  visible: { 
+    opacity: 1, 
     y: 0,
     scaleY: 1,
-    transition: { type: "spring" as const, stiffness: 400, damping: 26 },
-  },
+    transition: { type: "spring" as const, stiffness: 400, damping: 26 }
+  }
 };
 
 const CustomCoinsIcon = ({
@@ -890,40 +890,18 @@ export const Expenses: React.FC = () => {
   ) => {
     if (!user) return;
     try {
-      let currentWallets: any[] = [];
-      const cached = localStorage.getItem(`manage_me_wallets_${user.id}`);
-      if (cached) {
-        currentWallets = JSON.parse(cached);
-      } else {
-        currentWallets = [...wallets];
-      }
-
+      let currentWallets = [...wallets];
       if (currentWallets.length === 0) {
-        currentWallets = [
-          {
-            id: `wallet-cash-${user.id}`,
-            name: "ক্যাশ",
-            balance: 0,
-            isDefault: true,
-            lastTransactionDate: new Date().toLocaleDateString("bn-BD", {
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-            }),
-            userid: user.id,
-            createdAt: new Date().toISOString(),
-          }
-        ];
+        const cached = localStorage.getItem(`manage_me_wallets_${user.id}`);
+        if (cached) {
+          currentWallets = JSON.parse(cached);
+        }
       }
-
       const targetIdx = currentWallets.findIndex(
         (w) => w.name.trim() === walletName.trim(),
       );
-
-      let updatedWallets = [...currentWallets];
-
       if (targetIdx !== -1) {
-        const targetWallet = { ...currentWallets[targetIdx] };
+        const targetWallet = currentWallets[targetIdx];
         const newBalance = Number(targetWallet.balance || 0) + changeAmount;
         targetWallet.balance = newBalance;
         targetWallet.lastTransactionDate = new Date().toLocaleDateString(
@@ -931,14 +909,10 @@ export const Expenses: React.FC = () => {
           { day: "numeric", month: "long", year: "numeric" },
         );
 
-        updatedWallets = currentWallets.map((w, idx) =>
-          idx === targetIdx ? targetWallet : w,
-        );
-
-        setWallets(updatedWallets);
+        setWallets(currentWallets);
         localStorage.setItem(
           `manage_me_wallets_${user.id}`,
-          JSON.stringify(updatedWallets),
+          JSON.stringify(currentWallets),
         );
 
         await supabase
@@ -966,11 +940,11 @@ export const Expenses: React.FC = () => {
           userid: user.id,
           createdAt: new Date().toISOString(),
         };
-        updatedWallets = [...currentWallets, newWallet];
-        setWallets(updatedWallets);
+        const updated = [...currentWallets, newWallet];
+        setWallets(updated);
         localStorage.setItem(
           `manage_me_wallets_${user.id}`,
-          JSON.stringify(updatedWallets),
+          JSON.stringify(updated),
         );
 
         await supabase.from("wallets").upsert([newWallet]);
@@ -986,17 +960,6 @@ export const Expenses: React.FC = () => {
       fetchWallets();
     }
   }, [user, activeTab, isModalOpen]);
-
-  useEffect(() => {
-    if (!user) return;
-    const handleWalletsUpdatedGlobal = () => {
-      fetchWallets();
-    };
-    window.addEventListener("wallets-updated", handleWalletsUpdatedGlobal);
-    return () => {
-      window.removeEventListener("wallets-updated", handleWalletsUpdatedGlobal);
-    };
-  }, [user]);
 
   // Bangla Formatter helpers
   const toBanglaNumbers = (num: string | number): string => {
@@ -1187,8 +1150,10 @@ export const Expenses: React.FC = () => {
 
   const handleOpenAddModal = () => {
     if (!isOnline) {
-      showToast("অফলাইনে নতুন লেনদেন যোগ করা যাবে না", "error");
-      return;
+      showToast(
+        "অফলাইন মোডে আছেন। নতুন লেনদেন পরবর্তীতে সিঙ্ক হতে পারে।",
+        "info",
+      );
     }
     const now = new Date();
     const y = now.getFullYear();
@@ -1232,10 +1197,6 @@ export const Expenses: React.FC = () => {
   };
 
   const handleOpenEditUnified = (tx: any) => {
-    if (!isOnline) {
-      showToast("অফলাইনে লেনদেন এডিট করা যাবে না", "error");
-      return;
-    }
     setIsEditing(true);
     setTxModalType(tx.type);
     setActiveMenuId(null);
@@ -1500,10 +1461,6 @@ export const Expenses: React.FC = () => {
   };
 
   const initiateDeleteUnified = (tx: any) => {
-    if (!isOnline) {
-      showToast("অফলাইনে লেনদেন ডিলিট করা যাবে না", "error");
-      return;
-    }
     setTxToDelete({
       id: tx.id,
       type: tx.type,
@@ -1765,7 +1722,7 @@ export const Expenses: React.FC = () => {
           setIsLoadingMore(true);
         }
       },
-      { rootMargin: "150px" },
+      { rootMargin: "150px" }
     );
 
     const currentLoader = loaderRef.current;
@@ -2324,31 +2281,31 @@ export const Expenses: React.FC = () => {
                 </div>
               )}
 
-              {/* Search Inputs & Category Option Filters (Combining both) */}
-              <div className="space-y-2.5 w-full max-w-lg mx-auto">
-                {(searchTerm || showSearch) && (
-                  <div className="bg-white px-4 py-3 rounded-[10px] border border-slate-200/80 shadow-xs flex items-center gap-2 relative">
-                    <Search size={18} className="text-slate-400" />
-                    <input
-                      type="text"
-                      autoFocus
-                      placeholder="বিবরণ বা ক্যাটাগরি দিয়ে খুঁজুন..."
-                      className="w-full bg-transparent outline-none text-sm font-bold text-slate-800 placeholder:text-slate-400 pr-6"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSearchTerm("");
-                        setShowSearch(false);
-                      }}
-                      className="absolute right-3.5 text-slate-400 hover:text-slate-600 transition-colors"
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
-                )}
+               {/* Search Inputs & Category Option Filters (Combining both) */}
+               <div className="space-y-2.5 w-full max-w-lg mx-auto">
+                 {(searchTerm || showSearch) && (
+                   <div className="bg-white px-4 py-3 rounded-[10px] border border-slate-200/80 shadow-xs flex items-center gap-2 relative">
+                     <Search size={18} className="text-slate-400" />
+                     <input
+                       type="text"
+                       autoFocus
+                       placeholder="বিবরণ বা ক্যাটাগরি দিয়ে খুঁজুন..."
+                       className="w-full bg-transparent outline-none text-sm font-bold text-slate-800 placeholder:text-slate-400 pr-6"
+                       value={searchTerm}
+                       onChange={(e) => setSearchTerm(e.target.value)}
+                     />
+                     <button
+                       type="button"
+                       onClick={() => {
+                         setSearchTerm("");
+                         setShowSearch(false);
+                       }}
+                       className="absolute right-3.5 text-slate-400 hover:text-slate-600 transition-colors"
+                     >
+                       <X size={16} />
+                     </button>
+                   </div>
+                 )}
 
                 {/* Gray filter bar stretching across exactly like the image */}
                 <div className="bg-[#f0f3f6] rounded-[8px] p-[3px] flex items-center justify-between w-full select-none border border-slate-100">
@@ -2554,182 +2511,173 @@ export const Expenses: React.FC = () => {
                       return (
                         <GroupWrapper
                           key={group.date}
-                          {...(!isGeneratingPDF
-                            ? {
-                                initial: { opacity: 0, y: 16 },
-                                animate: { opacity: 1, y: 0 },
-                                transition: {
-                                  duration: 0.35,
-                                  delay: Math.min(groupIdx * 0.05, 0.2),
-                                  ease: [0.22, 1, 0.36, 1],
-                                },
-                              }
-                            : {})}
+                          {...(!isGeneratingPDF ? {
+                            initial: { opacity: 0, y: 16 },
+                            animate: { opacity: 1, y: 0 },
+                            transition: { duration: 0.35, delay: Math.min(groupIdx * 0.05, 0.2), ease: [0.22, 1, 0.36, 1] }
+                          } : {})}
                           className="space-y-2.5"
                         >
-                          {/* Day Date Indicator Header */}
-                          <div
-                            className={`flex items-center justify-between py-2 ${isGeneratingPDF ? "bg-white" : "bg-transparent"} select-none`}
-                          >
-                            <span className="text-[12px] sm:text-[13px] font-medium text-slate-400 whitespace-nowrap">
-                              {formatDateToBangla(group.date)}
+                        {/* Day Date Indicator Header */}
+                        <div
+                          className={`flex items-center justify-between py-2 ${isGeneratingPDF ? "bg-white" : "bg-transparent"} select-none`}
+                        >
+                          <span className="text-[12px] sm:text-[13px] font-medium text-slate-400 whitespace-nowrap">
+                            {formatDateToBangla(group.date)}
+                          </span>
+                          {/* Solid indicator line spanning from date to total indicator block */}
+                          <div className="flex-1 mx-3 border-b border-solid border-slate-200/60"></div>
+                          <div className="flex items-center gap-3 text-[12px] sm:text-[13px] font-medium text-slate-400 whitespace-nowrap">
+                            <span>মোট</span>
+                            <span className="text-[#50AD54] font-medium text-[12px] sm:text-[13px]">
+                              {toBanglaNumbers(group.incomeTotal)}
                             </span>
-                            {/* Solid indicator line spanning from date to total indicator block */}
-                            <div className="flex-1 mx-3 border-b border-solid border-slate-200/60"></div>
-                            <div className="flex items-center gap-3 text-[12px] sm:text-[13px] font-medium text-slate-400 whitespace-nowrap">
-                              <span>মোট</span>
-                              <span className="text-[#50AD54] font-medium text-[12px] sm:text-[13px]">
-                                {toBanglaNumbers(group.incomeTotal)}
-                              </span>
-                              <span className="text-[#db4437] font-medium text-[12px] sm:text-[13px]">
-                                {toBanglaNumbers(group.expenseTotal)}
-                              </span>
-                            </div>
+                            <span className="text-[#db4437] font-medium text-[12px] sm:text-[13px]">
+                              {toBanglaNumbers(group.expenseTotal)}
+                            </span>
                           </div>
+                        </div>
 
-                          {/* Day Ledger Items Container */}
-                          <div className="flex flex-col space-y-2.5">
-                            {group.transactions.map((tx) => {
-                              const isIncome = tx.type === "income";
-                              return (
-                                <div
-                                  key={tx.id}
-                                  className={`group relative rounded-[12px] px-4 py-2.5 sm:py-3 flex items-center justify-between gap-3 transition-colors duration-200 shadow-[0_2px_6px_rgba(0,0,0,0.015)] ${
-                                    isIncome
-                                      ? "bg-emerald-50/50 border-emerald-100"
-                                      : "bg-rose-50/50 border-rose-100"
-                                  }`}
-                                >
-                                  {/* Left side: Title and circular badge with Time detail */}
-                                  <div className="flex flex-col min-w-0 justify-center">
-                                    <h3 className="font-normal text-slate-800 text-[14.5px] sm:text-[15px] leading-normal pt-[3px] pb-[1px] truncate">
-                                      {tx.title}
-                                    </h3>
-                                    <div className="flex items-center gap-1.5 mt-1 select-none">
-                                      <span
-                                        className={`w-[18px] h-[18px] rounded-full flex items-center justify-center font-bold text-[9px] sm:text-[10px] shrink-0 ${
-                                          isIncome
-                                            ? "bg-emerald-100 text-emerald-600"
-                                            : "bg-rose-100 text-rose-600"
-                                        }`}
-                                      >
-                                        {isIncome ? "+" : "-"}
-                                      </span>
-                                      <span className="text-[10.5px] sm:text-[11px] font-medium text-slate-400">
-                                        {formatTimeToBangla(
-                                          tx.rawItem.date,
-                                          tx.rawItem.createdat,
-                                        )}
-                                      </span>
-                                    </div>
-                                  </div>
-
-                                  {/* Right side: Amount and Menu vertically centered */}
-                                  <div className="flex items-center gap-2.5 shrink-0 my-auto">
+                        {/* Day Ledger Items Container */}
+                        <div className="flex flex-col space-y-2.5">
+                          {group.transactions.map((tx) => {
+                            const isIncome = tx.type === "income";
+                            return (
+                              <div
+                                key={tx.id}
+                                className={`group relative rounded-[12px] px-4 py-2.5 sm:py-3 flex items-center justify-between gap-3 transition-colors duration-200 shadow-[0_2px_6px_rgba(0,0,0,0.015)] ${
+                                  isIncome
+                                    ? "bg-emerald-50/50 border-emerald-100"
+                                    : "bg-rose-50/50 border-rose-100"
+                                }`}
+                              >
+                                {/* Left side: Title and circular badge with Time detail */}
+                                <div className="flex flex-col min-w-0 justify-center">
+                                  <h3 className="font-normal text-slate-800 text-[14.5px] sm:text-[15px] leading-normal pt-[3px] pb-[1px] truncate">
+                                    {tx.title}
+                                  </h3>
+                                  <div className="flex items-center gap-1.5 mt-1 select-none">
                                     <span
-                                      className={`font-medium text-[15px] sm:text-[16px] whitespace-nowrap ${
+                                      className={`w-[18px] h-[18px] rounded-full flex items-center justify-center font-bold text-[9px] sm:text-[10px] shrink-0 ${
                                         isIncome
-                                          ? "text-emerald-600"
-                                          : "text-rose-600"
+                                          ? "bg-emerald-100 text-emerald-600"
+                                          : "bg-rose-100 text-rose-600"
                                       }`}
                                     >
-                                      {toBanglaNumbers(
-                                        tx.amount.toLocaleString("bn-BD"),
+                                      {isIncome ? "+" : "-"}
+                                    </span>
+                                    <span className="text-[10.5px] sm:text-[11px] font-medium text-slate-400">
+                                      {formatTimeToBangla(
+                                        tx.rawItem.date,
+                                        tx.rawItem.createdat,
                                       )}
                                     </span>
-
-                                    {!isGeneratingPDF && (
-                                      <div className="relative action-menu-container shrink-0">
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setActiveMenuId(
-                                              activeMenuId === tx.id
-                                                ? null
-                                                : tx.id,
-                                            );
-                                          }}
-                                          className={`p-1 rounded-lg transition-colors ${activeMenuId === tx.id ? "bg-slate-100/60 text-slate-800" : "text-slate-300 hover:text-slate-600"}`}
-                                        >
-                                          <MoreVertical size={16} />
-                                        </button>
-
-                                        <AnimatePresence>
-                                          {activeMenuId === tx.id && (
-                                            <motion.div
-                                              variants={dropdownVariants}
-                                              initial="hidden"
-                                              animate="visible"
-                                              exit="hidden"
-                                              onClick={(e) =>
-                                                e.stopPropagation()
-                                              }
-                                              className="absolute right-0 top-full mt-2 w-32 bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-100 z-30 flex flex-col py-2 origin-top"
-                                            >
-                                              <motion.button
-                                                variants={itemVariants}
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  if (!isOnline) {
-                                                    showToast(
-                                                      "অফলাইনে রেকর্ড করা যাবে না",
-                                                      "error",
-                                                    );
-                                                    return;
-                                                  }
-                                                  handleOpenEditUnified(tx);
-                                                }}
-                                                className="w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 hover:bg-slate-50 text-slate-800 transition-colors bg-transparent relative z-10 rounded-t-[14px]"
-                                                style={{
-                                                  fontFamily:
-                                                    "'Kohinoor Bangla', sans-serif",
-                                                }}
-                                              >
-                                                <CustomEditIcon
-                                                  size={20}
-                                                  className="text-slate-800"
-                                                />
-                                                এডিট
-                                              </motion.button>
-                                              <motion.div
-                                                variants={itemVariants}
-                                                className="h-[1px] bg-slate-50 w-[85%] mx-auto relative z-10"
-                                              ></motion.div>
-                                              <motion.button
-                                                variants={itemVariants}
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  if (!isOnline) {
-                                                    showToast(
-                                                      "অফলাইনে রেকর্ড ডিলিট করা যাবে না",
-                                                      "error",
-                                                    );
-                                                    return;
-                                                  }
-                                                  initiateDeleteUnified(tx);
-                                                }}
-                                                className="w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 hover:bg-rose-50/50 text-rose-500 transition-colors bg-transparent relative z-10 rounded-b-[14px]"
-                                                style={{
-                                                  fontFamily:
-                                                    "'Kohinoor Bangla', sans-serif",
-                                                }}
-                                              >
-                                                <CustomDeleteIcon
-                                                  size={20}
-                                                  className="text-rose-500"
-                                                />
-                                                ডিলিট
-                                              </motion.button>
-                                            </motion.div>
-                                          )}
-                                        </AnimatePresence>
-                                      </div>
-                                    )}
                                   </div>
                                 </div>
-                              );
-                            })}
-                          </div>
+
+                                {/* Right side: Amount and Menu vertically centered */}
+                                <div className="flex items-center gap-2.5 shrink-0 my-auto">
+                                  <span
+                                    className={`font-medium text-[15px] sm:text-[16px] whitespace-nowrap ${
+                                      isIncome
+                                        ? "text-emerald-600"
+                                        : "text-rose-600"
+                                    }`}
+                                  >
+                                    {toBanglaNumbers(
+                                      tx.amount.toLocaleString("bn-BD"),
+                                    )}
+                                  </span>
+
+                                  {!isGeneratingPDF && (
+                                    <div className="relative action-menu-container shrink-0">
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setActiveMenuId(
+                                            activeMenuId === tx.id
+                                              ? null
+                                              : tx.id,
+                                          );
+                                        }}
+                                        className={`p-1 rounded-lg transition-colors ${activeMenuId === tx.id ? "bg-slate-100/60 text-slate-800" : "text-slate-300 hover:text-slate-600"}`}
+                                      >
+                                        <MoreVertical size={16} />
+                                      </button>
+
+                                      <AnimatePresence>
+                                        {activeMenuId === tx.id && (
+                                          <motion.div
+                                            variants={dropdownVariants}
+                                            initial="hidden"
+                                            animate="visible"
+                                            exit="hidden"
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="absolute right-0 top-full mt-2 w-32 bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-100 z-30 flex flex-col py-2 origin-top"
+                                          >
+                                            <motion.button
+                                              variants={itemVariants}
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (!isOnline) {
+                                                  showToast(
+                                                    "অফলাইনে রেকর্ড করা যাবে না",
+                                                    "error",
+                                                  );
+                                                  return;
+                                                }
+                                                handleOpenEditUnified(tx);
+                                              }}
+                                              disabled={!isOnline}
+                                              className="w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 hover:bg-slate-50 text-slate-800 transition-colors bg-transparent relative z-10 rounded-t-[14px]"
+                                              style={{
+                                                fontFamily:
+                                                  "'Kohinoor Bangla', sans-serif",
+                                              }}
+                                            >
+                                              <CustomEditIcon
+                                                size={20}
+                                                className="text-slate-800"
+                                              />
+                                              এডিট
+                                            </motion.button>
+                                            <motion.div variants={itemVariants} className="h-[1px] bg-slate-50 w-[85%] mx-auto relative z-10"></motion.div>
+                                            <motion.button
+                                              variants={itemVariants}
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (!isOnline) {
+                                                  showToast(
+                                                    "অফলাইনে রেকর্ড ডিলিট করা যাবে না",
+                                                    "error",
+                                                  );
+                                                  return;
+                                                }
+                                                initiateDeleteUnified(tx);
+                                              }}
+                                              disabled={!isOnline}
+                                              className="w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 hover:bg-rose-50/50 text-rose-500 transition-colors bg-transparent relative z-10 rounded-b-[14px]"
+                                              style={{
+                                                fontFamily:
+                                                  "'Kohinoor Bangla', sans-serif",
+                                              }}
+                                            >
+                                              <CustomDeleteIcon
+                                                size={20}
+                                                className="text-rose-500"
+                                              />
+                                              ডিলিট
+                                            </motion.button>
+                                          </motion.div>
+                                        )}
+                                      </AnimatePresence>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
                         </GroupWrapper>
                       );
                     })
@@ -2737,8 +2685,7 @@ export const Expenses: React.FC = () => {
                 </div>
 
                 {!isGeneratingPDF &&
-                  (unifiedTransactions.length > visibleLimit ||
-                    isLoadingMore) && (
+                  (unifiedTransactions.length > visibleLimit || isLoadingMore) && (
                     <div
                       ref={loaderRef}
                       className="w-full space-y-6 py-8 pb-16 animate-in fade-in duration-500"
@@ -2746,32 +2693,21 @@ export const Expenses: React.FC = () => {
                     >
                       {/* Premium Shimmer Ledger Skeleton */}
                       <div className="flex flex-col space-y-3 opacity-60">
-                        {[1, 2]
-                          .slice(
-                            0,
-                            Math.max(
-                              1,
-                              Math.min(
-                                2,
-                                unifiedTransactions.length - visibleLimit,
-                              ),
-                            ),
-                          )
-                          .map((i) => (
-                            <div
-                              key={i}
-                              className="bg-white/40 backdrop-blur-sm p-4 rounded-2xl border border-slate-100/60 flex items-center justify-between shadow-xs animate-pulse"
-                            >
-                              <div className="flex items-center gap-3 w-2/3">
-                                <div className="w-10 h-10 bg-slate-100 rounded-xl shrink-0 animate-pulse"></div>
-                                <div className="space-y-2 w-full">
-                                  <div className="h-4 bg-slate-200/60 rounded-lg w-2/3"></div>
-                                  <div className="h-3 bg-slate-100/60 rounded-lg w-1/3"></div>
-                                </div>
+                        {[1, 2].slice(0, Math.max(1, Math.min(2, unifiedTransactions.length - visibleLimit))).map((i) => (
+                          <div
+                            key={i}
+                            className="bg-white/40 backdrop-blur-sm p-4 rounded-2xl border border-slate-100/60 flex items-center justify-between shadow-xs animate-pulse"
+                          >
+                            <div className="flex items-center gap-3 w-2/3">
+                              <div className="w-10 h-10 bg-slate-100 rounded-xl shrink-0 animate-pulse"></div>
+                              <div className="space-y-2 w-full">
+                                <div className="h-4 bg-slate-200/60 rounded-lg w-2/3"></div>
+                                <div className="h-3 bg-slate-100/60 rounded-lg w-1/3"></div>
                               </div>
-                              <div className="h-5 bg-slate-150/85 rounded-lg w-16"></div>
                             </div>
-                          ))}
+                            <div className="h-5 bg-slate-150/85 rounded-lg w-16"></div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   )}
@@ -3232,7 +3168,7 @@ export const Expenses: React.FC = () => {
       </div>
 
       {/* Sticky Floating Action Button on Bottom Right (Unified Grid for all Tabs/Slides) */}
-      {isOnline && !isGeneratingPDF &&
+      {!isGeneratingPDF &&
         (!isWalletSubView || activeTab !== "wallet") &&
         (activeTab !== "dues" || duesActiveView !== "details") &&
         createPortal(
@@ -3242,7 +3178,7 @@ export const Expenses: React.FC = () => {
               e.preventDefault();
               handleFabClick();
             }}
-            className={`fixed bottom-[84px] lg:bottom-12 right-5 lg:right-8 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-[0_4px_20px_rgba(0,0,0,0.2)] active:scale-95 transition-all duration-[150ms] ease-out z-[1000] pointer-events-auto opacity-100 scale-100 translate-y-0 ${getFabColor()}`}
+            className={`fixed bottom-[90px] lg:bottom-12 right-5 lg:right-8 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-[0_4px_20px_rgba(0,0,0,0.2)] active:scale-95 transition-all duration-[150ms] ease-out z-[1000] pointer-events-auto opacity-100 scale-100 translate-y-0 ${getFabColor()}`}
             style={{
               willChange: "transform, opacity",
             }}
@@ -3969,10 +3905,6 @@ const DuesManager: React.FC<DuesManagerProps> = ({
       );
       const customEvent = e as CustomEvent;
       if (customEvent.detail?.tab === "dues") {
-        if (!isOnline) {
-          showToast("অফলাইনে নতুন ব্যক্তি বা লেনদেন যোগ করা যাবে না", "error");
-          return;
-        }
         console.log(
           "DuesManager: handleGlobalAdd - matching tab, activeView is",
           activeView,
@@ -4147,10 +4079,6 @@ const DuesManager: React.FC<DuesManagerProps> = ({
   };
 
   const handleOpenEditPerson = (person: DuePerson) => {
-    if (!isOnline) {
-      showToast("অফলাইনে ব্যক্তি এডিট করা যাবে না", "error");
-      return;
-    }
     setIsEditingPerson(true);
     setEditingPersonId(person.id);
     setNewPersonName(person.name);
@@ -4204,10 +4132,6 @@ const DuesManager: React.FC<DuesManagerProps> = ({
   };
 
   const handleOpenEditTransaction = (tx: DueTransaction) => {
-    if (!isOnline) {
-      showToast("অফলাইনে লেনদেন এডিট করা যাবে না", "error");
-      return;
-    }
     setIsEditingTx(true);
     setEditingTxId(tx.id);
     setTxAmount(tx.amount.toString());
@@ -4253,7 +4177,7 @@ const DuesManager: React.FC<DuesManagerProps> = ({
 
       if (txToDelete) {
         const wallet = txToDelete.walletName || "ক্যাশ";
-        const impact = txToDelete.type === "receive" ? -txToDelete.amount : txToDelete.amount;
+        const impact = txToDelete.type === "receive" ? 0 : txToDelete.amount;
         if (impact !== 0) {
           await adjustWalletBalance(wallet, impact);
         }
@@ -4298,16 +4222,16 @@ const DuesManager: React.FC<DuesManagerProps> = ({
       if (isEditingTx && editingTxId) {
         const oldTx = person.transactions.find((t) => t.id === editingTxId);
         if (oldTx) {
-          // Revert old transaction
+          // Revert old transaction if it was 'give'
           const oldWallet = oldTx.walletName || "ক্যাশ";
-          const oldImpact = oldTx.type === "receive" ? -oldTx.amount : oldTx.amount;
+          const oldImpact = oldTx.type === "receive" ? 0 : oldTx.amount;
           if (oldImpact !== 0) {
             walletAdjustments.push({ wallet: oldWallet, amount: oldImpact });
           }
         }
 
-        // Apply new transaction
-        const newImpact = transactionType === "receive" ? numTxAmount : -numTxAmount;
+        // Apply new transaction if it is 'give'
+        const newImpact = transactionType === "receive" ? 0 : -numTxAmount;
         if (newImpact !== 0) {
           walletAdjustments.push({ wallet: txWalletName, amount: newImpact });
         }
@@ -4337,8 +4261,8 @@ const DuesManager: React.FC<DuesManagerProps> = ({
         };
         updatedTransactions = [newTx, ...person.transactions];
 
-        // Apply new transaction
-        const newImpact = transactionType === "receive" ? numTxAmount : -numTxAmount;
+        // Apply new transaction if it is 'give'
+        const newImpact = transactionType === "receive" ? 0 : -numTxAmount;
         if (newImpact !== 0) {
           walletAdjustments.push({ wallet: txWalletName, amount: newImpact });
         }
@@ -4698,8 +4622,7 @@ const DuesManager: React.FC<DuesManagerProps> = ({
                                     }}
                                     className="w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 text-slate-800 hover:bg-slate-50 transition-colors bg-transparent relative z-10 rounded-t-[14px]"
                                     style={{
-                                      fontFamily:
-                                        "'Kohinoor Bangla', sans-serif",
+                                      fontFamily: "'Kohinoor Bangla', sans-serif",
                                     }}
                                   >
                                     <CustomEditIcon
@@ -4708,29 +4631,18 @@ const DuesManager: React.FC<DuesManagerProps> = ({
                                     />
                                     এডিট
                                   </motion.button>
-                                  <motion.div
-                                    variants={itemVariants}
-                                    className="h-[1px] bg-slate-50 w-[85%] mx-auto relative z-10"
-                                  ></motion.div>
+                                  <motion.div variants={itemVariants} className="h-[1px] bg-slate-50 w-[85%] mx-auto relative z-10"></motion.div>
                                   <motion.button
                                     variants={itemVariants}
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      if (!isOnline) {
-                                        showToast(
-                                          "অফলাইনে লেনদেন ডিলিট করা যাবে না",
-                                          "error",
-                                        );
-                                        return;
-                                      }
                                       setTxToDeleteId(t.id);
                                       setShowTxDeleteModal(true);
                                       setActiveTxMenuId(null);
                                     }}
                                     className="w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 text-rose-500 hover:bg-rose-50 transition-colors bg-transparent relative z-10 rounded-b-[14px]"
                                     style={{
-                                      fontFamily:
-                                        "'Kohinoor Bangla', sans-serif",
+                                      fontFamily: "'Kohinoor Bangla', sans-serif",
                                     }}
                                   >
                                     <CustomDeleteIcon
@@ -4781,19 +4693,17 @@ const DuesManager: React.FC<DuesManagerProps> = ({
         </div>
 
         {/* Local Floating Blue Action Button (+), ignoring when printing */}
-        {isOnline && (
-          <button
-            onClick={() => {
-              resetTransactionForm();
-              setAddTransactionModalOpen(true);
-            }}
-            className="fixed bottom-[84px] right-5 text-white bg-[#1a73e8] hover:bg-blue-600 active:scale-95 transition-all duration-150 w-14 h-14 rounded-full flex items-center justify-center shadow-[0_4px_16px_rgba(26,115,232,0.4)] z-[900]"
-            title="নতুন লেনদেন অ্যাড করুন"
-            data-html2canvas-ignore="true"
-          >
-            <Plus size={26} strokeWidth={2.5} />
-          </button>
-        )}
+        <button
+          onClick={() => {
+            resetTransactionForm();
+            setAddTransactionModalOpen(true);
+          }}
+          className="fixed bottom-[90px] right-5 text-white bg-[#1a73e8] hover:bg-blue-600 active:scale-95 transition-all duration-150 w-14 h-14 rounded-full flex items-center justify-center shadow-[0_4px_16px_rgba(26,115,232,0.4)] z-[900]"
+          title="নতুন লেনদেন অ্যাড করুন"
+          data-html2canvas-ignore="true"
+        >
+          <Plus size={26} strokeWidth={2.5} />
+        </button>
 
         {/* Add Transaction Modal */}
         {isAddTransactionModalOpen &&
@@ -5194,7 +5104,7 @@ const DuesManager: React.FC<DuesManagerProps> = ({
                 setSelectedPersonId(person.id);
                 setActiveView("details");
               }}
-              className={`p-2.5 rounded-xl flex items-center gap-3 border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.01)] cursor-pointer transition-all relative ${bgClass}`}
+              className={`p-2.5 rounded-xl flex items-center gap-3 border border-slate-50 shadow-sm cursor-pointer transition-all relative ${bgClass}`}
             >
               <div className="w-11 h-11 rounded-full overflow-hidden shrink-0 flex items-center justify-center bg-indigo-100">
                 {person.avatar ? (
@@ -5250,24 +5160,17 @@ const DuesManager: React.FC<DuesManagerProps> = ({
                         className="w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 text-slate-800 hover:bg-slate-50 transition-colors bg-transparent relative z-10 rounded-t-[14px]"
                         style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
                       >
-                        <CustomEditIcon size={20} className="text-slate-800" />
+                        <CustomEditIcon
+                          size={20}
+                          className="text-slate-800"
+                        />
                         এডিট
                       </motion.button>
-                      <motion.div
-                        variants={itemVariants}
-                        className="h-[1px] bg-slate-50 w-[85%] mx-auto relative z-10"
-                      ></motion.div>
+                      <motion.div variants={itemVariants} className="h-[1px] bg-slate-50 w-[85%] mx-auto relative z-10"></motion.div>
                       <motion.button
                         variants={itemVariants}
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (!isOnline) {
-                            showToast(
-                              "অফলাইনে ব্যক্তি ডিলিট করা যাবে না",
-                              "error",
-                            );
-                            return;
-                          }
                           setPersonToDeleteId(person.id);
                           setShowPersonDeleteModal(true);
                           setPersonActiveMenuId(null);
@@ -5275,7 +5178,10 @@ const DuesManager: React.FC<DuesManagerProps> = ({
                         className="w-full px-4 py-2.5 text-left text-[15px] font-medium flex items-center gap-3 text-rose-500 hover:bg-rose-50 transition-colors bg-transparent relative z-10 rounded-b-[14px]"
                         style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
                       >
-                        <CustomDeleteIcon size={20} className="text-rose-500" />
+                        <CustomDeleteIcon
+                          size={20}
+                          className="text-rose-500"
+                        />
                         ডিলিট
                       </motion.button>
                     </motion.div>
@@ -6404,7 +6310,7 @@ const BudgetManager: React.FC<{ expenses: any[]; user: any }> = ({
   expenses,
   user,
 }) => {
-  const { showToast, isOnline } = useAppContext();
+  const { showToast } = useAppContext();
   const userId = user?.id || "default";
   const currency = user?.currency || "৳";
 
@@ -6447,10 +6353,6 @@ const BudgetManager: React.FC<{ expenses: any[]; user: any }> = ({
     const handleGlobalAdd = (e: Event) => {
       const customEvent = e as CustomEvent;
       if (customEvent.detail?.tab === "reports") {
-        if (!isOnline) {
-          showToast("অফলাইনে নতুন সঞ্চয় বা বাজেট যোগ করা যাবে না", "error");
-          return;
-        }
         if (activeView === "details") {
           resetTxForm();
           setIsTxModalOpen(true);
@@ -6611,10 +6513,6 @@ const BudgetManager: React.FC<{ expenses: any[]; user: any }> = ({
   };
 
   const handleDeleteBudget = (category: string) => {
-    if (!isOnline) {
-      showToast("অফলাইনে বাজেট অপসারণ করা যাবে না", "error");
-      return;
-    }
     setBudgetToDelete(category);
   };
 
@@ -6639,10 +6537,6 @@ const BudgetManager: React.FC<{ expenses: any[]; user: any }> = ({
   };
 
   const handleOpenEditTx = (tx: any) => {
-    if (!isOnline) {
-      showToast("অফলাইনে সঞ্চয় লেনদেন এডিট করা যাবে না", "error");
-      return;
-    }
     setEditingTransactionId(tx.id);
     setTxType(tx.type);
     setTxAmount(tx.amount.toString());
@@ -6652,10 +6546,6 @@ const BudgetManager: React.FC<{ expenses: any[]; user: any }> = ({
   };
 
   const handleDeleteBudgetTransaction = (txId: string) => {
-    if (!isOnline) {
-      showToast("অফলাইনে সঞ্চয় লেনদেন অপসারণ করা যাবে না", "error");
-      return;
-    }
     setTxToDeleteId(txId);
   };
 

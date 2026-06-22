@@ -192,7 +192,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
 
   const isAdmin = user.role === "admin";
   const showAdminUserList = isAdmin && !adminSelectedUserId;
-  const hasBottomNav = (!isAdmin || adminSelectedUserId) && !isFullScreenPage;
 
   // Primary Tabs for Bottom Nav (Most used features)
   const PRIMARY_NAV = [
@@ -231,6 +230,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
       path: "/clients",
       icon: <Users size={20} />,
       desc: "ক্লায়েন্ট তালিকা",
+    },
+    {
+      name: "খরচের খাত",
+      path: "/categories",
+      icon: <Tags size={20} />,
+      desc: "ক্যাটাগরি ম্যানেজমেন্ট",
     },
     {
       name: "রিপোর্ট",
@@ -721,24 +726,21 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
           isFullScreenPage
             ? "p-0"
             : isExpensesPage
-            ? `pt-14 lg:pt-8 ${!isOnline ? (hasBottomNav ? "pb-[110px]" : "pb-[38px]") : "pb-[72px]"} lg:pb-8 px-0`
-            : `pt-14 lg:pt-8 ${!isOnline ? (hasBottomNav ? "pb-[110px]" : "pb-[38px]") : "pb-[72px]"} lg:pb-8 px-3 lg:px-8`
+            ? "pt-14 lg:pt-8 pb-[72px] lg:pb-8 px-0"
+            : "pt-14 lg:pt-8 pb-[72px] lg:pb-8 px-3 lg:px-8"
         } ${isExpensesPage ? "" : "animate-in fade-in duration-150"} w-full max-w-[100vw] lg:max-w-none ${isExpensesPage ? 'overflow-x-clip' : 'overflow-x-hidden'} ${isTrash ? "" : "lg:ml-72"}`}
       >
         <div
           className={`max-w-7xl mx-auto w-full ${isFullScreenPage ? "h-[100dvh] lg:h-auto" : ""}`}
         >
-          <OfflineBanner className={`fixed bottom-0 left-0 right-0 ${isTrash ? '' : 'lg:left-72'} z-[51] border-t border-[#eb3b30] shadow-lg`} />
+          <OfflineBanner />
           {children}
         </div>
       </main>
 
       {/* Fixed Bottom Navigation Bar - Hide if Admin is on User List page or on Desktop */}
       {(!isAdmin || adminSelectedUserId) && !isFullScreenPage && (
-        <div 
-          className="fixed inset-x-0 z-50 bg-white border-t border-slate-100 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] pb-safe lg:hidden transition-all duration-300"
-          style={{ bottom: !isOnline ? '38px' : '0px' }}
-        >
+        <div className="fixed bottom-0 inset-x-0 z-50 bg-white border-t border-slate-100 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] pb-safe lg:hidden">
           <nav className="flex justify-between items-center px-6 h-[60px] w-full max-w-lg mx-auto">
             {PRIMARY_NAV.map((item) => {
               const isActive = location.pathname === item.path;
