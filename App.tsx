@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect } from "react";
+import React, { Suspense, useEffect } from "react";
 import {
   HashRouter,
   Routes,
@@ -19,32 +19,29 @@ import {
   setupOnMessageListener,
 } from "@/lib/firebase";
 
-// Lazy imports for main pages to support proper code-splitting and reduce entry bundle size
-const Dashboard = lazy(() => import("@/pages/Dashboard").then((module) => ({ default: module.Dashboard })));
-const Projects = lazy(() => import("@/pages/Projects").then((module) => ({ default: module.Projects })));
-const Clients = lazy(() => import("@/pages/Clients").then((module) => ({ default: module.Clients })));
-const Income = lazy(() => import("@/pages/Income").then((module) => ({ default: module.Income })));
-const Expenses = lazy(() => import("@/pages/Expenses").then((module) => ({ default: module.Expenses })));
-const Categories = lazy(() => import("@/pages/Categories").then((module) => ({ default: module.Categories })));
-const Reports = lazy(() => import("@/pages/Reports").then((module) => ({ default: module.Reports })));
-const Settings = lazy(() => import("@/pages/Settings").then((module) => ({ default: module.Settings })));
-const UpdatePassword = lazy(() => import("@/pages/UpdatePassword").then((module) => ({ default: module.UpdatePassword })));
-const AdminUserList = lazy(() => import("@/pages/AdminUserList").then((module) => ({ default: module.AdminUserList })));
-const GhazalNotes = lazy(() => import("@/pages/GhazalNotes").then((module) => ({ default: module.GhazalNotes })));
-const IconGenerator = lazy(() => import("@/pages/IconGenerator").then((module) => ({ default: module.IconGenerator })));
-const Profile = lazy(() => import("@/pages/Profile").then((module) => ({ default: module.Profile })));
-const Notifications = lazy(() => import("@/pages/Notifications").then((module) => ({ default: module.Notifications })));
-const ShoppingLists = lazy(() => import("@/pages/ShoppingLists")); // default export
-const Trash = lazy(() => import("@/pages/Trash")); // default export
-const AIAssistant = lazy(() => import("@/pages/AIAssistant").then((module) => ({ default: module.AIAssistant })));
-const ProjectsBackup = lazy(() => import("@/pages/ProjectsBackup").then((module) => ({ default: module.ProjectsBackup })));
-
-const Login = lazy(() =>
-  import("@/pages/Login").then((module) => ({ default: module.Login })),
-);
-const Signup = lazy(() =>
-  import("@/pages/Signup").then((module) => ({ default: module.Signup })),
-);
+// Static imports instead of lazy imports to avoid offline chunk load issues.
+// This bundles all pages together so that they are guaranteed to load immediately offline
+// without requiring further network requests for split .js chunk files.
+import { Dashboard } from "@/pages/Dashboard";
+import { Projects } from "@/pages/Projects";
+import { Clients } from "@/pages/Clients";
+import { Income } from "@/pages/Income";
+import { Expenses } from "@/pages/Expenses";
+import { Categories } from "@/pages/Categories";
+import { Reports } from "@/pages/Reports";
+import { Settings } from "@/pages/Settings";
+import { UpdatePassword } from "@/pages/UpdatePassword";
+import { AdminUserList } from "@/pages/AdminUserList";
+import { GhazalNotes } from "@/pages/GhazalNotes";
+import { IconGenerator } from "@/pages/IconGenerator";
+import { Profile } from "@/pages/Profile";
+import { Notifications } from "@/pages/Notifications";
+import ShoppingLists from "@/pages/ShoppingLists"; // default export
+import Trash from "@/pages/Trash"; // default export
+import { AIAssistant } from "@/pages/AIAssistant";
+import { ProjectsBackup } from "@/pages/ProjectsBackup";
+import { Login } from "@/pages/Login";
+import { Signup } from "@/pages/Signup";
 
 const AuthListener: React.FC = () => {
   const navigate = useNavigate();
