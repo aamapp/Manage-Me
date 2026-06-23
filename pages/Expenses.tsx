@@ -368,7 +368,10 @@ export const Expenses: React.FC = () => {
   const getSlideClassName = (tabName: string) => {
     const isActive = activeTab === tabName;
     if (isActive || isSwiping || isTabTransitioning) {
-      return "w-full shrink-0 px-3 lg:px-8 pb-4";
+      if (tabName === "expenses" || tabName === "dues") {
+        return "w-full shrink-0 px-3 lg:px-8 pb-4 h-full flex flex-col overflow-hidden pt-3";
+      }
+      return "w-full shrink-0 px-3 lg:px-8 pb-4 overflow-y-auto h-full pt-3";
     }
     return "w-full shrink-0 px-3 lg:px-8 pb-0 h-0 overflow-hidden opacity-0 pointer-events-none select-none";
   };
@@ -2046,7 +2049,11 @@ export const Expenses: React.FC = () => {
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
         onClickCapture={handleClickCapture}
-        className="space-y-3 overflow-x-clip"
+        className={`flex flex-col overflow-hidden w-full ${
+          isOnline
+            ? "h-[calc(100dvh-116px)] lg:h-[calc(100vh-64px)]"
+            : "h-[calc(100dvh-154px)] lg:h-[calc(100vh-102px)]"
+        }`}
       >
         {/* 6-Icon Navigation Tabs */}
         <div className="hidden lg:block sticky top-0 z-40 bg-white/95 backdrop-blur-md h-14 text-slate-800 border-b border-slate-200 shadow-[0_4px_12px_rgba(0,0,0,0.02)] select-none">
@@ -2205,9 +2212,9 @@ export const Expenses: React.FC = () => {
           </div>
         </div>
 
-        <div className="overflow-hidden w-full relative">
+        <div className="overflow-hidden w-full relative flex-1">
           <div
-            className="flex w-full"
+            className="flex w-full h-full"
             style={{
               transform: `translateX(calc(-${tabs.indexOf(activeTab) * 100}% - ${isSwiping ? swipeOffset : 0}px))`,
               transition: isSwiping
@@ -2217,8 +2224,9 @@ export const Expenses: React.FC = () => {
           >
             {/* Slide 1: Expenses/Dashboard (Index 0) */}
             <div className={getSlideClassName("expenses")}>
-              {/* Dynamic Period Stats Card - Unifying Income and Expense */}
-              <div className="bg-[#fafbfd] border border-[#e2e7ec]/80 py-3 px-4 rounded-[12px] shadow-[0_2px_8px_rgba(0,0,0,0.02)] w-full max-w-lg mx-auto mb-4 select-none">
+              <div className="flex-none w-full">
+                {/* Dynamic Period Stats Card - Unifying Income and Expense */}
+              <div className="bg-[#fafbfd] border border-[#e2e7ec]/80 py-3 px-4 rounded-[12px] shadow-[0_2px_8px_rgba(0,0,0,0.02)] w-full max-w-lg mx-auto mb-3 select-none">
                 {/* Period Segment Tabs matching the image */}
                 <div className="bg-[#f3f5f8] rounded-full flex items-stretch justify-between w-full mb-3 select-none overflow-hidden h-[42px] border border-[#e2e7ec]/60">
                   <button
@@ -2287,7 +2295,7 @@ export const Expenses: React.FC = () => {
 
               {/* Date Range Filter Panel */}
               {showDateFilter && (
-                <div className="bg-white border border-slate-100 p-3 rounded-[10px] shadow-sm space-y-3 animate-in fade-in slide-in-from-top-2">
+                <div className="bg-white border border-slate-100 p-3 rounded-[10px] shadow-sm space-y-3 animate-in fade-in slide-in-from-top-2 mb-3">
                   <div className="flex items-center justify-between">
                     <h3 className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                       <Filter size={14} className="text-rose-500" /> তারিখ
@@ -2324,161 +2332,165 @@ export const Expenses: React.FC = () => {
                 </div>
               )}
 
-              {/* Search Inputs & Category Option Filters (Combining both) */}
-              <div className="space-y-2.5 w-full max-w-lg mx-auto">
-                {(searchTerm || showSearch) && (
-                  <div className="bg-white px-4 py-3 rounded-[10px] border border-slate-200/80 shadow-xs flex items-center gap-2 relative">
-                    <Search size={18} className="text-slate-400" />
-                    <input
-                      type="text"
-                      autoFocus
-                      placeholder="বিবরণ বা ক্যাটাগরি দিয়ে খুঁজুন..."
-                      className="w-full bg-transparent outline-none text-sm font-bold text-slate-800 placeholder:text-slate-400 pr-6"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSearchTerm("");
-                        setShowSearch(false);
-                      }}
-                      className="absolute right-3.5 text-slate-400 hover:text-slate-600 transition-colors"
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
-                )}
+              {/* STICKY SEARCH & FILTER CONTROLS */}
+              <div className="sticky top-14 bg-[#fafbfd] z-20 pb-2.5 pt-1 space-y-2.5 -mx-3 px-3 lg:-mx-8 lg:px-8 mb-3">
+                {/* Search Inputs & Category Option Filters (Combining both) */}
+                <div className="space-y-2.5 w-full max-w-lg mx-auto">
+                  {(searchTerm || showSearch) && (
+                    <div className="bg-white px-4 py-3 rounded-[10px] border border-slate-200/80 shadow-xs flex items-center gap-2 relative">
+                      <Search size={18} className="text-slate-400" />
+                      <input
+                        type="text"
+                        autoFocus
+                        placeholder="বিবরণ বা ক্যাটাগরি দিয়ে খুঁজুন..."
+                        className="w-full bg-transparent outline-none text-sm font-bold text-slate-800 placeholder:text-slate-400 pr-6"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSearchTerm("");
+                          setShowSearch(false);
+                        }}
+                        className="absolute right-3.5 text-slate-400 hover:text-slate-600 transition-colors"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  )}
 
-                {/* Gray filter bar stretching across exactly like the image */}
-                <div className="bg-[#f0f3f6] rounded-[8px] p-[3px] flex items-center justify-between w-full select-none border border-slate-100">
-                  {/* Left filter segment items */}
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setListFilter("all")}
-                      className={`px-[26px] py-1.5 text-[14px] font-medium rounded-[6px] transition-all ${
-                        listFilter === "all"
-                          ? "bg-[#e2edfc] text-[#1a73e8]"
-                          : "text-[#8e9aa8] hover:text-slate-700"
-                      }`}
-                    >
-                      সব
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setListFilter("income")}
-                      className={`px-[26px] py-1.5 text-[14px] font-medium rounded-[6px] transition-all ${
-                        listFilter === "income"
-                          ? "bg-[#e2fced] text-[#50AD54]"
-                          : "text-[#8e9aa8] hover:text-slate-700"
-                      }`}
-                    >
-                      আয়
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setListFilter("expense")}
-                      className={`px-[26px] py-1.5 text-[14px] font-medium rounded-[6px] transition-all ${
-                        listFilter === "expense"
-                          ? "bg-[#fcedeb] text-[#db4437]"
-                          : "text-[#8e9aa8] hover:text-slate-700"
-                      }`}
-                    >
-                      ব্যয়
-                    </button>
-                  </div>
+                  {/* Gray filter bar stretching across exactly like the image */}
+                  <div className="bg-[#f0f3f6] rounded-[8px] p-[3px] flex items-center justify-between w-full select-none border border-slate-100">
+                    {/* Left filter segment items */}
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setListFilter("all")}
+                        className={`px-[26px] py-1.5 text-[14px] font-medium rounded-[6px] transition-all ${
+                          listFilter === "all"
+                            ? "bg-[#e2edfc] text-[#1a73e8]"
+                            : "text-[#8e9aa8] hover:text-slate-700"
+                        }`}
+                      >
+                        সব
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setListFilter("income")}
+                        className={`px-[26px] py-1.5 text-[14px] font-medium rounded-[6px] transition-all ${
+                          listFilter === "income"
+                            ? "bg-[#e2fced] text-[#50AD54]"
+                            : "text-[#8e9aa8] hover:text-slate-700"
+                        }`}
+                      >
+                        আয়
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setListFilter("expense")}
+                        className={`px-[26px] py-1.5 text-[14px] font-medium rounded-[6px] transition-all ${
+                          listFilter === "expense"
+                            ? "bg-[#fcedeb] text-[#db4437]"
+                            : "text-[#8e9aa8] hover:text-slate-700"
+                        }`}
+                      >
+                        ব্যয়
+                      </button>
+                    </div>
 
-                  {/* Right icon buttons matching the screenshot (CalendarSearch, Shapes, MoreVertical) */}
-                  <div className="flex items-center gap-4 px-3">
-                    <button
-                      onClick={() => {
-                        // Reset date filter if already active
-                        if (
-                          dateRange.start ||
-                          dateRange.end ||
-                          showDateFilter
-                        ) {
-                          setDateRange({ start: "", end: "" });
-                          setShowDateFilter(false);
-                          setSelectedPeriodOption("");
-                          return;
-                        }
-
-                        setModalSubView("main");
-                        setTempCustomDates({
-                          start:
+                    {/* Right icon buttons matching the screenshot (CalendarSearch, Shapes, MoreVertical) */}
+                    <div className="flex items-center gap-4 px-3">
+                      <button
+                        onClick={() => {
+                          // Reset date filter if already active
+                          if (
                             dateRange.start ||
-                            new Date().toISOString().split("T")[0],
-                          end:
                             dateRange.end ||
-                            new Date().toISOString().split("T")[0],
-                        });
+                            showDateFilter
+                          ) {
+                            setDateRange({ start: "", end: "" });
+                            setShowDateFilter(false);
+                            setSelectedPeriodOption("");
+                            return;
+                          }
 
-                        // Determine which period option is currently active based on real dateRange
-                        if (!dateRange.start && !dateRange.end) {
-                          setSelectedPeriodOption("");
-                        } else {
-                          const start = dateRange.start;
-                          const end = dateRange.end;
-                          if (start && end) {
-                            const startParts = start.split("-");
-                            const endParts = end.split("-");
-                            if (
-                              startParts[1] === "01" &&
-                              startParts[2] === "01" &&
-                              endParts[1] === "12" &&
-                              endParts[2] === "31"
-                            ) {
-                              setSelectedPeriodOption("year");
-                            } else if (startParts[2] === "01") {
-                              const y = parseInt(startParts[0]);
-                              const m = parseInt(startParts[1]);
-                              const lastDay = new Date(y, m, 0).getDate();
+                          setModalSubView("main");
+                          setTempCustomDates({
+                            start:
+                              dateRange.start ||
+                              new Date().toISOString().split("T")[0],
+                            end:
+                              dateRange.end ||
+                              new Date().toISOString().split("T")[0],
+                          });
+
+                          // Determine which period option is currently active based on real dateRange
+                          if (!dateRange.start && !dateRange.end) {
+                            setSelectedPeriodOption("");
+                          } else {
+                            const start = dateRange.start;
+                            const end = dateRange.end;
+                            if (start && end) {
+                              const startParts = start.split("-");
+                              const endParts = end.split("-");
                               if (
-                                parseInt(endParts[2]) === lastDay &&
-                                startParts[1] === endParts[1] &&
-                                startParts[0] === endParts[0]
+                                startParts[1] === "01" &&
+                                startParts[2] === "01" &&
+                                endParts[1] === "12" &&
+                                endParts[2] === "31"
                               ) {
-                                setSelectedPeriodOption("month");
+                                setSelectedPeriodOption("year");
+                              } else if (startParts[2] === "01") {
+                                const y = parseInt(startParts[0]);
+                                const m = parseInt(startParts[1]);
+                                const lastDay = new Date(y, m, 0).getDate();
+                                if (
+                                  parseInt(endParts[2]) === lastDay &&
+                                  startParts[1] === endParts[1] &&
+                                  startParts[0] === endParts[0]
+                                ) {
+                                  setSelectedPeriodOption("month");
+                                } else {
+                                  setSelectedPeriodOption("custom");
+                                }
                               } else {
                                 setSelectedPeriodOption("custom");
                               }
                             } else {
                               setSelectedPeriodOption("custom");
                             }
-                          } else {
-                            setSelectedPeriodOption("custom");
                           }
-                        }
 
-                        setModalSubView("main");
-                        setShowFilterModal(true);
-                      }}
-                      className={`transition-colors shrink-0 ${showDateFilter || dateRange.start || dateRange.end ? "text-[#1a73e8]" : "text-[#8e9aa8] md:hover:text-slate-700"}`}
-                      title="তারিখ ফিল্টার"
-                    >
-                      <CalendarDays size={19} />
-                    </button>
+                          setModalSubView("main");
+                          setShowFilterModal(true);
+                        }}
+                        className={`transition-colors shrink-0 ${showDateFilter || dateRange.start || dateRange.end ? "text-[#1a73e8]" : "text-[#8e9aa8] md:hover:text-slate-700"}`}
+                        title="তারিখ ফিল্টার"
+                      >
+                        <CalendarDays size={19} />
+                      </button>
 
-                    <button
-                      onClick={() => {
-                        setShowSearch((prev) => !prev);
-                      }}
-                      className={`transition-colors shrink-0 ${searchTerm || showSearch ? "text-[#1a73e8]" : "text-[#8e9aa8] md:hover:text-slate-700"}`}
-                      title="অনুসন্ধান"
-                    >
-                      <Search size={19} />
-                    </button>
+                      <button
+                        onClick={() => {
+                          setShowSearch((prev) => !prev);
+                        }}
+                        className={`transition-colors shrink-0 ${searchTerm || showSearch ? "text-[#1a73e8]" : "text-[#8e9aa8] md:hover:text-slate-700"}`}
+                        title="অনুসন্ধান"
+                      >
+                        <Search size={19} />
+                      </button>
+                    </div>
                   </div>
                 </div>
+              </div>
               </div>
 
               {/* Report Capture Container (supports PDF generation) */}
               <div
                 id="pdf-container"
                 ref={listRef}
-                className={`${isGeneratingPDF ? "block bg-white p-4" : "space-y-4 bg-transparent"} w-full max-w-lg mx-auto`}
+                className={`${isGeneratingPDF ? "block bg-white p-4" : "space-y-4 bg-transparent flex-1 overflow-y-auto pr-1 pb-24"} w-full max-w-lg mx-auto`}
               >
                 {isGeneratingPDF && (
                   <div
@@ -5118,9 +5130,9 @@ const DuesManager: React.FC<DuesManagerProps> = ({
   );
 
   return (
-    <div className="space-y-3 relative">
+    <div className="h-full flex flex-col overflow-hidden relative">
       {/* Top Summaries */}
-      <div className="grid grid-cols-3 gap-2 px-1">
+      <div className="grid grid-cols-3 gap-2 px-1 mb-2 flex-none">
         <div
           className="bg-white rounded-xl p-2 border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center"
           style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
@@ -5156,22 +5168,24 @@ const DuesManager: React.FC<DuesManagerProps> = ({
         </div>
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-          <Search className="text-slate-400" size={20} />
+      {/* STICKY SEARCH */}
+      <div className="sticky top-14 bg-[#fafbfd] z-20 pb-2.5 pt-1 -mx-3 px-3 lg:-mx-8 lg:px-8 mb-2 flex-none">
+        <div className="relative max-w-lg mx-auto w-full">
+          <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+            <Search className="text-slate-400" size={20} />
+          </div>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="নাম বা ফোন নম্বর দিয়ে খুঁজুন..."
+            className="w-full py-3 pl-12 pr-4 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm transition-all text-slate-700"
+          />
         </div>
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="নাম বা ফোন নম্বর দিয়ে খুঁজুন..."
-          className="w-full py-3 pl-12 pr-4 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm transition-all text-slate-700"
-        />
       </div>
 
       {/* Persons List */}
-      <div className="space-y-2 pb-8 mt-1">
+      <div className="space-y-2 pb-24 mt-1 flex-1 overflow-y-auto pr-1">
         {filteredPersons.map((person) => {
           const balance = getPersonBalance(person);
           const bgClass =
