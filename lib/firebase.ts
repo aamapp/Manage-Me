@@ -13,7 +13,12 @@ declare global {
 }
 
 const app = initializeApp(firebaseConfig);
-const messaging = getMessaging(app);
+let messaging: any = null;
+try {
+  messaging = getMessaging(app);
+} catch (e) {
+  console.warn('Firebase Messaging is not supported or failed to initialize in this environment:', e);
+}
 
 const mergeTokens = (existingTokens: string | null | undefined, newToken: string) => {
   if (!existingTokens) return newToken;
@@ -86,6 +91,10 @@ export const requestNotificationPermission = async (userId: string) => {
     if (permission === 'granted') {
       console.log('Notification permission granted.');
       
+      if (!messaging) {
+        console.warn('FCM Messaging is not supported or initialized. Skipping token retrieval.');
+        return;
+      }
       // Get the FCM token
       const token = await getToken(messaging, {
         vapidKey: 'BDbjGbPon8pjckPCxZ7xewSIEkWsnUPwl0KyYMLGHyqWI-uQydbC4d8bgEXDsAY-7jFvTU_WG4Q8Pec_Ziyp0b0'
@@ -132,6 +141,10 @@ export const requestNotificationPermission = async (userId: string) => {
 };
 
 export const setupOnMessageListener = () => {
+  if (!messaging) {
+    console.warn('FCM Messaging is not supported or initialized. Skipping listener setup.');
+    return;
+  }
   onMessage(messaging, (payload) => {
     console.log('Message received. ', payload);
     // You can show a custom toast or UI notification here

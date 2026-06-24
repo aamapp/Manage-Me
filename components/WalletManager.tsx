@@ -78,6 +78,17 @@ export const WalletManager: React.FC = () => {
   const [walletPeriod, setWalletPeriod] = useState<'today' | 'month' | 'all'>('all');
   const [pdfGenerating, setPdfGenerating] = useState<boolean>(false);
 
+  // Prevent swiping gestures on special components (like balance cards and subviews)
+  const blockSwipeProps = {
+    onTouchStart: (e: React.TouchEvent) => e.stopPropagation(),
+    onTouchMove: (e: React.TouchEvent) => e.stopPropagation(),
+    onTouchEnd: (e: React.TouchEvent) => e.stopPropagation(),
+    onMouseDown: (e: React.MouseEvent) => e.stopPropagation(),
+    onMouseMove: (e: React.MouseEvent) => e.stopPropagation(),
+    onMouseUp: (e: React.MouseEvent) => e.stopPropagation(),
+    onMouseLeave: (e: React.MouseEvent) => e.stopPropagation(),
+  };
+
   useEffect(() => {
     if (selectedDetailsWallet === null) {
       setTxSearchQuery('');
@@ -914,197 +925,210 @@ export const WalletManager: React.FC = () => {
     const groupedTxList = getGroupedTxList();
 
     return createPortal(
-      <div className="fixed inset-0 bg-[#f8fafc] text-slate-800 z-[1000] overflow-y-auto flex flex-col select-none animate-in fade-in zoom-in-95 duration-200">
+      <div 
+        className="fixed inset-0 bg-[#f8fafc] text-slate-800 z-[1000] overflow-hidden flex flex-col select-none animate-in fade-in zoom-in-95 duration-200 no-swipe"
+        {...blockSwipeProps}
+      >
         
-        {/* Sticky Glassy Header with Back Button */}
-        <div className="sticky top-0 bg-white/90 backdrop-blur-md border-b border-slate-200/60 px-4 py-2.5 flex items-center justify-between z-40">
-          <button
-            type="button"
-            onClick={() => setSelectedDetailsWallet(null)}
-            className="flex items-center gap-2 text-slate-500 hover:text-slate-800 transition-all font-bold text-sm cursor-pointer"
-          >
-            <ArrowLeft size={18} className="stroke-[2.5]" />
-            <span className="font-sans text-xs uppercase tracking-wider text-slate-655 font-bold">ফিরে যান</span>
-          </button>
-          
-          <div className="text-right flex-1 select-none pr-1 truncate">
-            <span className="text-[9px] text-[#1e75eb] font-bold tracking-wider block leading-normal pt-[2px] uppercase">ওয়ালেট ডিটেইলস</span>
-            <h3 className="text-sm font-black text-slate-800 mt-1">
-              {selectedDetailsWallet.name} - লেনদেনসমূহ
-            </h3>
+        {/* 1. Header & Controls Block - Entirely blocked from horizontal swiping and vertical page scrolling */}
+        <div 
+          className="flex-none w-full bg-white border-b border-slate-200/60 pb-3.5 no-swipe"
+          style={{ touchAction: 'none' }}
+          {...blockSwipeProps}
+        >
+          {/* Sticky Glassy Header with Back Button */}
+          <div className="px-4 py-2.5 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setSelectedDetailsWallet(null)}
+              className="flex items-center gap-2 text-slate-500 hover:text-slate-800 transition-all font-bold text-sm cursor-pointer"
+            >
+              <ArrowLeft size={18} className="stroke-[2.5]" />
+              <span className="font-sans text-xs uppercase tracking-wider text-slate-655 font-bold">ফিরে যান</span>
+            </button>
+            
+            <div className="text-right flex-1 select-none pr-1 truncate">
+              <span className="text-[9px] text-[#1e75eb] font-bold tracking-wider block leading-normal pt-[2px] uppercase">ওয়ালেট ডিটেইলস</span>
+              <h3 className="text-sm font-black text-slate-800 mt-1">
+                {selectedDetailsWallet.name} - লেনদেনসমূহ
+              </h3>
+            </div>
+          </div>
+
+          {/* Controls Wrapper inside the static block with standardized padding */}
+          <div className="w-full max-w-lg mx-auto px-4 flex flex-col gap-2.5">
+            {/* Dynamic Period Stats Card - Unifying Income and Expense - perfectly matching Expenses.tsx */}
+            <div className="bg-[#fafbfd] border border-[#e2e7ec]/80 py-2.5 px-3.5 rounded-[12px] shadow-[0_2px_8px_rgba(0,0,0,0.02)] w-full select-none">
+              {/* Period Segment Tabs matching the image */}
+              <div className="bg-[#f3f5f8] rounded-full flex items-stretch justify-between w-full mb-3 select-none overflow-hidden h-[42px] border border-[#e2e7ec]/60">
+                <button
+                  type="button"
+                  onClick={() => setWalletPeriod('today')}
+                  className={`flex-1 text-center text-[15px] sm:text-[16px] font-medium transition-all h-full cursor-pointer select-none ${
+                    walletPeriod === 'today'
+                      ? 'bg-[#1e75eb] text-white rounded-l-full'
+                      : 'text-[#111827] hover:text-black bg-transparent'
+                  }`}
+                >
+                  আজ
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWalletPeriod('all')}
+                  className={`flex-1 text-center text-[15px] sm:text-[16px] font-medium transition-all h-full cursor-pointer select-none ${
+                    walletPeriod === 'all'
+                      ? 'bg-[#1e75eb] text-white'
+                      : 'text-[#111827] hover:text-black bg-transparent'
+                  }`}
+                >
+                  মোট
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWalletPeriod('month')}
+                  className={`flex-1 text-center text-[15px] sm:text-[16px] font-medium transition-all h-full cursor-pointer select-none ${
+                    walletPeriod === 'month'
+                      ? 'bg-[#1e75eb] text-white rounded-r-full'
+                      : 'text-[#111827] hover:text-black bg-transparent'
+                  }`}
+                >
+                  {currentMonthBengali}
+                </button>
+              </div>
+
+              {/* Income, Expense, Net Counts */}
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="flex flex-col items-center justify-center">
+                  <p className="text-[12px] font-medium text-[#50AD54] mb-0.5">
+                    আয়
+                  </p>
+                  <p className="text-sm sm:text-base md:text-[16px] font-medium text-[#50AD54] truncate">
+                    ৳ {toBanglaNumbers(periodIncome.toLocaleString("bn-BD"))}
+                  </p>
+                </div>
+                <div className="flex flex-col items-center justify-center">
+                  <p className="text-[12px] font-medium text-[#db4437] mb-0.5">
+                    ব্যয়
+                  </p>
+                  <p className="text-sm sm:text-base md:text-[16px] font-medium text-[#db4437] truncate">
+                    ৳ {toBanglaNumbers(periodExpense.toLocaleString("bn-BD"))}
+                  </p>
+                </div>
+                <div className="flex flex-col items-center justify-center">
+                  <p className="text-[12px] font-medium text-[#1a73e8] mb-0.5">
+                    ব্যালেন্স
+                  </p>
+                  <p className="text-sm sm:text-base md:text-[16px] font-medium text-[#1a73e8] truncate">
+                    ৳ {toBanglaNumbers(periodBalance.toLocaleString("bn-BD"))}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Interactive Core Filters & Search Deck styled to match expenses page */}
+            <div className="flex flex-col gap-2.5">
+              
+              {/* Filter segments & PDF row matches reference layout on top */}
+              <div className="bg-[#f0f3f6] p-[3.5px] rounded-[8px] flex items-center justify-between gap-2.5 border border-[#e2e7ec]/50">
+                <div className="flex items-center gap-1 flex-1">
+                  {/* TAB 1: সব */}
+                  <button
+                     type="button"
+                     onClick={() => setTxTypeFilter('all')}
+                     className={`flex-1 py-1 h-[42px] rounded-[6px] transition-all cursor-pointer select-none flex flex-col items-center justify-center ${
+                       txTypeFilter === 'all'
+                         ? 'bg-[#e2edfc] text-[#1a73e8]'
+                         : 'bg-transparent text-[#8e9aa8] hover:text-[#4b5563]'
+                     }`}
+                  >
+                    <span className={`text-[13.5px] font-bold ${txTypeFilter === 'all' ? 'text-[#1a73e8]' : 'text-[#8e9aa8]'}`}>সব</span>
+                    <span className={`text-[10px] font-medium leading-none mt-0.5 ${txTypeFilter === 'all' ? 'text-[#1a73e8]' : 'text-[#8e9aa8]/80'}`}>
+                      ({toBanglaDigits(totalTxCount)})
+                    </span>
+                  </button>
+
+                  {/* TAB 2: আয় */}
+                  <button
+                     type="button"
+                     onClick={() => setTxTypeFilter('income')}
+                     className={`flex-1 py-1 h-[42px] rounded-[6px] transition-all cursor-pointer select-none flex flex-col items-center justify-center ${
+                       txTypeFilter === 'income'
+                         ? 'bg-[#e2fced] text-[#50AD54]'
+                         : 'bg-transparent text-[#8e9aa8] hover:text-[#4b5563]'
+                     }`}
+                  >
+                    <span className={`text-[13.5px] font-bold ${txTypeFilter === 'income' ? 'text-[#50AD54]' : 'text-[#8e9aa8]'}`}>আয়</span>
+                    <span className={`text-[10px] font-medium leading-none mt-0.5 ${txTypeFilter === 'income' ? 'text-[#50AD54]' : 'text-[#8e9aa8]/80'}`}>
+                      ({toBanglaDigits(periodTxList.filter(t => t.type === 'income').length)})
+                    </span>
+                  </button>
+
+                  {/* TAB 3: ব্যয় */}
+                  <button
+                     type="button"
+                     onClick={() => setTxTypeFilter('expense')}
+                     className={`flex-1 py-1 h-[42px] rounded-[6px] transition-all cursor-pointer select-none flex flex-col items-center justify-center ${
+                       txTypeFilter === 'expense'
+                         ? 'bg-[#fcedeb] text-[#db4437]'
+                         : 'bg-transparent text-[#8e9aa8] hover:text-[#4b5563]'
+                     }`}
+                  >
+                    <span className={`text-[13.5px] font-bold ${txTypeFilter === 'expense' ? 'text-[#db4437]' : 'text-[#8e9aa8]'}`}>ব্যয়</span>
+                    <span className={`text-[10px] font-medium leading-none mt-0.5 ${txTypeFilter === 'expense' ? 'text-[#db4437]' : 'text-[#8e9aa8]/80'}`}>
+                      ({toBanglaDigits(periodTxList.filter(t => t.type === 'expense').length)})
+                    </span>
+                  </button>
+                </div>
+
+                {/* Action: PDF download button */}
+                <button
+                  type="button"
+                  onClick={handleDownloadPdf}
+                  disabled={pdfGenerating || totalTxCount === 0}
+                  className={`rounded-[6px] border border-[#e2e7ec]/50 bg-white shadow-xs transition-all cursor-pointer flex items-center justify-center h-[42px] w-[42px] shrink-0 ${
+                    totalTxCount === 0
+                      ? 'opacity-50 cursor-not-allowed text-slate-300'
+                      : 'hover:bg-slate-50 text-[#1a73e8] active:scale-95'
+                  }`}
+                  title="পিডিএফ রিপোর্ট ডাউনলোড করুন"
+                >
+                  {pdfGenerating ? (
+                    <Loader2 size={16} className="animate-spin text-[#1a73e8]" />
+                  ) : (
+                    <FileDown size={16} className="text-[#1a73e8] stroke-[2.2]" />
+                  )}
+                </button>
+              </div>
+
+              {/* Clean White Search bar on the bottom matches layout requested */}
+              <div className="relative">
+                <input
+                  type="text"
+                  value={txSearchQuery}
+                  onChange={(e) => setTxSearchQuery(e.target.value)}
+                  placeholder="লেনদেনের নাম দিয়ে অনুসন্ধান করুন..."
+                  className="w-full bg-white border border-[#e2e7ec]/85 focus:border-[#1e75eb] focus:bg-white focus:ring-2 focus:ring-[#1e75eb]/10 pl-11 pr-4 py-2.5 rounded-[8px] outline-none text-[13.5px] font-medium text-slate-800 tracking-wide transition-all duration-200 shadow-2xs"
+                />
+                <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 stroke-[2.2]" />
+                {txSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setTxSearchQuery('')}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-800 p-0.5 active:scale-95 transition-all"
+                  >
+                    <X size={14} className="stroke-[2.5]" />
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Responsive Content Container wrapper styled to match expenses page */}
-        <div className="w-full max-w-lg mx-auto px-4 pt-2.5 pb-28 flex-1 flex flex-col gap-2.5">
-          
-          {/* Dynamic Period Stats Card - Unifying Income and Expense - perfectly matching Expenses.tsx */}
-          <div className="bg-[#fafbfd] border border-[#e2e7ec]/80 py-2.5 px-3.5 rounded-[12px] shadow-[0_2px_8px_rgba(0,0,0,0.02)] w-full select-none">
-            {/* Period Segment Tabs matching the image */}
-            <div className="bg-[#f3f5f8] rounded-full flex items-stretch justify-between w-full mb-3 select-none overflow-hidden h-[42px] border border-[#e2e7ec]/60">
-              <button
-                type="button"
-                onClick={() => setWalletPeriod('today')}
-                className={`flex-1 text-center text-[15px] sm:text-[16px] font-medium transition-all h-full cursor-pointer select-none ${
-                  walletPeriod === 'today'
-                    ? 'bg-[#1e75eb] text-white rounded-l-full'
-                    : 'text-[#111827] hover:text-black bg-transparent'
-                }`}
-              >
-                আজ
-              </button>
-              <button
-                type="button"
-                onClick={() => setWalletPeriod('all')}
-                className={`flex-1 text-center text-[15px] sm:text-[16px] font-medium transition-all h-full cursor-pointer select-none ${
-                  walletPeriod === 'all'
-                    ? 'bg-[#1e75eb] text-white'
-                    : 'text-[#111827] hover:text-black bg-transparent'
-                }`}
-              >
-                মোট
-              </button>
-              <button
-                type="button"
-                onClick={() => setWalletPeriod('month')}
-                className={`flex-1 text-center text-[15px] sm:text-[16px] font-medium transition-all h-full cursor-pointer select-none ${
-                  walletPeriod === 'month'
-                    ? 'bg-[#1e75eb] text-white rounded-r-full'
-                    : 'text-[#111827] hover:text-black bg-transparent'
-                }`}
-              >
-                {currentMonthBengali}
-              </button>
-            </div>
-
-            {/* Income, Expense, Net Counts */}
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="flex flex-col items-center justify-center">
-                <p className="text-[12px] font-medium text-[#50AD54] mb-0.5">
-                  আয়
-                </p>
-                <p className="text-sm sm:text-base md:text-[16px] font-medium text-[#50AD54] truncate">
-                  ৳ {toBanglaNumbers(periodIncome.toLocaleString("bn-BD"))}
-                </p>
-              </div>
-              <div className="flex flex-col items-center justify-center">
-                <p className="text-[12px] font-medium text-[#db4437] mb-0.5">
-                  ব্যয়
-                </p>
-                <p className="text-sm sm:text-base md:text-[16px] font-medium text-[#db4437] truncate">
-                  ৳ {toBanglaNumbers(periodExpense.toLocaleString("bn-BD"))}
-                </p>
-              </div>
-              <div className="flex flex-col items-center justify-center">
-                <p className="text-[12px] font-medium text-[#1a73e8] mb-0.5">
-                  ব্যালেন্স
-                </p>
-                <p className="text-sm sm:text-base md:text-[16px] font-medium text-[#1a73e8] truncate">
-                  ৳ {toBanglaNumbers(periodBalance.toLocaleString("bn-BD"))}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Interactive Core Filters & Search Deck styled to match expenses page */}
-          <div className="flex flex-col gap-2.5">
-            
-            {/* Filter segments & PDF row matches reference layout on top */}
-            <div className="bg-[#f0f3f6] p-[3.5px] rounded-[8px] flex items-center justify-between gap-2.5 border border-[#e2e7ec]/50">
-              <div className="flex items-center gap-1 flex-1">
-                {/* TAB 1: সব */}
-                <button
-                   type="button"
-                   onClick={() => setTxTypeFilter('all')}
-                   className={`flex-1 py-1 h-[42px] rounded-[6px] transition-all cursor-pointer select-none flex flex-col items-center justify-center ${
-                     txTypeFilter === 'all'
-                       ? 'bg-[#e2edfc] text-[#1a73e8]'
-                       : 'bg-transparent text-[#8e9aa8] hover:text-[#4b5563]'
-                   }`}
-                >
-                  <span className={`text-[13.5px] font-bold ${txTypeFilter === 'all' ? 'text-[#1a73e8]' : 'text-[#8e9aa8]'}`}>সব</span>
-                  <span className={`text-[10px] font-medium leading-none mt-0.5 ${txTypeFilter === 'all' ? 'text-[#1a73e8]' : 'text-[#8e9aa8]/80'}`}>
-                    ({toBanglaDigits(totalTxCount)})
-                  </span>
-                </button>
-
-                {/* TAB 2: আয় */}
-                <button
-                   type="button"
-                   onClick={() => setTxTypeFilter('income')}
-                   className={`flex-1 py-1 h-[42px] rounded-[6px] transition-all cursor-pointer select-none flex flex-col items-center justify-center ${
-                     txTypeFilter === 'income'
-                       ? 'bg-[#e2fced] text-[#50AD54]'
-                       : 'bg-transparent text-[#8e9aa8] hover:text-[#4b5563]'
-                   }`}
-                >
-                  <span className={`text-[13.5px] font-bold ${txTypeFilter === 'income' ? 'text-[#50AD54]' : 'text-[#8e9aa8]'}`}>আয়</span>
-                  <span className={`text-[10px] font-medium leading-none mt-0.5 ${txTypeFilter === 'income' ? 'text-[#50AD54]' : 'text-[#8e9aa8]/80'}`}>
-                    ({toBanglaDigits(periodTxList.filter(t => t.type === 'income').length)})
-                  </span>
-                </button>
-
-                {/* TAB 3: ব্যয় */}
-                <button
-                   type="button"
-                   onClick={() => setTxTypeFilter('expense')}
-                   className={`flex-1 py-1 h-[42px] rounded-[6px] transition-all cursor-pointer select-none flex flex-col items-center justify-center ${
-                     txTypeFilter === 'expense'
-                       ? 'bg-[#fcedeb] text-[#db4437]'
-                       : 'bg-transparent text-[#8e9aa8] hover:text-[#4b5563]'
-                   }`}
-                >
-                  <span className={`text-[13.5px] font-bold ${txTypeFilter === 'expense' ? 'text-[#db4437]' : 'text-[#8e9aa8]'}`}>ব্যয়</span>
-                  <span className={`text-[10px] font-medium leading-none mt-0.5 ${txTypeFilter === 'expense' ? 'text-[#db4437]' : 'text-[#8e9aa8]/80'}`}>
-                    ({toBanglaDigits(periodTxList.filter(t => t.type === 'expense').length)})
-                  </span>
-                </button>
-              </div>
-
-              {/* Action: PDF download button */}
-              <button
-                type="button"
-                onClick={handleDownloadPdf}
-                disabled={pdfGenerating || totalTxCount === 0}
-                className={`rounded-[6px] border border-[#e2e7ec]/50 bg-white shadow-xs transition-all cursor-pointer flex items-center justify-center h-[42px] w-[42px] shrink-0 ${
-                  totalTxCount === 0
-                    ? 'opacity-50 cursor-not-allowed text-slate-300'
-                    : 'hover:bg-slate-50 text-[#1a73e8] active:scale-95'
-                }`}
-                title="পিডিএফ রিপোর্ট ডাউনলোড করুন"
-              >
-                {pdfGenerating ? (
-                  <Loader2 size={16} className="animate-spin text-[#1a73e8]" />
-                ) : (
-                  <FileDown size={16} className="text-[#1a73e8] stroke-[2.2]" />
-                )}
-              </button>
-            </div>
-
-            {/* Clean White Search bar on the bottom matches layout requested */}
-            <div className="relative">
-              <input
-                type="text"
-                value={txSearchQuery}
-                onChange={(e) => setTxSearchQuery(e.target.value)}
-                placeholder="লেনদেনের নাম দিয়ে অনুসন্ধান করুন..."
-                className="w-full bg-white border border-[#e2e7ec]/85 focus:border-[#1e75eb] focus:bg-white focus:ring-2 focus:ring-[#1e75eb]/10 pl-11 pr-4 py-2.5 rounded-[8px] outline-none text-[13.5px] font-medium text-slate-800 tracking-wide transition-all duration-200 shadow-2xs"
-              />
-              <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 stroke-[2.2]" />
-              {txSearchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setTxSearchQuery('')}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-800 p-0.5 active:scale-95 transition-all"
-                >
-                  <X size={16} className="stroke-[2.5]" />
-                </button>
-              )}
-            </div>
-          </div>
+        {/* 2. Responsive Content Container wrapper for scrollable transaction list */}
+        <div className="w-full max-w-lg mx-auto px-4 pt-2.5 flex-1 flex flex-col gap-2.5 overflow-hidden">
 
           {/* Ledger Listing grouped by Date precisely matching Expenses page */}
-          <div className="flex flex-col space-y-4 animate-in fade-in duration-300">
+          <div className="flex-1 overflow-y-auto pr-0.5 pb-24 flex flex-col space-y-4 animate-in fade-in duration-300 no-swipe" style={{ touchAction: 'pan-y' }} {...blockSwipeProps}>
             {totalTxCount === 0 ? (
               <div className="text-center py-16 bg-white border border-dashed border-slate-200 rounded-2xl p-6 shadow-2xs">
                 <Banknote size={38} className="mx-auto text-slate-300 mb-2.5" />
@@ -1211,10 +1235,14 @@ export const WalletManager: React.FC = () => {
 
 
   return (
-    <div className="w-full max-w-lg mx-auto pb-24 px-0.5 select-none relative animate-in fade-in duration-300">
+    <div className="w-full max-w-lg mx-auto px-0.5 select-none relative animate-in fade-in duration-300 h-full flex flex-col overflow-hidden">
       
       {/* 1. Header Card - Total Balance */}
-      <div className="bg-white border border-slate-100 rounded-2xl py-5 px-4 text-center shadow-[0_2px_12px_rgba(30,117,235,0.02)] mb-4 transition-all mx-0.5">
+      <div 
+        className="bg-white border border-slate-100 rounded-2xl py-5 px-4 text-center shadow-[0_2px_12px_rgba(30,117,235,0.02)] mb-4 transition-all mx-0.5 no-swipe flex-none"
+        style={{ touchAction: 'none' }}
+        {...blockSwipeProps}
+      >
         <span className="text-slate-500 font-medium text-xs tracking-wide">
           মোট ব্যালেন্স • {toBanglaDigits(walletCount)}টি ওয়ালেট
         </span>
@@ -1225,7 +1253,7 @@ export const WalletManager: React.FC = () => {
 
       {/* 2. Wallets Loading View */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-16 animate-in fade-in duration-300">
+        <div className="flex-1 flex flex-col items-center justify-center py-16 animate-in fade-in duration-300">
           <div className="w-16 h-16 mb-4 flex items-center justify-center animate-spin">
             <AppLogo variant="transparent-color" size="100%" />
           </div>
@@ -1240,7 +1268,7 @@ export const WalletManager: React.FC = () => {
           </p>
         </div>
       ) : walletCount === 0 ? (
-        <div className="text-center py-12 bg-white border border-dashed border-slate-200 rounded-xl p-5 mx-0.5">
+        <div className="text-center py-12 bg-white border border-dashed border-slate-200 rounded-xl p-5 mx-0.5 flex-1 flex flex-col items-center justify-center">
           <WalletIcon size={40} className="mx-auto text-slate-300 mb-2.5" />
           <p className="text-slate-500 font-semibold text-sm mb-1">কোনো ওয়ালেট পাওয়া যায়নি</p>
           <p className="text-slate-400 text-xs mb-3.5">একটি নতুন ওয়ালেট যোগ করুন আপনার হিসাব ট্র্যাকিং শুরু করতে।</p>
@@ -1253,7 +1281,7 @@ export const WalletManager: React.FC = () => {
           </button>
         </div>
       ) : (
-        <div className="space-y-2.5 px-0.5">
+        <div className="space-y-2.5 px-0.5 no-swipe flex-1 overflow-y-auto pb-24" style={{ touchAction: 'pan-y' }} {...blockSwipeProps}>
           {/* List wallets */}
           {wallets.map((wallet) => {
             const hasNegativeBalance = wallet.balance < 0;
@@ -1365,7 +1393,7 @@ export const WalletManager: React.FC = () => {
 
       {/* 4. Overlay Form Modal (Floating) */}
       {isModalOpen && createPortal(
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[1000] p-4 select-none animate-in fade-in duration-200">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[1000] p-4 select-none animate-in fade-in duration-200 no-swipe">
           <div className="bg-white w-full max-w-[320px] rounded-[28px] shadow-2xl overflow-hidden border border-slate-100 flex flex-col relative max-h-[90vh]">
             {/* Modal Header/Title Centered and Clean, exactly as customized in prompt */}
             <div className="text-center pt-8 pb-5 px-6">
@@ -1436,7 +1464,7 @@ export const WalletManager: React.FC = () => {
 
       {/* 5. Add Money (টাকা যুক্ত করুন) Modal */}
       {isPayModalOpen && payWallet && createPortal(
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[1000] p-4 select-none animate-in fade-in duration-200">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[1000] p-4 select-none animate-in fade-in duration-200 no-swipe">
           <div className="bg-white w-full max-w-[320px] rounded-[28px] shadow-2xl overflow-hidden border border-slate-100 flex flex-col relative max-h-[90vh]">
             <div className="text-center pt-8 pb-5 px-6">
               {/* Profile-like Wallet Icon Container for Add Money */}

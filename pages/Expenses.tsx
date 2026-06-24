@@ -200,6 +200,17 @@ export const parseExpenseNotes = (
   };
 };
 
+// Global swipe preventing helper
+export const blockSwipeProps = {
+  onTouchStart: (e: React.TouchEvent) => e.stopPropagation(),
+  onTouchMove: (e: React.TouchEvent) => e.stopPropagation(),
+  onTouchEnd: (e: React.TouchEvent) => e.stopPropagation(),
+  onMouseDown: (e: React.MouseEvent) => e.stopPropagation(),
+  onMouseMove: (e: React.MouseEvent) => e.stopPropagation(),
+  onMouseUp: (e: React.MouseEvent) => e.stopPropagation(),
+  onMouseLeave: (e: React.MouseEvent) => e.stopPropagation(),
+};
+
 export const Expenses: React.FC = () => {
   // Use cached expenses and incomes from AppContext
   const {
@@ -368,10 +379,10 @@ export const Expenses: React.FC = () => {
   const getSlideClassName = (tabName: string) => {
     const isActive = activeTab === tabName;
     if (isActive || isSwiping || isTabTransitioning) {
-      if (tabName === "expenses" || tabName === "dues") {
-        return "w-full shrink-0 px-3 lg:px-8 pb-4 h-full flex flex-col overflow-hidden pt-3";
+      if (tabName === "expenses" || tabName === "dues" || tabName === "wallet") {
+        return "w-full shrink-0 px-3 lg:px-8 pb-4 h-full flex flex-col overflow-hidden pt-[22px]";
       }
-      return "w-full shrink-0 px-3 lg:px-8 pb-4 overflow-y-auto h-full pt-3";
+      return "w-full shrink-0 px-3 lg:px-8 pb-4 overflow-y-auto h-full pt-[22px]";
     }
     return "w-full shrink-0 px-3 lg:px-8 pb-0 h-0 overflow-hidden opacity-0 pointer-events-none select-none";
   };
@@ -2224,7 +2235,11 @@ export const Expenses: React.FC = () => {
           >
             {/* Slide 1: Expenses/Dashboard (Index 0) */}
             <div className={getSlideClassName("expenses")}>
-              <div className="flex-none w-full">
+              <div 
+                className="flex-none w-full no-swipe" 
+                style={{ touchAction: "none" }}
+                {...blockSwipeProps}
+              >
                 {/* Dynamic Period Stats Card - Unifying Income and Expense */}
               <div className="bg-[#fafbfd] border border-[#e2e7ec]/80 py-3 px-4 rounded-[12px] shadow-[0_2px_8px_rgba(0,0,0,0.02)] w-full max-w-lg mx-auto mb-3 select-none">
                 {/* Period Segment Tabs matching the image */}
@@ -2333,7 +2348,11 @@ export const Expenses: React.FC = () => {
               )}
 
               {/* STICKY SEARCH & FILTER CONTROLS */}
-              <div className="sticky top-14 bg-[#fafbfd] z-20 pb-2.5 pt-1 space-y-2.5 -mx-3 px-3 lg:-mx-8 lg:px-8 mb-3">
+              <div 
+                className="sticky top-14 bg-[#fafbfd] z-20 pb-2.5 pt-1 space-y-2.5 -mx-3 px-3 lg:-mx-8 lg:px-8 mb-3 no-swipe" 
+                style={{ touchAction: "pan-y" }}
+                {...blockSwipeProps}
+              >
                 {/* Search Inputs & Category Option Filters (Combining both) */}
                 <div className="space-y-2.5 w-full max-w-lg mx-auto">
                   {(searchTerm || showSearch) && (
@@ -5132,7 +5151,11 @@ const DuesManager: React.FC<DuesManagerProps> = ({
   return (
     <div className="h-full flex flex-col overflow-hidden relative">
       {/* Top Summaries */}
-      <div className="grid grid-cols-3 gap-2 px-1 mb-2 flex-none">
+      <div 
+        className="grid grid-cols-3 gap-2 px-1 mb-2 flex-none no-swipe" 
+        style={{ touchAction: "none" }}
+        {...blockSwipeProps}
+      >
         <div
           className="bg-white rounded-xl p-2 border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center"
           style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
@@ -5169,7 +5192,11 @@ const DuesManager: React.FC<DuesManagerProps> = ({
       </div>
 
       {/* STICKY SEARCH */}
-      <div className="sticky top-14 bg-[#fafbfd] z-20 pb-2.5 pt-1 -mx-3 px-3 lg:-mx-8 lg:px-8 mb-2 flex-none">
+      <div 
+        className="sticky top-14 bg-[#fafbfd] z-20 pb-2.5 pt-1 -mx-3 px-3 lg:-mx-8 lg:px-8 mb-2 flex-none no-swipe" 
+        style={{ touchAction: "pan-y" }}
+        {...blockSwipeProps}
+      >
         <div className="relative max-w-lg mx-auto w-full">
           <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
             <Search className="text-slate-400" size={20} />
