@@ -27,7 +27,8 @@ import {
   FileDown,
   TrendingUp,
   TrendingDown,
-  Filter
+  Filter,
+  RefreshCw
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -58,11 +59,13 @@ export const WalletManager: React.FC = () => {
     incomeRecords, 
     setIncomeRecords,
     duePersons, 
-    setDuePersons 
+    setDuePersons,
+    loading: appLoading
   } = useAppContext();
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [isDbAvailable, setIsDbAvailable] = useState<boolean>(true);
+  const [syncing, setSyncing] = useState<boolean>(false);
 
   // State for Add Money directly to wallet
   const [isPayModalOpen, setIsPayModalOpen] = useState<boolean>(false);
@@ -82,6 +85,22 @@ export const WalletManager: React.FC = () => {
   const blockSwipeProps = {
     onTouchStart: (e: React.TouchEvent) => e.stopPropagation(),
     onTouchMove: (e: React.TouchEvent) => e.stopPropagation(),
+    onTouchEnd: (e: React.TouchEvent) => e.stopPropagation(),
+    onMouseDown: (e: React.MouseEvent) => e.stopPropagation(),
+    onMouseMove: (e: React.MouseEvent) => e.stopPropagation(),
+    onMouseUp: (e: React.MouseEvent) => e.stopPropagation(),
+    onMouseLeave: (e: React.MouseEvent) => e.stopPropagation(),
+  };
+
+  // Prevent swiping gestures AND browser default scrolling/bouncing behavior on static headers/cards
+  const lockScrollAndSwipeProps = {
+    onTouchStart: (e: React.TouchEvent) => e.stopPropagation(),
+    onTouchMove: (e: React.TouchEvent) => {
+      e.stopPropagation();
+      if (e.cancelable) {
+        e.preventDefault();
+      }
+    },
     onTouchEnd: (e: React.TouchEvent) => e.stopPropagation(),
     onMouseDown: (e: React.MouseEvent) => e.stopPropagation(),
     onMouseMove: (e: React.MouseEvent) => e.stopPropagation(),
@@ -488,7 +507,8 @@ export const WalletManager: React.FC = () => {
           projectname: sourceName,
           clientname: 'সরাসরি ওয়ালেট যোগ',
           amount: amountNum,
-          date: timestamp,
+          date: timestamp.substring(0, 10),
+          createdat: timestamp,
           method: payWallet.name,
           userid: user.id
         });
@@ -685,6 +705,62 @@ export const WalletManager: React.FC = () => {
     setActiveMenuId(activeMenuId === id ? null : id);
   };
 
+  // Re-sync all wallet balances based on actual transactions
+  const handleSyncBalances = async () => {
+    if (!user) return;
+    if (appLoading) {
+      showToast('উপাত্ত লোড হচ্ছে, দয়া করে অপেক্ষা করুন...', 'info');
+      return;
+    }
+    setSyncing(true);
+    try {
+      // For each wallet, calculate the correct balance based on actual transaction records
+      const updatedWallets = await Promise.all(wallets.map(async (wallet) => {
+        const txs = getWalletTransactions(wallet.name);
+        const correctBalance = txs.reduce((sum, tx) => {
+          return sum + (tx.type === 'income' ? tx.amount : -tx.amount);
+        }, 0);
+        
+        // If the balance is out of sync, update the database record
+        if (wallet.balance !== correctBalance && isDbAvailable) {
+          try {
+            await supabase
+              .from('wallets')
+              .update({ 
+                balance: correctBalance, 
+                lastTransactionDate: new Date().toISOString() 
+              })
+              .eq('id', wallet.id);
+          } catch (dbErr) {
+            console.error(`Failed to update DB balance for wallet ${wallet.name}:`, dbErr);
+          }
+        }
+        
+        return {
+          ...wallet,
+          balance: correctBalance
+        };
+      }));
+
+      setWallets(updatedWallets);
+      localStorage.setItem(`manage_me_wallets_${user.id}`, JSON.stringify(updatedWallets));
+      
+      try {
+        await refreshData();
+      } catch (err) {
+        console.warn("Refresh context error ignored: ", err);
+      }
+
+      window.dispatchEvent(new CustomEvent('wallets-updated'));
+      showToast('সব ওয়ালেটের ব্যালেন্স সফলভাবে পুনঃগণনা ও সংশোধন করা হয়েছে!', 'success');
+    } catch (err: any) {
+      console.error("Error syncing balances:", err);
+      showToast('ব্যালেন্স রি-সিঙ্ক করতে সমস্যা হয়েছে: ' + err.message, 'error');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   // Calculations
   const walletCount = wallets.length;
   const totalBalance = wallets.reduce((sum, w) => sum + w.balance, 0);
@@ -719,25 +795,53 @@ export const WalletManager: React.FC = () => {
   const formatTimeToBangla = (dateStr: string, createdAtStr?: string): string => {
     if (!dateStr) return '';
     try {
-      let dateObj = new Date(dateStr);
-      if ((isNaN(dateObj.getTime()) || dateStr.length <= 10) && createdAtStr) {
-        const testObj = new Date(createdAtStr);
-        if (!isNaN(testObj.getTime())) {
-          dateObj = testObj;
+      let hours = 12;
+      let minutes = 0;
+      let isParsed = false;
+
+      if (createdAtStr && createdAtStr.includes("T")) {
+        const parts = createdAtStr.split("T");
+        if (parts.length === 2) {
+          const timePart = parts[1];
+          const timeSubparts = timePart.split(":");
+          if (timeSubparts.length >= 2) {
+            const h = parseInt(timeSubparts[0], 10);
+            const m = parseInt(timeSubparts[1], 10);
+            if (!isNaN(h) && !isNaN(m)) {
+              if (createdAtStr.endsWith("Z")) {
+                const dateObj = new Date(createdAtStr);
+                hours = dateObj.getHours();
+                minutes = dateObj.getMinutes();
+              } else {
+                hours = h;
+                minutes = m;
+              }
+              isParsed = true;
+            }
+          }
         }
       }
-      if (isNaN(dateObj.getTime())) return '';
-      
-      let hours = dateObj.getHours();
-      const minutes = dateObj.getMinutes();
+
+      if (!isParsed) {
+        let dateObj = new Date(dateStr);
+        if ((isNaN(dateObj.getTime()) || dateStr.length <= 10) && createdAtStr) {
+          const testObj = new Date(createdAtStr);
+          if (!isNaN(testObj.getTime())) {
+            dateObj = testObj;
+          }
+        }
+        if (isNaN(dateObj.getTime())) return '';
+        hours = dateObj.getHours();
+        minutes = dateObj.getMinutes();
+      }
+
       const ampm = hours >= 12 ? 'PM' : 'AM';
-      
-      hours = hours % 12;
-      hours = hours ? hours : 12;
-      
+      let displayHours = hours % 12;
+      displayHours = displayHours ? displayHours : 12;
+
       const minutesStr = minutes < 10 ? '0' + minutes : minutes;
-      
-      return `${toBanglaNumbers(hours)}:${toBanglaNumbers(minutesStr)} ${ampm}`;
+
+      return `${toBanglaNumbers(displayHours)}:${toBanglaNumbers(minutesStr)} ${ampm}`;
     } catch {
       return '';
     }
@@ -927,14 +1031,14 @@ export const WalletManager: React.FC = () => {
     return createPortal(
       <div 
         className="fixed inset-0 bg-[#f8fafc] text-slate-800 z-[1000] overflow-hidden flex flex-col select-none animate-in fade-in zoom-in-95 duration-200 no-swipe"
-        {...blockSwipeProps}
+        {...lockScrollAndSwipeProps}
       >
         
         {/* 1. Header & Controls Block - Entirely blocked from horizontal swiping and vertical page scrolling */}
         <div 
           className="flex-none w-full bg-white border-b border-slate-200/60 pb-3.5 no-swipe"
           style={{ touchAction: 'none' }}
-          {...blockSwipeProps}
+          {...lockScrollAndSwipeProps}
         >
           {/* Sticky Glassy Header with Back Button */}
           <div className="px-4 py-2.5 flex items-center justify-between">
@@ -1095,7 +1199,51 @@ export const WalletManager: React.FC = () => {
                   {pdfGenerating ? (
                     <Loader2 size={16} className="animate-spin text-[#1a73e8]" />
                   ) : (
-                    <FileDown size={16} className="text-[#1a73e8] stroke-[2.2]" />
+                    <svg
+                      viewBox="0 0 32 32"
+                      width={22}
+                      height={22}
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <g clipPath="url(#pdf-spec-clip-wallet)">
+                        {/* Document Body (Light Gray) */}
+                        <path d="M4 2H20L28 10V30H4V2Z" fill="#E2E8F0" />
+                        
+                        {/* Red Bottom Banner */}
+                        <rect x="4" y="20" width="24" height="10" fill="#E14E3A" />
+                        
+                        {/* PDF Text */}
+                        <text
+                          x="16"
+                          y="27.5"
+                          fill="#FFFFFF"
+                          fontSize="7.5"
+                          fontWeight="900"
+                          fontFamily="Inter, system-ui, sans-serif"
+                          textAnchor="middle"
+                          letterSpacing="0.2"
+                        >
+                          PDF
+                        </text>
+                      </g>
+                      
+                      {/* Fold flap */}
+                      <path d="M20 2L20 10L28 10Z" fill="#CBD5E1" />
+                      <path d="M20 10L28 10L20 14Z" fill="rgba(0,0,0,0.08)" />
+                      
+                      {/* Arrow Shadow */}
+                      <path d="M14.5 6.5H17.5V12.5H20.5L16 17.5L11.5 12.5H14.5V6.5Z" fill="rgba(0,0,0,0.12)" />
+                      
+                      {/* Red Arrow */}
+                      <path d="M14 6H18V12H21L16 17L11 12H14V6Z" fill="#E14E3A" />
+
+                      <defs>
+                        <clipPath id="pdf-spec-clip-wallet">
+                          <path d="M4 5C4 3.34315 5.34315 2 7 2H20L28 10V27C28 28.6569 26.6569 30 25 30H7C5.34315 30 4 28.6569 4 27V5Z" />
+                        </clipPath>
+                      </defs>
+                    </svg>
                   )}
                 </button>
               </div>
@@ -1241,13 +1389,25 @@ export const WalletManager: React.FC = () => {
       <div 
         className="bg-white border border-slate-100 rounded-2xl py-5 px-4 text-center shadow-[0_2px_12px_rgba(30,117,235,0.02)] mb-4 transition-all mx-0.5 no-swipe flex-none"
         style={{ touchAction: 'none' }}
-        {...blockSwipeProps}
+        {...lockScrollAndSwipeProps}
       >
         <span className="text-slate-500 font-medium text-xs tracking-wide">
           মোট ব্যালেন্স • {toBanglaDigits(walletCount)}টি ওয়ালেট
         </span>
         <div className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight mt-1.5">
           ৳ {totalBalance.toLocaleString('en-US')}/-
+        </div>
+        <div className="flex justify-center mt-3">
+          <button
+            type="button"
+            onClick={handleSyncBalances}
+            disabled={syncing || appLoading}
+            className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 text-slate-500 hover:text-slate-700 disabled:opacity-50 font-semibold rounded-lg text-[11px] sm:text-xs transition-all border border-slate-100 cursor-pointer shadow-sm"
+            title="সব ওয়ালেটের ব্যালেন্স আসল লেনদেনের সাথে রি-সিঙ্ক করুন"
+          >
+            <RefreshCw size={11} className={syncing ? "animate-spin" : ""} />
+            ব্যালেন্স রি-সিঙ্ক করুন
+          </button>
         </div>
       </div>
 

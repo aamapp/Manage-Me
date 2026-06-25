@@ -153,9 +153,10 @@ export const setupOnMessageListener = () => {
       const body = payload.notification.body;
       const imageUrl = payload.notification.image || (payload.data && payload.data.image);
 
-      // Speak the title
+      // Speak the body (fallback to title if body is empty)
       if ('speechSynthesis' in window) {
-        const utterance = new SpeechSynthesisUtterance(title);
+        const textToSpeak = body || title;
+        const utterance = new SpeechSynthesisUtterance(textToSpeak);
         utterance.lang = 'bn-BD'; // Set language to Bengali (modify if needed)
         window.speechSynthesis.speak(utterance);
       }

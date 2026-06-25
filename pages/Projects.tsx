@@ -481,6 +481,7 @@ export const Projects: React.FC = () => {
         : newProject.deadline
       : null;
 
+    const localDateOnly = newProject.createdat || localToday;
     let createdAtToSave = newProject.createdat;
     if (!createdAtToSave) {
       createdAtToSave = new Date(
@@ -600,7 +601,8 @@ export const Projects: React.FC = () => {
               projectname: projectName,
               clientname: clientName,
               amount: paidInput,
-              date: createdAtToSave,
+              date: localDateOnly,
+              createdat: createdAtToSave,
               method: "বিকাশ",
               userid: user.id,
             });
@@ -2270,9 +2272,19 @@ export const Projects: React.FC = () => {
                         const ss = String(now.getSeconds()).padStart(2, "0");
                         const currentTime = `${hh}:${mm}:${ss}`;
 
-                        const fullIsoDate = date
-                          ? new Date(`${date}T${currentTime}`).toISOString()
-                          : "";
+                        let fullIsoDate = "";
+                        if (date) {
+                          const [yStr, mStr, dStr] = date.split("-");
+                          const localDate = new Date(
+                            Number(yStr),
+                            Number(mStr) - 1,
+                            Number(dStr),
+                            now.getHours(),
+                            now.getMinutes(),
+                            now.getSeconds()
+                          );
+                          fullIsoDate = localDate.toISOString();
+                        }
                         setNewProject({
                           ...newProject,
                           createdat: fullIsoDate,
@@ -2295,9 +2307,19 @@ export const Projects: React.FC = () => {
                           : ""
                       }
                       onChange={(date) => {
-                        const fullIsoDate = date
-                          ? new Date(`${date}T23:59:59`).toISOString()
-                          : "";
+                        let fullIsoDate = "";
+                        if (date) {
+                          const [yStr, mStr, dStr] = date.split("-");
+                          const localDate = new Date(
+                            Number(yStr),
+                            Number(mStr) - 1,
+                            Number(dStr),
+                            23,
+                            59,
+                            59
+                          );
+                          fullIsoDate = localDate.toISOString();
+                        }
                         setNewProject({ ...newProject, deadline: fullIsoDate });
                       }}
                       placeholder="ডেডলাইন"

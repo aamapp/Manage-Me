@@ -1058,25 +1058,53 @@ export const Expenses: React.FC = () => {
   ): string => {
     if (!dateStr) return "";
     try {
-      let dateObj = new Date(dateStr);
-      if ((isNaN(dateObj.getTime()) || dateStr.length <= 10) && createdAtStr) {
-        const testObj = new Date(createdAtStr);
-        if (!isNaN(testObj.getTime())) {
-          dateObj = testObj;
+      let hours = 12;
+      let minutes = 0;
+      let isParsed = false;
+
+      if (createdAtStr && createdAtStr.includes("T")) {
+        const parts = createdAtStr.split("T");
+        if (parts.length === 2) {
+          const timePart = parts[1];
+          const timeSubparts = timePart.split(":");
+          if (timeSubparts.length >= 2) {
+            const h = parseInt(timeSubparts[0], 10);
+            const m = parseInt(timeSubparts[1], 10);
+            if (!isNaN(h) && !isNaN(m)) {
+              if (createdAtStr.endsWith("Z")) {
+                const dateObj = new Date(createdAtStr);
+                hours = dateObj.getHours();
+                minutes = dateObj.getMinutes();
+              } else {
+                hours = h;
+                minutes = m;
+              }
+              isParsed = true;
+            }
+          }
         }
       }
-      if (isNaN(dateObj.getTime())) return "";
 
-      let hours = dateObj.getHours();
-      const minutes = dateObj.getMinutes();
+      if (!isParsed) {
+        let dateObj = new Date(dateStr);
+        if ((isNaN(dateObj.getTime()) || dateStr.length <= 10) && createdAtStr) {
+          const testObj = new Date(createdAtStr);
+          if (!isNaN(testObj.getTime())) {
+            dateObj = testObj;
+          }
+        }
+        if (isNaN(dateObj.getTime())) return "";
+        hours = dateObj.getHours();
+        minutes = dateObj.getMinutes();
+      }
+
       const ampm = hours >= 12 ? "PM" : "AM";
-
-      hours = hours % 12;
-      hours = hours ? hours : 12;
+      let displayHours = hours % 12;
+      displayHours = displayHours ? displayHours : 12;
 
       const minutesStr = minutes < 10 ? "0" + minutes : minutes;
 
-      return `${toBanglaNumbers(hours)}:${toBanglaNumbers(minutesStr)} ${ampm}`;
+      return `${toBanglaNumbers(displayHours)}:${toBanglaNumbers(minutesStr)} ${ampm}`;
     } catch {
       return "";
     }
@@ -1259,15 +1287,52 @@ export const Expenses: React.FC = () => {
     const rawDate = tx.date.substring(0, 10);
 
     let timeStr = `${String(new Date().getHours()).padStart(2, "0")}:${String(new Date().getMinutes()).padStart(2, "0")}`;
-    if (tx.rawItem && tx.rawItem.date && tx.rawItem.date.length > 10) {
-      const dt = new Date(tx.rawItem.date);
-      if (!isNaN(dt.getTime())) {
-        timeStr = `${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")}`;
+    const rawCreatedAt = tx.rawItem ? (tx.rawItem.created_at || tx.rawItem.createdat) : null;
+    
+    if (rawCreatedAt && typeof rawCreatedAt === "string") {
+      if (rawCreatedAt.includes("T")) {
+        const parts = rawCreatedAt.split("T");
+        if (parts.length === 2) {
+          const timePart = parts[1];
+          const timeSubparts = timePart.split(":");
+          if (timeSubparts.length >= 2) {
+            const hStr = timeSubparts[0];
+            const mStr = timeSubparts[1];
+            const h = parseInt(hStr, 10);
+            const m = parseInt(mStr, 10);
+            if (!isNaN(h) && !isNaN(m)) {
+              if (rawCreatedAt.endsWith("Z")) {
+                const dt = new Date(rawCreatedAt);
+                timeStr = `${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")}`;
+              } else {
+                timeStr = `${hStr.padStart(2, "0")}:${mStr.padStart(2, "0")}`;
+              }
+            }
+          }
+        }
+      } else {
+        const dt = new Date(rawCreatedAt);
+        if (!isNaN(dt.getTime())) {
+          timeStr = `${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")}`;
+        }
       }
-    } else if (tx.rawItem && tx.rawItem.createdat) {
-      const dt = new Date(tx.rawItem.createdat);
-      if (!isNaN(dt.getTime())) {
-        timeStr = `${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")}`;
+    } else if (tx.rawItem && tx.rawItem.date && typeof tx.rawItem.date === "string") {
+      if (tx.rawItem.date.includes("T")) {
+        const parts = tx.rawItem.date.split("T");
+        if (parts.length === 2) {
+          const timePart = parts[1];
+          const timeSubparts = timePart.split(":");
+          if (timeSubparts.length >= 2) {
+            const hStr = timeSubparts[0];
+            const mStr = timeSubparts[1];
+            timeStr = `${hStr.padStart(2, "0")}:${mStr.padStart(2, "0")}`;
+          }
+        }
+      } else if (tx.rawItem.date.length > 10) {
+        const dt = new Date(tx.rawItem.date);
+        if (!isNaN(dt.getTime())) {
+          timeStr = `${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")}`;
+        }
       }
     }
 
@@ -1379,7 +1444,13 @@ export const Expenses: React.FC = () => {
         const tTime = newExpense.time
           ? `${newExpense.time}:00`
           : currentTimeNow;
-        let dateToSave = new Date(`${baseDateStr}T${tTime}`).toISOString();
+        
+        const parseToLocalIsoString = (baseDate: string, timeStr: string) => {
+          const [yStr, mStr, dStr] = baseDate.split("-");
+          const [hhStr, mmStr, ssStr] = timeStr.split(":");
+          return `${yStr}-${mStr}-${dStr}T${hhStr || "00"}:${mmStr || "00"}:${ssStr || "00"}`;
+        };
+        let dateToSave = parseToLocalIsoString(baseDateStr, tTime);
 
         const selectedWallet = newExpense.wallet || "ক্যাশ";
         const categoryVal = newExpense.category || "অন্যান্য";
@@ -1405,7 +1476,7 @@ export const Expenses: React.FC = () => {
             .update({
               category: newExpense.category || "অন্যান্য",
               amount: parsedAmount,
-              date: dateToSave,
+              date: baseDateStr,
               createdat: dateToSave, // Update createdat as well to reflect the time change since date col strips time
               notes: finalNotesColumn,
             })
@@ -1425,7 +1496,7 @@ export const Expenses: React.FC = () => {
           const { error } = await supabase.from("expenses").insert({
             category: newExpense.category || "অন্যান্য",
             amount: parsedAmount,
-            date: dateToSave,
+            date: baseDateStr,
             createdat: dateToSave,
             notes: finalNotesColumn,
             userid: targetUserId,
@@ -1444,7 +1515,13 @@ export const Expenses: React.FC = () => {
           ? newIncome.date.substring(0, 10)
           : localToday;
         const tTime = newIncome.time ? `${newIncome.time}:00` : currentTimeNow;
-        let dateToSave = new Date(`${baseDateStr}T${tTime}`).toISOString();
+        
+        const parseToLocalIsoString = (baseDate: string, timeStr: string) => {
+          const [yStr, mStr, dStr] = baseDate.split("-");
+          const [hhStr, mmStr, ssStr] = timeStr.split(":");
+          return `${yStr}-${mStr}-${dStr}T${hhStr || "00"}:${mmStr || "00"}:${ssStr || "00"}`;
+        };
+        let dateToSave = parseToLocalIsoString(baseDateStr, tTime);
 
         const selectedWallet = newIncome.method || "বিকাশ";
 
@@ -1462,7 +1539,7 @@ export const Expenses: React.FC = () => {
               projectname: newIncome.projectname,
               clientname: newIncome.clientname || "",
               amount: parsedAmount,
-              date: dateToSave,
+              date: baseDateStr,
               createdat: dateToSave, // Update createdat to persist time changes too
               method: selectedWallet,
             })
@@ -1486,7 +1563,7 @@ export const Expenses: React.FC = () => {
               projectname: newIncome.projectname,
               clientname: newIncome.clientname || "",
               amount: parsedAmount,
-              date: dateToSave,
+              date: baseDateStr,
               createdat: dateToSave,
               method: selectedWallet,
               userid: targetUserId,
@@ -1755,8 +1832,8 @@ export const Expenses: React.FC = () => {
 
     // Sort descending by exact timestamp when available
     return filtered.sort((a, b) => {
-      const db = b.rawItem.createdat || b.date;
-      const da = a.rawItem.createdat || a.date;
+      const db = b.rawItem.created_at || b.rawItem.createdat || b.date;
+      const da = a.rawItem.created_at || a.rawItem.createdat || a.date;
       return new Date(db).getTime() - new Date(da).getTime();
     });
   }, [
@@ -2649,7 +2726,7 @@ export const Expenses: React.FC = () => {
                                       <span className="text-[10.5px] sm:text-[11px] font-medium text-slate-400">
                                         {formatTimeToBangla(
                                           tx.rawItem.date,
-                                          tx.rawItem.createdat,
+                                          tx.rawItem.created_at || tx.rawItem.createdat,
                                         )}
                                       </span>
                                     </div>
@@ -4585,7 +4662,51 @@ const DuesManager: React.FC<DuesManagerProps> = ({
               className="p-2 border border-slate-200/80 bg-white text-slate-700 hover:bg-slate-100 rounded-xl transition-all flex items-center justify-center cursor-pointer"
               title="রিপোর্ট ডাউনলোড"
             >
-              <FileDown size={19} />
+              <svg
+                viewBox="0 0 32 32"
+                width={23}
+                height={23}
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <g clipPath="url(#pdf-spec-clip-expenses)">
+                  {/* Document Body (Light Gray) */}
+                  <path d="M4 2H20L28 10V30H4V2Z" fill="#E2E8F0" />
+                  
+                  {/* Red Bottom Banner */}
+                  <rect x="4" y="20" width="24" height="10" fill="#E14E3A" />
+                  
+                  {/* PDF Text */}
+                  <text
+                    x="16"
+                    y="27.5"
+                    fill="#FFFFFF"
+                    fontSize="7.5"
+                    fontWeight="900"
+                    fontFamily="Inter, system-ui, sans-serif"
+                    textAnchor="middle"
+                    letterSpacing="0.2"
+                  >
+                    PDF
+                  </text>
+                </g>
+                
+                {/* Fold flap */}
+                <path d="M20 2L20 10L28 10Z" fill="#CBD5E1" />
+                <path d="M20 10L28 10L20 14Z" fill="rgba(0,0,0,0.08)" />
+                
+                {/* Arrow Shadow */}
+                <path d="M14.5 6.5H17.5V12.5H20.5L16 17.5L11.5 12.5H14.5V6.5Z" fill="rgba(0,0,0,0.12)" />
+                
+                {/* Red Arrow */}
+                <path d="M14 6H18V12H21L16 17L11 12H14V6Z" fill="#E14E3A" />
+
+                <defs>
+                  <clipPath id="pdf-spec-clip-expenses">
+                    <path d="M4 5C4 3.34315 5.34315 2 7 2H20L28 10V27C28 28.6569 26.6569 30 25 30H7C5.34315 30 4 28.6569 4 27V5Z" />
+                  </clipPath>
+                </defs>
+              </svg>
             </button>
           </div>
         </div>

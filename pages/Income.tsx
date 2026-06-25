@@ -393,13 +393,54 @@ export const Income: React.FC = () => {
 
     let timeStr = `${String(new Date().getHours()).padStart(2, "0")}:${String(new Date().getMinutes()).padStart(2, "0")}`;
     let rawDate = new Date().toLocaleDateString("en-CA");
-    if (payment.createdat || payment.date) {
-      const dtStr = payment.createdat || payment.date;
-      const dt = new Date(dtStr);
-      if (!isNaN(dt.getTime())) {
-        timeStr = `${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")}`;
-        // extract 'YYYY-MM-DD' correctly safely
-        rawDate = String(dtStr).substring(0, 10);
+    
+    const rawCreatedAt = payment.created_at || payment.createdat;
+    if (rawCreatedAt && typeof rawCreatedAt === "string") {
+      if (rawCreatedAt.includes("T")) {
+        const parts = rawCreatedAt.split("T");
+        if (parts.length === 2) {
+          const timePart = parts[1];
+          const timeSubparts = timePart.split(":");
+          if (timeSubparts.length >= 2) {
+            const hStr = timeSubparts[0];
+            const mStr = timeSubparts[1];
+            const h = parseInt(hStr, 10);
+            const m = parseInt(mStr, 10);
+            if (!isNaN(h) && !isNaN(m)) {
+              if (rawCreatedAt.endsWith("Z")) {
+                const dt = new Date(rawCreatedAt);
+                timeStr = `${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")}`;
+              } else {
+                timeStr = `${hStr.padStart(2, "0")}:${mStr.padStart(2, "0")}`;
+              }
+            }
+          }
+        }
+      } else {
+        const dt = new Date(rawCreatedAt);
+        if (!isNaN(dt.getTime())) {
+          timeStr = `${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")}`;
+        }
+      }
+      rawDate = rawCreatedAt.substring(0, 10);
+    } else if (payment.date && typeof payment.date === "string") {
+      rawDate = payment.date.substring(0, 10);
+      if (payment.date.includes("T")) {
+        const parts = payment.date.split("T");
+        if (parts.length === 2) {
+          const timePart = parts[1];
+          const timeSubparts = timePart.split(":");
+          if (timeSubparts.length >= 2) {
+            const hStr = timeSubparts[0];
+            const mStr = timeSubparts[1];
+            timeStr = `${hStr.padStart(2, "0")}:${mStr.padStart(2, "0")}`;
+          }
+        }
+      } else if (payment.date.length > 10) {
+        const dt = new Date(payment.date);
+        if (!isNaN(dt.getTime())) {
+          timeStr = `${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")}`;
+        }
       }
     }
 
@@ -478,13 +519,19 @@ export const Income: React.FC = () => {
         const tTime = newPayment.time
           ? `${newPayment.time}:00`
           : currentTimeNow;
-        let dateToSave = new Date(`${baseDateStr}T${tTime}`).toISOString();
+        
+        const parseToLocalIsoString = (baseDate: string, timeStr: string) => {
+          const [yStr, mStr, dStr] = baseDate.split("-");
+          const [hhStr, mmStr, ssStr] = timeStr.split(":");
+          return `${yStr}-${mStr}-${dStr}T${hhStr || "00"}:${mmStr || "00"}:${ssStr || "00"}`;
+        };
+        let dateToSave = parseToLocalIsoString(baseDateStr, tTime);
 
         let query = supabase
           .from("income_records")
           .update({
             amount,
-            date: dateToSave,
+            date: baseDateStr,
             createdat: dateToSave,
             method: newPayment.method,
           })
@@ -505,7 +552,7 @@ export const Income: React.FC = () => {
               ? {
                   ...rec,
                   amount,
-                  date: dateToSave,
+                  date: baseDateStr,
                   createdat: dateToSave,
                   method: newPayment.method,
                 }
@@ -545,7 +592,13 @@ export const Income: React.FC = () => {
         const tTime = newPayment.time
           ? `${newPayment.time}:00`
           : currentTimeNow;
-        let dateToSave = new Date(`${baseDateStr}T${tTime}`).toISOString();
+        
+        const parseToLocalIsoString = (baseDate: string, timeStr: string) => {
+          const [yStr, mStr, dStr] = baseDate.split("-");
+          const [hhStr, mmStr, ssStr] = timeStr.split(":");
+          return `${yStr}-${mStr}-${dStr}T${hhStr || "00"}:${mmStr || "00"}:${ssStr || "00"}`;
+        };
+        let dateToSave = parseToLocalIsoString(baseDateStr, tTime);
 
         const { data: insertedRecords, error: insErr } = await supabase
           .from("income_records")
@@ -554,7 +607,7 @@ export const Income: React.FC = () => {
             projectname: selectedProject?.name,
             clientname: selectedProject?.clientname,
             amount,
-            date: dateToSave,
+            date: baseDateStr,
             createdat: dateToSave,
             method: newPayment.method,
             userid: targetUserId,
@@ -573,7 +626,7 @@ export const Income: React.FC = () => {
                 clientname:
                   selectedProject?.clientname || newPayment.clientName,
                 amount,
-                date: dateToSave,
+                date: baseDateStr,
                 createdat: dateToSave,
                 method: newPayment.method,
                 userid: targetUserId,
@@ -687,8 +740,8 @@ export const Income: React.FC = () => {
           return matchesSearch && matchesMethod && matchesDate;
         })
         .sort((a, b) => {
-          const db = b.createdat || b.date;
-          const da = a.createdat || a.date;
+          const db = b.created_at || b.createdat || b.date;
+          const da = a.created_at || a.createdat || a.date;
           return new Date(db).getTime() - new Date(da).getTime();
         }),
     [incomeRecords, searchTerm, methodFilter, dateRange],
