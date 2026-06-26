@@ -35,18 +35,27 @@ import {
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
-const parseExpenseNotes = (fullNotes: string): { notes: string; wallet: string } => {
+const parseExpenseNotes = (fullNotes: string): { notes: string; wallet: string; dueTxId?: string } => {
   if (!fullNotes) return { notes: '', wallet: 'ক্যাশ' };
-  const match = fullNotes.match(/(.*)\s*\[ওয়ালেট:\s*(.*)\]$/);
+  let currentNotes = fullNotes;
+  let dueTxId: string | undefined;
+  const dueTxMatch = currentNotes.match(/\[due_tx_id:\s*(.*?)\]/);
+  if (dueTxMatch) {
+    dueTxId = dueTxMatch[1].trim();
+    currentNotes = currentNotes.replace(/\[due_tx_id:\s*.*?\]/, "").trim();
+  }
+  const match = currentNotes.match(/(.*)\s*\[ওয়ালেট:\s*(.*)\]$/);
   if (match) {
     return {
       notes: match[1].trim(),
-      wallet: match[2].trim()
+      wallet: match[2].trim(),
+      dueTxId
     };
   }
   return {
-    notes: fullNotes,
-    wallet: 'ক্যাশ'
+    notes: currentNotes,
+    wallet: 'ক্যাশ',
+    dueTxId
   };
 };
 
@@ -557,6 +566,30 @@ export const WalletManager: React.FC = () => {
     }
   };
 
+  const handleSyncBalances = async () => {
+    if (!user || !isDbAvailable) return;
+    setLoading(true);
+    let changed = 0;
+    try {
+      for (const cw of computedWallets) {
+        if (cw.balance !== cw.computedBalance) {
+          await supabase.from('wallets').update({ balance: cw.computedBalance }).eq('id', cw.id).eq('userid', user.id);
+          changed++;
+        }
+      }
+      if (changed > 0) {
+        showToast(`সফলভাবে ${toBanglaDigits(changed)}টি ওয়ালেটের ব্যালেন্স আপডেট হয়েছে!`, 'success');
+        if (refreshData) await refreshData();
+      } else {
+        showToast('সব ওয়ালেটের ব্যালেন্স সঠিক আছে।', 'success');
+      }
+    } catch (e) {
+      console.error(e);
+      showToast('ব্যালেন্স সিঙ্ক করতে সমস্যা হয়েছে', 'error');
+    }
+    setLoading(false);
+  };
+
   // Open Edit Dialog
   const handleOpenEdit = (wallet: Wallet, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -825,65 +858,17 @@ export const WalletManager: React.FC = () => {
     setActiveMenuId(activeMenuId === id ? null : id);
   };
 
-  // Re-sync all wallet balances based on actual transactions
-  const handleSyncBalances = async () => {
-    if (!user) return;
-    if (appLoading) {
-      showToast('উপাত্ত লোড হচ্ছে, দয়া করে অপেক্ষা করুন...', 'info');
-      return;
-    }
-    setSyncing(true);
-    try {
-      // For each wallet, calculate the correct balance based on actual transaction records
-      const updatedWallets = await Promise.all(wallets.map(async (wallet) => {
-        const txs = getWalletTransactions(wallet.name);
-        const correctBalance = txs.reduce((sum, tx) => {
-          return sum + (tx.type === 'income' ? tx.amount : -tx.amount);
-        }, 0);
-        
-        // If the balance is out of sync, update the database record
-        if (wallet.balance !== correctBalance && isDbAvailable) {
-          try {
-            await supabase
-              .from('wallets')
-              .update({ 
-                balance: correctBalance, 
-                lastTransactionDate: new Date().toISOString() 
-              })
-              .eq('id', wallet.id);
-          } catch (dbErr) {
-            console.error(`Failed to update DB balance for wallet ${wallet.name}:`, dbErr);
-          }
-        }
-        
-        return {
-          ...wallet,
-          balance: correctBalance
-        };
-      }));
+  // Computed wallets with real-time balance
+  const computedWallets = wallets.map(wallet => {
+    const txs = getWalletTransactions(wallet.name);
+    const realBalance = txs.reduce((sum, tx) => {
+      return sum + (tx.type === 'income' ? tx.amount : -tx.amount);
+    }, 0);
+    return { ...wallet, computedBalance: realBalance };
+  });
 
-      setWallets(updatedWallets);
-      localStorage.setItem(`manage_me_wallets_${user.id}`, JSON.stringify(updatedWallets));
-      
-      try {
-        await refreshData();
-      } catch (err) {
-        console.warn("Refresh context error ignored: ", err);
-      }
-
-      window.dispatchEvent(new CustomEvent('wallets-updated'));
-      showToast('সব ওয়ালেটের ব্যালেন্স সফলভাবে পুনঃগণনা ও সংশোধন করা হয়েছে!', 'success');
-    } catch (err: any) {
-      console.error("Error syncing balances:", err);
-      showToast('ব্যালেন্স রি-সিঙ্ক করতে সমস্যা হয়েছে: ' + err.message, 'error');
-    } finally {
-      setSyncing(false);
-    }
-  };
-
-  // Calculations
-  const walletCount = wallets.length;
-  const totalBalance = wallets.reduce((sum, w) => sum + w.balance, 0);
+  const walletCount = computedWallets.length;
+  const totalBalance = computedWallets.reduce((sum, w) => sum + w.computedBalance, 0);
 
   // Helper functions for Bengali formatting and fetching detailed transaction list
   const toBanglaNumbers = (num: string | number): string => {
@@ -967,8 +952,47 @@ export const WalletManager: React.FC = () => {
     }
   };
 
-  const getWalletTransactions = (walletName: string) => {
+  function getWalletTransactions(walletName: string) {
     const list: any[] = [];
+    const isBakiWallet = walletName.includes('বাকি');
+    const linkedExpenseIds = new Set<string>();
+
+    if (isBakiWallet && duePersons) {
+      duePersons.forEach((person) => {
+        const balance = person.transactions?.reduce((sum, tx) => {
+          if (tx.expense_id) linkedExpenseIds.add(tx.expense_id);
+          return sum + (tx.type === 'receive' ? tx.amount : -tx.amount);
+        }, 0) || 0;
+
+        if (Math.abs(balance) > 0.01) {
+          let lastDate = new Date();
+          let dateStr = new Date().toISOString().split('T')[0];
+          if (person.transactions && person.transactions.length > 0) {
+             const sorted = [...person.transactions].sort((a,b) => {
+               const timeA = new Date(a.date).getTime();
+               const timeB = new Date(b.date).getTime();
+               return timeB - timeA;
+             });
+             dateStr = sorted[0].date;
+             lastDate = new Date(dateStr);
+          } else if (person.date) {
+             dateStr = person.date;
+             lastDate = new Date(dateStr);
+          }
+          
+          list.push({
+            id: `baki_net_${person.id}`,
+            type: balance > 0 ? 'expense' : 'income', 
+            amount: Math.abs(balance),
+            date: dateStr,
+            createdat: dateStr,
+            title: balance > 0 ? 'দেনা (পাবে)' : 'পাওনা (দিবে)',
+            subtitle: `ব্যক্তি: ${person.name} (অবশিষ্ট)`,
+            rawDate: lastDate,
+          });
+        }
+      });
+    }
 
     // 1. Incomes
     if (incomeRecords) {
@@ -996,10 +1020,22 @@ export const WalletManager: React.FC = () => {
     }
 
     // 2. Expenses
+    const handledDueTxIds = new Set<string>();
+    
     if (expenses) {
       expenses.forEach((e) => {
         const parsed = parseExpenseNotes(e.notes);
         if (parsed.wallet.trim() === walletName.trim()) {
+          if (isBakiWallet) {
+             if (linkedExpenseIds.has(e.id)) return;
+             if (parsed.dueTxId) return;
+             if (e.category === "দেনা পরিশোধ") return;
+          }
+
+          if (parsed.dueTxId) {
+            handledDueTxIds.add(parsed.dueTxId);
+          }
+
           let rawDate = new Date();
           const dateStr = e.createdat || e.created_at || e.date;
           if (dateStr) {
@@ -1022,12 +1058,13 @@ export const WalletManager: React.FC = () => {
     }
 
     // 3. Due transactions
-    if (duePersons) {
+    if (!isBakiWallet && duePersons) {
       duePersons.forEach((person) => {
         if (person.transactions) {
           person.transactions.forEach((tx) => {
             const wName = tx.walletName || 'ক্যাশ';
             if (wName.trim() === walletName.trim()) {
+              if (tx.expense_id || handledDueTxIds.has(tx.id)) return; // Skip because the Expenses block will pick up the associated expense
               let rawDate = new Date();
               const dateStr = tx.createdat || tx.created_at || tx.date;
               if (dateStr) {
@@ -1040,7 +1077,7 @@ export const WalletManager: React.FC = () => {
                 amount: tx.amount,
                 date: tx.date,
                 createdat: tx.createdat || tx.created_at || tx.date,
-                title: tx.description || `${tx.type === 'receive' ? 'টাকা গ্রহণ' : 'টাকা প্রদান'}`,
+                title: tx.description || (tx.type === 'receive' ? 'টাকা গ্রহণ / জমা' : 'টাকা প্রদান / খরচ'),
                 subtitle: `দেনাদার/পাওনাদার: ${person.name}`,
                 rawDate,
               });
@@ -1083,7 +1120,7 @@ export const WalletManager: React.FC = () => {
       .filter((t) => t.type === 'expense')
       .reduce((sum, t) => sum + t.amount, 0);
 
-    const periodBalance = walletPeriod === 'all' ? selectedDetailsWallet.balance : (periodIncome - periodExpense);
+    const periodBalance = (periodIncome - periodExpense);
 
     // Apply client filters (search + type) for the main ledger list
     const filteredTxList = periodTxList.filter((tx) => {
@@ -1507,27 +1544,22 @@ export const WalletManager: React.FC = () => {
       
       {/* 1. Header Card - Total Balance */}
       <div 
-        className="bg-white border border-slate-100 rounded-2xl py-5 px-4 text-center shadow-[0_2px_12px_rgba(30,117,235,0.02)] mb-4 transition-all mx-0.5 no-swipe flex-none"
+        className="bg-white border border-slate-100 rounded-2xl py-5 px-4 text-center shadow-[0_2px_12px_rgba(30,117,235,0.02)] mb-4 transition-all mx-0.5 no-swipe flex-none relative"
         style={{ touchAction: 'none' }}
         {...lockScrollAndSwipeProps}
       >
+        <button
+          onClick={handleSyncBalances}
+          title="ব্যালেন্স রি-সিঙ্ক করুন"
+          className="absolute top-4 right-4 p-1.5 text-slate-300 hover:text-blue-500 hover:bg-blue-50 rounded-md transition-colors"
+        >
+          <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+        </button>
         <span className="text-slate-500 font-medium text-xs tracking-wide">
           মোট ব্যালেন্স • {toBanglaDigits(walletCount)}টি ওয়ালেট
         </span>
-        <div className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight mt-1.5">
+        <div className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight mt-1.5 pb-2">
           ৳ {totalBalance.toLocaleString('en-US')}/-
-        </div>
-        <div className="flex justify-center mt-3">
-          <button
-            type="button"
-            onClick={handleSyncBalances}
-            disabled={syncing || appLoading}
-            className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 text-slate-500 hover:text-slate-700 disabled:opacity-50 font-semibold rounded-lg text-[11px] sm:text-xs transition-all border border-slate-100 cursor-pointer shadow-sm"
-            title="সব ওয়ালেটের ব্যালেন্স আসল লেনদেনের সাথে রি-সিঙ্ক করুন"
-          >
-            <RefreshCw size={11} className={syncing ? "animate-spin" : ""} />
-            ব্যালেন্স রি-সিঙ্ক করুন
-          </button>
         </div>
       </div>
 
@@ -1563,9 +1595,9 @@ export const WalletManager: React.FC = () => {
       ) : (
         <div className="space-y-2.5 px-0.5 no-swipe flex-1 overflow-y-auto pb-24" style={{ touchAction: 'pan-y' }} {...blockSwipeProps}>
           {/* List wallets */}
-          {wallets.map((wallet) => {
-            const hasNegativeBalance = wallet.balance < 0;
-            const hasPositiveBalance = wallet.balance > 0;
+          {computedWallets.map((wallet) => {
+            const hasNegativeBalance = wallet.computedBalance < 0;
+            const hasPositiveBalance = wallet.computedBalance > 0;
             
             return (
               <div 
@@ -1608,7 +1640,7 @@ export const WalletManager: React.FC = () => {
                         ? 'text-emerald-500' 
                         : 'text-slate-800'
                   }`}>
-                    ৳ {to_with_sign_digits(wallet.balance)}
+                    ৳ {to_with_sign_digits(wallet.computedBalance)}
                   </div>
                   
                   {/* Action Dropdown Selector */}

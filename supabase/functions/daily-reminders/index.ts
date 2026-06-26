@@ -31,7 +31,19 @@ serve(async (req) => {
       { auth: { persistSession: false } },
     );
 
-    console.log("Starting Daily Reminders Cron Job...");
+    // Parse request body for bypass options or manual testing
+    let bypassTimeCheck = false;
+    try {
+      const clonedReq = req.clone();
+      const body = await clonedReq.json();
+      if (body && (body.force === true || body.bypassTimeCheck === true || body.name === "Functions")) {
+        bypassTimeCheck = true;
+      }
+    } catch (_) {
+      // No JSON body, ignore
+    }
+
+    console.log(`Starting Daily Reminders Cron Job... (Bypass time checks: ${bypassTimeCheck})`);
 
     // 2. Fetch all profiles that have an fcm_token
     // Use select('*') instead of specific columns to avoid errors if the column was just added
@@ -118,7 +130,7 @@ serve(async (req) => {
       }
 
       // If this is not the user's preferred target hour, skip sending
-      if (!isTargetHour) {
+      if (!isTargetHour && !bypassTimeCheck) {
         console.log(
           `Skipping notification for user ${user.id} - Not a target hour.`,
         );
@@ -138,6 +150,7 @@ serve(async (req) => {
 
       // If notified in the last 2 hours, skip
       if (
+        !bypassTimeCheck &&
         lastNotifiedAt &&
         now.getTime() - lastNotifiedAt.getTime() < 2 * 60 * 60 * 1000
       ) {
@@ -228,7 +241,7 @@ serve(async (req) => {
         weekday: "short",
       }).format(new Date());
 
-      if (currentDayBD === "Fri" && currentHourBD === 9) {
+      if ((currentDayBD === "Fri" && currentHourBD === 9) || bypassTimeCheck) {
         const JUMMA_IMG = "https://qlmdoatgvovggvgzhwoy.supabase.co/storage/v1/object/public/notification-images/JUMMA_MUBARAK_IMG.png";
         notificationsToSend.push({
           title: "জুম্মা মোবারক 🥰",
@@ -301,7 +314,22 @@ serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({ success: true, notificationsSent }), {
+    const debugInfo = {
+      bypassTimeCheck,
+      profilesCount: profiles?.length || 0,
+      currentDayBD: new Intl.DateTimeFormat("en-US", {
+        timeZone: "Asia/Dhaka",
+        weekday: "short",
+      }).format(new Date()),
+      currentHourBD,
+      profilesChecked: (profiles || []).map(p => ({
+        id: p.id,
+        hasFcmToken: !!p.fcm_token,
+        fcmTokensCount: (p.fcm_token || "").split(",").map((t: string) => t.trim()).filter(Boolean).length
+      }))
+    };
+
+    return new Response(JSON.stringify({ success: true, notificationsSent, debug: debugInfo }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
