@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
+import { motion, AnimatePresence } from 'motion/react';
 import { useAppContext } from '@/context/AppContext';
 import { EXPENSE_CATEGORY_LABELS } from '../constants';
 import { supabase } from '@/lib/supabase';
 import { Wallet } from '@/types';
 import { AppLogo } from './AppLogo';
+import { ConfirmModal } from './ConfirmModal';
 import { 
   Wallet as WalletIcon, 
   Plus, 
@@ -47,6 +49,44 @@ const parseExpenseNotes = (fullNotes: string): { notes: string; wallet: string }
     wallet: 'ক্যাশ'
   };
 };
+
+const dropdownVariants = {
+  hidden: {
+    scaleY: 0,
+    opacity: 0,
+    transition: {
+      type: "tween" as const,
+      ease: "easeInOut" as const,
+      duration: 0.18,
+    },
+  },
+  visible: {
+    scaleY: 1,
+    opacity: 1,
+    transition: {
+      type: "spring" as const,
+      duration: 0.32,
+      bounce: 0.1,
+      staggerChildren: 0.05,
+      delayChildren: 0.04,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: {
+    opacity: 0,
+    y: -8,
+    scaleY: 0.8,
+  },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scaleY: 1,
+    transition: { type: "spring" as const, stiffness: 400, damping: 26 },
+  },
+};
+
 
 export const WalletManager: React.FC = () => {
   const navigate = useNavigate();
@@ -158,6 +198,11 @@ export const WalletManager: React.FC = () => {
   });
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
+  
+  // Wallet deletion confirmation states
+  const [deleteWalletId, setDeleteWalletId] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false);
+  const [isDeletingWallet, setIsDeletingWallet] = useState<boolean>(false);
 
   // Default wallets: on fresh account, only 'ক্যাশ' is created as default with 0 balance
   const getDefaultWallets = (userId: string): Wallet[] => {
@@ -195,6 +240,17 @@ export const WalletManager: React.FC = () => {
     return converted;
   };
 
+  const isIdLikeWalletName = (name: string): boolean => {
+    if (!name) return false;
+    const trimmed = name.trim();
+    // UUID regex
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (uuidRegex.test(trimmed)) return true;
+    if (trimmed.startsWith('wallet-')) return true;
+    if (/^wallet-\d+/.test(trimmed)) return true;
+    return false;
+  };
+
   // Fetch wallets
   const fetchWallets = async (background = false) => {
     if (!user) return;
@@ -220,14 +276,14 @@ export const WalletManager: React.FC = () => {
           `wallet-tahaj-${user.id}`
         ];
         const dummyNames = ['রাশিদুল ইসলাম', 'বিকাশ', 'নগদ', 'তাহাজ উদ্দিন'];
-        const hasDummies = data.some(w => dummyIds.includes(w.id) || dummyNames.includes(w.name));
+        const hasDummies = data.some(w => dummyIds.includes(w.id) || dummyNames.includes(w.name) || isIdLikeWalletName(w.name));
         const hasLegacyCashBalance = data.some(w => w.name === 'ক্যাশ' && w.balance === 9005);
 
         let processedData = data;
 
         if (hasDummies || hasLegacyCashBalance) {
           // Keep other wallets, and ensure 'ক্যাশ' exists with 0 balance
-          processedData = data.filter(w => !dummyIds.includes(w.id) && !dummyNames.includes(w.name));
+          processedData = data.filter(w => !dummyIds.includes(w.id) && !dummyNames.includes(w.name) && !isIdLikeWalletName(w.name));
           
           const cashWallet = processedData.find(w => w.name === 'ক্যাশ' || w.id === `wallet-cash-${user.id}`);
           if (!cashWallet) {
@@ -248,7 +304,7 @@ export const WalletManager: React.FC = () => {
           // Trigger background clean up
           try {
             const deleteIds = data
-              .filter(w => dummyIds.includes(w.id) || dummyNames.includes(w.name))
+              .filter(w => dummyIds.includes(w.id) || dummyNames.includes(w.name) || isIdLikeWalletName(w.name))
               .map(w => w.id);
             if (deleteIds.length > 0) {
               await supabase.from('wallets').delete().in('id', deleteIds);
@@ -403,7 +459,7 @@ export const WalletManager: React.FC = () => {
   };
 
   // Delete a wallet
-  const handleDelete = async (walletId: string, e: React.MouseEvent) => {
+  const handleDelete = (walletId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!user) return;
     
@@ -416,25 +472,89 @@ export const WalletManager: React.FC = () => {
       return;
     }
 
-    if (!window.confirm(`আপনি কি সত্যিই "${targetWallet.name}" ওয়ালেটটি মুছে ফেলতে চান?`)) {
-      setActiveMenuId(null);
-      return;
-    }
+    setDeleteWalletId(walletId);
+    setShowDeleteConfirm(true);
+    setActiveMenuId(null);
+  };
 
-    const updated = wallets.filter(w => w.id !== walletId);
+  const handleConfirmDelete = async () => {
+    if (!user || !deleteWalletId) return;
     
-    // Remove from DB if possible
+    const targetWallet = wallets.find(w => w.id === deleteWalletId);
+    if (!targetWallet) return;
+
+    setIsDeletingWallet(true);
+    const trashedName = `[TRASH]${targetWallet.name}`;
+    const updated = wallets.filter(w => w.id !== deleteWalletId);
+    
+    // Remove from active list in DB by renaming with [TRASH] prefix
     if (isDbAvailable) {
       try {
-        await supabase.from('wallets').delete().eq('id', walletId);
+        const { error: walletErr } = await supabase
+          .from('wallets')
+          .update({ name: trashedName })
+          .eq('id', deleteWalletId);
+        
+        if (walletErr) {
+          console.error("Supabase trash error:", walletErr);
+          showToast(`ওয়ালেট ডিলিট করা সম্ভব হয়নি: ${walletErr.message}`, 'error');
+          setIsDeletingWallet(false);
+          setShowDeleteConfirm(false);
+          setDeleteWalletId(null);
+          return;
+        }
+
+        // Send associated expenses to Recycle Bin by prepending [TRASH] to their notes
+        try {
+          const { data: expData, error: expFetchErr } = await supabase
+            .from('expenses')
+            .select('*')
+            .eq('userid', user.id);
+          
+          if (!expFetchErr && expData) {
+            const targetExpenses = expData.filter((exp: any) => {
+              if (!exp.notes) return false;
+              if (exp.notes.startsWith('[TRASH]')) return false;
+              return exp.notes.includes(`[ওয়ালেট: ${targetWallet.name}]`);
+            });
+
+            for (const exp of targetExpenses) {
+              const trashedNotes = `[TRASH]${exp.notes}`;
+              await supabase
+                .from('expenses')
+                .update({ notes: trashedNotes })
+                .eq('id', exp.id);
+            }
+          }
+        } catch (err) {
+          console.error("Error trashing wallet expenses:", err);
+        }
+
+        // Delete income records associated with this wallet
+        try {
+          await supabase
+            .from('income_records')
+            .delete()
+            .eq('userid', user.id)
+            .eq('method', targetWallet.name);
+        } catch (err) {
+          console.error("Error deleting wallet income records:", err);
+        }
+
       } catch (err) {
-        console.warn("DB delete failed, deleted state saved locally");
+        console.warn("DB trash failed, state saved locally");
       }
     }
 
     await saveWalletsState(updated);
-    showToast('ওয়ালেট সফলভাবে মুছে ফেলা হয়েছে।', 'success');
-    setActiveMenuId(null);
+    showToast('ওয়ালেট এবং এর সমস্ত ট্রানজেকশন রিসাইকেল বিনে পাঠানো হয়েছে।', 'success');
+    setIsDeletingWallet(false);
+    setShowDeleteConfirm(false);
+    setDeleteWalletId(null);
+    window.dispatchEvent(new CustomEvent('wallets-updated'));
+    if (refreshData) {
+      await refreshData();
+    }
   };
 
   // Open Edit Dialog
@@ -1496,51 +1616,66 @@ export const WalletManager: React.FC = () => {
                     <button
                       type="button"
                       onClick={(e) => toggleMenu(wallet.id, e)}
-                      className="p-1 px-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all"
+                      className={`p-1 px-1.5 rounded-lg transition-colors ${activeMenuId === wallet.id ? "bg-slate-100/60 text-slate-800" : "text-slate-300 hover:text-slate-600"}`}
                     >
                       <MoreVertical size={16} />
                     </button>
                     
-                    {activeMenuId === wallet.id && (
-                      <div 
-                        onClick={(e) => e.stopPropagation()}
-                        className="absolute right-0 top-7 bg-white border border-slate-100/90 rounded-xl shadow-md w-[150px] py-1 z-50 text-slate-700 font-medium text-xs animate-in fade-in slide-in-from-top-1 duration-150"
-                      >
-                        <button
-                          type="button"
-                          onClick={(e) => handleOpenAddMoney(wallet, e)}
-                          className="flex items-center gap-1.5 w-full text-left py-1.5 px-2.5 hover:bg-[#ecfdf5] text-emerald-600 transition-all font-semibold border-b border-slate-50"
+                    <AnimatePresence>
+                      {activeMenuId === wallet.id && (
+                        <motion.div 
+                          variants={dropdownVariants}
+                          initial="hidden"
+                          animate="visible"
+                          exit="hidden"
+                          onClick={(e) => e.stopPropagation()}
+                          className="absolute right-0 top-full mt-2 w-36 bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-150/80 z-50 flex flex-col py-1.5 origin-top"
                         >
-                          <Plus size={12} /> টাকা যুক্ত করুন
-                        </button>
+                          {!wallet.isDefault && (
+                            <motion.button
+                              variants={itemVariants}
+                              type="button"
+                              onClick={(e) => handleSetDefault(wallet.id, e)}
+                              className="w-full px-4 py-2.5 text-left text-sm font-medium flex items-center gap-3 hover:bg-slate-50 text-blue-600 transition-colors bg-transparent relative z-10"
+                              style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
+                            >
+                              <Check size={16} className="text-blue-600 stroke-[2.2]" />
+                              <span>ডিফল্ট করুন</span>
+                            </motion.button>
+                          )}
+                          
+                          <motion.button
+                            variants={itemVariants}
+                            type="button"
+                            onClick={(e) => handleOpenEdit(wallet, e)}
+                            className="w-full px-4 py-2.5 text-left text-sm font-medium flex items-center gap-3 hover:bg-slate-50 text-slate-800 transition-colors bg-transparent relative z-10"
+                            style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
+                          >
+                            <Edit2 size={15} className="text-slate-700 stroke-[1.8]" />
+                            <span>সম্পাদনা</span>
+                          </motion.button>
 
-                        {!wallet.isDefault && (
-                          <button
-                            type="button"
-                            onClick={(e) => handleSetDefault(wallet.id, e)}
-                            className="flex items-center gap-1.5 w-full text-left py-1.5 px-2.5 hover:bg-slate-50 text-blue-600 transition-all font-semibold"
-                          >
-                            <Check size={12} /> ডিফল্ট করুন
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={(e) => handleOpenEdit(wallet, e)}
-                          className="flex items-center gap-1.5 w-full text-left py-1.5 px-2.5 hover:bg-slate-50 transition-all"
-                        >
-                          <Edit2 size={11} /> সম্পাদনা করুন
-                        </button>
-                        {!wallet.isDefault && (
-                          <button
-                            type="button"
-                            onClick={(e) => handleDelete(wallet.id, e)}
-                            className="flex items-center gap-1.5 w-full text-left py-1.5 px-2.5 hover:bg-red-50 text-red-600 transition-all font-semibold border-t border-slate-50 mt-1"
-                          >
-                            <Trash2 size={11} /> মুছে ফেলুন
-                          </button>
-                        )}
-                      </div>
-                    )}
+                          {!wallet.isDefault && (
+                            <>
+                              <motion.div
+                                variants={itemVariants}
+                                className="h-[1px] bg-slate-100/70 w-[88%] mx-auto my-1"
+                              />
+                              <motion.button
+                                variants={itemVariants}
+                                type="button"
+                                onClick={(e) => handleDelete(wallet.id, e)}
+                                className="w-full px-4 py-2.5 text-left text-sm font-medium flex items-center gap-3 hover:bg-rose-50/50 text-rose-500 transition-colors bg-transparent relative z-10"
+                                style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
+                              >
+                                <Trash2 size={15} className="text-rose-500 stroke-[1.8]" />
+                                <span>মুছে ফেলুন</span>
+                              </motion.button>
+                            </>
+                          )}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 </div>
               </div>
@@ -1724,6 +1859,21 @@ export const WalletManager: React.FC = () => {
         </div>,
         document.body
       )}
+
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false);
+          setDeleteWalletId(null);
+        }}
+        onConfirm={handleConfirmDelete}
+        title="ওয়ালেট ডিলিট"
+        message={`আপনি কি সত্যিই "${wallets.find(w => w.id === deleteWalletId)?.name || ''}" ওয়ালেটটি রিসাইকেল বিনে পাঠাতে চান?`}
+        isProcessing={isDeletingWallet}
+        confirmText="ডিলিট"
+        cancelText="বাতিল"
+        type="danger"
+      />
 
     </div>
   );

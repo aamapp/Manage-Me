@@ -185,18 +185,27 @@ const CustomReceiptIcon = ({
 
 export const parseExpenseNotes = (
   fullNotes: string,
-): { notes: string; wallet: string } => {
+): { notes: string; wallet: string; dueTxId?: string } => {
   if (!fullNotes) return { notes: "", wallet: "ক্যাশ" };
-  const match = fullNotes.match(/(.*)\s*\[ওয়ালেট:\s*(.*)\]$/);
+  let currentNotes = fullNotes;
+  let dueTxId: string | undefined;
+  const dueTxMatch = currentNotes.match(/\[due_tx_id:\s*(.*?)\]/);
+  if (dueTxMatch) {
+    dueTxId = dueTxMatch[1].trim();
+    currentNotes = currentNotes.replace(/\[due_tx_id:\s*.*?\]/, "").trim();
+  }
+  const match = currentNotes.match(/(.*)\s*\[ওয়ালেট:\s*(.*)\]$/);
   if (match) {
     return {
       notes: match[1].trim(),
       wallet: match[2].trim(),
+      dueTxId,
     };
   }
   return {
-    notes: fullNotes,
+    notes: currentNotes,
     wallet: "ক্যাশ",
+    dueTxId,
   };
 };
 
@@ -224,6 +233,8 @@ export const Expenses: React.FC = () => {
     incomeRecords,
     setIncomeRecords,
     projects,
+    duePersons,
+    setDuePersons,
   } = useAppContext();
   const location = useLocation();
   const navigate = useNavigate();
@@ -862,25 +873,139 @@ export const Expenses: React.FC = () => {
     method: "বিকাশ",
   });
 
+  const [isQuickAddingPerson, setIsQuickAddingPerson] = useState(false);
+
+  const createDueTxForExpense = async (
+    expenseId: string,
+    amount: number,
+    category: string,
+    notes: string,
+    dateStr: string,
+    timeStr: string,
+  ) => {
+    if (!user) return;
+    try {
+      let targetPersonId = newExpense.duePersonId;
+      
+      if (newExpense.wallet === "বাকি (দেনা-পাওনা)" && !targetPersonId && newExpense.quickPersonName?.trim()) {
+        const newPersonId = crypto.randomUUID();
+        const newPerson = {
+          id: newPersonId,
+          name: newExpense.quickPersonName.trim(),
+          phone: "",
+          address: "বাকি ক্রেতা",
+          date: dateStr,
+          transactions: [],
+          userid: user.id,
+        };
+        const { error: pError } = await supabase.from("due_persons").insert([newPerson]);
+        if (pError) throw pError;
+        
+        setDuePersons((prev: any[]) => [newPerson, ...prev]);
+        targetPersonId = newPersonId;
+      }
+      
+      if (!targetPersonId) return;
+      
+      const person = duePersons.find((p) => p.id === targetPersonId);
+      if (!person) return;
+      
+      const newTx = {
+        id: crypto.randomUUID(),
+        type: "receive" as const,
+        amount: amount,
+        description: `বাকি কেনা (${category}): ${notes}`,
+        date: dateStr,
+        time: timeStr.substring(0, 5),
+        walletName: "বাকি",
+        expense_id: expenseId,
+      };
+      
+      const updatedTransactions = [newTx, ...person.transactions];
+      
+      const { error } = await supabase
+        .from("due_persons")
+        .update({ transactions: updatedTransactions })
+        .eq("id", targetPersonId)
+        .eq("userid", user.id);
+        
+      if (error) throw error;
+      
+      setDuePersons((prev: any[]) =>
+        prev.map((p) => (p.id === targetPersonId ? { ...p, transactions: updatedTransactions } : p))
+      );
+    } catch (err) {
+      console.error("Error creating due transaction for expense:", err);
+    }
+  };
+
+  const removeDueTxForExpense = async (expenseId: string, dueTxId?: string) => {
+    if (!user) return;
+    try {
+      const personWithTx = duePersons.find((p) =>
+        p.transactions.some((tx: any) => tx.expense_id === expenseId || (dueTxId && tx.id === dueTxId))
+      );
+      if (!personWithTx) return;
+      
+      const updatedTransactions = personWithTx.transactions.filter(
+        (tx: any) => tx.expense_id !== expenseId && !(dueTxId && tx.id === dueTxId)
+      );
+      
+      const { error } = await supabase
+        .from("due_persons")
+        .update({ transactions: updatedTransactions })
+        .eq("id", personWithTx.id)
+        .eq("userid", user.id);
+        
+      if (error) throw error;
+      
+      setDuePersons((prev: any[]) =>
+        prev.map((p) => (p.id === personWithTx.id ? { ...p, transactions: updatedTransactions } : p))
+      );
+    } catch (err) {
+      console.error("Error removing due transaction for expense:", err);
+    }
+  };
+
   const [formErrors, setFormErrors] = useState<any>({});
 
   const [wallets, setWallets] = useState<any[]>([]);
   const [isExpenseWalletOpen, setIsExpenseWalletOpen] = useState(false);
+  const [isDuePersonDropdownOpen, setIsDuePersonDropdownOpen] = useState(false);
+  const [duePersonSearchQuery, setDuePersonSearchQuery] = useState("");
   const [isIncomeWalletOpen, setIsIncomeWalletOpen] = useState(false);
+
+  const isIdLikeWalletName = (name: string): boolean => {
+    if (!name) return false;
+    const trimmed = name.trim();
+    if (trimmed.startsWith("[TRASH]")) return true;
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (uuidRegex.test(trimmed)) return true;
+    if (trimmed.startsWith("wallet-")) return true;
+    if (/^wallet-\d+/.test(trimmed)) return true;
+    return false;
+  };
 
   const fetchWallets = async () => {
     if (!user) return;
     try {
       const cached = localStorage.getItem(`manage_me_wallets_${user.id}`);
       if (cached) {
-        setWallets(JSON.parse(cached));
+        try {
+          const parsed = JSON.parse(cached);
+          const filteredCached = parsed.filter((w: any) => !isIdLikeWalletName(w.name));
+          setWallets(filteredCached);
+        } catch (e) {
+          console.warn("Error parsing cached wallets:", e);
+        }
       }
       const { data, error } = await supabase
         .from("wallets")
         .select("*")
         .eq("userid", user.id);
       if (!error && data) {
-        const sortedData = [...data].sort((a, b) => {
+        const cleanData = data.filter((w: any) => !isIdLikeWalletName(w.name));
+        const sortedData = [...cleanData].sort((a, b) => {
           if (a.isDefault && !b.isDefault) return -1;
           if (!a.isDefault && b.isDefault) return 1;
           return (
@@ -1387,6 +1512,18 @@ export const Expenses: React.FC = () => {
         errors.amount = "সঠিক পরিমাণ দিন (০ থেকে বেশি)";
       }
 
+      if (newExpense.wallet === "বাকি (দেনা-পাওনা)") {
+        if (isQuickAddingPerson) {
+          if (!newExpense.quickPersonName || !newExpense.quickPersonName.trim()) {
+            errors.duePerson = "ব্যক্তি বা দোকানের নাম লিখুন";
+          }
+        } else {
+          if (!newExpense.duePersonId) {
+            errors.duePerson = "দয়া করে ব্যক্তি বা দোকান সিলেক্ট করুন";
+          }
+        }
+      }
+
       /* 
       if (!newExpense.category || !newExpense.category.trim()) {
         errors.category = 'ক্যাটাগরি দেওয়া আবশ্যক';
@@ -1468,7 +1605,14 @@ export const Expenses: React.FC = () => {
           const oldExp = expenses.find((e) => e.id === activeExpenseId);
           if (oldExp) {
             const oldParsed = parseExpenseNotes(oldExp.notes);
-            await adjustWalletBalance(oldParsed.wallet, oldExp.amount);
+            if (oldParsed.wallet !== "বাকি (দেনা-পাওনা)") {
+              await adjustWalletBalance(oldParsed.wallet, oldExp.amount);
+              if (oldParsed.dueTxId || oldExp.category === "দেনা পরিশোধ") {
+                await removeDueTxForExpense(oldExp.id, oldParsed.dueTxId);
+              }
+            } else {
+              await removeDueTxForExpense(oldExp.id);
+            }
           }
 
           let query = supabase
@@ -1488,12 +1632,25 @@ export const Expenses: React.FC = () => {
           const { error } = await query;
           if (error) throw error;
 
-          // Apply new balance deduction
-          await adjustWalletBalance(selectedWallet, -parsedAmount);
+          // Apply new balance deduction/creation
+          if (selectedWallet !== "বাকি (দেনা-পাওনা)") {
+            await adjustWalletBalance(selectedWallet, -parsedAmount);
+          } else {
+            await createDueTxForExpense(
+              activeExpenseId,
+              parsedAmount,
+              newExpense.category || "অন্যান্য",
+              notesText,
+              baseDateStr,
+              tTime,
+            );
+          }
 
           showToast("খরচ আপডেট হয়েছে", "success");
         } else {
+          const generatedExpenseId = crypto.randomUUID();
           const { error } = await supabase.from("expenses").insert({
+            id: generatedExpenseId,
             category: newExpense.category || "অন্যান্য",
             amount: parsedAmount,
             date: baseDateStr,
@@ -1503,8 +1660,19 @@ export const Expenses: React.FC = () => {
           });
           if (error) throw error;
 
-          // Apply balance deduction
-          await adjustWalletBalance(selectedWallet, -parsedAmount);
+          // Apply balance deduction/creation
+          if (selectedWallet !== "বাকি (দেনা-পাওনা)") {
+            await adjustWalletBalance(selectedWallet, -parsedAmount);
+          } else {
+            await createDueTxForExpense(
+              generatedExpenseId,
+              parsedAmount,
+              newExpense.category || "অন্যান্য",
+              notesText,
+              baseDateStr,
+              tTime,
+            );
+          }
 
           showToast("খরচ সফলভাবে সেভ হয়েছে", "success");
         }
@@ -1620,7 +1788,14 @@ export const Expenses: React.FC = () => {
           if (error) throw error;
 
           const parsed = parseExpenseNotes(expenseObj.notes);
-          await adjustWalletBalance(parsed.wallet, txToDelete.amount);
+          if (parsed.wallet !== "বাকি (দেনা-পাওনা)") {
+            await adjustWalletBalance(parsed.wallet, txToDelete.amount);
+            if (parsed.dueTxId || expenseObj.category === "দেনা পরিশোধ") {
+              await removeDueTxForExpense(txToDelete.id, parsed.dueTxId);
+            }
+          } else {
+            await removeDueTxForExpense(txToDelete.id);
+          }
         }
         setExpenses((prev: any[]) =>
           prev.filter((e) => e.id !== txToDelete.id),
@@ -3462,9 +3637,9 @@ export const Expenses: React.FC = () => {
                       </label>
                       {(() => {
                         const selectedWalletName = newExpense.wallet || "ক্যাশ";
-                        const selectedWallet = wallets.find(
-                          (w) => w.name === selectedWalletName,
-                        ) || { name: selectedWalletName, balance: 0 };
+                        const selectedWallet = (selectedWalletName === "বাকি (দেনা-পাওনা)")
+                          ? { name: "বাকি (দেনা-পাওনা)", balance: undefined }
+                          : (wallets.find((w) => w.name === selectedWalletName) || { name: selectedWalletName, balance: 0 });
                         return (
                           <div className="relative">
                             <button
@@ -3482,11 +3657,15 @@ export const Expenses: React.FC = () => {
                                 <span className="font-medium text-slate-700 text-sm sm:text-base mr-3">
                                   {selectedWallet.name}
                                 </span>
-                                <span className="font-bold text-emerald-600 text-sm sm:text-base">
-                                  {selectedWallet.balance !== undefined
-                                    ? selectedWallet.balance.toFixed(1)
-                                    : "0.0"}
-                                </span>
+                                {selectedWallet.balance !== undefined ? (
+                                  <span className="font-bold text-emerald-600 text-sm sm:text-base">
+                                    {selectedWallet.balance.toFixed(1)}
+                                  </span>
+                                ) : (
+                                  <span className="font-bold text-rose-500 text-xs sm:text-sm bg-rose-50 px-2.5 py-0.5 rounded-full">
+                                    দেনা হবে
+                                  </span>
+                                )}
                               </div>
                               <ChevronDown
                                 size={18}
@@ -3500,82 +3679,338 @@ export const Expenses: React.FC = () => {
                                   className="fixed inset-0 z-40"
                                   onClick={() => setIsExpenseWalletOpen(false)}
                                 />
-                                <div className="absolute z-50 left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl max-h-60 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-150 py-1">
-                                  {wallets.length === 0 ? (
+                                <div className="absolute z-50 left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl max-h-[75vh] sm:max-h-[480px] overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-150 py-1">
+                                  {[...wallets, { id: "wallet-due-special", name: "বাকি (দেনা-পাওনা)" }].map((wallet) => (
                                     <div
+                                      key={wallet.id}
                                       onClick={() => {
                                         setNewExpense({
                                           ...newExpense,
-                                          wallet: "ক্যাশ",
+                                          wallet: wallet.name,
+                                          duePersonId: wallet.name === "বাকি (দেনা-পাওনা)" ? (newExpense.duePersonId || "") : undefined,
                                         });
                                         setIsExpenseWalletOpen(false);
+                                        if (wallet.name !== "বাকি (দেনা-পাওনা)") {
+                                          setIsQuickAddingPerson(false);
+                                        }
                                       }}
-                                      className="px-4 py-3 flex items-center justify-between hover:bg-slate-50 active:bg-slate-100/60 cursor-pointer border-b last:border-b-0 border-slate-100 transition-colors"
+                                      className={`px-4 py-3 flex items-center justify-between hover:bg-slate-50 active:bg-slate-100/60 cursor-pointer border-b last:border-b-0 border-slate-100 transition-colors ${
+                                        selectedWalletName === wallet.name
+                                          ? "bg-slate-50/70 border-l-4 border-l-rose-500 pl-3"
+                                          : ""
+                                      }`}
                                     >
                                       <div className="flex items-center">
                                         <Wallet
                                           size={16}
-                                          className="text-slate-400 mr-2.5"
+                                          className={`mr-2.5 ${selectedWalletName === wallet.name ? "text-rose-500" : "text-slate-400"}`}
                                         />
-                                        <span className="font-medium text-slate-700 text-sm">
-                                          ক্যাশ
+                                        <span
+                                          className={`font-medium text-sm ${selectedWalletName === wallet.name ? "text-rose-600" : "text-slate-700"}`}
+                                        >
+                                          {wallet.name}
                                         </span>
                                       </div>
-                                      <span className="font-bold text-emerald-600 text-sm">
-                                        0.0
-                                      </span>
-                                    </div>
-                                  ) : (
-                                    wallets.map((wallet) => (
-                                      <div
-                                        key={wallet.id}
-                                        onClick={() => {
-                                          setNewExpense({
-                                            ...newExpense,
-                                            wallet: wallet.name,
-                                          });
-                                          setIsExpenseWalletOpen(false);
-                                        }}
-                                        className={`px-4 py-3 flex items-center justify-between hover:bg-slate-50 active:bg-slate-100/60 cursor-pointer border-b last:border-b-0 border-slate-100 transition-colors ${
-                                          selectedWalletName === wallet.name
-                                            ? "bg-slate-50/70 border-l-4 border-l-rose-500 pl-3"
-                                            : ""
-                                        }`}
-                                      >
-                                        <div className="flex items-center">
-                                          <Wallet
-                                            size={16}
-                                            className={`mr-2.5 ${selectedWalletName === wallet.name ? "text-rose-500" : "text-slate-400"}`}
-                                          />
-                                          <span
-                                            className={`font-medium text-sm ${selectedWalletName === wallet.name ? "text-rose-600" : "text-slate-700"}`}
-                                          >
-                                            {wallet.name}
-                                          </span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
+                                      <div className="flex items-center gap-2">
+                                        {wallet.balance !== undefined ? (
                                           <span className="font-bold text-emerald-600 text-sm">
-                                            {wallet.balance !== undefined
-                                              ? wallet.balance.toFixed(1)
-                                              : "0.0"}
+                                            {wallet.balance.toFixed(1)}
                                           </span>
-                                          {selectedWalletName ===
-                                            wallet.name && (
-                                            <Check
-                                              size={14}
-                                              className="text-rose-500 shrink-0"
-                                            />
-                                          )}
-                                        </div>
+                                        ) : (
+                                          <span className="font-bold text-rose-500 text-xs bg-rose-50 px-2 py-0.5 rounded-full">
+                                            বাকি কেনা
+                                          </span>
+                                        )}
+                                        {selectedWalletName ===
+                                          wallet.name && (
+                                          <Check
+                                            size={14}
+                                            className="text-rose-500 shrink-0"
+                                          />
+                                        )}
                                       </div>
-                                    ))
-                                  )}
+                                    </div>
+                                  ))}
                                 </div>
                               </>
                             )}
                           </div>
                         );
                       })()}
+
+                      {/* Due Person selection if "বাকি (দেনা-পাওনা)" is selected */}
+                      {newExpense.wallet === "বাকি (দেনা-পাওনা)" && (
+                        <div className="space-y-2 mt-3 animate-in fade-in slide-in-from-top-1 duration-150">
+                          <label className="text-[11px] font-bold text-rose-500 uppercase block">
+                            বাকি বিক্রেতা/ব্যক্তি নির্বাচন করুন
+                          </label>
+                          <div className="relative">
+                            {(() => {
+                              const selectedPerson = duePersons.find((p: any) => p.id === newExpense.duePersonId);
+                              
+                              // Calculate net balance for a person
+                              const getPersonNetBalance = (person: any) => {
+                                if (!person || !person.transactions) return 0;
+                                return person.transactions.reduce((acc: number, curr: any) => {
+                                  return curr.type === "give" ? acc + curr.amount : acc - curr.amount;
+                                }, 0);
+                              };
+
+                              // Filtered list based on search query
+                              const filteredDuePersons = duePersons.filter((p: any) => {
+                                if (!duePersonSearchQuery.trim()) return true;
+                                const q = duePersonSearchQuery.toLowerCase();
+                                return (
+                                  p.name.toLowerCase().includes(q) || 
+                                  (p.phone && p.phone.toLowerCase().includes(q))
+                                );
+                              });
+
+                              return (
+                                <div className="relative">
+                                  {/* Custom trigger button */}
+                                  <button
+                                    type="button"
+                                    onClick={() => setIsDuePersonDropdownOpen(!isDuePersonDropdownOpen)}
+                                    className="w-full flex items-center justify-between px-4 py-3 bg-white border border-slate-200 hover:border-slate-300 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 rounded-2xl transition-all text-left shadow-xs cursor-pointer group"
+                                  >
+                                    <div className="flex items-center gap-3 overflow-hidden">
+                                      {selectedPerson ? (
+                                        <>
+                                          <div className="w-8 h-8 rounded-full overflow-hidden bg-slate-100 flex items-center justify-center shrink-0 border border-slate-200/50 shadow-sm">
+                                            {selectedPerson.avatar ? (
+                                              <img
+                                                src={selectedPerson.avatar}
+                                                alt="Profile"
+                                                className="w-full h-full object-cover"
+                                              />
+                                            ) : (
+                                              <AppLogo variant="navy-striped" size="100%" />
+                                            )}
+                                          </div>
+                                          <div className="flex flex-col truncate">
+                                            <span className="font-medium text-slate-800 text-sm truncate">
+                                              {selectedPerson.name}
+                                            </span>
+                                            {selectedPerson.phone && (
+                                              <span className="text-[11px] text-slate-400 font-medium font-mono">
+                                                {selectedPerson.phone}
+                                              </span>
+                                            )}
+                                          </div>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 shrink-0">
+                                            <UserIcon size={16} />
+                                          </div>
+                                          <span className="font-medium text-slate-500 text-sm">
+                                            -- ব্যক্তি/দোকান সিলেক্ট করুন --
+                                          </span>
+                                        </>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      {selectedPerson && (() => {
+                                        const bal = getPersonNetBalance(selectedPerson);
+                                        if (bal < 0) {
+                                          return (
+                                            <span className="font-bold text-rose-600 text-xs bg-rose-50 px-2 py-0.5 rounded-full">
+                                              দেনা: ৳{Math.abs(bal).toLocaleString('bn-BD')}
+                                            </span>
+                                          );
+                                        } else if (bal > 0) {
+                                          return (
+                                            <span className="font-bold text-emerald-600 text-xs bg-emerald-50 px-2 py-0.5 rounded-full">
+                                              পাওনা: ৳{bal.toLocaleString('bn-BD')}
+                                            </span>
+                                          );
+                                        } else {
+                                          return (
+                                            <span className="font-bold text-slate-500 text-[10px] bg-slate-100 px-2 py-0.5 rounded-full">
+                                              পরিশোধিত
+                                            </span>
+                                          );
+                                        }
+                                      })()}
+                                      <ChevronDown
+                                        size={18}
+                                        className={`text-slate-400 transition-transform duration-200 ${isDuePersonDropdownOpen ? "rotate-180 text-rose-500" : ""}`}
+                                      />
+                                    </div>
+                                  </button>
+
+                                  {/* Custom dropdown body */}
+                                  {isDuePersonDropdownOpen && (
+                                    <>
+                                      {/* Backdrop to close dropdown */}
+                                      <div
+                                        className="fixed inset-0 z-40"
+                                        onClick={() => {
+                                          setIsDuePersonDropdownOpen(false);
+                                          setDuePersonSearchQuery("");
+                                        }}
+                                      />
+                                      {/* Dropdown container */}
+                                      <div className="absolute z-50 left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl max-h-[300px] overflow-hidden flex flex-col animate-in fade-in slide-in-from-top-2 duration-150">
+                                        
+                                        {/* Search Bar inside dropdown */}
+                                        <div className="p-2 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2 sticky top-0 z-10">
+                                          <Search size={16} className="text-slate-400 ml-2" />
+                                          <input
+                                            type="text"
+                                            value={duePersonSearchQuery}
+                                            onChange={(e) => setDuePersonSearchQuery(e.target.value)}
+                                            placeholder="নাম বা মোবাইল দিয়ে খুঁজুন..."
+                                            className="w-full bg-transparent py-1.5 text-xs font-bold text-slate-700 outline-none placeholder:text-slate-400 placeholder:font-normal"
+                                            onClick={(e) => e.stopPropagation()}
+                                          />
+                                          {duePersonSearchQuery && (
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setDuePersonSearchQuery("");
+                                              }}
+                                              className="p-1 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-200/50 transition-colors"
+                                            >
+                                              <X size={12} />
+                                            </button>
+                                          )}
+                                        </div>
+
+                                        {/* Dropdown Items List */}
+                                        <div className="overflow-y-auto flex-1 divide-y divide-slate-50 max-h-[200px]">
+                                          {filteredDuePersons.length === 0 ? (
+                                            <div className="p-4 text-center text-xs text-slate-400 font-medium">
+                                              কোনো ব্যক্তি পাওয়া যায়নি
+                                            </div>
+                                          ) : (
+                                            filteredDuePersons.map((p: any) => {
+                                              const bal = getPersonNetBalance(p);
+                                              const isSelected = p.id === newExpense.duePersonId;
+                                              return (
+                                                <div
+                                                  key={p.id}
+                                                  onClick={() => {
+                                                    setIsQuickAddingPerson(false);
+                                                    setNewExpense({
+                                                      ...newExpense,
+                                                      duePersonId: p.id,
+                                                      quickPersonName: "",
+                                                    });
+                                                    setIsDuePersonDropdownOpen(false);
+                                                    setDuePersonSearchQuery("");
+                                                    if (formErrors.duePerson) {
+                                                      setFormErrors({ ...formErrors, duePerson: null });
+                                                    }
+                                                  }}
+                                                  className={`px-4 py-3 flex items-center justify-between hover:bg-slate-50/80 active:bg-slate-100/50 cursor-pointer transition-colors ${
+                                                    isSelected ? "bg-rose-50/40 border-l-4 border-l-rose-500 pl-3" : ""
+                                                  }`}
+                                                >
+                                                  <div className="flex items-center gap-3 overflow-hidden">
+                                                    <div className="w-8 h-8 rounded-full overflow-hidden bg-slate-100 flex items-center justify-center shrink-0 border border-slate-200/50 shadow-sm">
+                                                      {p.avatar ? (
+                                                        <img
+                                                          src={p.avatar}
+                                                          alt="Profile"
+                                                          className="w-full h-full object-cover"
+                                                        />
+                                                      ) : (
+                                                        <AppLogo variant="navy-striped" size="100%" />
+                                                      )}
+                                                    </div>
+                                                    <div className="flex flex-col truncate">
+                                                      <span className={`text-sm font-medium truncate ${
+                                                        isSelected ? "text-rose-600" : "text-slate-700"
+                                                      }`}>
+                                                        {p.name}
+                                                      </span>
+                                                      {p.phone && (
+                                                        <span className="text-[10px] text-slate-400 font-mono">
+                                                          {p.phone}
+                                                        </span>
+                                                      )}
+                                                    </div>
+                                                  </div>
+                                                  <div className="flex items-center gap-2 shrink-0">
+                                                    {bal < 0 ? (
+                                                      <span className="font-bold text-[11px] text-rose-500 bg-rose-50 px-2 py-0.5 rounded-full">
+                                                        দেনা: ৳{Math.abs(bal).toLocaleString('bn-BD')}
+                                                      </span>
+                                                    ) : bal > 0 ? (
+                                                      <span className="font-bold text-[11px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                                                        পাওনা: ৳{bal.toLocaleString('bn-BD')}
+                                                      </span>
+                                                    ) : (
+                                                      <span className="font-bold text-[10px] text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full">
+                                                        পরিশোধিত
+                                                      </span>
+                                                    )}
+                                                    {isSelected && <Check size={14} className="text-rose-500" />}
+                                                  </div>
+                                                </div>
+                                              );
+                                            })
+                                          )}
+                                        </div>
+
+                                        {/* Action: Add new person quickly */}
+                                        <div
+                                          onClick={() => {
+                                            setIsQuickAddingPerson(true);
+                                            setNewExpense({
+                                              ...newExpense,
+                                              duePersonId: "",
+                                            });
+                                            setIsDuePersonDropdownOpen(false);
+                                            setDuePersonSearchQuery("");
+                                            if (formErrors.duePerson) {
+                                              setFormErrors({ ...formErrors, duePerson: null });
+                                            }
+                                          }}
+                                          className="p-3 bg-rose-50/50 hover:bg-rose-50 text-rose-500 font-bold text-xs text-center border-t border-rose-100 flex items-center justify-center gap-1.5 cursor-pointer select-none transition-colors"
+                                        >
+                                          <Plus size={14} />
+                                          নতুন ব্যক্তি যুক্ত করুন
+                                        </div>
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              );
+                            })()}
+                          </div>
+
+                          {isQuickAddingPerson && (
+                            <div className="mt-2 animate-in slide-in-from-top-2 duration-150">
+                              <input
+                                type="text"
+                                placeholder="ব্যক্তি বা দোকানের নাম লিখুন"
+                                value={newExpense.quickPersonName || ""}
+                                onChange={(e) => {
+                                  setNewExpense({
+                                    ...newExpense,
+                                    quickPersonName: e.target.value,
+                                  });
+                                  if (formErrors.duePerson) {
+                                    setFormErrors({ ...formErrors, duePerson: null });
+                                  }
+                                }}
+                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 rounded-2xl font-bold text-slate-800 outline-none text-[14px]"
+                              />
+                            </div>
+                          )}
+
+                          {formErrors.duePerson && (
+                            <p className="text-xs font-semibold text-rose-500 mt-1.5 flex items-center gap-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                              <AlertCircle size={14} className="shrink-0" />{" "}
+                              {formErrors.duePerson}
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     <div className="relative pt-1.5">
@@ -3739,7 +4174,7 @@ export const Expenses: React.FC = () => {
                                   className="fixed inset-0 z-40"
                                   onClick={() => setIsIncomeWalletOpen(false)}
                                 />
-                                <div className="absolute z-50 left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl max-h-60 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-150 py-1">
+                                <div className="absolute z-50 left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl max-h-[75vh] sm:max-h-[480px] overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-150 py-1">
                                   {wallets.length === 0
                                     ? [
                                         "বিকাশ",
@@ -3967,7 +4402,7 @@ const DuesManager: React.FC<DuesManagerProps> = ({
   setPdfPreviewUrl,
   setPdfPublicUrl,
 }) => {
-  const { user, duePersons, setDuePersons, showToast, isOnline } =
+  const { user, duePersons, setDuePersons, showToast, isOnline, setExpenses, refreshData } =
     useAppContext();
   const persons = duePersons;
   const location = useLocation();
@@ -4365,6 +4800,23 @@ const DuesManager: React.FC<DuesManagerProps> = ({
         if (impact !== 0) {
           await adjustWalletBalance(wallet, impact);
         }
+
+        // Delete associated expense if this is a give (repayment) transaction
+        if (txToDelete.expense_id) {
+          await supabase.from("expenses").delete().eq("id", txToDelete.expense_id);
+          setExpenses((prev: any[]) => prev.filter((e) => e.id !== txToDelete.expense_id));
+        } else if (txToDelete.type === "give") {
+          const { data: expToDel } = await supabase
+            .from("expenses")
+            .select("id")
+            .ilike("notes", `%[due_tx_id:${txToDeleteId}]%`);
+            
+          if (expToDel && expToDel.length > 0) {
+            const expIds = expToDel.map((e) => e.id);
+            await supabase.from("expenses").delete().in("id", expIds);
+            setExpenses((prev: any[]) => prev.filter((e) => !expIds.includes(e.id)));
+          }
+        }
       }
 
       setDuePersons((prev) =>
@@ -4405,6 +4857,8 @@ const DuesManager: React.FC<DuesManagerProps> = ({
 
       if (isEditingTx && editingTxId) {
         const oldTx = person.transactions.find((t) => t.id === editingTxId);
+        let linkedExpenseId = oldTx?.expense_id;
+
         if (oldTx) {
           // Revert old transaction
           const oldWallet = oldTx.walletName || "ক্যাশ";
@@ -4420,6 +4874,70 @@ const DuesManager: React.FC<DuesManagerProps> = ({
           walletAdjustments.push({ wallet: txWalletName, amount: newImpact });
         }
 
+        if (transactionType === "give") {
+          const finalNotesColumn = `দেনা পরিশোধ: ${person.name} ${txDescription ? `- ${txDescription}` : ""} [ওয়ালেট: ${txWalletName}] [due_tx_id:${editingTxId}]`;
+          
+          if (linkedExpenseId) {
+            await supabase
+              .from("expenses")
+              .update({
+                amount: numTxAmount,
+                date: txDate,
+                createdat: `${txDate}T${txTime}:00`,
+                notes: finalNotesColumn,
+              })
+              .eq("id", linkedExpenseId);
+          } else {
+            // Try to find by search
+            const { data: expToUpd } = await supabase
+              .from("expenses")
+              .select("id")
+              .ilike("notes", `%[due_tx_id:${editingTxId}]%`);
+              
+            if (expToUpd && expToUpd.length > 0) {
+              linkedExpenseId = expToUpd[0].id;
+              await supabase
+                .from("expenses")
+                .update({
+                  amount: numTxAmount,
+                  date: txDate,
+                  createdat: `${txDate}T${txTime}:00`,
+                  notes: finalNotesColumn,
+                })
+                .eq("id", linkedExpenseId);
+            } else {
+              // If not found, create a new one!
+              linkedExpenseId = crypto.randomUUID();
+              await supabase.from("expenses").insert({
+                id: linkedExpenseId,
+                category: "দেনা পরিশোধ",
+                amount: numTxAmount,
+                date: txDate,
+                createdat: `${txDate}T${txTime}:00`,
+                notes: finalNotesColumn,
+                userid: user.id,
+              });
+            }
+          }
+        } else {
+          // Changed to "receive" (borrowed/bought on dues), so delete the repayment expense!
+          if (linkedExpenseId) {
+            await supabase.from("expenses").delete().eq("id", linkedExpenseId);
+            setExpenses((prev: any[]) => prev.filter((e) => e.id !== linkedExpenseId));
+          } else {
+            const { data: expToDel } = await supabase
+              .from("expenses")
+              .select("id")
+              .ilike("notes", `%[due_tx_id:${editingTxId}]%`);
+              
+            if (expToDel && expToDel.length > 0) {
+              const expIds = expToDel.map((e) => e.id);
+              await supabase.from("expenses").delete().in("id", expIds);
+              setExpenses((prev: any[]) => prev.filter((e) => !expIds.includes(e.id)));
+            }
+          }
+        }
+
         updatedTransactions = person.transactions.map((t) =>
           t.id === editingTxId
             ? {
@@ -4430,18 +4948,38 @@ const DuesManager: React.FC<DuesManagerProps> = ({
                 date: txDate,
                 time: txTime,
                 walletName: txWalletName,
+                expense_id: linkedExpenseId || undefined,
               }
             : t,
         );
       } else {
+        const newTxId = crypto.randomUUID();
+        let linkedExpenseId: string | undefined = undefined;
+
+        if (transactionType === "give") {
+          linkedExpenseId = crypto.randomUUID();
+          const finalNotesColumn = `দেনা পরিশোধ: ${person.name} ${txDescription ? `- ${txDescription}` : ""} [ওয়ালেট: ${txWalletName}] [due_tx_id:${newTxId}]`;
+          
+          await supabase.from("expenses").insert({
+            id: linkedExpenseId,
+            category: "দেনা পরিশোধ",
+            amount: numTxAmount,
+            date: txDate,
+            createdat: `${txDate}T${txTime}:00`,
+            notes: finalNotesColumn,
+            userid: user.id,
+          });
+        }
+
         const newTx: DueTransaction = {
-          id: crypto.randomUUID(),
+          id: newTxId,
           type: transactionType,
           amount: numTxAmount,
           description: txDescription,
           date: txDate,
           time: txTime,
           walletName: txWalletName,
+          expense_id: linkedExpenseId || undefined,
         };
         updatedTransactions = [newTx, ...person.transactions];
 
@@ -4472,6 +5010,8 @@ const DuesManager: React.FC<DuesManagerProps> = ({
           return p;
         }),
       );
+
+      await refreshData();
 
       resetTransactionForm();
       setAddTransactionModalOpen(false);
@@ -5358,7 +5898,7 @@ const DuesManager: React.FC<DuesManagerProps> = ({
               }}
               className={`p-2.5 rounded-xl flex items-center gap-3 border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.01)] cursor-pointer transition-all relative ${bgClass}`}
             >
-              <div className="w-11 h-11 rounded-full overflow-hidden shrink-0 flex items-center justify-center bg-indigo-100">
+              <div className="w-11 h-11 rounded-full overflow-hidden shrink-0 flex items-center justify-center bg-slate-100 border border-slate-200/40 shadow-sm">
                 {person.avatar ? (
                   <img
                     src={person.avatar}

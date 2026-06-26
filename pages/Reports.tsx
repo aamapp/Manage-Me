@@ -339,6 +339,17 @@ export const Reports: React.FC = () => {
 
   const [wallets, setWallets] = useState<any[]>([]);
 
+  const isIdLikeWalletName = (name: string): boolean => {
+    if (!name) return false;
+    const trimmed = name.trim();
+    if (trimmed.startsWith("[TRASH]")) return true;
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (uuidRegex.test(trimmed)) return true;
+    if (trimmed.startsWith("wallet-")) return true;
+    if (/^wallet-\d+/.test(trimmed)) return true;
+    return false;
+  };
+
   useEffect(() => {
     if (!user) return;
     
@@ -352,23 +363,29 @@ export const Reports: React.FC = () => {
         if (error) throw error;
         
         if (data && data.length > 0) {
-          const sorted = [...data].sort((a, b) => {
+          const cleanData = data.filter((w: any) => !isIdLikeWalletName(w.name));
+          const sorted = [...cleanData].sort((a, b) => {
             if (a.isDefault && !b.isDefault) return -1;
             if (!a.isDefault && b.isDefault) return 1;
             return new Date(b.createdAt || b.created_at || 0).getTime() - new Date(a.createdAt || a.created_at || 0).getTime();
           });
           setWallets(sorted);
           
-          if (!walletName) {
+          if (!walletName && sorted.length > 0) {
             setWalletName(sorted[0].name);
           }
         } else {
           const cached = localStorage.getItem(`manage_me_wallets_${user.id}`);
           if (cached) {
-            const parsed = JSON.parse(cached);
-            setWallets(parsed);
-            if (!walletName && parsed.length > 0) {
-              setWalletName(parsed[0].name);
+            try {
+              const parsed = JSON.parse(cached);
+              const cleanParsed = parsed.filter((w: any) => !isIdLikeWalletName(w.name));
+              setWallets(cleanParsed);
+              if (!walletName && cleanParsed.length > 0) {
+                setWalletName(cleanParsed[0].name);
+              }
+            } catch (e) {
+              console.warn("Error parsing cached wallets in Reports:", e);
             }
           } else {
             const defaults = [
@@ -390,10 +407,15 @@ export const Reports: React.FC = () => {
       } catch (err) {
         const cached = localStorage.getItem(`manage_me_wallets_${user.id}`);
         if (cached) {
-          const parsed = JSON.parse(cached);
-          setWallets(parsed);
-          if (!walletName && parsed.length > 0) {
-            setWalletName(parsed[0].name);
+          try {
+            const parsed = JSON.parse(cached);
+            const cleanParsed = parsed.filter((w: any) => !isIdLikeWalletName(w.name));
+            setWallets(cleanParsed);
+            if (!walletName && cleanParsed.length > 0) {
+              setWalletName(cleanParsed[0].name);
+            }
+          } catch (e) {
+            console.warn("Error parsing cached wallets in Reports (catch):", e);
           }
         } else {
           const defaults = [

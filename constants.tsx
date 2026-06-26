@@ -45,5 +45,6 @@ export const EXPENSE_CATEGORY_LABELS: Record<string, string> = {
   'Studio Rent': 'স্টুডিও ভাড়া',
   'Gear': 'গিয়ার খরচ',
   'Plugin': 'প্লাগইন',
-  'Others': 'অন্যান্য'
+  'Others': 'অন্যান্য',
+  'দেনা পরিশোধ': 'দেনা পরিশোধ'
 };

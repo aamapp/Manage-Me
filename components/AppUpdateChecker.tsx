@@ -199,12 +199,15 @@ export const AppUpdateChecker: React.FC = () => {
 
       if (data) {
         const update = data as AppUpdate;
+        // চেক করা যে কোনো এন্ড্রয়েড ইন্টারফেস উপলব্ধ আছে কিনা (WebView context)
+        const isAndroidApp = !!(window.Android || window.AndroidInterface);
         // যদি ডাটাবেজের version_code আমাদের বর্তমান ইনস্টলড version_code এর চেয়ে বড় হয়
         if (update.version_code > localVersion) {
           setUpdateInfo(update);
-          // সেশন অনুযায়ী ডিসমিস করা হয়েছে কিনা চেক (Force update হলে ডিসমিস করা যাবে না)
+          // সেশন অনুযায়ী ডিসমিস করা হয়েছে কিনা চেক (Force update হলে ডিসমিস করা যাবে না, তবে শুধুমাত্র এন্ড্রয়েড অ্যাপে)
           const sessionDismissed = sessionStorage.getItem(`update_dismissed_${update.version_code}`);
-          if (!sessionDismissed || update.is_force_update) {
+          const isForce = update.is_force_update && isAndroidApp;
+          if (!sessionDismissed || isForce) {
             setShowModal(true);
           }
         }
@@ -348,7 +351,8 @@ export const AppUpdateChecker: React.FC = () => {
   };
 
   const handleClose = () => {
-    if (updateInfo?.is_force_update) return; // ফোর্সড আপডেট হলে ক্লোজ করা যাবে না
+    const isAndroidApp = !!(window.Android || window.AndroidInterface);
+    if (updateInfo?.is_force_update && isAndroidApp) return; // ফোর্সড আপডেট হলে ক্লোজ করা যাবে না (শুধু অ্যান্ড্রয়েড অ্যাপে)
     if (isDownloading) return; // ডাউনলোড চলাকালীন ক্লোজ করা যাবে না
     setShowModal(false);
     setIsDismissed(true);
@@ -371,8 +375,8 @@ export const AppUpdateChecker: React.FC = () => {
           transition={{ type: 'spring', duration: 0.4 }}
           className="relative w-full max-w-[350px] md:max-w-md overflow-hidden bg-white border border-slate-100 rounded-3xl shadow-2xl p-8"
         >
-          {/* Close button (Only show if not a force update and not currently downloading) */}
-          {!updateInfo.is_force_update && !isDownloading && (
+          {/* Close button (Only show if not a force update or not in Android App, and not currently downloading) */}
+          {(!updateInfo.is_force_update || !(window.Android || window.AndroidInterface)) && !isDownloading && (
             <button
               onClick={handleClose}
               className="absolute top-5 right-5 p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-50 transition"

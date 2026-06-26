@@ -20,11 +20,12 @@ import { supabase } from '@/lib/supabase';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { motion, AnimatePresence } from 'motion/react';
 
-type TrashTab = 'projects' | 'clients' | 'expenses' | 'ghazal_notes' | 'shopping_lists' | 'due_persons';
+type TrashTab = 'projects' | 'clients' | 'expenses' | 'ghazal_notes' | 'shopping_lists' | 'due_persons' | 'wallets';
 
 const Trash: React.FC = () => {
   const navigate = useNavigate();
   const { 
+    user,
     trashedProjects, 
     trashedExpenses, 
     trashedGhazalNotes, 
@@ -40,6 +41,28 @@ const Trash: React.FC = () => {
   const [selectedItem, setSelectedItem] = useState<{ id: string; type: TrashTab } | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [confirmAction, setConfirmAction] = useState<'restore' | 'delete'>('restore');
+  const [trashedWallets, setTrashedWallets] = useState<any[]>([]);
+
+  const fetchTrashedWallets = async () => {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase
+        .from('wallets')
+        .select('*')
+        .eq('userid', user.id);
+      if (error) throw error;
+      if (data) {
+        const filtered = data.filter((w: any) => w.name && w.name.startsWith('[TRASH]'));
+        setTrashedWallets(filtered);
+      }
+    } catch (err) {
+      console.error("Error fetching trashed wallets:", err);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchTrashedWallets();
+  }, [user]);
 
   const handleRestore = async () => {
     if (!selectedItem) return;
@@ -72,6 +95,37 @@ const Trash: React.FC = () => {
         table = 'due_persons';
         const person = trashedDuePersons.find(d => d.id === selectedItem.id);
         updateData = { name: person?.name?.replace('[TRASH]', '').trim() || '' };
+      } else if (selectedItem.type === 'wallets') {
+        table = 'wallets';
+        const wallet = trashedWallets.find(w => w.id === selectedItem.id);
+        const originalName = wallet?.name?.replace('[TRASH]', '').trim() || '';
+        updateData = { name: originalName };
+
+        // Also restore associated expenses
+        try {
+          const { data: expData } = await supabase
+            .from('expenses')
+            .select('*')
+            .eq('userid', user.id);
+          
+          if (expData) {
+            const targetExpenses = expData.filter((e: any) => {
+              if (!e.notes) return false;
+              if (!e.notes.startsWith('[TRASH]')) return false;
+              return e.notes.includes(`[ওয়ালেট: ${originalName}]`);
+            });
+
+            for (const exp of targetExpenses) {
+              const cleanNotes = exp.notes.replace('[TRASH]', '').trim();
+              await supabase
+                .from('expenses')
+                .update({ notes: cleanNotes })
+                .eq('id', exp.id);
+            }
+          }
+        } catch (err) {
+          console.error("Error restoring wallet expenses:", err);
+        }
       }
 
       const { error } = await supabase
@@ -81,6 +135,11 @@ const Trash: React.FC = () => {
 
       if (error) throw error;
       showToast('সফলভাবে রিস্টোর করা হয়েছে', 'success');
+      
+      if (selectedItem.type === 'wallets') {
+        fetchTrashedWallets();
+        window.dispatchEvent(new CustomEvent('wallets-updated'));
+      }
       await refreshData();
     } catch (error: any) {
       showToast(error.message, 'error');
@@ -99,7 +158,47 @@ const Trash: React.FC = () => {
                     selectedItem.type === 'expenses' ? 'expenses' : 
                     selectedItem.type === 'clients' ? 'clients' : 
                     selectedItem.type === 'ghazal_notes' ? 'ghazal_notes' :
-                    selectedItem.type === 'shopping_lists' ? 'shopping_lists' : 'due_persons';
+                    selectedItem.type === 'shopping_lists' ? 'shopping_lists' : 
+                    selectedItem.type === 'wallets' ? 'wallets' : 'due_persons';
+
+      // Special cleanup if permanently deleting a wallet
+      if (selectedItem.type === 'wallets') {
+        const wallet = trashedWallets.find(w => w.id === selectedItem.id);
+        if (wallet && user) {
+          const originalName = wallet.name.replace('[TRASH]', '').trim();
+          
+          // Delete all associated expenses from DB (even if trashed)
+          try {
+            const { data: expData } = await supabase
+              .from('expenses')
+              .select('id, notes')
+              .eq('userid', user.id);
+            
+            if (expData) {
+              const expIdsToDelete = expData
+                .filter((e: any) => e.notes && e.notes.includes(`[ওয়ালেট: ${originalName}]`))
+                .map((e: any) => e.id);
+              
+              if (expIdsToDelete.length > 0) {
+                await supabase.from('expenses').delete().in('id', expIdsToDelete);
+              }
+            }
+          } catch (e) {
+            console.error("Error deleting wallet expenses permanently:", e);
+          }
+
+          // Delete all associated income records
+          try {
+            await supabase
+              .from('income_records')
+              .delete()
+              .eq('userid', user.id)
+              .eq('method', originalName);
+          } catch (e) {
+            console.error("Error deleting wallet incomes permanently:", e);
+          }
+        }
+      }
 
       const { error } = await supabase
         .from(table)
@@ -118,6 +217,11 @@ const Trash: React.FC = () => {
       }
 
       showToast('স্থায়ীভাবে মুছে ফেলা হয়েছে', 'success');
+      
+      if (selectedItem.type === 'wallets') {
+        fetchTrashedWallets();
+        window.dispatchEvent(new CustomEvent('wallets-updated'));
+      }
       await refreshData();
     } catch (error: any) {
       showToast(error.message, 'error');
@@ -481,6 +585,59 @@ const Trash: React.FC = () => {
     </div>
   );
 
+  const renderWallets = () => (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {trashedWallets.length === 0 ? (
+        <div className="col-span-full text-center py-12 bg-white rounded-2xl border border-dashed border-slate-200">
+          <Coins className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+          <p className="text-slate-500 font-medium">কোন ডিলিট করা ওয়ালেট নেই</p>
+        </div>
+      ) : (
+        trashedWallets.map((wallet) => {
+          const originalName = wallet.name.replace('[TRASH]', '').trim();
+          return (
+            <div key={wallet.id} className="bg-white p-5 rounded-2xl border border-slate-150 shadow-sm transition-all flex flex-col justify-between">
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                    <Coins className="w-4 h-4" />
+                  </div>
+                  <h3 className="font-bold text-slate-800 text-lg line-clamp-1">{originalName}</h3>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-sm text-slate-600 mb-4">
+                  <div className="flex items-center gap-1.5">
+                    <Coins className="w-4 h-4 text-slate-400 shrink-0" /> <span>ব্যালেন্স: ৳{wallet.balance}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Calendar className="w-4 h-4 text-slate-400 shrink-0" /> <span>তৈরি: {new Date(wallet.createdAt || wallet.created_at || Date.now()).toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 mt-2 pt-4 border-t border-slate-100 font-sans">
+                <button
+                  onClick={() => openConfirm(wallet.id, 'wallets', 'restore')}
+                  disabled={!isOnline}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold tracking-wide uppercase transition-colors duration-200 cursor-pointer ${!isOnline ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-blue-600 bg-blue-50 hover:bg-blue-100'}`}
+                  title="Restore"
+                >
+                  <RotateCcw className="w-4 h-4" /> রিস্টোর
+                </button>
+                <button
+                  onClick={() => openConfirm(wallet.id, 'wallets', 'delete')}
+                  disabled={!isOnline}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold tracking-wide uppercase transition-colors duration-200 cursor-pointer ${!isOnline ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-red-600 bg-red-50 hover:bg-red-100'}`}
+                  title="Permanent Delete"
+                >
+                  <Trash2 className="w-4 h-4" /> ডিলিট
+                </button>
+              </div>
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+
   return (
     <div className="px-4 sm:px-6 lg:px-8 pb-24 pt-0 min-h-screen bg-slate-50/50 font-sans">
       {/* Header Content */}
@@ -690,6 +847,33 @@ const Trash: React.FC = () => {
               )}
             </button>
 
+            {/* Tab 7: Wallets */}
+            <button
+              onClick={() => setActiveTab('wallets')}
+              title="ডিলিট করা ওয়ালেট সমূহ"
+              className="flex flex-col items-center justify-center h-full w-[44px] cursor-pointer group focus:outline-none relative"
+            >
+              <div
+                className={`w-[28px] h-[28px] rounded-[8px] flex items-center justify-center transition-all border relative ${
+                  activeTab === 'wallets'
+                    ? "border-[#1a73e8] text-white bg-[#1a73e8] shadow-xs"
+                    : "border-[#cdd5de] text-[#8e9aa8] hover:border-slate-300 hover:text-slate-600 bg-white"
+                }`}
+              >
+                <Coins size={14} strokeWidth={2.4} />
+                {trashedWallets.length > 0 && (
+                  <span className={`absolute -top-1.5 -right-1.5 min-w-[15px] h-3.5 px-0.5 rounded-full text-[8.5px] font-sans font-bold flex items-center justify-center border ${
+                    activeTab === 'wallets' ? 'bg-white text-[#1a73e8] border-[#1a73e8]' : 'bg-[#eff6ff] text-[#1a73e8] border-[#dbeafe]'
+                  }`}>
+                    {trashedWallets.length}
+                  </span>
+                )}
+              </div>
+              {activeTab === 'wallets' && (
+                <div className="absolute bottom-0 h-[3px] w-7 bg-[#1a73e8] rounded-t-[3px]" />
+              )}
+            </button>
+
           </div>
         </div>
 
@@ -710,6 +894,7 @@ const Trash: React.FC = () => {
             {activeTab === 'ghazal_notes' && renderGhazalNotes()}
             {activeTab === 'shopping_lists' && renderShoppingLists()}
             {activeTab === 'due_persons' && renderDuePersons()}
+            {activeTab === 'wallets' && renderWallets()}
           </motion.div>
         </AnimatePresence>
 

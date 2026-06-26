@@ -112,6 +112,7 @@ export interface DueTransaction {
   walletName?: string;
   createdat?: string;
   created_at?: string;
+  expense_id?: string;
 }
 
 export interface DuePerson {
