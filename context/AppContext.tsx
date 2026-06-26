@@ -305,6 +305,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       }
     });
 
+    // 3. Jumma Mubarak (Friday) Notification
+    const today = new Date();
+    const currentDayBD = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Dhaka", weekday: "short" }).format(today);
+    if (currentDayBD === "Fri") {
+      const jummaDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Dhaka" }).format(today);
+      const jummaId = `jumma-${jummaDate}`;
+      if (!dismissedNotifications.includes(jummaId)) {
+        const jummaTime = new Date();
+        jummaTime.setHours(9, 0, 0, 0); // show at 9 AM approximately
+        notifs.push({
+          id: jummaId,
+          title: "জুম্মা মোবারক 🥰",
+          body: "আজ শুক্রবার ছুটির দিন। সপ্তাহের শেষ দিনটা একটু নিজের জন্যও রাখো না?...",
+          icon: "gift",
+          is_read: readNotifications.includes(jummaId),
+          createdat: jummaTime.toISOString(),
+          userid: user.id,
+          actionUrl: "/notifications/jumma",
+        });
+      }
+    }
+
     // Add local notifications that are not dismissed
     localNotifications.forEach((localNotif) => {
       if (!dismissedNotifications.includes(localNotif.id)) {

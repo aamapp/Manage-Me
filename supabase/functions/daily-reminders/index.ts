@@ -222,6 +222,22 @@ serve(async (req) => {
         });
       }
 
+      // --- Check 4: Jumma Mubarak (Friday)
+      const currentDayBD = new Intl.DateTimeFormat("en-US", {
+        timeZone: "Asia/Dhaka",
+        weekday: "short",
+      }).format(new Date());
+
+      if (currentDayBD === "Fri" && currentHourBD === 9) {
+        const JUMMA_IMG = "https://qlmdoatgvovggvgzhwoy.supabase.co/storage/v1/object/public/notification-images/JUMMA_MUBARAK_IMG.png";
+        notificationsToSend.push({
+          title: "জুম্মা মোবারক 🥰",
+          body: "আজ শুক্রবার ছুটির দিন। সপ্তাহের শেষ দিনটা একটু নিজের জন্যও রাখো না?...",
+          imageUrl: JUMMA_IMG,
+          actionUrl: "/notifications/jumma",
+        });
+      }
+
       // 5. Send separate notifications
       let notificationsSentForThisUser = 0;
       for (const token of fcmTokens) {
@@ -239,6 +255,7 @@ serve(async (req) => {
                 channel_id: "fcm_default_channel",
                 image: notif.imageUrl || "",
                 tts_text: notif.body,
+                action_url: notif.actionUrl || "",
               },
             },
           };

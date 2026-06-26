@@ -887,29 +887,6 @@ export const Expenses: React.FC = () => {
     try {
       let targetPersonId = newExpense.duePersonId;
       
-      if (newExpense.wallet === "বাকি (দেনা-পাওনা)" && !targetPersonId && newExpense.quickPersonName?.trim()) {
-        const newPersonId = crypto.randomUUID();
-        const newPerson = {
-          id: newPersonId,
-          name: newExpense.quickPersonName.trim(),
-          phone: "",
-          address: "বাকি ক্রেতা",
-          date: dateStr,
-          transactions: [],
-          userid: user.id,
-        };
-        const { error: pError } = await supabase.from("due_persons").insert([newPerson]);
-        if (pError) throw pError;
-        
-        setDuePersons((prev: any[]) => [newPerson, ...prev]);
-        targetPersonId = newPersonId;
-      }
-      
-      if (!targetPersonId) return;
-      
-      const person = duePersons.find((p) => p.id === targetPersonId);
-      if (!person) return;
-      
       const newTx = {
         id: crypto.randomUUID(),
         type: "receive" as const,
@@ -920,6 +897,29 @@ export const Expenses: React.FC = () => {
         walletName: "বাকি",
         expense_id: expenseId,
       };
+
+      if (newExpense.wallet === "বাকি (দেনা-পাওনা)" && !targetPersonId && newExpense.quickPersonName?.trim()) {
+        const newPersonId = crypto.randomUUID();
+        const newPerson = {
+          id: newPersonId,
+          name: newExpense.quickPersonName.trim(),
+          phone: "",
+          address: "বাকি ক্রেতা",
+          date: dateStr,
+          transactions: [newTx],
+          userid: user.id,
+        };
+        const { error: pError } = await supabase.from("due_persons").insert([newPerson]);
+        if (pError) throw pError;
+        
+        setDuePersons((prev: any[]) => [newPerson, ...prev]);
+        return;
+      }
+      
+      if (!targetPersonId) return;
+      
+      const person = duePersons.find((p) => p.id === targetPersonId);
+      if (!person) return;
       
       const updatedTransactions = [newTx, ...person.transactions];
       
@@ -3852,7 +3852,7 @@ export const Expenses: React.FC = () => {
                                         }}
                                       />
                                       {/* Dropdown container */}
-                                      <div className="absolute z-50 left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl max-h-[300px] overflow-hidden flex flex-col animate-in fade-in slide-in-from-top-2 duration-150">
+                                      <div className="absolute z-50 left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl max-h-[500px] overflow-hidden flex flex-col animate-in fade-in slide-in-from-top-2 duration-150">
                                         
                                         {/* Search Bar inside dropdown */}
                                         <div className="p-2 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2 sticky top-0 z-10">
@@ -3880,7 +3880,7 @@ export const Expenses: React.FC = () => {
                                         </div>
 
                                         {/* Dropdown Items List */}
-                                        <div className="overflow-y-auto flex-1 divide-y divide-slate-50 max-h-[200px]">
+                                        <div className="overflow-y-auto flex-1 divide-y divide-slate-50 max-h-[440px]">
                                           {filteredDuePersons.length === 0 ? (
                                             <div className="p-4 text-center text-xs text-slate-400 font-medium">
                                               কোনো ব্যক্তি পাওয়া যায়নি
@@ -4710,17 +4710,83 @@ const DuesManager: React.FC<DuesManagerProps> = ({
 
     setIsDeletingPerson(true);
     try {
-      const { error } = await supabase
-        .from("due_persons")
-        .delete()
-        .eq("id", personToDeleteId)
-        .eq("userid", user.id);
+      const person = persons.find((p) => p.id === personToDeleteId);
+      const expenseIdsToTrash: string[] = [];
 
-      if (error) throw error;
+      if (person) {
+        // Find associated expenses to soft-delete
+        if (person.transactions && person.transactions.length > 0) {
+          const dueTxIds: string[] = [];
 
-      setDuePersons((prev) => prev.filter((p) => p.id !== personToDeleteId));
-      showToast("মুছে ফেলা হয়েছে", "success");
+          person.transactions.forEach((tx: any) => {
+            if (tx.expense_id) {
+              expenseIdsToTrash.push(tx.expense_id);
+            }
+            if (tx.id) {
+              dueTxIds.push(tx.id);
+            }
+          });
+
+          // Search for any other expenses that reference these transaction IDs in notes
+          for (const txId of dueTxIds) {
+            const { data: expToDel } = await supabase
+              .from("expenses")
+              .select("id")
+              .ilike("notes", `%[due_tx_id:${txId}]%`);
+
+            if (expToDel && expToDel.length > 0) {
+              expToDel.forEach((e) => {
+                if (!expenseIdsToTrash.includes(e.id)) {
+                  expenseIdsToTrash.push(e.id);
+                }
+              });
+            }
+          }
+
+          // Soft-delete (trash) all gathered expenses by prepending [TRASH] to notes
+          if (expenseIdsToTrash.length > 0) {
+            const { data: expensesToTrash } = await supabase
+              .from("expenses")
+              .select("id, notes")
+              .in("id", expenseIdsToTrash);
+
+            if (expensesToTrash) {
+              for (const exp of expensesToTrash) {
+                if (exp.notes && !exp.notes.startsWith("[TRASH]")) {
+                  const trashedNotes = `[TRASH] ${exp.notes}`.trim();
+                  await supabase
+                    .from("expenses")
+                    .update({ notes: trashedNotes })
+                    .eq("id", exp.id);
+                }
+              }
+            }
+          }
+        }
+
+        // Soft-delete (trash) the person by prepending [TRASH] to their name
+        const trashedName = `[TRASH]${person.name}`;
+        const { error } = await supabase
+          .from("due_persons")
+          .update({ name: trashedName })
+          .eq("id", personToDeleteId)
+          .eq("userid", user.id);
+
+        if (error) throw error;
+
+        if (expenseIdsToTrash.length > 0) {
+          setExpenses((prev: any[]) => prev.filter((e) => !expenseIdsToTrash.includes(e.id)));
+        }
+        setDuePersons((prev) => prev.filter((p) => p.id !== personToDeleteId));
+        
+        showToast("রিসাইকেল বিনে পাঠানো হয়েছে", "success");
+      }
+
       setShowPersonDeleteModal(false);
+
+      if (refreshData) {
+        await refreshData();
+      }
     } catch (e: any) {
       showToast("ব্যর্থ হয়েছে: " + e.message);
     } finally {
@@ -5997,7 +6063,7 @@ const DuesManager: React.FC<DuesManagerProps> = ({
         onClose={() => setShowPersonDeleteModal(false)}
         onConfirm={handleDeletePerson}
         title="ব্যক্তি ডিলিট"
-        message="আপনি কি এই ব্যক্তির সকল তথ্য ও লেনদেনের রেকর্ড মুছে ফেলতে চান?"
+        message="আপনি কি এই ব্যক্তির সকল তথ্য ও লেনদেনের রেকর্ড রিসাইকেল বিনে পাঠাতে চান?"
         isProcessing={isDeletingPerson}
       />
 

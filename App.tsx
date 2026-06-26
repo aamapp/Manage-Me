@@ -35,6 +35,7 @@ import { GhazalNotes } from "@/pages/GhazalNotes";
 import { IconGenerator } from "@/pages/IconGenerator";
 import { Profile } from "@/pages/Profile";
 import { Notifications } from "@/pages/Notifications";
+import { JummaNotification } from "@/pages/JummaNotification";
 import ShoppingLists from "@/pages/ShoppingLists"; // default export
 import Trash from "@/pages/Trash"; // default export
 import { AIAssistant } from "@/pages/AIAssistant";
@@ -309,6 +310,7 @@ const AppContent: React.FC = () => {
                     <Route path="/settings" element={<Settings />} />
                     <Route path="/profile" element={<Profile />} />
                     <Route path="/notifications" element={<Notifications />} />
+                    <Route path="/notifications/jumma" element={<JummaNotification />} />
                     <Route path="/ai-assistant" element={<AIAssistant />} />
                     <Route path="/ghazal-notes" element={<GhazalNotes />} />
                     <Route path="/shopping-lists" element={<ShoppingLists />} />

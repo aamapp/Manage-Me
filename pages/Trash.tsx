@@ -94,7 +94,62 @@ const Trash: React.FC = () => {
       } else if (selectedItem.type === 'due_persons') {
         table = 'due_persons';
         const person = trashedDuePersons.find(d => d.id === selectedItem.id);
-        updateData = { name: person?.name?.replace('[TRASH]', '').trim() || '' };
+        const originalName = person?.name?.replace('[TRASH]', '').trim() || '';
+        updateData = { name: originalName };
+
+        // Also restore associated expenses
+        try {
+          if (person && person.transactions && person.transactions.length > 0) {
+            const dueTxIds: string[] = [];
+            const expenseIdsToRestore: string[] = [];
+
+            person.transactions.forEach((tx: any) => {
+              if (tx.expense_id) {
+                expenseIdsToRestore.push(tx.expense_id);
+              }
+              if (tx.id) {
+                dueTxIds.push(tx.id);
+              }
+            });
+
+            // Find expenses referencing the tx IDs in notes
+            for (const txId of dueTxIds) {
+              const { data: expData } = await supabase
+                .from('expenses')
+                .select('id')
+                .ilike('notes', `%[due_tx_id:${txId}]%`);
+
+              if (expData) {
+                expData.forEach((e: any) => {
+                  if (!expenseIdsToRestore.includes(e.id)) {
+                    expenseIdsToRestore.push(e.id);
+                  }
+                });
+              }
+            }
+
+            if (expenseIdsToRestore.length > 0) {
+              const { data: expensesToRestore } = await supabase
+                .from('expenses')
+                .select('id, notes')
+                .in('id', expenseIdsToRestore);
+
+              if (expensesToRestore) {
+                for (const exp of expensesToRestore) {
+                  if (exp.notes && exp.notes.startsWith('[TRASH]')) {
+                    const cleanNotes = exp.notes.replace('[TRASH]', '').trim();
+                    await supabase
+                      .from('expenses')
+                      .update({ notes: cleanNotes })
+                      .eq('id', exp.id);
+                  }
+                }
+              }
+            }
+          }
+        } catch (err) {
+          console.error("Error restoring person expenses:", err);
+        }
       } else if (selectedItem.type === 'wallets') {
         table = 'wallets';
         const wallet = trashedWallets.find(w => w.id === selectedItem.id);
@@ -196,6 +251,52 @@ const Trash: React.FC = () => {
               .eq('method', originalName);
           } catch (e) {
             console.error("Error deleting wallet incomes permanently:", e);
+          }
+        }
+      }
+
+      // Special cleanup if permanently deleting a due person
+      if (selectedItem.type === 'due_persons') {
+        const person = trashedDuePersons.find(d => d.id === selectedItem.id);
+        if (person && user) {
+          try {
+            const expenseIdsToDelete: string[] = [];
+            const dueTxIds: string[] = [];
+
+            if (person.transactions && person.transactions.length > 0) {
+              person.transactions.forEach((tx: any) => {
+                if (tx.expense_id) {
+                  expenseIdsToDelete.push(tx.expense_id);
+                }
+                if (tx.id) {
+                  dueTxIds.push(tx.id);
+                }
+              });
+
+              for (const txId of dueTxIds) {
+                const { data: expData } = await supabase
+                  .from('expenses')
+                  .select('id')
+                  .ilike('notes', `%[due_tx_id:${txId}]%`);
+
+                if (expData) {
+                  expData.forEach((e: any) => {
+                    if (!expenseIdsToDelete.includes(e.id)) {
+                      expenseIdsToDelete.push(e.id);
+                    }
+                  });
+                }
+              }
+
+              if (expenseIdsToDelete.length > 0) {
+                await supabase
+                  .from('expenses')
+                  .delete()
+                  .in('id', expenseIdsToDelete);
+              }
+            }
+          } catch (e) {
+            console.error("Error deleting person expenses permanently:", e);
           }
         }
       }
