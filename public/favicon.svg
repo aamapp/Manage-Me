@@ -1,6 +1,20 @@
 <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <g transform="translate(50, 50) scale(1.2) translate(-50, -50)">
-    <polygon points="38.25,22 57,22 47,62 20.75,62" stroke="#FFFFFF" strokeWidth="11" strokeLinejoin="round" fill="none" />
-    <polygon points="53,38 79.25,38 61.75,78 43,78" stroke="#FFFFFF" strokeWidth="11" strokeLinejoin="round" fill="none" />
+  <g transform="translate(50, 50) scale(1.35) translate(-50, -50)">
+    {/* Left Slanted Parallelogram Shape with solid white fill and brand color stroke */}
+    <polygon 
+      points="38.25,22 57,22 47,62 20.75,62" 
+      stroke="#4f46e5" 
+      strokeWidth="7.5" 
+      strokeLinejoin="round" 
+      fill="#FFFFFF" 
+    />
+    {/* Right Slanted Parallelogram Shape with solid white fill and brand color stroke */}
+    <polygon 
+      points="53,38 79.25,38 61.75,78 43,78" 
+      stroke="#4f46e5" 
+      strokeWidth="7.5" 
+      strokeLinejoin="round" 
+      fill="#FFFFFF" 
+    />
   </g>
 </svg>
