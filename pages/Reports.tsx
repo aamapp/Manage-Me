@@ -1544,7 +1544,7 @@ export const Reports: React.FC = () => {
   };
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 pb-24 pt-0 max-w-lg mx-auto bg-slate-50/50 min-h-screen">
+    <div className="px-4 sm:px-6 lg:px-8 pb-24 pt-0 max-w-lg lg:max-w-3xl mx-auto bg-slate-50/50 min-h-screen">
       {false && (
         <div className="space-y-6 animate-in fade-in duration-300">
           <div className="flex items-start justify-between">

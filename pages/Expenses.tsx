@@ -2332,7 +2332,7 @@ export const Expenses: React.FC = () => {
         <div className="hidden lg:block sticky top-0 z-40 bg-white/95 backdrop-blur-md h-14 text-slate-800 border-b border-slate-200 shadow-[0_4px_12px_rgba(0,0,0,0.02)] select-none">
           <div
             ref={tabsContainerRef}
-            className="flex items-end justify-between w-full max-w-md mx-auto px-4 relative h-full"
+            className="flex items-end justify-between w-full max-w-md lg:max-w-3xl mx-auto px-4 relative h-full"
           >
             {/* Tab 1: Expenses / Dashboard / লেনদেন */}
             <button
@@ -2503,7 +2503,7 @@ export const Expenses: React.FC = () => {
                 {...blockSwipeProps}
               >
                 {/* Dynamic Period Stats Card - Unifying Income and Expense */}
-              <div className="bg-[#fafbfd] border border-[#e2e7ec]/80 py-3 px-4 rounded-[12px] shadow-[0_2px_8px_rgba(0,0,0,0.02)] w-full max-w-lg mx-auto mb-3 select-none">
+              <div className="bg-[#fafbfd] border border-[#e2e7ec]/80 py-3 px-4 rounded-[12px] shadow-[0_2px_8px_rgba(0,0,0,0.02)] w-full max-w-lg lg:max-w-3xl mx-auto mb-3 select-none">
                 {/* Period Segment Tabs matching the image */}
                 <div className="bg-[#f3f5f8] rounded-full flex items-stretch justify-between w-full mb-3 select-none overflow-hidden h-[42px] border border-[#e2e7ec]/60">
                   <button
@@ -2616,7 +2616,7 @@ export const Expenses: React.FC = () => {
                 {...blockSwipeProps}
               >
                 {/* Search Inputs & Category Option Filters (Combining both) */}
-                <div className="space-y-2.5 w-full max-w-lg mx-auto">
+                <div className="space-y-2.5 w-full max-w-lg lg:max-w-3xl mx-auto">
                   {(searchTerm || showSearch) && (
                     <div className="bg-white px-4 py-3 rounded-[10px] border border-slate-200/80 shadow-xs flex items-center gap-2 relative">
                       <Search size={18} className="text-slate-400" />
@@ -2771,7 +2771,7 @@ export const Expenses: React.FC = () => {
               <div
                 id="pdf-container"
                 ref={listRef}
-                className={`${isGeneratingPDF ? "block bg-white p-4" : "space-y-4 bg-transparent flex-1 overflow-y-auto pr-1 pb-24"} w-full max-w-lg mx-auto`}
+                className={`${isGeneratingPDF ? "block bg-white p-4" : "space-y-4 bg-transparent flex-1 overflow-y-auto pr-1 pb-24"} w-full max-w-lg lg:max-w-3xl mx-auto`}
               >
                 {isGeneratingPDF && (
                   <div
@@ -5991,7 +5991,7 @@ const DuesManager: React.FC<DuesManagerProps> = ({
     <div className="h-full flex flex-col overflow-hidden relative">
       {/* Top Summaries */}
       <div 
-        className="grid grid-cols-3 gap-2 px-1 mb-2 flex-none no-swipe" 
+        className="grid grid-cols-3 gap-2 px-1 mb-2 flex-none no-swipe w-full max-w-lg lg:max-w-3xl mx-auto" 
         style={{ touchAction: "none" }}
         {...blockSwipeProps}
       >
@@ -6036,7 +6036,7 @@ const DuesManager: React.FC<DuesManagerProps> = ({
         style={{ touchAction: "pan-y" }}
         {...blockSwipeProps}
       >
-        <div className="relative max-w-lg mx-auto w-full">
+        <div className="relative max-w-lg lg:max-w-3xl mx-auto w-full">
           <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
             <Search className="text-slate-400" size={20} />
           </div>
@@ -6051,7 +6051,7 @@ const DuesManager: React.FC<DuesManagerProps> = ({
       </div>
 
       {/* Persons List */}
-      <div className="space-y-2 pb-24 mt-1 flex-1 overflow-y-auto pr-1">
+      <div className="space-y-2 pb-24 mt-1 flex-1 overflow-y-auto pr-1 w-full max-w-lg lg:max-w-3xl mx-auto">
         {filteredPersons.map((person) => {
           const balance = getPersonBalance(person);
           const bgClass =
@@ -7670,7 +7670,7 @@ const BudgetManager: React.FC<{ expenses: any[]; user: any }> = ({
     return (
       <div className="space-y-4 animate-in fade-in duration-300 pb-20">
         {/* Back Button Header */}
-        <div className="flex items-center gap-4 bg-white p-3 rounded-2xl border border-slate-100 shadow-sm w-full max-w-lg mx-auto">
+        <div className="flex items-center gap-4 bg-white p-3 rounded-2xl border border-slate-100 shadow-sm w-full max-w-lg lg:max-w-3xl mx-auto">
           <button
             onClick={() => {
               setActiveView("list");
@@ -7689,7 +7689,7 @@ const BudgetManager: React.FC<{ expenses: any[]; user: any }> = ({
         </div>
 
         {/* Budget Detailed Progress Banner */}
-        <div className="bg-white border border-[#e2e7ec]/80 p-5 rounded-3xl shadow-[0_4px_16px_rgba(0,0,0,0.03)] w-full max-w-lg mx-auto text-left">
+        <div className="bg-white border border-[#e2e7ec]/80 p-5 rounded-3xl shadow-[0_4px_16px_rgba(0,0,0,0.03)] w-full max-w-lg lg:max-w-3xl mx-auto text-left">
           <div className="flex justify-between items-start mb-4">
             <div>
               <h3 className="text-lg font-extrabold text-[#111827] tracking-tight">
@@ -7772,7 +7772,7 @@ const BudgetManager: React.FC<{ expenses: any[]; user: any }> = ({
         </div>
 
         {/* Transaction log/Ledger */}
-        <div className="w-full max-w-lg mx-auto">
+        <div className="w-full max-w-lg lg:max-w-3xl mx-auto">
           <div className="flex justify-between items-center px-1 mb-2.5 text-left">
             <div>
               <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
@@ -8017,7 +8017,7 @@ const BudgetManager: React.FC<{ expenses: any[]; user: any }> = ({
   return (
     <div className="space-y-4 animate-in fade-in duration-300 pb-20">
       {/* Budget Overview Card */}
-      <div className="bg-white border border-[#e2e7ec]/80 p-5 rounded-3xl shadow-[0_4px_16px_rgba(0,0,0,0.03)] w-full max-w-lg mx-auto">
+      <div className="bg-white border border-[#e2e7ec]/80 p-5 rounded-3xl shadow-[0_4px_16px_rgba(0,0,0,0.03)] w-full max-w-lg lg:max-w-3xl mx-auto">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-extrabold text-[#111827] tracking-tight">
             বাজেট ম্যানেজমেন্ট
@@ -8050,7 +8050,7 @@ const BudgetManager: React.FC<{ expenses: any[]; user: any }> = ({
         </div>
       </div>
 
-      <div className="w-full max-w-lg mx-auto px-1">
+      <div className="w-full max-w-lg lg:max-w-3xl mx-auto px-1">
         {budgets.length === 0 ? (
           /* Image Accurate Beautiful Empty State */
           <div className="flex flex-col items-center justify-center py-20 text-slate-400 select-none">
@@ -8365,7 +8365,7 @@ const TasksManager: React.FC<{ expenses: any[]; user: any }> = ({
 
   return (
     <div className="space-y-4 animate-in fade-in duration-300 pb-20">
-      <div className="flex justify-between items-center mb-1 text-left w-full max-w-lg mx-auto px-1">
+      <div className="flex justify-between items-center mb-1 text-left w-full max-w-lg lg:max-w-3xl mx-auto px-1">
         <div>
           <h3 className="text-base font-bold text-slate-800">খরচের চেকলিস্ট</h3>
           <p className="text-xs text-slate-400 font-medium">
@@ -8374,7 +8374,7 @@ const TasksManager: React.FC<{ expenses: any[]; user: any }> = ({
         </div>
       </div>
 
-      <div className="w-full max-w-lg mx-auto">
+      <div className="w-full max-w-lg lg:max-w-3xl mx-auto">
         {tasks.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-slate-400 select-none">
             <div className="w-20 h-20 bg-slate-50 border border-slate-100 rounded-full flex items-center justify-center mb-4 shadow-xs">
