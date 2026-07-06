@@ -931,7 +931,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                     {APP_NAME}
                   </h2>
                   <p className="text-indigo-200 text-xs font-bold uppercase tracking-widest mt-1">
-                    ভার্সন ১.০.০
+                    ভার্সন ২.০.০
                   </p>
                 </div>
 

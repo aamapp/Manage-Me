@@ -1,7 +1,7 @@
 {
   "name": "manage-me",
   "private": true,
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "অডিও সাউন্ড ডিজাইন প্রজেক্ট ম্যানেজমেন্ট সিস্টেম",
   "author": "Abdullah Al Mamun",
   "type": "module",
