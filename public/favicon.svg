@@ -1,10 +1,10 @@
 <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <g transform="translate(50, 50) scale(0.85) translate(-50, -50)">
+  <g transform="translate(50, 50) scale(1.35) translate(-50, -50)">
     <!-- Left Slanted Parallelogram Shape -->
     <polygon 
       points="38.25,22 57,22 47,62 20.75,62" 
       stroke="#FFFFFF" 
-      stroke-width="9.5" 
+      stroke-width="10.5" 
       stroke-linejoin="round" 
       fill="none" 
     />
@@ -13,7 +13,7 @@
     <polygon 
       points="53,38 79.25,38 61.75,78 43,78" 
       stroke="#FFFFFF" 
-      stroke-width="9.5" 
+      stroke-width="10.5" 
       stroke-linejoin="round" 
       fill="none" 
     />
