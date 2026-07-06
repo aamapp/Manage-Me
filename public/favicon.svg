@@ -1,14 +1,45 @@
 <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <g transform="translate(50, 50) scale(1.45) translate(-50, -50)">
-    {/* Left Slanted Parallelogram with solid white fill */}
+  <defs>
+    {/* High quality drop shadow filter */}
+    <filter id="logoShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000000" flood-opacity="0.3" />
+    </filter>
+  </defs>
+  <g transform="translate(50, 50) scale(1.1) translate(-50, -50)" filter="url(#logoShadow)">
+    {/* Background Outlines (Rich Navy) to provide strong contrast on light and dark browser tabs */}
     <polygon 
       points="38.25,22 57,22 47,62 20.75,62" 
-      fill="#FFFFFF" 
+      stroke="#0f172a" 
+      strokeWidth="18" 
+      strokeLinejoin="round" 
+      strokeLinecap="round"
+      fill="none" 
     />
-    {/* Right Slanted Parallelogram with solid white fill */}
     <polygon 
       points="53,38 79.25,38 61.75,78 43,78" 
-      fill="#FFFFFF" 
+      stroke="#0f172a" 
+      strokeWidth="18" 
+      strokeLinejoin="round" 
+      strokeLinecap="round"
+      fill="none" 
+    />
+
+    {/* Foreground Outlines (Crisp Solid White) */}
+    <polygon 
+      points="38.25,22 57,22 47,62 20.75,62" 
+      stroke="#FFFFFF" 
+      strokeWidth="10" 
+      strokeLinejoin="round" 
+      strokeLinecap="round"
+      fill="none" 
+    />
+    <polygon 
+      points="53,38 79.25,38 61.75,78 43,78" 
+      stroke="#FFFFFF" 
+      strokeWidth="10" 
+      strokeLinejoin="round" 
+      strokeLinecap="round"
+      fill="none" 
     />
   </g>
 </svg>
