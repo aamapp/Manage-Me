@@ -165,6 +165,30 @@ export const AIAssistant: React.FC = () => {
       return;
     }
 
+    // Check if running in Android WebView with native TTS Interface
+    if ((window as any).AndroidInterface && typeof (window as any).AndroidInterface.speak === "function") {
+      try {
+        let callbackCalled = false;
+        (window as any).onAndroidSpeechEnd = () => {
+          if (!callbackCalled) {
+            callbackCalled = true;
+            if (callback) callback();
+          }
+        };
+        (window as any).AndroidInterface.speak(cleanText);
+        // Fallback safety in case Android side doesn't trigger the end callback
+        setTimeout(() => {
+          if (!callbackCalled) {
+            callbackCalled = true;
+            if (callback) callback();
+          }
+        }, Math.max(3000, cleanText.length * 200));
+        return;
+      } catch (e) {
+        console.error("Android native TTS bridge failed:", e);
+      }
+    }
+
     const utterance = new SpeechSynthesisUtterance(cleanText);
     utterance.lang = "bn-BD";
 
