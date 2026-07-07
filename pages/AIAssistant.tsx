@@ -1185,10 +1185,10 @@ export const AIAssistant: React.FC = () => {
               )}
 
               {/* AI current spoken output */}
-              {aiSpeechOutput && callStatus === "speaking" && (
-                <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-sm max-h-[120px] overflow-y-auto">
+              {aiSpeechOutput && (
+                <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-sm max-h-[150px] overflow-y-auto">
                   <span className="text-[10px] text-indigo-400 block mb-0.5 font-semibold uppercase tracking-wider font-sans">এআই উত্তর:</span>
-                  <p className="text-slate-200 font-medium text-xs sm:text-sm line-clamp-3 leading-relaxed" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
+                  <p className="text-slate-200 font-medium text-xs sm:text-sm leading-relaxed" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
                     {aiSpeechOutput.replace(/[*#_`\-[\]()]/g, "")}
                   </p>
                 </div>
