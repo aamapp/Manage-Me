@@ -253,6 +253,8 @@ export const Reports: React.FC = () => {
     clientName?: string;
     personId?: string;
     walletName?: string;
+    startDate?: string;
+    endDate?: string;
   } | null;
 
   // Custom PDF Download States and Subview Systems
@@ -326,7 +328,7 @@ export const Reports: React.FC = () => {
   const [pdfReportType, setPdfReportType] = useState<
     "all" | "income" | "expense" | "projects" | "dues" | "personal_dues" | "wallet"
   >(
-    initialState?.action === "download_preview" && initialState.reportType
+    initialState?.action === "download_preview" && initialState?.reportType
       ? (initialState.reportType as any)
       : "all",
   );
@@ -334,7 +336,7 @@ export const Reports: React.FC = () => {
     initialState?.personId || null,
   );
   const [walletName, setWalletName] = useState<string | null>(
-    initialState?.action === "download_preview" ? initialState.walletName || null : null
+    initialState?.action === "download_preview" ? initialState?.walletName || null : null
   );
 
   const [wallets, setWallets] = useState<any[]>([]);
@@ -449,7 +451,7 @@ export const Reports: React.FC = () => {
     string | null
   >(
     initialState?.action === "download_preview"
-      ? initialState.clientName || null
+      ? initialState?.clientName || null
       : null,
   );
   const [clientSearchQuery, setClientSearchQuery] = useState("");
@@ -492,8 +494,12 @@ export const Reports: React.FC = () => {
   const [pdfQuickRange, setPdfQuickRange] = useState<
     "current_month" | "last_month" | "current_year" | "custom"
   >(initialState?.action === "download_preview" ? "custom" : "current_month");
-  const [pdfStartDate, setPdfStartDate] = useState("");
-  const [pdfEndDate, setPdfEndDate] = useState("");
+  const [pdfStartDate, setPdfStartDate] = useState(
+    initialState?.action === "download_preview" && initialState?.startDate ? initialState.startDate : ""
+  );
+  const [pdfEndDate, setPdfEndDate] = useState(
+    initialState?.action === "download_preview" && initialState?.endDate ? initialState.endDate : ""
+  );
   const [pdfAdminName, setPdfAdminName] = useState(
     () => localStorage.getItem("reports_pdfAdminName") || "",
   );

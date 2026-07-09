@@ -127,7 +127,15 @@ export const WalletManager: React.FC = () => {
   const [selectedDetailsWallet, setSelectedDetailsWallet] = useState<Wallet | null>(null);
   const [txSearchQuery, setTxSearchQuery] = useState<string>('');
   const [txTypeFilter, setTxTypeFilter] = useState<'all' | 'income' | 'expense'>('all');
-  const [walletPeriod, setWalletPeriod] = useState<'today' | 'month' | 'all'>('all');
+  const [walletPeriod, setWalletPeriod] = useState<'today' | 'month' | 'all' | 'custom'>('all');
+  const [customStartDate, setCustomStartDate] = useState<string>(() => {
+    const d = new Date();
+    const start = new Date(d.getFullYear(), d.getMonth(), 1);
+    return start.toISOString().split('T')[0];
+  });
+  const [customEndDate, setCustomEndDate] = useState<string>(() => {
+    return new Date().toISOString().split('T')[0];
+  });
   const [pdfGenerating, setPdfGenerating] = useState<boolean>(false);
 
   // Prevent swiping gestures on special components (like balance cards and subviews)
@@ -1109,6 +1117,15 @@ export const WalletManager: React.FC = () => {
         const d = new Date(t.date);
         return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
       }
+      if (walletPeriod === 'custom') {
+        if (!t.date) return false;
+        const txDateOnly = t.date.substring(0, 10);
+        const start = customStartDate;
+        const end = customEndDate;
+        if (start && txDateOnly < start) return false;
+        if (end && txDateOnly > end) return false;
+        return true;
+      }
       return true; // 'all'
     });
 
@@ -1145,12 +1162,33 @@ export const WalletManager: React.FC = () => {
     const handleDownloadPdf = () => {
       if (!selectedDetailsWallet) return;
 
+      let startDate = '';
+      let endDate = '';
+
+      if (walletPeriod === 'today') {
+        const todayStr = new Date().toISOString().split('T')[0];
+        startDate = todayStr;
+        endDate = todayStr;
+      } else if (walletPeriod === 'month') {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, "0");
+        startDate = `${year}-${month}-01`;
+        const lastDay = new Date(year, now.getMonth() + 1, 0).getDate();
+        endDate = `${year}-${month}-${String(lastDay).padStart(2, "0")}`;
+      } else if (walletPeriod === 'custom') {
+        startDate = customStartDate;
+        endDate = customEndDate;
+      }
+
       navigate("/reports", {
         state: {
           action: "download_preview",
           reportType: "wallet",
           walletName: selectedDetailsWallet.name,
           walletBalance: selectedDetailsWallet.balance,
+          startDate,
+          endDate,
         }
       });
     };
@@ -1225,7 +1263,7 @@ export const WalletManager: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setWalletPeriod('today')}
-                  className={`flex-1 text-center text-[15px] sm:text-[16px] font-medium transition-all h-full cursor-pointer select-none ${
+                  className={`flex-1 text-center text-[13px] sm:text-[15px] font-medium transition-all h-full cursor-pointer select-none ${
                     walletPeriod === 'today'
                       ? 'bg-[#1e75eb] text-white rounded-l-full'
                       : 'text-[#111827] hover:text-black bg-transparent'
@@ -1236,7 +1274,7 @@ export const WalletManager: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setWalletPeriod('all')}
-                  className={`flex-1 text-center text-[15px] sm:text-[16px] font-medium transition-all h-full cursor-pointer select-none ${
+                  className={`flex-1 text-center text-[13px] sm:text-[15px] font-medium transition-all h-full cursor-pointer select-none ${
                     walletPeriod === 'all'
                       ? 'bg-[#1e75eb] text-white'
                       : 'text-[#111827] hover:text-black bg-transparent'
@@ -1247,15 +1285,50 @@ export const WalletManager: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setWalletPeriod('month')}
-                  className={`flex-1 text-center text-[15px] sm:text-[16px] font-medium transition-all h-full cursor-pointer select-none ${
+                  className={`flex-1 text-center text-[13px] sm:text-[15px] font-medium transition-all h-full cursor-pointer select-none ${
                     walletPeriod === 'month'
-                      ? 'bg-[#1e75eb] text-white rounded-r-full'
+                      ? 'bg-[#1e75eb] text-white'
                       : 'text-[#111827] hover:text-black bg-transparent'
                   }`}
                 >
                   {currentMonthBengali}
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setWalletPeriod('custom')}
+                  className={`flex-1 text-center text-[13px] sm:text-[15px] font-medium transition-all h-full cursor-pointer select-none ${
+                    walletPeriod === 'custom'
+                      ? 'bg-[#1e75eb] text-white rounded-r-full'
+                      : 'text-[#111827] hover:text-black bg-transparent'
+                  }`}
+                >
+                  কাস্টম
+                </button>
               </div>
+
+              {/* Custom Date Picker Inputs inside Stats card - with high-polish responsive styling */}
+              {walletPeriod === 'custom' && (
+                <div className="flex items-center gap-3 mb-3 bg-[#f8fafc] border border-[#e2e7ec]/50 p-2.5 rounded-[10px]">
+                  <div className="flex-1 flex flex-col gap-1">
+                    <span className="text-[11px] text-slate-500 font-bold select-none pl-0.5">শুরুর তারিখ</span>
+                    <input 
+                      type="date"
+                      value={customStartDate}
+                      onChange={(e) => setCustomStartDate(e.target.value)}
+                      className="w-full text-xs font-semibold bg-white border border-[#e2e7ec] rounded-lg px-2 py-1.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#1e75eb] focus:border-[#1e75eb]"
+                    />
+                  </div>
+                  <div className="flex-1 flex flex-col gap-1">
+                    <span className="text-[11px] text-slate-500 font-bold select-none pl-0.5">শেষের তারিখ</span>
+                    <input 
+                      type="date"
+                      value={customEndDate}
+                      onChange={(e) => setCustomEndDate(e.target.value)}
+                      className="w-full text-xs font-semibold bg-white border border-[#e2e7ec] rounded-lg px-2 py-1.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#1e75eb] focus:border-[#1e75eb]"
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Income, Expense, Net Counts */}
               <div className="grid grid-cols-3 gap-2 text-center">
