@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 import { Wallet } from '@/types';
 import { AppLogo } from './AppLogo';
 import { ConfirmModal } from './ConfirmModal';
+import { DatePicker } from './DatePicker';
 import { 
   Wallet as WalletIcon, 
   Plus, 
@@ -1308,23 +1309,19 @@ export const WalletManager: React.FC = () => {
 
               {/* Custom Date Picker Inputs inside Stats card - with high-polish responsive styling */}
               {walletPeriod === 'custom' && (
-                <div className="flex items-center gap-3 mb-3 bg-[#f8fafc] border border-[#e2e7ec]/50 p-2.5 rounded-[10px]">
-                  <div className="flex-1 flex flex-col gap-1">
-                    <span className="text-[11px] text-slate-500 font-bold select-none pl-0.5">শুরুর তারিখ</span>
-                    <input 
-                      type="date"
+                <div className="flex items-center gap-3 mb-3 bg-[#f8fafc]/40 border border-[#e2e7ec]/30 p-2 rounded-[14px]">
+                  <div className="flex-1">
+                    <DatePicker 
                       value={customStartDate}
-                      onChange={(e) => setCustomStartDate(e.target.value)}
-                      className="w-full text-xs font-semibold bg-white border border-[#e2e7ec] rounded-lg px-2 py-1.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#1e75eb] focus:border-[#1e75eb]"
+                      onChange={setCustomStartDate}
+                      label="শুরুর তারিখ"
                     />
                   </div>
-                  <div className="flex-1 flex flex-col gap-1">
-                    <span className="text-[11px] text-slate-500 font-bold select-none pl-0.5">শেষের তারিখ</span>
-                    <input 
-                      type="date"
+                  <div className="flex-1">
+                    <DatePicker 
                       value={customEndDate}
-                      onChange={(e) => setCustomEndDate(e.target.value)}
-                      className="w-full text-xs font-semibold bg-white border border-[#e2e7ec] rounded-lg px-2 py-1.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#1e75eb] focus:border-[#1e75eb]"
+                      onChange={setCustomEndDate}
+                      label="শেষের তারিখ"
                     />
                   </div>
                 </div>
