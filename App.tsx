@@ -40,6 +40,7 @@ import ShoppingLists from "@/pages/ShoppingLists"; // default export
 import Trash from "@/pages/Trash"; // default export
 import { AIAssistant } from "@/pages/AIAssistant";
 import { ProjectsBackup } from "@/pages/ProjectsBackup";
+import { CarRent } from "@/pages/CarRent";
 import { Login } from "@/pages/Login";
 import { Signup } from "@/pages/Signup";
 
@@ -314,6 +315,7 @@ const AppContent: React.FC = () => {
                     <Route path="/ai-assistant" element={<AIAssistant />} />
                     <Route path="/ghazal-notes" element={<GhazalNotes />} />
                     <Route path="/shopping-lists" element={<ShoppingLists />} />
+                    <Route path="/car-rent" element={<CarRent />} />
                     <Route path="/trash" element={<Trash />} />
                     <Route
                       path="/projects-backup"

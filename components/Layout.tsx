@@ -31,6 +31,7 @@ import {
   Plus,
   ListTodo,
   Wallet,
+  Car,
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { APP_NAME } from "@/constants";
@@ -120,6 +121,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   const isGhazalNotes = location.pathname === "/ghazal-notes";
   const isShoppingLists = location.pathname === "/shopping-lists";
   const isClients = location.pathname === "/clients";
+  const isCarRent = location.pathname === "/car-rent";
   const isFullScreenPage =
     isAiAssistant ||
     isNotifications ||
@@ -130,7 +132,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
     isTrash ||
     isGhazalNotes ||
     isShoppingLists ||
-    isClients;
+    isClients ||
+    isCarRent;
   const isExpensesPage = location.pathname === "/expenses";
 
   const handleNavigate = (path: string) => {
@@ -231,6 +234,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
       path: "/clients",
       icon: <Users size={20} />,
       desc: "ক্লায়েন্ট তালিকা",
+    },
+    {
+      name: "গাড়ি ভাড়া হিসাব",
+      path: "/car-rent",
+      icon: <Car size={20} />,
+      desc: "ভাড়া ও বকেয়া হিসাব",
     },
     {
       name: "রিপোর্ট",

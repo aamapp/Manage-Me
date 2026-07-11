@@ -1,0 +1,79 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Entities validation
+    function isValidFriend(data) {
+      return data.keys().hasAll(['id', 'name', 'userid'])
+        && data.id is string && data.id.size() <= 128
+        && data.name is string && data.name.size() <= 100
+        && data.userid is string && data.userid.size() > 0;
+    }
+
+    function isValidTrip(data) {
+      return data.keys().hasAll(['id', 'date', 'examName', 'totalRent', 'userid'])
+        && data.id is string && data.id.size() <= 128
+        && data.date is string && data.date.size() <= 20
+        && data.examName is string && data.examName.size() <= 200
+        && data.totalRent is number && data.totalRent >= 0
+        && data.userid is string && data.userid.size() > 0;
+    }
+
+    function isValidCollection(data) {
+      return data.keys().hasAll(['id', 'date', 'friendId', 'amount', 'userid'])
+        && data.id is string && data.id.size() <= 128
+        && data.date is string && data.date.size() <= 20
+        && data.friendId is string && data.friendId.size() <= 128
+        && data.amount is number && data.amount >= 0
+        && data.userid is string && data.userid.size() > 0;
+    }
+
+    function isValidDriverPayment(data) {
+      return data.keys().hasAll(['id', 'date', 'amount', 'userid'])
+        && data.id is string && data.id.size() <= 128
+        && data.date is string && data.date.size() <= 20
+        && data.amount is number && data.amount >= 0
+        && data.userid is string && data.userid.size() > 0;
+    }
+
+    // Rules for Car Rent Friends
+    match /car_rent_friends/{friendId} {
+      allow read: if resource.data.userid != null;
+      allow create: if isValidId(friendId) && isValidFriend(request.resource.data);
+      allow update: if isValidId(friendId) && resource.data.userid == request.resource.data.userid && isValidFriend(request.resource.data);
+      allow delete: if resource.data.userid != null;
+    }
+
+    // Rules for Car Rent Trips
+    match /car_rent_trips/{tripId} {
+      allow read: if resource.data.userid != null;
+      allow create: if isValidId(tripId) && isValidTrip(request.resource.data);
+      allow update: if isValidId(tripId) && resource.data.userid == request.resource.data.userid && isValidTrip(request.resource.data);
+      allow delete: if resource.data.userid != null;
+    }
+
+    // Rules for Car Rent Collections
+    match /car_rent_collections/{collectionId} {
+      allow read: if resource.data.userid != null;
+      allow create: if isValidId(collectionId) && isValidCollection(request.resource.data);
+      allow update: if isValidId(collectionId) && resource.data.userid == request.resource.data.userid && isValidCollection(request.resource.data);
+      allow delete: if resource.data.userid != null;
+    }
+
+    // Rules for Car Rent Driver Payments
+    match /car_rent_driver_payments/{paymentId} {
+      allow read: if resource.data.userid != null;
+      allow create: if isValidId(paymentId) && isValidDriverPayment(request.resource.data);
+      allow update: if isValidId(paymentId) && resource.data.userid == request.resource.data.userid && isValidDriverPayment(request.resource.data);
+      allow delete: if resource.data.userid != null;
+    }
+  }
+}

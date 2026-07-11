@@ -1,0 +1,83 @@
+{
+  "entities": {
+    "car_rent_friend": {
+      "title": "Car Rent Friend",
+      "description": "A friend participating in daily exam trips",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier" },
+        "name": { "type": "string", "description": "Name of the friend" },
+        "phone": { "type": "string", "description": "Optional phone number" },
+        "userid": { "type": "string", "description": "User ID who owns this record" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last update timestamp" }
+      },
+      "required": ["id", "name", "userid"]
+    },
+    "car_rent_trip": {
+      "title": "Car Rent Trip",
+      "description": "A daily trip/exam event",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier" },
+        "date": { "type": "string", "format": "date", "description": "Date of the trip" },
+        "examName": { "type": "string", "description": "Name or description of the exam/trip" },
+        "totalRent": { "type": "number", "description": "Total vehicle rent for this trip" },
+        "participantIds": { "type": "array", "description": "List of friend IDs participating" },
+        "userid": { "type": "string", "description": "User ID who owns this record" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last update timestamp" }
+      },
+      "required": ["id", "date", "examName", "totalRent", "userid"]
+    },
+    "car_rent_collection": {
+      "title": "Car Rent Collection",
+      "description": "Money collected from a friend for vehicle rent",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier" },
+        "date": { "type": "string", "format": "date", "description": "Date of collection" },
+        "friendId": { "type": "string", "description": "ID of the friend who paid" },
+        "amount": { "type": "number", "description": "Amount collected" },
+        "tripId": { "type": "string", "description": "Optional trip ID this payment is linked to" },
+        "userid": { "type": "string", "description": "User ID who owns this record" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last update timestamp" }
+      },
+      "required": ["id", "date", "friendId", "amount", "userid"]
+    },
+    "car_rent_driver_payment": {
+      "title": "Car Rent Driver Payment",
+      "description": "Payment made to the driver or vehicle owner",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier" },
+        "date": { "type": "string", "format": "date", "description": "Date of payment" },
+        "amount": { "type": "number", "description": "Amount paid to driver" },
+        "remarks": { "type": "string", "description": "Optional remarks" },
+        "userid": { "type": "string", "description": "User ID who owns this record" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last update timestamp" }
+      },
+      "required": ["id", "date", "amount", "userid"]
+    }
+  },
+  "firestore": {
+    "car_rent_friends": {
+      "schema": "car_rent_friend",
+      "description": "Friends participating in vehicle rides"
+    },
+    "car_rent_trips": {
+      "schema": "car_rent_trip",
+      "description": "Daily exam vehicle trips and total cost"
+    },
+    "car_rent_collections": {
+      "schema": "car_rent_collection",
+      "description": "Collections from friends for vehicle rides"
+    },
+    "car_rent_driver_payments": {
+      "schema": "car_rent_driver_payment",
+      "description": "Rent payments made to the driver/owner"
+    }
+  }
+}

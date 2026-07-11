@@ -171,3 +171,44 @@ export interface Wallet {
   createdAt: string;
 }
 
+export interface CarRentFriend {
+  id: string;
+  name: string;
+  phone?: string;
+  userid: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CarRentTrip {
+  id: string;
+  date: string;
+  examName: string;
+  totalRent: number;
+  participantIds: string[];
+  userid: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CarRentCollection {
+  id: string;
+  date: string;
+  friendId: string;
+  amount: number;
+  tripId?: string;
+  userid: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CarRentDriverPayment {
+  id: string;
+  date: string;
+  amount: number;
+  remarks?: string;
+  userid: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
