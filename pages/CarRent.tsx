@@ -1210,7 +1210,7 @@ export const CarRent: React.FC = () => {
   return (
     <div className="w-full min-h-screen bg-slate-50 flex flex-col pb-20">
       {/* Top Header */}
-      <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md flex items-center justify-between mb-6 border-b border-slate-200/60 h-14 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+      <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md flex items-center justify-between mb-2 border-b border-slate-200/60 h-14 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
         <div className="flex items-center gap-3.5">
           <button
             onClick={() => navigate(-1)}
