@@ -8,6 +8,7 @@ import {
   TrendingUp,
   DollarSign,
   Calendar,
+  CalendarDays,
   Trash2,
   Edit2,
   ArrowLeft,
@@ -23,7 +24,13 @@ import {
   BadgeAlert,
   AlertCircle,
   HelpCircle,
+  Share2,
+  Copy,
+  ExternalLink,
 } from "lucide-react";
+import { createPortal } from "react-dom";
+import html2canvas from "html2canvas";
+import { jsPDF } from "jspdf";
 import { useAppContext } from "@/context/AppContext";
 import { DatePicker } from "@/components/DatePicker";
 import { ConfirmModal } from "@/components/ConfirmModal";
@@ -45,9 +52,92 @@ import {
   CarRentDriverPayment,
 } from "@/types";
 
+// Specialized highly robust App logo component designed specifically for html2canvas export
+// This avoids dynamic SVG transforms and scales which cause layout offsets in pdf rendering.
+const ReportAppLogo: React.FC<{
+  size: number;
+  variant?: "color" | "white" | "transparent-color";
+}> = ({ size, variant = "color" }) => {
+  const strokeColor = variant === "transparent-color" ? "#4f46e5" : "#FFFFFF";
+  return (
+    <svg
+      viewBox="0 0 100 100"
+      width={size}
+      height={size}
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      style={{ display: "block", width: `${size}px`, height: `${size}px` }}
+    >
+      {variant === "color" && (
+        <rect width="100" height="100" rx="24" fill="#4f46e5" />
+      )}
+      <polygon
+        points="41.19,29 55.25,29 47.75,59 28.06,59"
+        stroke={strokeColor}
+        strokeWidth="6.375"
+        strokeLinejoin="round"
+        fill="none"
+      />
+      <polygon
+        points="52.25,41 71.94,41 58.81,71 44.75,71"
+        stroke={strokeColor}
+        strokeWidth="6.375"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </svg>
+  );
+};
+
 export const CarRent: React.FC = () => {
   const navigate = useNavigate();
   const { user, showToast, isOnline } = useAppContext();
+
+  // PDF Preview and Generation States
+  const [viewState, setViewState] = useState<"main" | "preview">("main");
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const sheetRef = React.useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [pdfProgress, setPdfProgress] = useState(0);
+
+  useEffect(() => {
+    if (viewState !== "preview") return;
+
+    const updateDimensions = () => {
+      if (containerRef.current) {
+        const containerWidth =
+          containerRef.current.clientWidth ||
+          containerRef.current.getBoundingClientRect().width;
+        if (containerWidth > 0) {
+          if (containerWidth < 794) {
+            setScale(containerWidth / 794);
+          } else {
+            setScale(1);
+          }
+        }
+      }
+    };
+
+    updateDimensions();
+    const t = setTimeout(updateDimensions, 100);
+
+    const observer = new ResizeObserver(() => {
+      updateDimensions();
+    });
+
+    if (containerRef.current) {
+      observer.observe(containerRef.current);
+    }
+
+    window.addEventListener("resize", updateDimensions);
+
+    return () => {
+      clearTimeout(t);
+      observer.disconnect();
+      window.removeEventListener("resize", updateDimensions);
+    };
+  }, [viewState]);
 
   // Active Tab
   const [activeTab, setActiveTab] = useState<"dashboard" | "friends" | "trips" | "driver">("dashboard");
@@ -60,16 +150,53 @@ export const CarRent: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   // Search and Filter States
-  const [startDate, setStartDate] = useState<string>(() => {
-    const d = new Date();
-    d.setMonth(d.getMonth() - 1);
-    return d.toISOString().split("T")[0];
-  });
-  const [endDate, setEndDate] = useState<string>(() => {
-    return new Date().toISOString().split("T")[0];
-  });
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
   const [searchFriend, setSearchFriend] = useState("");
   const [searchTrip, setSearchTrip] = useState("");
+
+  // Custom Date/Month/Year Filter States matching Expenses design
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [modalSubView, setModalSubView] = useState<"main" | "date" | "month" | "year">("main");
+  const [selectedPeriodOption, setSelectedPeriodOption] = useState<"custom" | "month" | "year" | "">("");
+  const [tempCustomDates, setTempCustomDates] = useState<{ start: string; end: string }>({ start: "", end: "" });
+  const [isStartDatePickerOpen, setIsStartDatePickerOpen] = useState(false);
+  const [isEndDatePickerOpen, setIsEndDatePickerOpen] = useState(false);
+
+  // Bangla Formatter helpers
+  const toBanglaNumbers = (num: string | number): string => {
+    const banglaDigits = ["০", "১", "২", "৩", "৪", "৫", "৬", "৭", "৮", "৯"];
+    return String(num).replace(
+      /[0-9]/g,
+      (digit) => banglaDigits[parseInt(digit)],
+    );
+  };
+
+  const formatDateToBangla = (dateStr: string): string => {
+    if (!dateStr) return "";
+    try {
+      const dateObj = new Date(dateStr);
+      if (isNaN(dateObj.getTime())) return dateStr;
+
+      const day = dateObj.getDate();
+      const monthIdx = dateObj.getMonth();
+      const year = dateObj.getFullYear();
+
+      const banglaMonths = [
+        "জানুয়ারি", "ফেব্রুয়ারি", "মার্চ", "এপ্রিল", "মে", "জুন",
+        "জুলাই", "আগস্ট", "সেপ্টেম্বর", "অক্টোবর", "নভেম্বর", "ডিসেম্বর"
+      ];
+
+      return `${toBanglaNumbers(day)} ${banglaMonths[monthIdx]}, ${toBanglaNumbers(year)}`;
+    } catch (e) {
+      return dateStr;
+    }
+  };
+
+  const banglaMonths = [
+    "জানুয়ারি", "ফেব্রুয়ারি", "মার্চ", "এপ্রিল", "মে", "জুন",
+    "জুলাই", "আগস্ট", "সেপ্টেম্বর", "অক্টোবর", "নভেম্বর", "ডিসেম্বর"
+  ];
 
   // Modals States
   const [friendModal, setFriendModal] = useState<{ open: boolean; mode: "add" | "edit"; data?: Partial<CarRentFriend> }>({ open: false, mode: "add" });
@@ -722,134 +849,116 @@ export const CarRent: React.FC = () => {
     }
   };
 
-  // Printable Report Trigger
+  // Printable Report Trigger (now switches to beautiful full A4 preview mode)
   const handlePrintReport = () => {
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) return;
+    setViewState("preview");
+  };
 
-    const tripsRows = filteredReportData.trips.map(t => `
-      <tr>
-        <td style="padding: 8px; border: 1px solid #ddd;">${t.date}</td>
-        <td style="padding: 8px; border: 1px solid #ddd;">${t.examName}</td>
-        <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">৳${t.totalRent}</td>
-        <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${t.participantIds?.length || 0} জন</td>
-      </tr>
-    `).join("");
+  const handleDownloadPDF = async () => {
+    if (!sheetRef.current) return;
 
-    const friendsRows = analytics.friendDetails.map(fd => `
-      <tr>
-        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">${fd.name}</td>
-        <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${fd.totalTrips}</td>
-        <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">৳${fd.totalShare.toFixed(1)}</td>
-        <td style="padding: 8px; border: 1px solid #ddd; text-align: right; color: green;">৳${fd.totalPaid.toFixed(1)}</td>
-        <td style="padding: 8px; border: 1px solid #ddd; text-align: right; color: red; font-weight: bold;">৳${fd.due.toFixed(1)}</td>
-      </tr>
-    `).join("");
+    setIsGeneratingPDF(true);
+    setPdfProgress(10);
+    window.dispatchEvent(new CustomEvent("app:processing", { detail: true }));
+    showToast("পিডিএফ তৈরি হচ্ছে...", "info");
 
-    const driverRows = filteredReportData.driverPayments.map(dp => `
-      <tr>
-        <td style="padding: 8px; border: 1px solid #ddd;">${dp.date}</td>
-        <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">৳${dp.amount}</td>
-        <td style="padding: 8px; border: 1px solid #ddd;">${dp.remarks || "---"}</td>
-      </tr>
-    `).join("");
+    const progressInterval = setInterval(() => {
+      setPdfProgress((prev) => {
+        if (prev >= 90) {
+          clearInterval(progressInterval);
+          return 90;
+        }
+        return prev + 10;
+      });
+    }, 150);
 
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>গাড়ি ভাড়া হিসাব রিপোর্ট</title>
-          <style>
-            body { font-family: 'Inter', sans-serif; padding: 24px; color: #333; }
-            h1 { text-align: center; color: #1e3a8a; margin-bottom: 5px; }
-            h2 { text-align: center; color: #4b5563; font-size: 14px; margin-top: 0; margin-bottom: 30px; }
-            .grid { display: grid; grid-template-cols: repeat(4, 1fr); gap: 15px; margin-bottom: 30px; }
-            .card { background: #f3f4f6; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #e5e7eb; }
-            .card p { margin: 0; font-size: 11px; color: #6b7280; font-weight: bold; text-transform: uppercase; }
-            .card h3 { margin: 5px 0 0 0; font-size: 20px; color: #111827; }
-            table { width: 100%; border-collapse: collapse; margin-bottom: 40px; font-size: 13px; }
-            th { background: #f3f4f6; padding: 10px; text-align: left; border: 1px solid #ddd; font-weight: bold; }
-            td { padding: 10px; border: 1px solid #ddd; }
-            .section-title { font-size: 16px; font-weight: bold; color: #1e293b; margin-bottom: 12px; border-left: 4px solid #4f46e5; padding-left: 8px; }
-          </style>
-        </head>
-        <body>
-          <h1>গাড়ি ভাড়া হিসাব বিবরণী</h1>
-          <h2>সময়কাল: ${startDate || "---"} থেকে ${endDate || "---"}</h2>
+    // Wait a bit for UI to settle
+    await new Promise((resolve) => setTimeout(resolve, 600));
 
-          <div class="grid">
-            <div class="card">
-              <p>বন্ধুদের থেকে মোট আদায়</p>
-              <h3>৳${analytics.totalCollected}</h3>
-            </div>
-            <div class="card">
-              <p>বন্ধুদের মোট বকেয়া</p>
-              <h3>৳${analytics.totalPendingDues}</h3>
-            </div>
-            <div class="card">
-              <p>গাড়িওয়ালার মোট ভাড়া</p>
-              <h3>৳${analytics.totalDriverRent}</h3>
-            </div>
-            <div class="card">
-              <p>গাড়িওয়ালাকে পরিশোধ</p>
-              <h3>৳${analytics.totalPaidToDriver}</h3>
-            </div>
-          </div>
+    try {
+      const element = sheetRef.current;
+      const fileName = `ManageMe_CarRent_Report_${new Date().toLocaleDateString("en-CA")}.pdf`;
 
-          <div class="section-title">১. বন্ধুদের বকেয়া ও হিসাব তালিকা</div>
-          <table>
-            <thead>
-              <tr>
-                <th>বন্ধুর নাম</th>
-                <th style="text-align: center;">মোট ট্রিপ</th>
-                <th style="text-align: right;">মোট নির্ধারিত শেয়ার</th>
-                <th style="text-align: right;">পরিশোধিত টাকা</th>
-                <th style="text-align: right;">মোট বকেয়া (Dues)</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${friendsRows}
-            </tbody>
-          </table>
+      const canvas = await html2canvas(element, {
+        scale: 4, // 4x scale for ultra HD
+        useCORS: true,
+        logging: false,
+        backgroundColor: "#ffffff",
+        windowWidth: 794,
+        onclone: (clonedDoc: Document) => {
+          clonedDoc.documentElement.style.overflow = "visible";
+          clonedDoc.documentElement.style.height = "auto";
+          clonedDoc.body.style.overflow = "visible";
+          clonedDoc.body.style.height = "auto";
 
-          <div class="section-title">২. ট্রিপ ও পরীক্ষার খরচ বিবরণী (এই সময়কালের)</div>
-          <table>
-            <thead>
-              <tr>
-                <th>তারিখ</th>
-                <th>পরীক্ষা/উদ্দেশ্য</th>
-                <th style="text-align: right;">গাড়ির ভাড়া</th>
-                <th style="text-align: center;">অংশগ্রহণকারী</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${tripsRows.length > 0 ? tripsRows : '<tr><td colspan="4" style="text-align: center; padding: 20px; color: #999;">এই সময়ে কোনো ট্রিপ রেকর্ড পাওয়া যায়নি।</td></tr>'}
-            </tbody>
-          </table>
+          const container = clonedDoc.getElementById("pdf-container");
+          if (container) {
+            container.style.transform = "none";
+            container.style.width = "794px";
+            container.style.height = "1122px";
+            container.style.position = "relative";
+            container.style.left = "0";
+            container.style.top = "0";
+          }
 
-          <div class="section-title">৩. গাড়িওয়ালাকে ভাড়া পরিশোধ লগ (এই সময়কালের)</div>
-          <table>
-            <thead>
-              <tr>
-                <th>তারিখ</th>
-                <th style="text-align: right;">পরিশোধিত টাকা</th>
-                <th>মন্তব্য/রসিদ</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${driverRows.length > 0 ? driverRows : '<tr><td colspan="3" style="text-align: center; padding: 20px; color: #999;">এই সময়ে কোনো পরিশোধ পাওয়া যায়নি।</td></tr>'}
-            </tbody>
-          </table>
+          const style = clonedDoc.createElement("style");
+          style.innerHTML = `
+            h1, h2, h3, h4, h5, h6, p, span, div, td, th {
+              line-height: 1.8 !important;
+              font-smooth: always;
+              -webkit-font-smoothing: antialiased;
+              -moz-osx-font-smoothing: grayscale;
+            }
+          `;
+          clonedDoc.head.appendChild(style);
+        },
+      });
 
-          <script>
-            window.onload = function() {
-              window.print();
-              setTimeout(function() { window.close(); }, 500);
-            };
-          </script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
+      setPdfProgress(95);
+
+      // Calculate dimensions in px (divide by 4 because scale is 4)
+      const imgWidth = canvas.width / 4;
+      const imgHeight = canvas.height / 4;
+
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "px",
+        format: [imgWidth, imgHeight],
+      });
+
+      const imgData = canvas.toDataURL("image/jpeg", 1.0); // Maximum quality HD
+      pdf.addImage(imgData, "JPEG", 0, 0, imgWidth, imgHeight);
+
+      const pdfBlob = pdf.output("blob");
+      const downloadUrl = URL.createObjectURL(pdfBlob);
+
+      // Create download link and trigger download
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      setPdfProgress(100);
+      showToast("পিডিএফ ডাউনলোড সম্পন্ন হয়েছে", "success");
+
+      // Clean up the object URL after a short delay
+      setTimeout(() => {
+        URL.revokeObjectURL(downloadUrl);
+      }, 500);
+
+    } catch (error) {
+      console.error("PDF Error:", error);
+      showToast("পিডিএফ তৈরি করতে সমস্যা হয়েছে", "error");
+    } finally {
+      clearInterval(progressInterval);
+      setIsGeneratingPDF(false);
+      setPdfProgress(0);
+      window.dispatchEvent(
+        new CustomEvent("app:processing", { detail: false }),
+      );
+    }
   };
 
   // Helper to resolve Friend Name
@@ -857,30 +966,268 @@ export const CarRent: React.FC = () => {
     return friends.find(f => f.id === fid)?.name || "অজানা বন্ধু";
   };
 
+  if (viewState === "preview") {
+    return (
+      <div className="min-h-screen bg-slate-100/70 -mx-4 px-4 pb-6 pt-0 flex flex-col space-y-6 relative select-none animate-in fade-in duration-300">
+        {/* Header Controller */}
+        <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md flex items-center justify-between border-b border-slate-200/50 h-14 -mx-4 px-4">
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setViewState("main")}
+              className="p-1 text-slate-800 hover:text-slate-950 active:scale-95 transition-all cursor-pointer"
+            >
+              <ArrowLeft size={24} />
+            </button>
+            <div className="flex flex-col justify-center leading-tight pl-1">
+              <h1 className="text-sm font-bold text-slate-800">
+                রিপোর্ট প্রিভিউ
+              </h1>
+              <p className="text-[9px] text-slate-400 font-semibold">
+                গাড়ি ভাড়া খতিয়ান রিপোর্ট (A4 সাইজ)
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleDownloadPDF}
+              disabled={isGeneratingPDF}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-full text-xs font-bold shadow-md transition-all duration-150 cursor-pointer disabled:opacity-50"
+            >
+              {isGeneratingPDF ? (
+                <>
+                  <span className="w-3.5 h-3.5 border-2 border-white/35 border-t-white rounded-full animate-spin" />
+                  <span>{toBanglaNumbers(pdfProgress)}% পিডিএফ</span>
+                </>
+              ) : (
+                <>
+                  <Printer size={14} />
+                  <span>ডাউনলোড PDF</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Central A4 Document Frame wrapper styled with dynamic scaling */}
+        <div
+          ref={containerRef}
+          className="w-full pb-24 flex flex-col items-center justify-start overflow-x-hidden min-h-[calc(100vh-4rem)] pt-4"
+        >
+          <div
+            className="relative overflow-hidden shadow-xl border border-slate-200 bg-white rounded-2xl"
+            style={{
+              width: `${794 * scale}px`,
+              height: `${1122 * scale}px`,
+            }}
+          >
+            <div
+              ref={sheetRef}
+              id="pdf-container"
+              className="bg-white text-slate-800 p-10 font-sans flex flex-col justify-between absolute left-0 top-0 origin-top-left"
+              style={{
+                width: "794px",
+                height: "1122px",
+                transform: `scale(${scale})`,
+              }}
+            >
+              {/* Document Content */}
+              <div className="flex flex-col h-full justify-between">
+                <div>
+                  {/* Header Banner */}
+                  <div className="mb-6 border-b border-slate-150 pb-5 flex justify-between items-start">
+                    <div>
+                      <h1 className="text-2xl font-black text-indigo-600 tracking-tight flex items-center gap-1.5 font-sans">
+                        <Car size={26} />
+                        ম্যানেজ-মি
+                      </h1>
+                      <p className="text-[10px] font-bold text-slate-400 tracking-wider mt-1">
+                        স্মার্ট গাড়ি ভাড়া খতিয়ান ব্যবস্থা
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <h2 className="text-lg font-black text-slate-800">
+                        গাড়ি ভাড়া খতিয়ান রিপোর্ট
+                      </h2>
+                      <p className="text-xs text-slate-400 mt-1 font-bold">
+                        তৈরি হয়েছে: {toBanglaNumbers(new Date().toLocaleDateString("en-US", { year: "numeric", month: "2-digit", day: "2-digit" }))}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Subtitle / Period */}
+                  <div className="mb-6 bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-500">রিপোর্ট সময়কাল:</span>
+                    <span className="text-xs font-black text-indigo-600 bg-indigo-50/50 border border-indigo-100/50 px-3 py-1 rounded-xl">
+                      {startDate === "" && endDate === ""
+                        ? "সব সময়ের হিসাব"
+                        : `${startDate ? formatDateToBangla(startDate) : "---"} থেকে ${endDate ? formatDateToBangla(endDate) : "---"}`}
+                    </span>
+                  </div>
+
+                  {/* Stats Grid */}
+                  <div className="grid grid-cols-4 gap-4 mb-6">
+                    <div className="bg-slate-50/50 border border-slate-100/80 rounded-xl p-3 text-center">
+                      <span className="text-[10px] font-bold text-slate-400 block mb-0.5">মোট ট্রিপ</span>
+                      <span className="text-sm font-black text-slate-800">{toBanglaNumbers(filteredReportData.trips.length)} টি</span>
+                    </div>
+                    <div className="bg-slate-50/50 border border-slate-100/80 rounded-xl p-3 text-center">
+                      <span className="text-[10px] font-bold text-slate-400 block mb-0.5">মোট ভাড়া (গাড়ি)</span>
+                      <span className="text-sm font-black text-rose-600">৳{toBanglaNumbers(filteredReportData.periodRent)}</span>
+                    </div>
+                    <div className="bg-slate-50/50 border border-slate-100/80 rounded-xl p-3 text-center">
+                      <span className="text-[10px] font-bold text-slate-400 block mb-0.5">মোট আদায়</span>
+                      <span className="text-sm font-black text-emerald-600">৳{toBanglaNumbers(filteredReportData.periodCollected)}</span>
+                    </div>
+                    <div className="bg-slate-50/50 border border-slate-100/80 rounded-xl p-3 text-center">
+                      <span className="text-[10px] font-bold text-slate-400 block mb-0.5">ড্রাইভারকে পরিশোধ</span>
+                      <span className="text-sm font-black text-indigo-600">৳{toBanglaNumbers(filteredReportData.periodDriverPaid)}</span>
+                    </div>
+                  </div>
+
+                  {/* Section 1: Friends summary */}
+                  <div className="mb-6">
+                    <div className="border-l-4 border-indigo-600 pl-2.5 mb-3">
+                      <h3 className="text-sm font-black text-slate-800 tracking-tight">
+                        ১. বন্ধুদের বকেয়া ও হিসাব তালিকা
+                      </h3>
+                    </div>
+                    <div className="border border-slate-100 rounded-xl overflow-hidden shadow-sm">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50/80 text-slate-700 border-b border-slate-100">
+                            <th className="p-2.5 text-[11px] font-extrabold uppercase font-bold text-slate-700">বন্ধুর নাম</th>
+                            <th className="p-2.5 text-[11px] font-extrabold uppercase text-center font-bold text-slate-700">মোট ট্রিপ</th>
+                            <th className="p-2.5 text-[11px] font-extrabold uppercase text-right font-bold text-slate-700">মোট নির্ধারিত শেয়ার</th>
+                            <th className="p-2.5 text-[11px] font-extrabold uppercase text-right font-bold text-slate-700">পরিশোধিত টাকা</th>
+                            <th className="p-2.5 text-[11px] font-extrabold uppercase text-right font-bold text-slate-700">মোট বকেয়া (Dues)</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {analytics.friendDetails.map((fd, i) => (
+                            <tr key={i} className="border-b border-slate-100 hover:bg-slate-50/50">
+                              <td className="p-2.5 text-xs text-slate-800 font-bold">{fd.name}</td>
+                              <td className="p-2.5 text-xs text-slate-600 text-center font-bold">{toBanglaNumbers(fd.totalTrips)}</td>
+                              <td className="p-2.5 text-xs text-slate-700 text-right font-bold">৳{toBanglaNumbers(fd.totalShare.toFixed(0))}</td>
+                              <td className="p-2.5 text-xs text-emerald-600 text-right font-bold">৳{toBanglaNumbers(fd.totalPaid.toFixed(0))}</td>
+                              <td className="p-2.5 text-xs text-rose-600 text-right font-black">৳{toBanglaNumbers(fd.due.toFixed(0))}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Section 2: Trips */}
+                  <div className="mb-6">
+                    <div className="border-l-4 border-indigo-600 pl-2.5 mb-3">
+                      <h3 className="text-sm font-black text-slate-800 tracking-tight">
+                        ২. ট্রিপ ও পরীক্ষার খরচ বিবরণী (এই সময়কালের)
+                      </h3>
+                    </div>
+                    <div className="border border-slate-100 rounded-xl overflow-hidden shadow-sm">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50/80 text-slate-700 border-b border-slate-100">
+                            <th className="p-2.5 text-[11px] font-extrabold uppercase font-bold text-slate-700">তারিখ</th>
+                            <th className="p-2.5 text-[11px] font-extrabold uppercase font-bold text-slate-700">পরীক্ষা/উদ্দেশ্য</th>
+                            <th className="p-2.5 text-[11px] font-extrabold uppercase text-right font-bold text-slate-700">গাড়ির ভাড়া</th>
+                            <th className="p-2.5 text-[11px] font-extrabold uppercase text-center font-bold text-slate-700">অংশগ্রহণকারী</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredReportData.trips.length > 0 ? (
+                            filteredReportData.trips.map((t, i) => (
+                              <tr key={i} className="border-b border-slate-100 hover:bg-slate-50/50">
+                                <td className="p-2.5 text-xs text-slate-600 font-medium">{formatDateToBangla(t.date)}</td>
+                                <td className="p-2.5 text-xs text-slate-800 font-bold">{t.examName}</td>
+                                <td className="p-2.5 text-xs text-slate-800 text-right font-black">৳{toBanglaNumbers(t.totalRent)}</td>
+                                <td className="p-2.5 text-xs text-slate-600 text-center font-bold">{toBanglaNumbers(t.participantIds?.length || 0)} জন</td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan={4} className="p-6 text-center text-xs text-slate-400 font-bold">
+                                এই সময়ে কোনো ট্রিপ রেকর্ড পাওয়া যায়নি।
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Section 3: Driver Payments */}
+                  <div className="mb-6">
+                    <div className="border-l-4 border-indigo-600 pl-2.5 mb-3">
+                      <h3 className="text-sm font-black text-slate-800 tracking-tight">
+                        ৩. গাড়িওয়ালাকে ভাড়া পরিশোধ লগ (এই সময়কালের)
+                      </h3>
+                    </div>
+                    <div className="border border-slate-100 rounded-xl overflow-hidden shadow-sm">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50/80 text-slate-700 border-b border-slate-100">
+                            <th className="p-2.5 text-[11px] font-extrabold uppercase font-bold text-slate-700">তারিখ</th>
+                            <th className="p-2.5 text-[11px] font-extrabold uppercase text-right font-bold text-slate-700">পরিশোধিত টাকা</th>
+                            <th className="p-2.5 text-[11px] font-extrabold uppercase font-bold text-slate-700">মন্তব্য/রসিদ</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredReportData.driverPayments.length > 0 ? (
+                            filteredReportData.driverPayments.map((dp, i) => (
+                              <tr key={i} className="border-b border-slate-100 hover:bg-slate-50/50">
+                                <td className="p-2.5 text-xs text-slate-600 font-medium">{formatDateToBangla(dp.date)}</td>
+                                <td className="p-2.5 text-xs text-indigo-600 text-right font-black">৳{toBanglaNumbers(dp.amount)}</td>
+                                <td className="p-2.5 text-xs text-slate-600 font-bold">{dp.remarks || "---"}</td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan={3} className="p-6 text-center text-xs text-slate-400 font-bold">
+                                এই সময়ে কোনো পরিশোধ পাওয়া যায়নি।
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer watermark */}
+                <div className="text-center text-[10px] text-slate-400 font-bold tracking-wider border-t border-slate-100 pt-4">
+                  ম্যানেজ-মি স্মার্ট খতিয়ান ব্যবস্থা দ্বারা পরিচালিত
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full min-h-screen bg-slate-50 flex flex-col pb-20">
       {/* Top Header */}
-      <div className="bg-white border-b border-slate-100 shadow-sm sticky top-0 z-50 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md flex items-center justify-between mb-6 border-b border-slate-200/60 h-14 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+        <div className="flex items-center gap-3.5">
           <button
             onClick={() => navigate(-1)}
-            className="w-10 h-10 rounded-full flex items-center justify-center text-slate-600 hover:bg-slate-100 active:scale-95 transition-all"
+            className="w-11 h-11 rounded-full border border-slate-200 bg-white flex items-center justify-center text-slate-800 active:scale-95 transition-all hover:bg-slate-100 hover:border-slate-300 cursor-pointer shrink-0 shadow-sm"
           >
             <ArrowLeft size={20} />
           </button>
           <div>
-            <h1 className="text-lg font-black text-slate-800 tracking-tight flex items-center gap-1.5">
+            <h1 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-1.5">
               <Car className="text-indigo-600" size={22} />
               গাড়ি ভাড়া খতিয়ান
             </h1>
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-              বন্ধুদের পরীক্ষা ও গাড়ির ভাড়ার হিসাব
-            </p>
           </div>
         </div>
 
         {/* Sync Status Badge */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-100 rounded-full py-1 px-3">
           <div className={`w-2 h-2 rounded-full ${isOnline ? "bg-green-500 animate-pulse" : "bg-amber-500"}`} />
           <span className="text-[10px] font-bold text-slate-500">
             {isOnline ? "অনলাইন সিঙ্কড" : "অফলাইন ক্যাশ"}
@@ -894,27 +1241,30 @@ export const CarRent: React.FC = () => {
         {/* WALLET & STATS OVERVIEW */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Main Wallet Card */}
-          <div className="md:col-span-1 bg-gradient-to-br from-indigo-900 via-slate-900 to-indigo-950 rounded-3xl p-5 text-white shadow-lg relative overflow-hidden flex flex-col justify-between min-h-[140px] border border-slate-800">
-            <div className="absolute right-0 top-0 translate-x-4 -translate-y-4 opacity-10">
-              <Car size={140} />
+          <div className="md:col-span-1 bg-gradient-to-br from-indigo-600 via-indigo-600 to-indigo-700 rounded-2xl p-4 text-white shadow-md relative overflow-hidden flex flex-col justify-between min-h-[115px]">
+            <div className="absolute right-0 bottom-0 translate-x-4 translate-y-4 opacity-15 pointer-events-none">
+              <Car size={100} className="text-white" />
             </div>
-            <div>
+            <div className="relative z-10">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-black uppercase tracking-wider text-indigo-300 bg-indigo-950/60 px-2 py-0.5 rounded-lg border border-indigo-800/50">
+                <span className="text-[9px] font-black uppercase tracking-wider text-white bg-white/20 px-2 py-0.5 rounded">
                   খতিয়ান ওয়ালেট
                 </span>
-                <span className="text-[10px] text-slate-400 font-bold">Cash Fund</span>
+                <span className="text-[9px] text-indigo-100 font-bold opacity-90">Cash Fund</span>
               </div>
-              <h3 className="text-3xl font-black mt-3 tracking-tight">
-                ৳{analytics.walletBalance}
-              </h3>
-              <p className="text-[10px] text-slate-400 font-semibold mt-1">
+              <div className="flex items-baseline gap-1.5 mt-2">
+                <span className="text-[20px] font-extrabold text-indigo-200">৳</span>
+                <span className="text-2xl font-black tracking-tight text-white drop-shadow-sm">
+                  {analytics.walletBalance}
+                </span>
+              </div>
+              <p className="text-[9px] text-indigo-100 font-bold mt-1 opacity-90">
                 উদ্বৃত্ত ক্যাশ তহবিল (আদায় - ড্রাইভার পেমেন্ট)
               </p>
             </div>
-            <div className="border-t border-slate-800/80 pt-2 mt-2 flex items-center justify-between text-[9px] text-indigo-200">
-              <span>রেট: ৳১০০/স্টুডেন্ট</span>
-              <span>ড্রাইভার: ৳১৩০০/দিন</span>
+            <div className="border-t border-white/20 pt-1.5 mt-2 flex items-center justify-between text-[9px] text-indigo-100 font-bold relative z-10">
+              <span className="bg-white/10 px-1.5 py-0.5 rounded">রেট: ৳১০০/স্টুডেন্ট</span>
+              <span className="bg-white/10 px-1.5 py-0.5 rounded">ড্রাইভার: ৳১৩০০/দিন</span>
             </div>
           </div>
 
@@ -987,7 +1337,18 @@ export const CarRent: React.FC = () => {
                   <Calendar className="text-indigo-600" size={18} />
                   <h3 className="font-bold text-slate-800 text-sm">রিপোর্ট ও কাস্টম তারিখ ফিল্টার</h3>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setTempCustomDates({ start: startDate || "", end: endDate || "" });
+                      setModalSubView("main");
+                      setShowFilterModal(true);
+                    }}
+                    className={`p-2 active:scale-95 transition-all rounded-xl border ${startDate || endDate ? "text-indigo-600 bg-indigo-50 border-indigo-200" : "text-slate-400 bg-slate-50 border-slate-100"}`}
+                    title="তারিখ ফিল্টার"
+                  >
+                    <CalendarDays size={16} />
+                  </button>
                   <button
                     onClick={handlePrintReport}
                     className="flex items-center gap-1 bg-slate-100 text-slate-700 px-3 py-1.5 rounded-xl font-bold text-[11px] active:scale-95 transition-all hover:bg-slate-200"
@@ -995,30 +1356,37 @@ export const CarRent: React.FC = () => {
                     <Printer size={13} />
                     প্রিন্ট / PDF
                   </button>
-                  <button
-                    onClick={handleDownloadCSV}
-                    className="flex items-center gap-1 bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-xl font-bold text-[11px] active:scale-95 transition-all hover:bg-indigo-100"
-                  >
-                    <Download size={13} />
-                    CSV ডাউনলোড
-                  </button>
                 </div>
               </div>
 
-              {/* DATE PICKER */}
-              <div className="grid grid-cols-2 gap-3">
-                <DatePicker
-                  label="শুরুর তারিখ"
-                  value={startDate}
-                  onChange={(date) => setStartDate(date)}
-                  placeholder="শুরুর তারিখ"
-                />
-                <DatePicker
-                  label="শেষ তারিখ"
-                  value={endDate}
-                  onChange={(date) => setEndDate(date)}
-                  placeholder="শেষ তারিখ"
-                />
+              {/* DATE RANGE FILTER STATE ROW */}
+              <div className="flex items-center justify-between bg-slate-50/50 px-3 py-2 rounded-2xl border border-slate-100/80">
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${startDate || endDate ? "bg-indigo-500 animate-pulse" : "bg-slate-300"}`}></div>
+                  <span className="text-xs font-bold text-slate-600">
+                    {startDate === "" && endDate === "" ? (
+                      "সব সময়ের হিসাব"
+                    ) : selectedPeriodOption === "month" ? (
+                      `মাস অনুযায়ী: ${banglaMonths[new Date(startDate).getMonth()]}, ${toBanglaNumbers(new Date(startDate).getFullYear())}`
+                    ) : selectedPeriodOption === "year" ? (
+                      `বছর অনুযায়ী: ${toBanglaNumbers(new Date(startDate).getFullYear())}`
+                    ) : (
+                      `তারিখ অনুযায়ী: ${formatDateToBangla(startDate)} থেকে ${formatDateToBangla(endDate)}`
+                    )}
+                  </span>
+                </div>
+                {(startDate || endDate) && (
+                  <button
+                    onClick={() => {
+                      setStartDate("");
+                      setEndDate("");
+                      setSelectedPeriodOption("");
+                    }}
+                    className="text-[10px] text-red-500 hover:text-red-600 font-bold px-2 py-1 rounded bg-red-50"
+                  >
+                    মুছে ফেলুন
+                  </button>
+                )}
               </div>
 
               {/* Filter Period Summary */}
@@ -1692,6 +2060,288 @@ export const CarRent: React.FC = () => {
         title={deleteConfirm.title}
         message={deleteConfirm.message}
       />
+
+      {/* Date Filter Selection Modal matching Expenses design */}
+      {showFilterModal && (
+        <div
+          onClick={() => {
+            setIsStartDatePickerOpen(false);
+            setIsEndDatePickerOpen(false);
+            setShowFilterModal(false);
+          }}
+          className="fixed inset-0 z-[2000] bg-black/60 backdrop-blur-[2px] overflow-y-auto flex items-start sm:items-center justify-center p-4 animate-in fade-in duration-300"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-[28px] w-full max-w-[305px] p-5 shadow-2xl flex flex-col items-center animate-in zoom-in-95 duration-200 select-none border border-slate-100 my-auto"
+          >
+            {/* Conditional Rendering based on active subView */}
+            {modalSubView === "main" && (
+              <div className="w-full animate-in fade-in duration-150">
+                {/* Modal Title matching Bangladesh "নির্বাচন করুন" */}
+                <h3 className="text-[20px] font-black text-slate-800 mb-5 text-center tracking-tight">
+                  নির্বাচন করুন
+                </h3>
+
+                {/* Vertical Stack of Styled Buttons following design/color in screenshot */}
+                <div className="w-full space-y-3">
+                  <button
+                    type="button"
+                    onClick={() => setModalSubView("date")}
+                    className={`w-full h-[51px] rounded-2xl text-[15px] font-medium transition-all duration-200 active:scale-[0.98] ${
+                      selectedPeriodOption === "custom"
+                        ? "bg-indigo-600 text-white shadow-lg"
+                        : "bg-[#f3f5f8] hover:bg-[#eef1f6] text-[#1f2937]"
+                    }`}
+                  >
+                    তারিখ অনুযায়ী
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setModalSubView("month")}
+                    className={`w-full h-[51px] rounded-2xl text-[15px] font-medium transition-all duration-200 active:scale-[0.98] ${
+                      selectedPeriodOption === "month"
+                        ? "bg-indigo-600 text-white shadow-lg"
+                        : "bg-[#f3f5f8] hover:bg-[#eef1f6] text-[#1f2937]"
+                    }`}
+                  >
+                    মাস অনুযায়ী
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setModalSubView("year")}
+                    className={`w-full h-[51px] rounded-2xl text-[15px] font-medium transition-all duration-200 active:scale-[0.98] ${
+                      selectedPeriodOption === "year"
+                        ? "bg-indigo-600 text-white shadow-lg"
+                        : "bg-[#f3f5f8] hover:bg-[#eef1f6] text-[#1f2937]"
+                    }`}
+                  >
+                    বছর অনুযায়ী
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {modalSubView === "date" && (
+              <div className="w-full animate-in fade-in slide-in-from-right-3 duration-200">
+                {/* Back button + Header */}
+                <div className="flex items-center gap-3 mb-5 w-full">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsStartDatePickerOpen(false);
+                      setIsEndDatePickerOpen(false);
+                      setModalSubView("main");
+                    }}
+                    className="p-1.5 hover:bg-slate-100 rounded-full transition-colors text-slate-500 shrink-0"
+                  >
+                    <ArrowLeft size={18} />
+                  </button>
+                  <span className="text-[17px] font-bold text-slate-800">
+                    তারিখ নির্বাচন করুন
+                  </span>
+                </div>
+
+                {/* Form inputs */}
+                <div
+                  className={`w-full space-y-4 transition-all duration-300 ${isStartDatePickerOpen || isEndDatePickerOpen ? "pb-[260px]" : ""}`}
+                >
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold text-slate-500">
+                      শুরের তারিখ
+                    </label>
+                    <DatePicker
+                      value={tempCustomDates.start}
+                      onChange={(date) =>
+                        setTempCustomDates({
+                          ...tempCustomDates,
+                          start: date,
+                        })
+                      }
+                      placeholder="শুরুর তারিখ"
+                      onOpenChange={(open) =>
+                        setIsStartDatePickerOpen(open)
+                      }
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold text-slate-500">
+                      শেষের তারিখ
+                    </label>
+                    <DatePicker
+                      value={tempCustomDates.end}
+                      onChange={(date) =>
+                        setTempCustomDates({
+                          ...tempCustomDates,
+                          end: date,
+                        })
+                      }
+                      placeholder="শেষের তারিখ"
+                      align="right"
+                      onOpenChange={(open) =>
+                        setIsEndDatePickerOpen(open)
+                      }
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!tempCustomDates.start || !tempCustomDates.end) {
+                        showToast("দয়া করে শুরুর তারিখ এবং শেষ তারিখ নির্বাচন করুন।", "error");
+                        return;
+                      }
+                      setStartDate(tempCustomDates.start);
+                      setEndDate(tempCustomDates.end);
+                      setSelectedPeriodOption("custom");
+                      setShowFilterModal(false);
+                      setIsStartDatePickerOpen(false);
+                      setIsEndDatePickerOpen(false);
+                    }}
+                    className="w-full h-[52px] mt-4 bg-indigo-600 text-white rounded-2xl font-bold hover:opacity-95 text-[16px] transition-all shadow-lg"
+                  >
+                    নিশ্চিত করুন
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {modalSubView === "month" && (
+              <div className="w-full animate-in fade-in slide-in-from-right-3 duration-200">
+                {/* Back button + Header */}
+                <div className="flex items-center gap-3 mb-5 w-full">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsStartDatePickerOpen(false);
+                      setIsEndDatePickerOpen(false);
+                      setModalSubView("main");
+                    }}
+                    className="p-1.5 hover:bg-slate-100 rounded-full transition-colors text-slate-500 shrink-0"
+                  >
+                    <ArrowLeft size={18} />
+                  </button>
+                  <span className="text-[17px] font-bold text-slate-800">
+                    চলতি বছরের মাসসমূহ
+                  </span>
+                </div>
+
+                {/* 12 Months Grid */}
+                <div className="grid grid-cols-3 gap-2 w-full max-h-[350px] overflow-y-auto pr-0.5">
+                  {[
+                    "জানুয়ারি",
+                    "ফেব্রুয়ারি",
+                    "মার্চ",
+                    "এপ্রিল",
+                    "মে",
+                    "জুন",
+                    "জুলাই",
+                    "আগস্ট",
+                    "সেপ্টেম্বর",
+                    "অক্টোবর",
+                    "নভেম্বর",
+                    "ডিসেম্বর",
+                  ].map((mName, idx) => {
+                    const currentYearValue = new Date().getFullYear();
+                    const mNumStr = String(idx + 1).padStart(2, "0");
+                    const lastDayOfM = new Date(
+                      currentYearValue,
+                      idx + 1,
+                      0,
+                    ).getDate();
+                    const startVal = `${currentYearValue}-${mNumStr}-01`;
+                    const endVal = `${currentYearValue}-${mNumStr}-${lastDayOfM}`;
+                    const isActiveM =
+                      startDate === startVal &&
+                      endDate === endVal;
+
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          setStartDate(startVal);
+                          setEndDate(endVal);
+                          setSelectedPeriodOption("month");
+                          setShowFilterModal(false);
+                        }}
+                        className={`py-3 rounded-xl text-[13px] font-bold transition-all duration-150 active:scale-95 text-center ${
+                          isActiveM
+                            ? "bg-indigo-600 text-white shadow-md"
+                            : "bg-[#f3f5f8] hover:bg-[#eef1f6] text-[#1f2937]"
+                        }`}
+                      >
+                        {mName}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {modalSubView === "year" && (
+              <div className="w-full animate-in fade-in slide-in-from-right-3 duration-200">
+                {/* Back button + Header */}
+                <div className="flex items-center gap-3 mb-5 w-full">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsStartDatePickerOpen(false);
+                      setIsEndDatePickerOpen(false);
+                      setModalSubView("main");
+                    }}
+                    className="p-1.5 hover:bg-slate-100 rounded-full transition-colors text-slate-500 shrink-0"
+                  >
+                    <ArrowLeft size={18} />
+                  </button>
+                  <span className="text-[17px] font-bold text-slate-800">
+                    সাল নির্বাচন করুন
+                  </span>
+                </div>
+
+                {/* Years Stack */}
+                <div className="flex flex-col gap-2.5 w-full max-h-[350px] overflow-y-auto pr-0.5">
+                  {Array.from(
+                    { length: 5 },
+                    (_, i) => new Date().getFullYear() - 2 + i,
+                  ).map((yearValue) => {
+                    const startVal = `${yearValue}-01-01`;
+                    const endVal = `${yearValue}-12-31`;
+                    const isActiveY =
+                      startDate === startVal &&
+                      endDate === endVal;
+
+                    return (
+                      <button
+                        key={yearValue}
+                        type="button"
+                        onClick={() => {
+                          setStartDate(startVal);
+                          setEndDate(endVal);
+                          setSelectedPeriodOption("year");
+                          setShowFilterModal(false);
+                        }}
+                        className={`w-full py-3.5 rounded-2xl text-[15px] font-bold transition-all duration-150 active:scale-95 text-center ${
+                          isActiveY
+                            ? "bg-indigo-600 text-white shadow-md"
+                            : "bg-[#f3f5f8] hover:bg-[#eef1f6] text-[#1f2937]"
+                        }`}
+                      >
+                        {toBanglaNumbers(yearValue)}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+
+
 
     </div>
   );
