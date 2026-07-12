@@ -197,6 +197,7 @@ export interface CarRentCollection {
   friendId: string;
   amount: number;
   tripId?: string;
+  paymentMethod?: 'cash' | 'advance';
   userid: string;
   createdAt?: string;
   updatedAt?: string;

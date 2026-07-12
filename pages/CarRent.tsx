@@ -365,14 +365,17 @@ export const CarRent: React.FC = () => {
       });
     });
 
-    // 2. Calculate friend total paid collections
+    // 2. Calculate friend total paid collections (Only fresh cash payments count towards "paid" for balance calc)
     const friendPaid: Record<string, number> = {};
     friends.forEach(f => {
       friendPaid[f.id] = 0;
     });
     collections.forEach(c => {
       if (friendPaid[c.friendId] !== undefined) {
-        friendPaid[c.friendId] += c.amount;
+        // Exclude advance usage to avoid double counting
+        if (c.paymentMethod !== 'advance') {
+          friendPaid[c.friendId] += c.amount;
+        }
       }
     });
 
@@ -391,12 +394,16 @@ export const CarRent: React.FC = () => {
     });
 
     // 4. Summaries
-    const totalCollected = friendDetails.reduce((sum, fd) => sum + fd.totalPaid, 0);
-    const totalDriverRent = trips.length * 1300; // Driver cost is fixed 1300 Taka per day/trip
+    // totalCollected should only include fresh cash to represent the real money in hand
+    const totalCollected = collections
+      .filter(c => c.paymentMethod !== 'advance')
+      .reduce((sum, c) => sum + c.amount, 0);
+      
+    const totalDriverRent = trips.length * 1300; 
     const totalPaidToDriver = driverPayments.reduce((sum, p) => sum + p.amount, 0);
     const totalPendingDues = friendDetails.reduce((sum, fd) => sum + fd.due, 0);
     
-    // Wallet Balance = Student payments - Driver payments
+    // Wallet Balance = Fresh Cash Collected - Driver payments
     const walletBalance = totalCollected - totalPaidToDriver;
     const driverDue = Math.max(0, totalDriverRent - totalPaidToDriver);
 
@@ -549,19 +556,45 @@ export const CarRent: React.FC = () => {
 
         // Save collections for each selected student
         for (const pid of newTrip.participantIds) {
-          const colId = `col_${tripId}_${pid}`;
           const amountPaid = tempPayments[pid] !== undefined && tempPayments[pid] !== "" ? Number(tempPayments[pid]) : 0;
-          const newCol: CarRentCollection = {
-            id: colId,
-            friendId: pid,
-            tripId: tripId,
-            amount: amountPaid,
-            date: newTrip.date,
-            userid: user.id,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          };
-          await setDoc(doc(db, "car_rent_collections", colId), newCol);
+          
+          // Determine how much is from existing advance balance
+          const fdDetail = analytics.friendDetails.find(d => d.id === pid);
+          const currentAdvance = fdDetail ? fdDetail.balance : 0;
+          const advanceUsage = Math.min(amountPaid, currentAdvance);
+          const cashPayment = amountPaid - advanceUsage;
+
+          if (advanceUsage > 0) {
+            const advColId = `col_${tripId}_${pid}_adv`;
+            const advCol: CarRentCollection = {
+              id: advColId,
+              friendId: pid,
+              tripId: tripId,
+              amount: advanceUsage,
+              paymentMethod: 'advance',
+              date: newTrip.date,
+              userid: user.id,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            };
+            await setDoc(doc(db, "car_rent_collections", advColId), advCol);
+          }
+
+          if (cashPayment > 0 || (advanceUsage === 0 && amountPaid === 0)) {
+            const cashColId = `col_${tripId}_${pid}_cash`;
+            const cashCol: CarRentCollection = {
+              id: cashColId,
+              friendId: pid,
+              tripId: tripId,
+              amount: cashPayment,
+              paymentMethod: 'cash',
+              date: newTrip.date,
+              userid: user.id,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            };
+            await setDoc(doc(db, "car_rent_collections", cashColId), cashCol);
+          }
         }
       }
 
@@ -577,20 +610,38 @@ export const CarRent: React.FC = () => {
       setCollections(prev => {
         // Filter out old collections for this trip
         let updated = prev.filter(c => c.tripId !== tripId);
-        // Add new ones for selected participants
+        // Add new ones
         newTrip.participantIds.forEach(pid => {
-          const colId = `col_${tripId}_${pid}`;
           const amountPaid = tempPayments[pid] !== undefined && tempPayments[pid] !== "" ? Number(tempPayments[pid]) : 0;
-          updated.push({
-            id: colId,
-            friendId: pid,
-            tripId: tripId,
-            amount: amountPaid,
-            date: newTrip.date,
-            userid: user.id,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          });
+          const fdDetail = analytics.friendDetails.find(d => d.id === pid);
+          const currentAdvance = fdDetail ? fdDetail.balance : 0;
+          const advanceUsage = Math.min(amountPaid, currentAdvance);
+          const cashPayment = amountPaid - advanceUsage;
+
+          if (advanceUsage > 0) {
+            updated.push({
+              id: `col_${tripId}_${pid}_adv`,
+              friendId: pid,
+              tripId: tripId,
+              amount: advanceUsage,
+              paymentMethod: 'advance',
+              date: newTrip.date,
+              userid: user.id,
+              createdAt: new Date().toISOString()
+            });
+          }
+          if (cashPayment > 0 || (advanceUsage === 0 && amountPaid === 0)) {
+            updated.push({
+              id: `col_${tripId}_${pid}_cash`,
+              friendId: pid,
+              tripId: tripId,
+              amount: cashPayment,
+              paymentMethod: 'cash',
+              date: newTrip.date,
+              userid: user.id,
+              createdAt: new Date().toISOString()
+            });
+          }
         });
         updated.sort((a, b) => b.date.localeCompare(a.date));
         return updated;
@@ -651,6 +702,7 @@ export const CarRent: React.FC = () => {
         friendId: cData.friendId,
         amount: Number(cData.amount),
         tripId: cData.tripId || "",
+        paymentMethod: 'cash',
         userid: user.id,
         createdAt: cData.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString()
@@ -1930,11 +1982,14 @@ export const CarRent: React.FC = () => {
                                 <span className="text-xs font-bold text-slate-700 truncate">{f.name}</span>
                                 {(() => {
                                   const detail = analytics.friendDetails.find(d => d.id === f.id);
-                                  const bal = (detail?.totalPaid || 0) - (detail?.totalShare || 0);
-                                  if (bal > 0) {
+                                  const currentBal = (detail?.totalPaid || 0) - (detail?.totalShare || 0);
+                                  const currentTempPay = Number(tempPayments[f.id]) || 0;
+                                  const effectiveBal = currentBal - currentTempPay;
+                                  
+                                  if (currentBal > 0 || effectiveBal > 0) {
                                     return (
-                                      <span className="text-[9px] font-bold text-green-600 bg-green-50 px-1 rounded-md w-fit">
-                                        জমা: ৳{toBanglaNumbers(bal)}
+                                      <span className={`text-[9px] font-bold px-1 rounded-md w-fit ${effectiveBal >= 0 ? "text-green-600 bg-green-50" : "text-rose-600 bg-rose-50"}`}>
+                                        জমা: ৳{toBanglaNumbers(effectiveBal)}
                                       </span>
                                     );
                                   }
@@ -1985,13 +2040,13 @@ export const CarRent: React.FC = () => {
                       <span>মোট ভাড়া: <span className="font-black text-emerald-600 text-xs">৳{tripModal.data.participantIds.length * 100}</span></span>
                     </div>
                     <div className="flex items-center justify-between border-t border-emerald-100/50 pt-1 mt-1 text-[9px] text-emerald-600">
-                      <span>আজ আদায় হয়েছে:</span>
+                      <span>মোট পরিশোধ (নগদ + জমা):</span>
                       <span className="font-bold">
                         ৳{tripModal.data.participantIds.reduce((sum, pid) => sum + (tempPayments[pid] ? Number(tempPayments[pid]) : 0), 0)}
                       </span>
                     </div>
                     <div className="flex items-center justify-between text-[9px] text-rose-500 font-bold">
-                      <span>বকেয়া জমা থাকবে:</span>
+                      <span>অবশিষ্ট বকেয়া:</span>
                       <span>
                         ৳{tripModal.data.participantIds.reduce((sum, pid) => sum + Math.max(0, 100 - (tempPayments[pid] ? Number(tempPayments[pid]) : 0)), 0)}
                       </span>
