@@ -732,7 +732,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
             : isExpensesPage
             ? `pt-14 lg:pt-8 ${hasBottomNav ? "pb-[72px]" : "pb-4"} lg:pb-8 px-0 lg:px-8`
             : `pt-14 lg:pt-8 ${hasBottomNav ? "pb-[72px]" : "pb-4"} lg:pb-8 px-3 lg:px-8`
-        } ${isExpensesPage ? "" : "animate-in fade-in duration-150"} w-full max-w-[100vw] lg:max-w-none ${isExpensesPage ? 'overflow-x-clip' : 'overflow-x-hidden'} ${isTrash ? "" : "lg:ml-72"} transition-[padding] duration-300`}
+        } ${isExpensesPage ? "" : "animate-in fade-in duration-150"} w-full max-w-[100vw] lg:max-w-none ${isExpensesPage ? 'overflow-x-clip' : 'overflow-x-hidden'} ${isTrash ? "" : "lg:ml-72"}`}
       >
         <div
           className={`max-w-4xl lg:max-w-5xl mx-auto w-full ${isFullScreenPage ? "h-[100dvh] lg:h-auto" : ""}`}
