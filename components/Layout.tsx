@@ -745,10 +745,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
       {/* Fixed Bottom Navigation Bar - Hide if Admin is on User List page or on Desktop */}
       {(!isAdmin || adminSelectedUserId) && !isFullScreenPage && (
         <div 
-          className="fixed inset-x-0 z-50 bg-white border-t border-slate-100 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] pb-safe lg:hidden transition-all duration-300"
+          className="fixed inset-x-0 z-50 bg-white border-t border-slate-100 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] lg:hidden h-[60px]"
           style={{ bottom: !isOnline ? '38px' : '0px' }}
         >
-          <nav className="flex justify-between items-center px-6 h-[60px] w-full max-w-lg mx-auto">
+          <nav className="flex justify-between items-center px-6 h-full w-full max-w-lg mx-auto">
             {PRIMARY_NAV.map((item) => {
               const isActive = location.pathname === item.path;
               return (
