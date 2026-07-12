@@ -43,6 +43,7 @@ import {
   doc,
   setDoc,
   deleteDoc,
+  updateDoc,
   writeBatch,
 } from "firebase/firestore";
 import {
@@ -197,7 +198,12 @@ export const CarRent: React.FC = () => {
         // Make sure currently checked participants default to "" if no collection exists
         tripModal.data?.participantIds?.forEach(pid => {
           if (paymentsMap[pid] === undefined) {
-            paymentsMap[pid] = "";
+            // Calculate student's existing advance balance
+            const friendDetail = analytics.friendDetails.find(d => d.id === pid);
+            const currentBalance = (friendDetail?.totalPaid || 0) - (friendDetail?.totalShare || 0);
+            
+            // Auto-fill payment from balance (max 100)
+            paymentsMap[pid] = currentBalance > 0 ? Math.min(100, currentBalance) : "";
           }
         });
         setTempPayments(paymentsMap);
@@ -379,12 +385,13 @@ export const CarRent: React.FC = () => {
         totalTrips: friendTripCounts[f.id] || 0,
         totalShare: share,
         totalPaid: paid,
-        due: Math.max(0, share - paid)
+        due: Math.max(0, share - paid),
+        balance: Math.max(0, paid - share)
       };
     });
 
     // 4. Summaries
-    const totalCollected = collections.reduce((sum, c) => sum + c.amount, 0);
+    const totalCollected = friendDetails.reduce((sum, fd) => sum + fd.totalPaid, 0);
     const totalDriverRent = trips.length * 1300; // Driver cost is fixed 1300 Taka per day/trip
     const totalPaidToDriver = driverPayments.reduce((sum, p) => sum + p.amount, 0);
     const totalPendingDues = friendDetails.reduce((sum, fd) => sum + fd.due, 0);
@@ -461,10 +468,36 @@ export const CarRent: React.FC = () => {
       onConfirm: async () => {
         try {
           if (isOnline) {
+            // Delete friend doc
             await deleteDoc(doc(db, "car_rent_friends", friendId));
+            
+            // Delete all associated collections for this friend
+            const friendCollections = collections.filter(c => c.friendId === friendId);
+            for (const col of friendCollections) {
+              await deleteDoc(doc(db, "car_rent_collections", col.id));
+            }
+
+            // Remove friend from all trips participantIds
+            const affectedTrips = trips.filter(t => t.participantIds?.includes(friendId));
+            for (const trip of affectedTrips) {
+              const updatedParts = trip.participantIds.filter(pid => pid !== friendId);
+              await updateDoc(doc(db, "car_rent_trips", trip.id), {
+                participantIds: updatedParts,
+                updatedAt: new Date().toISOString()
+              });
+            }
           }
+          
           setFriends(prev => prev.filter(f => f.id !== friendId));
-          showToast("স্টুডেন্ট প্রোফাইল ডিলিট হয়েছে।", "success");
+          setCollections(prev => prev.filter(c => c.friendId !== friendId));
+          setTrips(prev => prev.map(t => {
+            if (t.participantIds?.includes(friendId)) {
+              return { ...t, participantIds: t.participantIds.filter(pid => pid !== friendId) };
+            }
+            return t;
+          }));
+          
+          showToast("স্টুডেন্ট প্রোফাইল ও সংশ্লিষ্ট হিসাব ডিলিট হয়েছে।", "success");
           setTimeout(fetchLiveAndSync, 500);
         } catch (err: any) {
           showToast("ডিলিট করা যায়নি।", "error");
@@ -1614,7 +1647,8 @@ export const CarRent: React.FC = () => {
               {trips
                 .filter(t => t.examName.toLowerCase().includes(searchTrip.toLowerCase()))
                 .map(t => {
-                  const participantCount = t.participantIds?.length || 0;
+                  const activeParticipants = t.participantIds?.filter(pid => friends.some(f => f.id === pid)) || [];
+                  const participantCount = activeParticipants.length;
                   const studentTotalFare = participantCount * 100;
                   const driverFare = 1300;
                   const tripBalance = studentTotalFare - driverFare;
@@ -1679,18 +1713,23 @@ export const CarRent: React.FC = () => {
                         </div>
 
                         {/* Checklist-like names bubble */}
-                        <div className="flex flex-wrap gap-1.5 mt-1">
-                          {t.participantIds?.map(pid => {
+                        <div className="flex flex-wrap gap-1.5 mt-1.5">
+                          {t.participantIds?.filter(pid => friends.some(f => f.id === pid)).map(pid => {
                             const studentPayment = tripCollections.find(c => c.friendId === pid)?.amount ?? 0;
                             const isPaidInFull = studentPayment >= 100;
+                            const name = getFriendName(pid);
+                            
                             return (
-                              <span key={pid} className="text-[10px] font-bold bg-slate-50 border border-slate-100/80 rounded-lg px-2 py-1 text-slate-600 flex items-center gap-1.5">
-                                <Check size={10} className={isPaidInFull ? "text-emerald-600" : "text-amber-500"} />
-                                <span>{getFriendName(pid)}</span>
-                                <span className={`text-[8px] px-1.5 py-0.5 rounded font-black ${isPaidInFull ? "bg-emerald-100/70 text-emerald-700" : studentPayment > 0 ? "bg-amber-100/70 text-amber-700" : "bg-rose-100/70 text-rose-700"}`}>
-                                  ৳{studentPayment}
+                              <div 
+                                key={pid} 
+                                className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-50 border border-slate-100 text-slate-600"
+                              >
+                                <Check size={10} className={isPaidInFull ? "text-emerald-500" : "text-amber-500"} />
+                                <span className="text-[10px] font-bold">{name}</span>
+                                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${isPaidInFull ? "bg-emerald-100 text-emerald-700" : studentPayment > 0 ? "bg-amber-100 text-amber-700" : "bg-rose-100 text-rose-700"}`}>
+                                  ৳{toBanglaNumbers(studentPayment)}
                                 </span>
-                              </span>
+                              </div>
                             );
                           })}
                         </div>
@@ -1874,7 +1913,14 @@ export const CarRent: React.FC = () => {
                                     });
                                   } else {
                                     nextIds = [...currentIds, f.id];
-                                    setTempPayments(prev => ({ ...prev, [f.id]: "" }));
+                                    
+                                    // Calculate student's existing advance balance
+                                    const friendDetail = analytics.friendDetails.find(d => d.id === f.id);
+                                    const currentBalance = (friendDetail?.totalPaid || 0) - (friendDetail?.totalShare || 0);
+                                    
+                                    // Auto-fill payment from balance (max 100)
+                                    const autoFillAmount = currentBalance > 0 ? Math.min(100, currentBalance) : "";
+                                    setTempPayments(prev => ({ ...prev, [f.id]: autoFillAmount }));
                                   }
                                   setTripModal(prev => ({ ...prev, data: { ...prev.data, participantIds: nextIds } }));
                                 }}
@@ -1882,6 +1928,18 @@ export const CarRent: React.FC = () => {
                               />
                               <div className="flex flex-col min-w-0">
                                 <span className="text-xs font-bold text-slate-700 truncate">{f.name}</span>
+                                {(() => {
+                                  const detail = analytics.friendDetails.find(d => d.id === f.id);
+                                  const bal = (detail?.totalPaid || 0) - (detail?.totalShare || 0);
+                                  if (bal > 0) {
+                                    return (
+                                      <span className="text-[9px] font-bold text-green-600 bg-green-50 px-1 rounded-md w-fit">
+                                        জমা: ৳{toBanglaNumbers(bal)}
+                                      </span>
+                                    );
+                                  }
+                                  return null;
+                                })()}
                               </div>
                             </label>
 
