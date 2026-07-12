@@ -730,26 +730,25 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
           isFullScreenPage
             ? "p-0"
             : isExpensesPage
-            ? `pt-14 lg:pt-8 ${hasBottomNav ? "pb-[72px]" : "pb-4"} lg:pb-8 px-0 lg:px-8`
-            : `pt-14 lg:pt-8 ${hasBottomNav ? "pb-[72px]" : "pb-4"} lg:pb-8 px-3 lg:px-8`
+            ? `pt-14 lg:pt-8 ${!isOnline ? (hasBottomNav ? "pb-[110px]" : "pb-[38px]") : "pb-[72px]"} lg:pb-8 px-0 lg:px-8`
+            : `pt-14 lg:pt-8 ${!isOnline ? (hasBottomNav ? "pb-[110px]" : "pb-[38px]") : "pb-[72px]"} lg:pb-8 px-3 lg:px-8`
         } ${isExpensesPage ? "" : "animate-in fade-in duration-150"} w-full max-w-[100vw] lg:max-w-none ${isExpensesPage ? 'overflow-x-clip' : 'overflow-x-hidden'} ${isTrash ? "" : "lg:ml-72"}`}
       >
         <div
           className={`max-w-4xl lg:max-w-5xl mx-auto w-full ${isFullScreenPage ? "h-[100dvh] lg:h-auto" : ""}`}
         >
-          <OfflineBanner 
-            className={`fixed left-0 right-0 ${isTrash ? '' : 'lg:left-72'} z-[51] border-t border-[#eb3b30] shadow-lg ${hasBottomNav ? 'bottom-[60px]' : 'bottom-0'}`} 
-          />
+          <OfflineBanner className={`fixed bottom-0 left-0 right-0 ${isTrash ? '' : 'lg:left-72'} z-[51] border-t border-[#eb3b30] shadow-lg`} />
           {children}
         </div>
       </main>
 
       {/* Fixed Bottom Navigation Bar - Hide if Admin is on User List page or on Desktop */}
-      {hasBottomNav && (
+      {(!isAdmin || adminSelectedUserId) && !isFullScreenPage && (
         <div 
-          className="fixed inset-x-0 z-50 bg-white border-t border-slate-100 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] lg:hidden h-[60px] bottom-0"
+          className="fixed inset-x-0 z-50 bg-white border-t border-slate-100 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] pb-safe lg:hidden transition-all duration-300"
+          style={{ bottom: !isOnline ? '38px' : '0px' }}
         >
-          <nav className="flex justify-between items-center px-6 h-full w-full max-w-lg mx-auto">
+          <nav className="flex justify-between items-center px-6 h-[60px] w-full max-w-lg mx-auto">
             {PRIMARY_NAV.map((item) => {
               const isActive = location.pathname === item.path;
               return (
