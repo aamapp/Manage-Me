@@ -98,46 +98,9 @@ export const CarRent: React.FC = () => {
   const containerRef = React.useRef<HTMLDivElement>(null);
   const sheetRef = React.useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
+  const [contentHeight, setContentHeight] = useState(1122);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [pdfProgress, setPdfProgress] = useState(0);
-
-  useEffect(() => {
-    if (viewState !== "preview") return;
-
-    const updateDimensions = () => {
-      if (containerRef.current) {
-        const containerWidth =
-          containerRef.current.clientWidth ||
-          containerRef.current.getBoundingClientRect().width;
-        if (containerWidth > 0) {
-          if (containerWidth < 794) {
-            setScale(containerWidth / 794);
-          } else {
-            setScale(1);
-          }
-        }
-      }
-    };
-
-    updateDimensions();
-    const t = setTimeout(updateDimensions, 100);
-
-    const observer = new ResizeObserver(() => {
-      updateDimensions();
-    });
-
-    if (containerRef.current) {
-      observer.observe(containerRef.current);
-    }
-
-    window.addEventListener("resize", updateDimensions);
-
-    return () => {
-      clearTimeout(t);
-      observer.disconnect();
-      window.removeEventListener("resize", updateDimensions);
-    };
-  }, [viewState]);
 
   // Active Tab
   const [activeTab, setActiveTab] = useState<"dashboard" | "friends" | "trips" | "driver">("dashboard");
@@ -261,6 +224,48 @@ export const CarRent: React.FC = () => {
     }
     fetchLiveAndSync();
   }, [user]);
+
+  useEffect(() => {
+    if (viewState !== "preview") return;
+
+    const updateDimensions = () => {
+      if (containerRef.current) {
+        const containerWidth =
+          containerRef.current.clientWidth ||
+          containerRef.current.getBoundingClientRect().width;
+        if (containerWidth > 0) {
+          if (containerWidth < 794) {
+            setScale(containerWidth / 794);
+          } else {
+            setScale(1);
+          }
+        }
+      }
+      if (sheetRef.current) {
+        const actualH = sheetRef.current.scrollHeight;
+        setContentHeight(Math.max(1122, actualH));
+      }
+    };
+
+    updateDimensions();
+    const t = setTimeout(updateDimensions, 100);
+
+    const observer = new ResizeObserver(() => {
+      updateDimensions();
+    });
+
+    if (containerRef.current) {
+      observer.observe(containerRef.current);
+    }
+
+    window.addEventListener("resize", updateDimensions);
+
+    return () => {
+      clearTimeout(t);
+      observer.disconnect();
+      window.removeEventListener("resize", updateDimensions);
+    };
+  }, [viewState, friends, trips, collections, driverPayments, startDate, endDate]);
 
   // Fetch from Firestore & Sync cache
   const fetchLiveAndSync = async () => {
@@ -851,12 +856,26 @@ export const CarRent: React.FC = () => {
 
   // Printable Report Trigger (now switches to beautiful full A4 preview mode)
   const handlePrintReport = () => {
-    setViewState("preview");
+    navigate("/reports", {
+      state: {
+        action: "download_preview",
+        reportType: "car_rent",
+        startDate: startDate,
+        endDate: endDate,
+        carRentData: {
+          friends,
+          trips,
+          collections,
+          driverPayments,
+        },
+      },
+    });
   };
 
   const handleDownloadPDF = async () => {
     if (!sheetRef.current) return;
 
+    window.scrollTo(0, 0);
     setIsGeneratingPDF(true);
     setPdfProgress(10);
     window.dispatchEvent(new CustomEvent("app:processing", { detail: true }));
@@ -873,18 +892,20 @@ export const CarRent: React.FC = () => {
     }, 150);
 
     // Wait a bit for UI to settle
-    await new Promise((resolve) => setTimeout(resolve, 600));
+    await new Promise((resolve) => setTimeout(resolve, 800));
 
     try {
       const element = sheetRef.current;
       const fileName = `ManageMe_CarRent_Report_${new Date().toLocaleDateString("en-CA")}.pdf`;
 
       const canvas = await html2canvas(element, {
-        scale: 4, // 4x scale for ultra HD
+        scale: 2, // 2x scale for standard sharp HD
         useCORS: true,
         logging: false,
         backgroundColor: "#ffffff",
         windowWidth: 794,
+        height: element.scrollHeight,
+        windowHeight: element.scrollHeight + 100,
         onclone: (clonedDoc: Document) => {
           clonedDoc.documentElement.style.overflow = "visible";
           clonedDoc.documentElement.style.height = "auto";
@@ -895,16 +916,68 @@ export const CarRent: React.FC = () => {
           if (container) {
             container.style.transform = "none";
             container.style.width = "794px";
-            container.style.height = "1122px";
+            container.style.maxWidth = "none";
+            container.style.margin = "0";
+            container.style.padding = "40px";
+            container.style.backgroundColor = "#ffffff";
+            container.style.display = "block";
+            container.style.overflow = "visible";
+            container.style.height = "auto";
             container.style.position = "relative";
             container.style.left = "0";
             container.style.top = "0";
+
+            // Recursively reset parent heights and overflows in the clone to prevent clipping
+            let parent = container.parentElement;
+            while (parent && parent !== clonedDoc.body) {
+              parent.style.overflow = "visible";
+              parent.style.height = "auto";
+              parent.style.maxHeight = "none";
+              parent = parent.parentElement;
+            }
+
+            const allElements = container.querySelectorAll("*");
+            allElements.forEach((el) => {
+              const htmlEl = el as HTMLElement;
+              htmlEl.style.transition = "none";
+              htmlEl.style.animation = "none";
+              htmlEl.style.boxShadow = "none";
+              htmlEl.style.transform = "none";
+              htmlEl.style.opacity = "1";
+            });
+
+            // Target specific text elements for Bengali font fix
+            const textElements = container.querySelectorAll(
+              "h1:not(.pdf-exact-text), h2:not(.pdf-exact-text), h3:not(.pdf-exact-text), h4, h5, h6, p:not(.pdf-exact-text), span:not(.pdf-exact-text), div.text-xs:not(.pdf-exact-text), div.text-sm:not(.pdf-exact-text)",
+            );
+            textElements.forEach((el) => {
+              const htmlEl = el as HTMLElement;
+              htmlEl.style.lineHeight = "1.8";
+              htmlEl.style.paddingTop = "2px";
+              htmlEl.style.paddingBottom = "2px";
+              htmlEl.style.overflow = "visible";
+            });
+
+            const truncatedElements = container.querySelectorAll(
+              ".truncate, .line-clamp-1, .line-clamp-2, .leading-snug, .leading-tight, .leading-none",
+            );
+            truncatedElements.forEach((el) => {
+              el.classList.remove(
+                "truncate",
+                "line-clamp-1",
+                "line-clamp-2",
+                "leading-snug",
+                "leading-tight",
+                "leading-none",
+              );
+              (el as HTMLElement).style.whiteSpace = "normal";
+              (el as HTMLElement).style.overflow = "visible";
+            });
           }
 
           const style = clonedDoc.createElement("style");
           style.innerHTML = `
-            h1, h2, h3, h4, h5, h6, p, span, div, td, th {
-              line-height: 1.8 !important;
+            h1, h2, h3, h4, h5, h6, p, span, div.text-xs, div.text-sm {
               font-smooth: always;
               -webkit-font-smoothing: antialiased;
               -moz-osx-font-smoothing: grayscale;
@@ -916,9 +989,9 @@ export const CarRent: React.FC = () => {
 
       setPdfProgress(95);
 
-      // Calculate dimensions in px (divide by 4 because scale is 4)
-      const imgWidth = canvas.width / 4;
-      const imgHeight = canvas.height / 4;
+      // Calculate dimensions in px (divide by 2 because scale is 2)
+      const imgWidth = canvas.width / 2;
+      const imgHeight = canvas.height / 2;
 
       const pdf = new jsPDF({
         orientation: "portrait",
@@ -926,7 +999,7 @@ export const CarRent: React.FC = () => {
         format: [imgWidth, imgHeight],
       });
 
-      const imgData = canvas.toDataURL("image/jpeg", 1.0); // Maximum quality HD
+      const imgData = canvas.toDataURL("image/jpeg", 0.95); // High quality
       pdf.addImage(imgData, "JPEG", 0, 0, imgWidth, imgHeight);
 
       const pdfBlob = pdf.output("blob");
@@ -1018,7 +1091,7 @@ export const CarRent: React.FC = () => {
             className="relative overflow-hidden shadow-xl border border-slate-200 bg-white rounded-2xl"
             style={{
               width: `${794 * scale}px`,
-              height: `${1122 * scale}px`,
+              height: `${contentHeight * scale}px`,
             }}
           >
             <div
@@ -1027,7 +1100,8 @@ export const CarRent: React.FC = () => {
               className="bg-white text-slate-800 p-10 font-sans flex flex-col justify-between absolute left-0 top-0 origin-top-left"
               style={{
                 width: "794px",
-                height: "1122px",
+                minHeight: "1122px",
+                height: "auto",
                 transform: `scale(${scale})`,
               }}
             >
@@ -1036,14 +1110,18 @@ export const CarRent: React.FC = () => {
                 <div>
                   {/* Header Banner */}
                   <div className="mb-6 border-b border-slate-150 pb-5 flex justify-between items-start">
-                    <div>
-                      <h1 className="text-2xl font-black text-indigo-600 tracking-tight flex items-center gap-1.5 font-sans">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-indigo-600 p-2 rounded-xl text-white h-12 w-12 flex items-center justify-center flex-shrink-0">
                         <Car size={26} />
-                        ম্যানেজ-মি
-                      </h1>
-                      <p className="text-[10px] font-bold text-slate-400 tracking-wider mt-1">
-                        স্মার্ট গাড়ি ভাড়া খতিয়ান ব্যবস্থা
-                      </p>
+                      </div>
+                      <div className="flex flex-col justify-between h-12 py-0.5 flex-grow">
+                        <h1 className="text-2xl font-black text-indigo-600 tracking-tight leading-none" style={{ lineHeight: "1" }}>
+                          ম্যানেজ-মি
+                        </h1>
+                        <p className="text-[10px] font-bold text-slate-400 tracking-wider leading-none" style={{ lineHeight: "1" }}>
+                          স্মার্ট গাড়ি ভাড়া খতিয়ান ব্যবস্থা
+                        </p>
+                      </div>
                     </div>
                     <div className="text-right">
                       <h2 className="text-lg font-black text-slate-800">
@@ -1087,7 +1165,7 @@ export const CarRent: React.FC = () => {
 
                   {/* Section 1: Friends summary */}
                   <div className="mb-6">
-                    <div className="border-l-4 border-indigo-600 pl-2.5 mb-3">
+                    <div className="flex items-center border-l-4 border-indigo-600 pl-2.5 mb-3">
                       <h3 className="text-sm font-black text-slate-800 tracking-tight">
                         ১. বন্ধুদের বকেয়া ও হিসাব তালিকা
                       </h3>
@@ -1120,7 +1198,7 @@ export const CarRent: React.FC = () => {
 
                   {/* Section 2: Trips */}
                   <div className="mb-6">
-                    <div className="border-l-4 border-indigo-600 pl-2.5 mb-3">
+                    <div className="flex items-center border-l-4 border-indigo-600 pl-2.5 mb-3">
                       <h3 className="text-sm font-black text-slate-800 tracking-tight">
                         ২. ট্রিপ ও পরীক্ষার খরচ বিবরণী (এই সময়কালের)
                       </h3>
@@ -1159,7 +1237,7 @@ export const CarRent: React.FC = () => {
 
                   {/* Section 3: Driver Payments */}
                   <div className="mb-6">
-                    <div className="border-l-4 border-indigo-600 pl-2.5 mb-3">
+                    <div className="flex items-center border-l-4 border-indigo-600 pl-2.5 mb-3">
                       <h3 className="text-sm font-black text-slate-800 tracking-tight">
                         ৩. গাড়িওয়ালাকে ভাড়া পরিশোধ লগ (এই সময়কালের)
                       </h3>
@@ -1208,9 +1286,9 @@ export const CarRent: React.FC = () => {
   }
 
   return (
-    <div className="w-full min-h-screen bg-slate-50 flex flex-col pb-20">
+    <div className="w-full h-[100dvh] sm:min-h-screen bg-slate-50 flex flex-col overflow-hidden sm:overflow-visible">
       {/* Top Header */}
-      <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md flex items-center justify-between mb-2 border-b border-slate-200/60 h-14 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+      <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md flex items-center justify-between mb-0 border-b border-slate-200/60 h-14 px-4 sm:px-6 lg:px-8 shrink-0">
         <div className="flex items-center gap-3.5">
           <button
             onClick={() => navigate(-1)}
@@ -1225,87 +1303,13 @@ export const CarRent: React.FC = () => {
             </h1>
           </div>
         </div>
-
-        {/* Sync Status Badge */}
-        <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-100 rounded-full py-1 px-3">
-          <div className={`w-2 h-2 rounded-full ${isOnline ? "bg-green-500 animate-pulse" : "bg-amber-500"}`} />
-          <span className="text-[10px] font-bold text-slate-500">
-            {isOnline ? "অনলাইন সিঙ্কড" : "অফলাইন ক্যাশ"}
-          </span>
-        </div>
       </div>
 
       {/* Main Container */}
-      <div className="flex-1 max-w-4xl w-full mx-auto p-4 flex flex-col gap-5">
+      <div className="flex-1 max-w-4xl w-full mx-auto px-3.5 pb-3.5 pt-2 flex flex-col gap-3 min-h-0 overflow-y-auto sm:overflow-y-visible sm:px-4 sm:pb-4 sm:pt-2.5 sm:gap-3.5">
         
-        {/* WALLET & STATS OVERVIEW */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Main Wallet Card */}
-          <div className="md:col-span-1 bg-gradient-to-br from-indigo-600 via-indigo-600 to-indigo-700 rounded-2xl p-4 text-white shadow-md relative overflow-hidden flex flex-col justify-between min-h-[115px]">
-            <div className="absolute right-0 bottom-0 translate-x-4 translate-y-4 opacity-15 pointer-events-none">
-              <Car size={100} className="text-white" />
-            </div>
-            <div className="relative z-10">
-              <div className="flex items-center justify-between">
-                <span className="text-[9px] font-black uppercase tracking-wider text-white bg-white/20 px-2 py-0.5 rounded">
-                  খতিয়ান ওয়ালেট
-                </span>
-                <span className="text-[9px] text-indigo-100 font-bold opacity-90">Cash Fund</span>
-              </div>
-              <div className="flex items-baseline gap-1.5 mt-2">
-                <span className="text-[20px] font-extrabold text-indigo-200">৳</span>
-                <span className="text-2xl font-black tracking-tight text-white drop-shadow-sm">
-                  {analytics.walletBalance}
-                </span>
-              </div>
-              <p className="text-[9px] text-indigo-100 font-bold mt-1 opacity-90">
-                উদ্বৃত্ত ক্যাশ তহবিল (আদায় - ড্রাইভার পেমেন্ট)
-              </p>
-            </div>
-            <div className="border-t border-white/20 pt-1.5 mt-2 flex items-center justify-between text-[9px] text-indigo-100 font-bold relative z-10">
-              <span className="bg-white/10 px-1.5 py-0.5 rounded">রেট: ৳১০০/স্টুডেন্ট</span>
-              <span className="bg-white/10 px-1.5 py-0.5 rounded">ড্রাইভার: ৳১৩০০/দিন</span>
-            </div>
-          </div>
-
-          {/* Core Analytics Metrics */}
-          <div className="md:col-span-2 grid grid-cols-2 gap-3">
-            <div className="bg-white border border-slate-100 rounded-3xl p-4 shadow-sm relative overflow-hidden flex flex-col justify-between">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-widest text-green-600">মোট আদায়</span>
-                <h4 className="text-xl font-black text-slate-800 mt-1">৳{analytics.totalCollected}</h4>
-              </div>
-              <span className="text-[9px] font-semibold text-slate-400 block mt-2">স্টুডেন্টদের থেকে মোট জমা</span>
-            </div>
-
-            <div className="bg-white border border-slate-100 rounded-3xl p-4 shadow-sm relative overflow-hidden flex flex-col justify-between">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-widest text-rose-500">মোট বকেয়া (Dues)</span>
-                <h4 className="text-xl font-black text-slate-800 mt-1">৳{analytics.totalPendingDues}</h4>
-              </div>
-              <span className="text-[9px] font-semibold text-slate-400 block mt-2">স্টুডেন্টদের কাছে বাকি</span>
-            </div>
-
-            <div className="bg-white border border-slate-100 rounded-3xl p-4 shadow-sm relative overflow-hidden flex flex-col justify-between">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">ড্রাইভার বিল</span>
-                <h4 className="text-xl font-black text-slate-800 mt-1">৳{analytics.totalDriverRent}</h4>
-              </div>
-              <span className="text-[9px] font-semibold text-slate-400 block mt-2">মোট ১৩০০ টাকা/দিন হিসেবে</span>
-            </div>
-
-            <div className="bg-amber-50 border border-amber-100 rounded-3xl p-4 shadow-sm relative overflow-hidden flex flex-col justify-between">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-widest text-amber-700">ড্রাইভার বকেয়া</span>
-                <h4 className="text-xl font-black text-amber-800 mt-1">৳{analytics.driverDue}</h4>
-              </div>
-              <span className="text-[9px] font-semibold text-amber-600 block mt-2">চালককে পরিশোধ বাকি</span>
-            </div>
-          </div>
-        </div>
-
         {/* TABS CONTROLLER */}
-        <div className="bg-white p-1.5 rounded-2xl border border-slate-100 shadow-sm flex grid grid-cols-4 gap-1">
+        <div className="bg-white p-1.5 rounded-xl border border-slate-100 shadow-sm grid grid-cols-4 gap-1 shrink-0">
           {[
             { id: "dashboard", label: "ড্যাশবোর্ড" },
             { id: "friends", label: "স্টুডেন্ট তালিকা" },
@@ -1315,7 +1319,7 @@ export const CarRent: React.FC = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`py-2 px-1 text-center font-bold text-[11px] sm:text-xs rounded-xl transition-all duration-300 ${
+              className={`py-2 px-1 text-center font-medium text-[11px] sm:text-xs rounded-lg transition-all duration-300 ${
                 activeTab === tab.id
                   ? "bg-indigo-600 text-white shadow-md shadow-indigo-100"
                   : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
@@ -1326,44 +1330,112 @@ export const CarRent: React.FC = () => {
           ))}
         </div>
 
+        {/* WALLET & STATS OVERVIEW - Only visible in dashboard tab */}
+        {activeTab === "dashboard" && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Main Wallet Card */}
+            <div className="md:col-span-1 bg-gradient-to-br from-indigo-600 via-indigo-600 to-indigo-700 rounded-xl p-4 text-white shadow-md relative overflow-hidden flex flex-col justify-between min-h-[115px]">
+              <div className="absolute right-0 bottom-0 translate-x-4 translate-y-4 opacity-15 pointer-events-none">
+                <Car size={100} className="text-white" />
+              </div>
+              <div className="relative z-10">
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] font-black uppercase tracking-wider text-white bg-white/20 px-2 py-0.5 rounded">
+                    খতিয়ান ওয়ালেট
+                  </span>
+                  <span className="text-[9px] text-indigo-100 font-bold opacity-90">Cash Fund</span>
+                </div>
+                <div className="flex items-baseline gap-1.5 mt-2">
+                  <span className="text-[20px] font-extrabold text-indigo-200">৳</span>
+                  <span className="text-2xl font-black tracking-tight text-white drop-shadow-sm">
+                    {analytics.walletBalance}
+                  </span>
+                </div>
+                <p className="text-[9px] text-indigo-100 font-bold mt-1 opacity-90">
+                  উদ্বৃত্ত ক্যাশ তহবিল (আদায় - ড্রাইভার পেমেন্ট)
+                </p>
+              </div>
+              <div className="border-t border-white/20 pt-1.5 mt-2 flex items-center justify-between text-[9px] text-indigo-100 font-bold relative z-10">
+                <span className="bg-white/10 px-1.5 py-0.5 rounded">রেট: ৳১০০/স্টুডেন্ট</span>
+                <span className="bg-white/10 px-1.5 py-0.5 rounded">ড্রাইভার: ৳১৩০০/দিন</span>
+              </div>
+            </div>
+
+            {/* Core Analytics Metrics */}
+            <div className="md:col-span-2 grid grid-cols-2 gap-2">
+              <div className="bg-white border border-slate-100 rounded-xl p-2.5 shadow-sm relative overflow-hidden flex flex-col justify-between">
+                <div>
+                  <span className="text-[9px] font-bold uppercase tracking-wide text-green-600">মোট আদায়</span>
+                  <h4 className="text-lg font-black text-slate-800 mt-0.5">৳{analytics.totalCollected}</h4>
+                </div>
+                <span className="text-[8px] font-semibold text-slate-400 block mt-1">স্টুডেন্টদের থেকে মোট জমা</span>
+              </div>
+
+              <div className="bg-white border border-slate-100 rounded-xl p-2.5 shadow-sm relative overflow-hidden flex flex-col justify-between">
+                <div>
+                  <span className="text-[9px] font-bold uppercase tracking-wide text-rose-500">মোট বকেয়া (Dues)</span>
+                  <h4 className="text-lg font-black text-slate-800 mt-0.5">৳{analytics.totalPendingDues}</h4>
+                </div>
+                <span className="text-[8px] font-semibold text-slate-400 block mt-1">স্টুডেন্টদের কাছে বাকি</span>
+              </div>
+
+              <div className="bg-white border border-slate-100 rounded-xl p-2.5 shadow-sm relative overflow-hidden flex flex-col justify-between">
+                <div>
+                  <span className="text-[9px] font-bold uppercase tracking-wide text-slate-500">ড্রাইভার বিল</span>
+                  <h4 className="text-lg font-black text-slate-800 mt-0.5">৳{analytics.totalDriverRent}</h4>
+                </div>
+                <span className="text-[8px] font-semibold text-slate-400 block mt-1">মোট ১৩০০ টাকা/দিন হিসেবে</span>
+              </div>
+
+              <div className="bg-amber-50 border border-amber-100 rounded-xl p-2.5 shadow-sm relative overflow-hidden flex flex-col justify-between">
+                <div>
+                  <span className="text-[9px] font-bold uppercase tracking-wide text-amber-700">ড্রাইভার বকেয়া</span>
+                  <h4 className="text-lg font-black text-amber-800 mt-0.5">৳{analytics.driverDue}</h4>
+                </div>
+                <span className="text-[8px] font-semibold text-amber-600 block mt-1">চালককে পরিশোধ বাকি</span>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* TAB 1: DASHBOARD VIEW */}
         {activeTab === "dashboard" && (
           <div className="flex flex-col gap-4">
             
             {/* REPORT & FILTER SECTION */}
-            <div className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-3">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div className="flex items-center gap-2">
-                  <Calendar className="text-indigo-600" size={18} />
-                  <h3 className="font-bold text-slate-800 text-sm">রিপোর্ট ও কাস্টম তারিখ ফিল্টার</h3>
+            <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm flex flex-col gap-2.5">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <div className="flex items-center gap-1.5">
+                  <Calendar className="text-indigo-600" size={16} />
+                  <h3 className="font-bold text-slate-800 text-xs">রিপোর্ট ও কাস্টম তারিখ ফিল্টার</h3>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                   <button
                     onClick={() => {
                       setTempCustomDates({ start: startDate || "", end: endDate || "" });
                       setModalSubView("main");
                       setShowFilterModal(true);
                     }}
-                    className={`p-2 active:scale-95 transition-all rounded-xl border ${startDate || endDate ? "text-indigo-600 bg-indigo-50 border-indigo-200" : "text-slate-400 bg-slate-50 border-slate-100"}`}
+                    className={`p-1.5 active:scale-95 transition-all rounded-lg border ${startDate || endDate ? "text-indigo-600 bg-indigo-50 border-indigo-200" : "text-slate-400 bg-slate-50 border-slate-100"}`}
                     title="তারিখ ফিল্টার"
                   >
-                    <CalendarDays size={16} />
+                    <CalendarDays size={14} />
                   </button>
                   <button
                     onClick={handlePrintReport}
-                    className="flex items-center gap-1 bg-slate-100 text-slate-700 px-3 py-1.5 rounded-xl font-bold text-[11px] active:scale-95 transition-all hover:bg-slate-200"
+                    className="flex items-center gap-1 bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg font-bold text-[10px] active:scale-95 transition-all hover:bg-slate-200"
                   >
-                    <Printer size={13} />
+                    <Printer size={12} />
                     প্রিন্ট / PDF
                   </button>
                 </div>
               </div>
 
               {/* DATE RANGE FILTER STATE ROW */}
-              <div className="flex items-center justify-between bg-slate-50/50 px-3 py-2 rounded-2xl border border-slate-100/80">
-                <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${startDate || endDate ? "bg-indigo-500 animate-pulse" : "bg-slate-300"}`}></div>
-                  <span className="text-xs font-bold text-slate-600">
+              <div className="flex items-center justify-between bg-slate-50/50 px-2.5 py-1.5 rounded-lg border border-slate-100/80">
+                <div className="flex items-center gap-1.5">
+                  <div className={`w-1.5 h-1.5 rounded-full ${startDate || endDate ? "bg-indigo-500 animate-pulse" : "bg-slate-300"}`}></div>
+                  <span className="text-[11px] font-bold text-slate-600">
                     {startDate === "" && endDate === "" ? (
                       "সব সময়ের হিসাব"
                     ) : selectedPeriodOption === "month" ? (
@@ -1382,7 +1454,7 @@ export const CarRent: React.FC = () => {
                       setEndDate("");
                       setSelectedPeriodOption("");
                     }}
-                    className="text-[10px] text-red-500 hover:text-red-600 font-bold px-2 py-1 rounded bg-red-50"
+                    className="text-[9px] text-red-500 hover:text-red-600 font-bold px-1.5 py-0.5 rounded bg-red-50"
                   >
                     মুছে ফেলুন
                   </button>
@@ -1390,64 +1462,19 @@ export const CarRent: React.FC = () => {
               </div>
 
               {/* Filter Period Summary */}
-              <div className="grid grid-cols-3 gap-2 bg-slate-50 p-2.5 rounded-2xl border border-slate-100 text-center">
+              <div className="grid grid-cols-3 gap-1.5 bg-slate-50 p-2 rounded-lg border border-slate-100 text-center">
                 <div>
-                  <p className="text-[9px] font-bold text-slate-400">এই সময়ের ট্রিপ</p>
-                  <p className="font-extrabold text-slate-700 text-xs mt-0.5">{filteredReportData.trips.length} টি (৳{filteredReportData.periodRent})</p>
+                  <p className="text-[8px] font-bold text-slate-400">এই সময়ের ট্রিপ</p>
+                  <p className="font-extrabold text-slate-700 text-[11px] mt-0.5">{filteredReportData.trips.length} টি (৳{filteredReportData.periodRent})</p>
                 </div>
                 <div>
-                  <p className="text-[9px] font-bold text-slate-400">এই সময়ের আদায়</p>
-                  <p className="font-extrabold text-green-600 text-xs mt-0.5">৳{filteredReportData.periodCollected}</p>
+                  <p className="text-[8px] font-bold text-slate-400">এই সময়ের আদায়</p>
+                  <p className="font-extrabold text-green-600 text-[11px] mt-0.5">৳{filteredReportData.periodCollected}</p>
                 </div>
                 <div>
-                  <p className="text-[9px] font-bold text-slate-400">গাড়িওয়ালা পেইড</p>
-                  <p className="font-extrabold text-indigo-600 text-xs mt-0.5">৳{filteredReportData.periodDriverPaid}</p>
+                  <p className="text-[8px] font-bold text-slate-400">গাড়িওয়ালা পেইড</p>
+                  <p className="font-extrabold text-indigo-600 text-[11px] mt-0.5">৳{filteredReportData.periodDriverPaid}</p>
                 </div>
-              </div>
-            </div>
-
-            {/* RECENT ACTIVITIES TIMELINE */}
-            <div className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-3">
-              <h3 className="font-bold text-slate-800 text-sm flex items-center gap-1.5 mb-2">
-                <Clock className="text-slate-400" size={18} />
-                সাম্প্রতিক খতিয়ান খাতা (Timeline)
-              </h3>
-
-              <div className="flex flex-col gap-2.5 max-h-[400px] overflow-y-auto pr-1">
-                {activities.length === 0 ? (
-                  <div className="py-12 text-center text-slate-400 flex flex-col items-center gap-2">
-                    <AlertCircle size={32} className="text-slate-300" />
-                    <p className="text-xs font-bold">এখনো কোনো রেকর্ড যুক্ত করা হয়নি।</p>
-                    <p className="text-[10px]">অ্যাড ট্রিপ বা আদায় পেমেন্ট করে শুরু করুন।</p>
-                  </div>
-                ) : (
-                  activities.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-100 hover:border-indigo-100 transition-all">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-9 h-9 rounded-full flex items-center justify-center shadow-sm ${
-                          item.type === "trip" ? "bg-amber-100 text-amber-700" :
-                          item.type === "collection" ? "bg-green-100 text-green-700" : "bg-indigo-100 text-indigo-700"
-                        }`}>
-                          {item.type === "trip" ? <Car size={16} /> :
-                           item.type === "collection" ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
-                        </div>
-                        <div>
-                          <p className="font-bold text-slate-800 text-xs">{item.title}</p>
-                          <p className="text-[9px] text-slate-400 font-bold flex items-center gap-1 mt-0.5">
-                            <Calendar size={10} /> {item.date} • {item.subtitle}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className={`font-black text-sm ${
-                          item.type === "collection" ? "text-green-600" : "text-slate-700"
-                        }`}>
-                          {item.type === "collection" ? "+" : "-"}৳{item.amount}
-                        </p>
-                      </div>
-                    </div>
-                  ))
-                )}
               </div>
             </div>
           </div>
@@ -1458,7 +1485,7 @@ export const CarRent: React.FC = () => {
           <div className="flex flex-col gap-4">
             
             {/* Search and Action Header */}
-            <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-white p-3.5 rounded-3xl border border-slate-100 shadow-sm">
+            <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-white p-3.5 rounded-xl border border-slate-100 shadow-sm">
               <div className="relative w-full sm:max-w-xs">
                 <span className="absolute left-3 top-2.5 text-slate-400">
                   <Search size={15} />
@@ -1468,12 +1495,12 @@ export const CarRent: React.FC = () => {
                   placeholder="স্টুডেন্টের নাম খুঁজুন..."
                   value={searchFriend}
                   onChange={(e) => setSearchFriend(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-100 rounded-2xl pl-9 pr-4 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-slate-50 border border-slate-100 rounded-xl pl-9 pr-4 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:border-indigo-500"
                 />
               </div>
               <button
                 onClick={() => setFriendModal({ open: true, mode: "add", data: { name: "", phone: "" } })}
-                className="w-full sm:w-auto flex items-center justify-center gap-1.5 bg-indigo-600 text-white font-bold text-xs px-4 py-2.5 rounded-2xl active:scale-95 transition-all shadow-md shadow-indigo-100 hover:bg-indigo-700"
+                className="w-full sm:w-auto flex items-center justify-center gap-1.5 bg-indigo-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl active:scale-95 transition-all shadow-md shadow-indigo-100 hover:bg-indigo-700"
               >
                 <UserPlus size={15} />
                 নতুন স্টুডেন্ট যোগ করুন
@@ -1485,10 +1512,10 @@ export const CarRent: React.FC = () => {
               {analytics.friendDetails
                 .filter(fd => fd.name.toLowerCase().includes(searchFriend.toLowerCase()))
                 .map(fd => (
-                  <div key={fd.id} className="bg-white rounded-3xl p-4 border border-slate-100 shadow-sm hover:border-indigo-100 hover:shadow-md transition-all flex flex-col justify-between gap-4">
+                  <div key={fd.id} className="bg-white rounded-xl p-4 border border-slate-100 shadow-sm hover:border-indigo-100 hover:shadow-md transition-all flex flex-col justify-between gap-4">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-700 font-extrabold text-base flex items-center justify-center">
+                        <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-700 font-extrabold text-base flex items-center justify-center">
                           {fd.name.charAt(0)}
                         </div>
                         <div>
@@ -1516,7 +1543,7 @@ export const CarRent: React.FC = () => {
                     </div>
 
                     {/* Friend Balance Stats */}
-                    <div className="grid grid-cols-3 gap-2 bg-slate-50 p-2.5 rounded-2xl border border-slate-100/80 text-center">
+                    <div className="grid grid-cols-3 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100/80 text-center">
                       <div>
                         <p className="text-[8px] font-bold text-slate-400 uppercase">মোট খরচ ভাগ</p>
                         <p className="font-extrabold text-slate-700 text-xs mt-0.5">৳{fd.totalShare.toFixed(0)}</p>
@@ -1544,7 +1571,7 @@ export const CarRent: React.FC = () => {
                           date: new Date().toISOString().split("T")[0]
                         }
                       })}
-                      className="w-full py-2 bg-indigo-50 hover:bg-indigo-100 active:scale-95 text-indigo-700 font-bold text-[11px] rounded-xl flex items-center justify-center gap-1 transition-all"
+                      className="w-full py-2 bg-indigo-50 hover:bg-indigo-100 active:scale-95 text-indigo-700 font-bold text-[11px] rounded-lg flex items-center justify-center gap-1 transition-all"
                     >
                       <DollarSign size={12} />
                       টাকা আদায় রিসিভ করুন
@@ -1560,7 +1587,7 @@ export const CarRent: React.FC = () => {
           <div className="flex flex-col gap-4">
             
             {/* Search and Action Header */}
-            <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-white p-3.5 rounded-3xl border border-slate-100 shadow-sm">
+            <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-white p-3.5 rounded-xl border border-slate-100 shadow-sm">
               <div className="relative w-full sm:max-w-xs">
                 <span className="absolute left-3 top-2.5 text-slate-400">
                   <Search size={15} />
@@ -1570,12 +1597,12 @@ export const CarRent: React.FC = () => {
                   placeholder="পরীক্ষার নাম খুঁজুন..."
                   value={searchTrip}
                   onChange={(e) => setSearchTrip(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-100 rounded-2xl pl-9 pr-4 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-slate-50 border border-slate-100 rounded-xl pl-9 pr-4 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:border-indigo-500"
                 />
               </div>
               <button
                 onClick={() => setTripModal({ open: true, mode: "add", data: { examName: "", totalRent: 0, participantIds: [], date: new Date().toISOString().split("T")[0] } })}
-                className="w-full sm:w-auto flex items-center justify-center gap-1.5 bg-indigo-600 text-white font-bold text-xs px-4 py-2.5 rounded-2xl active:scale-95 transition-all shadow-md shadow-indigo-100 hover:bg-indigo-700"
+                className="w-full sm:w-auto flex items-center justify-center gap-1.5 bg-indigo-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl active:scale-95 transition-all shadow-md shadow-indigo-100 hover:bg-indigo-700"
               >
                 <Plus size={15} />
                 নতুন ট্রিপ/পরীক্ষা যোগ করুন
@@ -1596,10 +1623,10 @@ export const CarRent: React.FC = () => {
                   const actualCollected = tripCollections.reduce((sum, c) => sum + c.amount, 0);
                   const actualDue = Math.max(0, studentTotalFare - actualCollected);
                   return (
-                    <div key={t.id} className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm hover:border-indigo-500/20 hover:shadow-md transition-all">
+                    <div key={t.id} className="bg-white rounded-xl p-5 border border-slate-100 shadow-sm hover:border-indigo-500/20 hover:shadow-md transition-all">
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-700 flex items-center justify-center shadow-sm">
+                          <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center shadow-sm">
                             <Car size={20} />
                           </div>
                           <div>
@@ -1627,7 +1654,7 @@ export const CarRent: React.FC = () => {
                       </div>
 
                       {/* Financial breakdown of the trip */}
-                      <div className="mt-4 grid grid-cols-3 gap-2 bg-slate-50/80 p-3 rounded-2xl border border-slate-100/50 text-center">
+                      <div className="mt-4 grid grid-cols-3 gap-2 bg-slate-50/80 p-3 rounded-xl border border-slate-100/50 text-center">
                         <div>
                           <p className="text-[9px] font-bold text-slate-400">ড্রাইভার ভাড়া</p>
                           <p className="text-xs font-black text-rose-600 mt-0.5">৳{driverFare}</p>
@@ -1670,7 +1697,7 @@ export const CarRent: React.FC = () => {
                       </div>
                     </div>
                   );
-              })}
+                })}
             </div>
           </div>
         )}
@@ -1680,9 +1707,9 @@ export const CarRent: React.FC = () => {
           <div className="flex flex-col gap-4">
             
             {/* Action Card to record payment */}
-            <div className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="w-11 h-11 bg-indigo-50 text-indigo-700 rounded-2xl flex items-center justify-center">
+                <div className="w-11 h-11 bg-indigo-50 text-indigo-700 rounded-xl flex items-center justify-center">
                   <TrendingDown size={22} />
                 </div>
                 <div>
@@ -1692,7 +1719,7 @@ export const CarRent: React.FC = () => {
               </div>
               <button
                 onClick={() => setDriverModal({ open: true, mode: "add", data: { amount: analytics.driverDue, date: new Date().toISOString().split("T")[0], remarks: "" } })}
-                className="w-full sm:w-auto flex items-center justify-center gap-1.5 bg-indigo-600 text-white font-bold text-xs px-4 py-2.5 rounded-2xl active:scale-95 transition-all shadow-md shadow-indigo-100 hover:bg-indigo-700"
+                className="w-full sm:w-auto flex items-center justify-center gap-1.5 bg-indigo-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl active:scale-95 transition-all shadow-md shadow-indigo-100 hover:bg-indigo-700"
               >
                 <Plus size={15} />
                 পেমেন্ট প্রদান করুন
@@ -1702,13 +1729,13 @@ export const CarRent: React.FC = () => {
             {/* List of Payments */}
             <div className="flex flex-col gap-3">
               {driverPayments.length === 0 ? (
-                <div className="py-16 bg-white rounded-3xl border border-slate-100 shadow-sm text-center text-slate-400 flex flex-col items-center gap-2">
+                <div className="py-16 bg-white rounded-xl border border-slate-100 shadow-sm text-center text-slate-400 flex flex-col items-center gap-2">
                   <AlertCircle size={32} className="text-slate-300" />
                   <p className="text-xs font-bold">এখনো গাড়িওয়ালাকে কোনো ভাড়া দেওয়া হয়নি।</p>
                 </div>
               ) : (
                 driverPayments.map(p => (
-                  <div key={p.id} className="bg-white rounded-3xl p-4 border border-slate-100 shadow-sm hover:shadow-md transition-all flex items-center justify-between">
+                  <div key={p.id} className="bg-white rounded-xl p-4 border border-slate-100 shadow-sm hover:shadow-md transition-all flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
                         <TrendingDown size={18} />

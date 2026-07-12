@@ -102,7 +102,7 @@ interface PageData {
   isLastPage: boolean;
 }
 
-function paginateData(allLines: any[], isWallet: boolean = false): PageData[] {
+function paginateData(allLines: any[], isWallet: boolean = false, isCarRent: boolean = false): PageData[] {
   const totalItems = allLines.length;
   if (totalItems === 0) {
     return [
@@ -115,10 +115,10 @@ function paginateData(allLines: any[], isWallet: boolean = false): PageData[] {
     ];
   }
 
-  // If wallet, we make the limits safer to prevent overflow cut-offs
-  const firstPageLimit = isWallet ? 10 : 12;
+  // If wallet or car_rent, we make the limits safer to prevent overflow cut-offs
+  const firstPageLimit = isCarRent ? 0 : (isWallet ? 10 : 12);
 
-  if (totalItems <= firstPageLimit) {
+  if (totalItems <= firstPageLimit && !isCarRent) {
     return [
       {
         pageNumber: 1,
@@ -133,7 +133,7 @@ function paginateData(allLines: any[], isWallet: boolean = false): PageData[] {
   let currentIndex = 0;
   let pageNumber = 1;
 
-  while (currentIndex < totalItems) {
+  while (currentIndex < totalItems || (pageNumber === 1 && isCarRent)) {
     const isFirst = pageNumber === 1;
     const remaining = totalItems - currentIndex;
 
@@ -141,7 +141,9 @@ function paginateData(allLines: any[], isWallet: boolean = false): PageData[] {
     let isLast = false;
 
     if (isFirst) {
-      if (isWallet) {
+      if (isCarRent) {
+        takeCount = 0; // Empty first page for car rent
+      } else if (isWallet) {
         if (totalItems <= 18) {
           takeCount = 9;
         } else if (totalItems <= 25) {
@@ -163,7 +165,7 @@ function paginateData(allLines: any[], isWallet: boolean = false): PageData[] {
       }
     } else {
       // For subsequent pages (not the first page)
-      if (isWallet) {
+      if (isWallet || isCarRent) {
         if (remaining <= 12) {
           takeCount = remaining;
           isLast = true;
@@ -253,6 +255,12 @@ export const Reports: React.FC = () => {
     clientName?: string;
     personId?: string;
     walletName?: string;
+    carRentData?: {
+      friends: any[];
+      trips: any[];
+      collections: any[];
+      driverPayments: any[];
+    };
     startDate?: string;
     endDate?: string;
   } | null;
@@ -326,12 +334,13 @@ export const Reports: React.FC = () => {
     };
   }, [viewState, expenses, incomeRecords]);
   const [pdfReportType, setPdfReportType] = useState<
-    "all" | "income" | "expense" | "projects" | "dues" | "personal_dues" | "wallet"
+    "all" | "income" | "expense" | "projects" | "dues" | "personal_dues" | "wallet" | "car_rent"
   >(
     initialState?.action === "download_preview" && initialState?.reportType
       ? (initialState.reportType as any)
       : "all",
   );
+  const [carRentData, setCarRentData] = useState(initialState?.carRentData || null);
   const [personalDuePersonId, setPersonalDuePersonId] = useState<string | null>(
     initialState?.personId || null,
   );
@@ -340,6 +349,53 @@ export const Reports: React.FC = () => {
   );
 
   const [wallets, setWallets] = useState<any[]>([]);
+
+  const friendsSummary = useMemo(() => {
+    if (pdfReportType !== "car_rent" || !carRentData) return [];
+    
+    const stats: Record<string, any> = {};
+    
+    if (carRentData.friends) {
+      carRentData.friends.forEach((f: any) => {
+        stats[f.id] = { id: f.id, name: f.name, totalTrips: 0, totalShare: 0, totalPaid: 0 };
+      });
+    }
+    
+    if (carRentData.trips) {
+      carRentData.trips.forEach((trip: any) => {
+        const parts = trip.participantIds || [];
+        // Students pay a fixed 100 Taka per trip/day as per CarRent.tsx logic
+        const sharePerPerson = 100;
+        parts.forEach((pid: string) => {
+          if (stats[pid]) {
+            stats[pid].totalTrips += 1;
+            stats[pid].totalShare += sharePerPerson;
+          }
+        });
+      });
+    }
+    
+    if (carRentData.collections) {
+      carRentData.collections.forEach((c: any) => {
+        if (stats[c.friendId]) {
+          stats[c.friendId].totalPaid += (Number(c.amount) || 0);
+        }
+      });
+    }
+    
+    return Object.values(stats);
+  }, [pdfReportType, carRentData]);
+
+  const carRentSummary = useMemo(() => {
+    if (pdfReportType !== "car_rent" || !carRentData) return null;
+    
+    const totalTrips = carRentData.trips?.length || 0;
+    const totalRent = carRentData.trips?.reduce((sum: number, t: any) => sum + (Number(t.totalRent) || 0), 0) || 0;
+    const totalCollections = carRentData.collections?.reduce((sum: number, c: any) => sum + (Number(c.amount) || 0), 0) || 0;
+    const totalDriverPaid = carRentData.driverPayments?.reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0) || 0;
+    
+    return { totalTrips, totalRent, totalCollections, totalDriverPaid };
+  }, [pdfReportType, carRentData]);
 
   const isIdLikeWalletName = (name: string): boolean => {
     if (!name) return false;
@@ -859,6 +915,40 @@ export const Reports: React.FC = () => {
       });
     }
 
+    // 4. Car Rent
+    if (pdfReportType === "car_rent" && carRentData) {
+        if (carRentData.trips) {
+            carRentData.trips.forEach((trip: any) => {
+                if (pdfStartDate && trip.date < pdfStartDate) return;
+                if (pdfEndDate && trip.date > pdfEndDate) return;
+                
+                list.push({
+                    id: `car-rent-trip-${trip.id}`,
+                    type: "income",
+                    date: trip.date,
+                    time: "10:00",
+                    description: trip.examName,
+                    category: "গাড়ির ভাড়া",
+                    amount: Number(trip.totalRent) || 0,
+                });
+            });
+        }
+        carRentData.driverPayments.forEach((payment: any) => {
+            if (pdfStartDate && payment.date < pdfStartDate) return;
+            if (pdfEndDate && payment.date > pdfEndDate) return;
+            
+            list.push({
+                id: `car-rent-payment-${payment.id}`,
+                type: "expense",
+                date: payment.date,
+                time: "10:00",
+                description: payment.remarks || "ড্রাইভার পেমেন্ট",
+                category: "ড্রাইভার পেমেন্ট",
+                amount: Number(payment.amount) || 0,
+            });
+        });
+    }
+
     return list.sort(
       (a, b) =>
         (b.date || "").localeCompare(a.date || "") ||
@@ -873,6 +963,7 @@ export const Reports: React.FC = () => {
     personalDuePersonId,
     duePersons,
     walletName,
+    carRentData,
   ]);
 
   const pdfStats = useMemo(() => {
@@ -967,7 +1058,7 @@ export const Reports: React.FC = () => {
           ? pdfFilteredDues
           : pdfTransactions;
 
-    return paginateData(listToPaginate, pdfReportType === "wallet");
+    return paginateData(listToPaginate, pdfReportType === "wallet" || pdfReportType === "car_rent", pdfReportType === "car_rent");
   }, [pdfReportType, pdfFilteredProjects, pdfFilteredDues, pdfTransactions]);
 
   const formatPdfRowDate = (dateStr: string) => {
@@ -1132,6 +1223,8 @@ export const Reports: React.FC = () => {
         filename = `personal_dues_report_${personName.replace(/\s+/g, "_")}.pdf`;
       } else if (pdfReportType === "wallet") {
         filename = `wallet_report_${walletName ? walletName.replace(/\s+/g, "_") : "wallet"}.pdf`;
+      } else if (pdfReportType === "car_rent") {
+        filename = `car_rent_report_${pdfStartDate}_to_${pdfEndDate}.pdf`;
       }
 
       // Smoothly jump progress to 100% on complete render cycle
@@ -2442,13 +2535,17 @@ export const Reports: React.FC = () => {
                     ? "ব্যক্তিগত লেনদেন"
                     : pdfReportType === "wallet"
                       ? "ওয়ালেট লেনদেন"
-                      : "লেনদেন"}
+                      : pdfReportType === "car_rent"
+                        ? "গাড়ির খতিয়ান"
+                        : "লেনদেন"}
               :{" "}
               {pdfReportType === "projects"
                 ? pdfFilteredProjects.length
                 : pdfReportType === "dues"
                   ? pdfFilteredDues.length
-                  : pdfTransactions.length}{" "}
+                  : pdfReportType === "car_rent"
+                    ? 0
+                    : pdfTransactions.length}{" "}
               &nbsp;|&nbsp; পৃষ্ঠা: {toBnDigits(getPaginatedPages.length)}
             </div>
           </div>
@@ -2723,6 +2820,7 @@ export const Reports: React.FC = () => {
                                   `ব্যক্তিগত হিসাব স্টেটমেন্ট (${duePersons?.find((p: any) => p.id === personalDuePersonId)?.name || ""})`}
                                  {pdfReportType === "wallet" &&
                                    `ওয়ালেট লেনদেন প্রতিবেদন (${walletName || ""})`}
+                                 {pdfReportType === "car_rent" && "গাড়ির খতিয়ান রিপোর্ট"}
                               </span>
                             </div>
                             <div
@@ -2766,9 +2864,73 @@ export const Reports: React.FC = () => {
                           </div>
                         )}
 
+                        {/* Car Rent Dashboard - ONLY on page 1 */}
+                        {page.isFirstPage && pdfReportType === "car_rent" && carRentSummary && (
+                          <div className="grid grid-cols-4 gap-4 mb-6">
+                            <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm text-center">
+                              <p className="text-[10px] text-slate-500 font-bold mb-1" style={{fontFamily: "'Kohinoor Bangla', sans-serif"}}>মোট ট্রিপ</p>
+                              <p className="text-lg font-black text-slate-800 font-sans">{toBnDigits(carRentSummary.totalTrips.toString())} টি</p>
+                            </div>
+                            <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm text-center">
+                              <p className="text-[10px] text-rose-500 font-bold mb-1" style={{fontFamily: "'Kohinoor Bangla', sans-serif"}}>মোট ভাড়া (গাড়ি)</p>
+                              <p className="text-lg font-black text-rose-600 font-sans">{carRentSummary.totalRent.toLocaleString("bn-BD")}</p>
+                            </div>
+                            <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm text-center">
+                              <p className="text-[10px] text-emerald-500 font-bold mb-1" style={{fontFamily: "'Kohinoor Bangla', sans-serif"}}>মোট আদায়</p>
+                              <p className="text-lg font-black text-emerald-600 font-sans">{carRentSummary.totalCollections.toLocaleString("bn-BD")}</p>
+                            </div>
+                            <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm text-center">
+                              <p className="text-[10px] text-indigo-500 font-bold mb-1" style={{fontFamily: "'Kohinoor Bangla', sans-serif"}}>ড্রাইভারকে পরিশোধ</p>
+                              <p className="text-lg font-black text-indigo-600 font-sans">{carRentSummary.totalDriverPaid.toLocaleString("bn-BD")}</p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 1. Friends Dues Table - ONLY on page 1 for car_rent */}
+                        {page.isFirstPage && pdfReportType === "car_rent" && friendsSummary.length > 0 && (
+                          <div className="mb-8">
+                            <div className="flex items-center gap-2 mb-4">
+                              <div className="w-1.5 h-6 bg-indigo-600 rounded-full"></div>
+                              <h2 className="text-lg font-bold text-slate-800" style={{fontFamily: "'Kohinoor Bangla', sans-serif"}}>১. বন্ধুদের বকেয়া ও হিসাব তালিকা</h2>
+                            </div>
+                            <div className="overflow-hidden border border-slate-100 rounded-xl shadow-sm">
+                              <table className="w-full text-left border-collapse">
+                                <thead>
+                                  <tr className="bg-slate-50 border-b border-slate-100 text-[10px] text-slate-500 font-extrabold tracking-wider" style={{fontFamily: "'Kohinoor Bangla', sans-serif"}}>
+                                    <th className="py-2.5 px-4 font-bold">বন্ধুর নাম</th>
+                                    <th className="py-2.5 px-4 font-bold text-center">মোট ট্রিপ</th>
+                                    <th className="py-2.5 px-4 font-bold text-right">মোট নির্ধারিত শেয়ার</th>
+                                    <th className="py-2.5 px-4 font-bold text-right">পরিশোধিত টাকা</th>
+                                    <th className="py-2.5 px-4 font-bold text-right text-rose-600">বকেয়া (DUES)</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="text-[11px] font-medium text-slate-700 divide-y divide-slate-50">
+                                  {friendsSummary.map((friend: any) => (
+                                    <tr key={friend.id} className="hover:bg-slate-50/30 transition-colors">
+                                      <td className="py-3 px-4 text-slate-800 font-bold" style={{fontFamily: "'Kohinoor Bangla', sans-serif"}}>{friend.name}</td>
+                                      <td className="py-3 px-4 text-center font-sans">{toBnDigits(friend.totalTrips.toString())}</td>
+                                      <td className="py-3 px-4 text-right font-sans">{Math.round(friend.totalShare).toLocaleString("bn-BD")}</td>
+                                      <td className="py-3 px-4 text-right font-sans text-emerald-600">{friend.totalPaid.toLocaleString("bn-BD")}</td>
+                                      <td className="py-3 px-4 text-right font-sans font-bold text-rose-600">
+                                        {friend.totalShare - friend.totalPaid > 1 ? Math.round(friend.totalShare - friend.totalPaid).toLocaleString("bn-BD") : toBnDigits("০")}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+
                         {/* 2. Document Table Section */}
                         <div className="space-y-4">
-                          <div className="overflow-hidden border border-slate-100 rounded-xl">
+                          {pdfReportType === "car_rent" && !page.isFirstPage && page.pageNumber === 2 && (
+                             <div className="flex items-center gap-2 mb-2">
+                               <div className="w-1.5 h-6 bg-slate-400 rounded-full"></div>
+                               <h2 className="text-lg font-bold text-slate-800" style={{fontFamily: "'Kohinoor Bangla', sans-serif"}}>২. ট্রিপ ও পরিশোধের বিস্তারিত লগ</h2>
+                             </div>
+                          )}
+                          <div className={`overflow-hidden border border-slate-100 rounded-xl ${pdfReportType === "car_rent" && page.isFirstPage ? "hidden" : ""}`}>
                             <table className="w-full text-left border-collapse">
                               <thead>
                                 {pdfReportType === "projects" ||
@@ -2855,9 +3017,11 @@ export const Reports: React.FC = () => {
                                     <th className="py-2.5 px-4 font-bold">
                                       তারিখ
                                     </th>
-                                    <th className="py-2.5 px-4 font-bold">
-                                      সময়
-                                    </th>
+                                    {pdfReportType !== "car_rent" && (
+                                      <th className="py-2.5 px-4 font-bold">
+                                        সময়
+                                      </th>
+                                    )}
                                     <th className="py-2.5 px-4 font-bold">
                                       বিবরণ
                                     </th>
@@ -2871,7 +3035,115 @@ export const Reports: React.FC = () => {
                                 )}
                               </thead>
                               <tbody className="text-[11px] font-medium text-slate-700 divide-y divide-slate-50">
-                                {pdfReportType === "projects" ||
+                                {pdfReportType === "car_rent" ? (
+                                  (() => {
+                                    const trips = page.items.filter((item) =>
+                                      item.id.includes("car-rent-trip"),
+                                    );
+                                    const payments = page.items.filter((item) =>
+                                      item.id.includes("car-rent-payment"),
+                                    );
+
+                                    return (
+                                      <>
+                                        {/* Trips Section */}
+                                        {trips.length > 0 && (
+                                          <>
+                                            <tr className="bg-slate-100/50">
+                                              <td
+                                                colSpan={4}
+                                                className="py-2 px-4 font-bold text-slate-800"
+                                              >
+                                                ট্রিপ ও পরীক্ষার খরচ বিবরণ
+                                              </td>
+                                            </tr>
+                                            {trips.map((tx) => (
+                                              <tr
+                                                key={tx.id}
+                                                className="hover:bg-slate-50/50 transition-colors"
+                                              >
+                                                <td className="py-2.5 px-4 text-slate-500 font-sans text-[10px] font-bold">
+                                                  {formatPdfRowDate(tx.date)}
+                                                </td>
+                                                <td
+                                                  className="py-2.5 px-4 font-normal text-slate-800"
+                                                  style={{
+                                                    fontFamily:
+                                                      "'Kohinoor Bangla', sans-serif",
+                                                  }}
+                                                >
+                                                  {tx.description}
+                                                </td>
+                                                <td
+                                                  className="py-2.5 px-4 text-slate-400 font-semibold"
+                                                  style={{
+                                                    fontFamily:
+                                                      "'Kohinoor Bangla', sans-serif",
+                                                  }}
+                                                >
+                                                  {tx.category}
+                                                </td>
+                                                <td className="py-2.5 px-4 text-right font-bold font-sans text-[11px] text-emerald-600">
+                                                  +
+                                                  {tx.amount.toLocaleString(
+                                                    "bn-BD",
+                                                  )}
+                                                </td>
+                                              </tr>
+                                            ))}
+                                          </>
+                                        )}
+                                        {/* Payments Section */}
+                                        {payments.length > 0 && (
+                                          <>
+                                            <tr className="bg-slate-100/50">
+                                              <td
+                                                colSpan={4}
+                                                className="py-2 px-4 font-bold text-slate-800"
+                                              >
+                                                গাড়িওয়ালা কে ভাড়া পরিশোধ লগ
+                                              </td>
+                                            </tr>
+                                            {payments.map((tx) => (
+                                              <tr
+                                                key={tx.id}
+                                                className="hover:bg-slate-50/50 transition-colors"
+                                              >
+                                                <td className="py-2.5 px-4 text-slate-500 font-sans text-[10px] font-bold">
+                                                  {formatPdfRowDate(tx.date)}
+                                                </td>
+                                                <td
+                                                  className="py-2.5 px-4 font-normal text-slate-800"
+                                                  style={{
+                                                    fontFamily:
+                                                      "'Kohinoor Bangla', sans-serif",
+                                                  }}
+                                                >
+                                                  {tx.description}
+                                                </td>
+                                                <td
+                                                  className="py-2.5 px-4 text-slate-400 font-semibold"
+                                                  style={{
+                                                    fontFamily:
+                                                      "'Kohinoor Bangla', sans-serif",
+                                                  }}
+                                                >
+                                                  {tx.category}
+                                                </td>
+                                                <td className="py-2.5 px-4 text-right font-bold font-sans text-[11px] text-rose-600">
+                                                  -
+                                                  {tx.amount.toLocaleString(
+                                                    "bn-BD",
+                                                  )}
+                                                </td>
+                                              </tr>
+                                            ))}
+                                          </>
+                                        )}
+                                      </>
+                                    );
+                                  })()
+                                ) : pdfReportType === "projects" ||
                                 pdfReportType === "dues" ? (
                                   page.items.length === 0 ? (
                                     <tr>
@@ -3208,7 +3480,7 @@ export const Reports: React.FC = () => {
                           </div>
 
                           {/* Under table summary bar row - ONLY on last page */}
-                          {page.isLastPage && (
+                          {page.isLastPage && pdfReportType !== "car_rent" && (
                             <div className="bg-slate-50 rounded-xl px-4 py-2.5 border border-slate-100 flex items-center justify-between text-[11px] text-slate-600 font-bold font-sans">
                               {pdfReportType === "projects" ||
                               pdfReportType === "dues" ? (
@@ -3411,7 +3683,7 @@ export const Reports: React.FC = () => {
                         </div>
 
                         {/* 3. Executive Metrics Blocks - ONLY on Last Page */}
-                        {page.isLastPage && (
+                        {page.isLastPage && pdfReportType !== "car_rent" && (
                           <div className="grid grid-cols-3 gap-3">
                             {/* Total Income or Total Budget */}
                             <div className="bg-[#f0fdf4] border border-emerald-100 rounded-2xl p-4 flex flex-col justify-between h-20 shadow-xs">
