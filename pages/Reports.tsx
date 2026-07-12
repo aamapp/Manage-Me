@@ -3872,7 +3872,7 @@ export const Reports: React.FC = () => {
               </div>
 
               {/* Sticky Solid Blue PDF Download Button or Progress Bar depending on process state */}
-              <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-md border-t border-slate-200/60 z-50 flex justify-center">
+              <div className="fixed bottom-0 left-0 lg:left-72 right-0 p-4 bg-white/80 backdrop-blur-md border-t border-slate-200/60 z-50 flex justify-center">
                 {isGeneratingPDF ? (
                   <div className="w-full max-w-lg bg-white rounded-2xl p-4 shadow-xl border border-slate-100/80 flex flex-col gap-2.5 animate-in fade-in slide-in-from-bottom-2 duration-200">
                     <div className="flex justify-between items-center text-sm font-sans px-0.5">

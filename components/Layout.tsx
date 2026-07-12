@@ -730,23 +730,24 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
           isFullScreenPage
             ? "p-0"
             : isExpensesPage
-            ? `pt-14 lg:pt-8 ${!isOnline ? (hasBottomNav ? "pb-[110px]" : "pb-[38px]") : "pb-[72px]"} lg:pb-8 px-0 lg:px-8`
-            : `pt-14 lg:pt-8 ${!isOnline ? (hasBottomNav ? "pb-[110px]" : "pb-[38px]") : "pb-[72px]"} lg:pb-8 px-3 lg:px-8`
-        } ${isExpensesPage ? "" : "animate-in fade-in duration-150"} w-full max-w-[100vw] lg:max-w-none ${isExpensesPage ? 'overflow-x-clip' : 'overflow-x-hidden'} ${isTrash ? "" : "lg:ml-72"}`}
+            ? `pt-14 lg:pt-8 ${hasBottomNav ? "pb-[72px]" : "pb-4"} lg:pb-8 px-0 lg:px-8`
+            : `pt-14 lg:pt-8 ${hasBottomNav ? "pb-[72px]" : "pb-4"} lg:pb-8 px-3 lg:px-8`
+        } ${isExpensesPage ? "" : "animate-in fade-in duration-150"} w-full max-w-[100vw] lg:max-w-none ${isExpensesPage ? 'overflow-x-clip' : 'overflow-x-hidden'} ${isTrash ? "" : "lg:ml-72"} transition-[padding] duration-300`}
       >
         <div
           className={`max-w-4xl lg:max-w-5xl mx-auto w-full ${isFullScreenPage ? "h-[100dvh] lg:h-auto" : ""}`}
         >
-          <OfflineBanner className={`fixed bottom-0 left-0 right-0 ${isTrash ? '' : 'lg:left-72'} z-[51] border-t border-[#eb3b30] shadow-lg`} />
+          <OfflineBanner 
+            className={`fixed left-0 right-0 ${isTrash ? '' : 'lg:left-72'} z-[51] border-t border-[#eb3b30] shadow-lg ${hasBottomNav ? 'bottom-[60px]' : 'bottom-0'}`} 
+          />
           {children}
         </div>
       </main>
 
       {/* Fixed Bottom Navigation Bar - Hide if Admin is on User List page or on Desktop */}
-      {(!isAdmin || adminSelectedUserId) && !isFullScreenPage && (
+      {hasBottomNav && (
         <div 
-          className="fixed inset-x-0 z-50 bg-white border-t border-slate-100 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] lg:hidden h-[60px]"
-          style={{ bottom: !isOnline ? '38px' : '0px' }}
+          className="fixed inset-x-0 z-50 bg-white border-t border-slate-100 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] lg:hidden h-[60px] bottom-0"
         >
           <nav className="flex justify-between items-center px-6 h-full w-full max-w-lg mx-auto">
             {PRIMARY_NAV.map((item) => {
