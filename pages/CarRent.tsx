@@ -508,32 +508,32 @@ export const CarRent: React.FC = () => {
       onConfirm: async () => {
         try {
           if (isOnline) {
+            const batch = writeBatch(db);
+            
             // Delete friend doc
-            await deleteDoc(doc(db, "car_rent_friends", friendId));
+            batch.delete(doc(db, "car_rent_friends", friendId));
             
             // Delete all associated collections for this friend using pre-loaded local state
             const friendCollections = collections.filter(c => c.friendId === friendId);
-            if (friendCollections.length > 0) {
-              const batch = writeBatch(db);
-              friendCollections.forEach((col) => {
-                batch.delete(doc(db, "car_rent_collections", col.id));
-              });
-              await batch.commit();
-            }
+            friendCollections.forEach((col) => {
+              batch.delete(doc(db, "car_rent_collections", col.id));
+            });
 
             // Remove friend from all trips participantIds using pre-loaded local state
             const friendTrips = trips.filter(t => t.participantIds?.includes(friendId));
-            for (const trip of friendTrips) {
+            friendTrips.forEach((trip) => {
               const updatedParts = (trip.participantIds || []).filter((pid: string) => pid !== friendId);
               if (updatedParts.length === 0) {
-                await deleteDoc(doc(db, "car_rent_trips", trip.id));
+                batch.delete(doc(db, "car_rent_trips", trip.id));
               } else {
-                await updateDoc(doc(db, "car_rent_trips", trip.id), {
+                batch.update(doc(db, "car_rent_trips", trip.id), {
                   participantIds: updatedParts,
                   updatedAt: new Date().toISOString()
                 });
               }
-            }
+            });
+
+            await batch.commit();
           }
           
           setFriends(prev => prev.filter(f => f.id !== friendId));
@@ -586,18 +586,19 @@ export const CarRent: React.FC = () => {
       };
 
       if (isOnline) {
-        await setDoc(doc(db, "car_rent_trips", tripId), newTrip);
+        const batch = writeBatch(db);
+        batch.set(doc(db, "car_rent_trips", tripId), newTrip);
 
         // Delete any collections for this trip that are no longer participants
         const oldTripCols = collections.filter(c => c.tripId === tripId);
-        for (const oldCol of oldTripCols) {
+        oldTripCols.forEach(oldCol => {
           if (!newTrip.participantIds.includes(oldCol.friendId)) {
-            await deleteDoc(doc(db, "car_rent_collections", oldCol.id));
+            batch.delete(doc(db, "car_rent_collections", oldCol.id));
           }
-        }
+        });
 
         // Save collections for each selected student
-        for (const pid of newTrip.participantIds) {
+        newTrip.participantIds.forEach(pid => {
           const amountPaid = tempPayments[pid] !== undefined && tempPayments[pid] !== "" ? Number(tempPayments[pid]) : 0;
           
           // Determine how much is from existing advance balance
@@ -606,8 +607,10 @@ export const CarRent: React.FC = () => {
           const advanceUsage = Math.min(amountPaid, currentAdvance);
           const cashPayment = amountPaid - advanceUsage;
 
+          const advColId = `col_${tripId}_${pid}_adv`;
+          const cashColId = `col_${tripId}_${pid}_cash`;
+
           if (advanceUsage > 0) {
-            const advColId = `col_${tripId}_${pid}_adv`;
             const advCol: CarRentCollection = {
               id: advColId,
               friendId: pid,
@@ -619,11 +622,15 @@ export const CarRent: React.FC = () => {
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString()
             };
-            await setDoc(doc(db, "car_rent_collections", advColId), advCol);
+            batch.set(doc(db, "car_rent_collections", advColId), advCol);
+          } else {
+            // Delete old advance collection if it existed
+            if (oldTripCols.some(c => c.id === advColId)) {
+              batch.delete(doc(db, "car_rent_collections", advColId));
+            }
           }
 
           if (cashPayment > 0 || (advanceUsage === 0 && amountPaid === 0)) {
-            const cashColId = `col_${tripId}_${pid}_cash`;
             const cashCol: CarRentCollection = {
               id: cashColId,
               friendId: pid,
@@ -635,9 +642,16 @@ export const CarRent: React.FC = () => {
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString()
             };
-            await setDoc(doc(db, "car_rent_collections", cashColId), cashCol);
+            batch.set(doc(db, "car_rent_collections", cashColId), cashCol);
+          } else {
+            // Delete old cash collection if it existed
+            if (oldTripCols.some(c => c.id === cashColId)) {
+              batch.delete(doc(db, "car_rent_collections", cashColId));
+            }
           }
-        }
+        });
+
+        await batch.commit();
       }
 
       // Update trips state
@@ -706,12 +720,16 @@ export const CarRent: React.FC = () => {
       onConfirm: async () => {
         try {
           if (isOnline) {
-            await deleteDoc(doc(db, "car_rent_trips", tripId));
+            const batch = writeBatch(db);
+            batch.delete(doc(db, "car_rent_trips", tripId));
+            
             // Delete all associated collections in Firestore
             const colsToDelete = collections.filter(c => c.tripId === tripId);
-            for (const col of colsToDelete) {
-              await deleteDoc(doc(db, "car_rent_collections", col.id));
-            }
+            colsToDelete.forEach(col => {
+              batch.delete(doc(db, "car_rent_collections", col.id));
+            });
+            
+            await batch.commit();
           }
           setTrips(prev => prev.filter(t => t.id !== tripId));
           setCollections(prev => prev.filter(c => c.tripId !== tripId));
