@@ -1927,9 +1927,9 @@ export const CarRent: React.FC = () => {
       {/* ======================================= */}
       {/* 1. FRIEND MODAL */}
       {friendModal.open && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 overflow-y-auto">
           <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setFriendModal({ open: false, mode: "add" })} />
-          <div className="relative bg-white w-full max-w-sm rounded-[2rem] shadow-2xl p-6 overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="relative bg-white w-full max-w-sm rounded-[2rem] shadow-2xl p-6 overflow-hidden animate-in zoom-in-95 duration-200 transition-transform duration-300 ease-in-out focus-within:-translate-y-[6vh] sm:focus-within:translate-y-0">
             <h3 className="text-base font-black text-slate-800 mb-4 border-b border-slate-50 pb-2.5">
               {friendModal.mode === "add" ? "নতুন স্টুডেন্ট যোগ করুন" : "স্টুডেন্ট প্রোফাইল এডিট করুন"}
             </h3>
@@ -2142,9 +2142,9 @@ export const CarRent: React.FC = () => {
       {/* ======================================= */}
       {/* 3. COLLECTION/MONEY RECEIPT MODAL */}
       {collectionModal.open && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 overflow-y-auto">
           <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setCollectionModal({ open: false, mode: "add" })} />
-          <div className="relative bg-white w-full max-w-sm rounded-[2rem] shadow-2xl p-6 overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="relative bg-white w-full max-w-sm rounded-[2rem] shadow-2xl p-6 overflow-hidden animate-in zoom-in-95 duration-200 transition-transform duration-300 ease-in-out focus-within:-translate-y-[6vh] sm:focus-within:translate-y-0">
             <h3 className="text-base font-black text-slate-800 mb-4 border-b border-slate-50 pb-2.5">
               টাকা আদায়ের রসিদ লিখুন
             </h3>
@@ -2207,9 +2207,9 @@ export const CarRent: React.FC = () => {
       {/* ======================================= */}
       {/* 4. DRIVER PAYMENT MODAL */}
       {driverModal.open && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 overflow-y-auto">
           <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setDriverModal({ open: false, mode: "add" })} />
-          <div className="relative bg-white w-full max-w-sm rounded-[2rem] shadow-2xl p-6 overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="relative bg-white w-full max-w-sm rounded-[2rem] shadow-2xl p-6 overflow-hidden animate-in zoom-in-95 duration-200 transition-transform duration-300 ease-in-out focus-within:-translate-y-[6vh] sm:focus-within:translate-y-0">
             <h3 className="text-base font-black text-slate-800 mb-4 border-b border-slate-50 pb-2.5">
               গাড়িওয়ালাকে পেমেন্ট করুন
             </h3>
@@ -2271,11 +2271,11 @@ export const CarRent: React.FC = () => {
             setIsEndDatePickerOpen(false);
             setShowFilterModal(false);
           }}
-          className="fixed inset-0 z-[2000] bg-black/60 backdrop-blur-[2px] overflow-y-auto flex items-start sm:items-center justify-center p-4 animate-in fade-in duration-300"
+          className="fixed inset-0 z-[2000] bg-black/60 backdrop-blur-[2px] overflow-y-auto flex items-center justify-center p-4 animate-in fade-in duration-300"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="bg-white rounded-[28px] w-full max-w-[305px] p-5 shadow-2xl flex flex-col items-center animate-in zoom-in-95 duration-200 select-none border border-slate-100 my-auto"
+            className="bg-white rounded-[28px] w-full max-w-[305px] p-5 shadow-2xl flex flex-col items-center animate-in zoom-in-95 duration-200 select-none border border-slate-100 transition-transform duration-300 ease-in-out focus-within:-translate-y-[6vh] sm:focus-within:translate-y-0"
           >
             {/* Conditional Rendering based on active subView */}
             {modalSubView === "main" && (
