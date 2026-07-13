@@ -479,31 +479,24 @@ export const CarRent: React.FC = () => {
             // Delete friend doc
             await deleteDoc(doc(db, "car_rent_friends", friendId));
             
-            // Delete all associated collections for this friend - Robust Firestore Query
-            const collectionsQuery = query(
-              collection(db, "car_rent_collections"),
-              where("friendId", "==", friendId)
-            );
-            const collectionsSnap = await getDocs(collectionsQuery);
-            const batch = writeBatch(db);
-            collectionsSnap.forEach((colDoc) => {
-              batch.delete(colDoc.ref);
-            });
-            await batch.commit();
+            // Delete all associated collections for this friend using pre-loaded local state
+            const friendCollections = collections.filter(c => c.friendId === friendId);
+            if (friendCollections.length > 0) {
+              const batch = writeBatch(db);
+              friendCollections.forEach((col) => {
+                batch.delete(doc(db, "car_rent_collections", col.id));
+              });
+              await batch.commit();
+            }
 
-            // Remove friend from all trips participantIds
-            const tripsQuery = query(
-              collection(db, "car_rent_trips"),
-              where("participantIds", "array-contains", friendId)
-            );
-            const tripsSnap = await getDocs(tripsQuery);
-            for (const tripDoc of tripsSnap.docs) {
-              const tripData = tripDoc.data();
-              const updatedParts = (tripData.participantIds || []).filter((pid: string) => pid !== friendId);
+            // Remove friend from all trips participantIds using pre-loaded local state
+            const friendTrips = trips.filter(t => t.participantIds?.includes(friendId));
+            for (const trip of friendTrips) {
+              const updatedParts = (trip.participantIds || []).filter((pid: string) => pid !== friendId);
               if (updatedParts.length === 0) {
-                await deleteDoc(tripDoc.ref);
+                await deleteDoc(doc(db, "car_rent_trips", trip.id));
               } else {
-                await updateDoc(tripDoc.ref, {
+                await updateDoc(doc(db, "car_rent_trips", trip.id), {
                   participantIds: updatedParts,
                   updatedAt: new Date().toISOString()
                 });
