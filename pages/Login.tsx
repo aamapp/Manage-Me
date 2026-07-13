@@ -53,7 +53,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onResetPassword, onGoToSi
       </div>
 
       <div className="flex-1 px-6 -mt-12 relative z-20 pb-10 flex justify-center">
-        <div className="bg-white rounded-3xl shadow-xl p-6 md:p-8 border border-slate-100 transition-all duration-300 w-full max-w-md">
+        <div className="bg-white rounded-3xl shadow-xl p-6 md:p-8 border border-slate-100 transition-all duration-300 w-full max-w-md transition-transform duration-300 ease-in-out focus-within:-translate-y-24 sm:focus-within:translate-y-0">
           
           {view === 'login' ? (
             <>

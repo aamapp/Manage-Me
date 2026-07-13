@@ -37,7 +37,7 @@ export const Signup: React.FC<SignupProps> = ({ onSignup, onGoToLogin }) => {
       </div>
 
       <div className="flex-1 px-6 -mt-12 relative z-20 pb-10 flex justify-center">
-        <div className="bg-white rounded-3xl shadow-xl p-6 md:p-8 border border-slate-100 w-full max-w-md">
+        <div className="bg-white rounded-3xl shadow-xl p-6 md:p-8 border border-slate-100 w-full max-w-md transition-transform duration-300 ease-in-out focus-within:-translate-y-24 sm:focus-within:translate-y-0">
           <button 
               onClick={onGoToLogin}
               className="flex items-center gap-2 text-slate-400 font-bold text-xs mb-6 hover:text-indigo-600 transition-colors"

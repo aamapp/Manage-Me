@@ -167,6 +167,8 @@ export const CarRent: React.FC = () => {
   const [tripModal, setTripModal] = useState<{ open: boolean; mode: "add" | "edit"; data?: Partial<CarRentTrip> }>({ open: false, mode: "add" });
   const [collectionModal, setCollectionModal] = useState<{ open: boolean; mode: "add" | "edit"; data?: Partial<CarRentCollection> }>({ open: false, mode: "add" });
   const [driverModal, setDriverModal] = useState<{ open: boolean; mode: "add" | "edit"; data?: Partial<CarRentDriverPayment> }>({ open: false, mode: "add" });
+  const [walletModalOpen, setWalletModalOpen] = useState(false);
+  const [searchWalletStudent, setSearchWalletStudent] = useState("");
 
   // Temporary payments mapped to each participant for trip creation
   const [tempPayments, setTempPayments] = useState<Record<string, number | "">>({});
@@ -1482,7 +1484,10 @@ export const CarRent: React.FC = () => {
         {activeTab === "dashboard" && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Main Wallet Card */}
-            <div className="md:col-span-1 bg-gradient-to-br from-indigo-600 via-indigo-600 to-indigo-700 rounded-xl p-4 text-white shadow-md relative overflow-hidden flex flex-col justify-between min-h-[115px]">
+            <div 
+              onClick={() => setWalletModalOpen(true)}
+              className="md:col-span-1 bg-gradient-to-br from-indigo-600 via-indigo-600 to-indigo-700 rounded-xl p-4 text-white shadow-md relative overflow-hidden flex flex-col justify-between min-h-[115px] cursor-pointer hover:shadow-lg hover:scale-[1.01] active:scale-[0.99] transition-all"
+            >
               <div className="absolute right-0 bottom-0 translate-x-4 translate-y-4 opacity-15 pointer-events-none">
                 <Car size={100} className="text-white" />
               </div>
@@ -2542,8 +2547,107 @@ export const CarRent: React.FC = () => {
         </div>
       )}
 
+      {/* ======================================= */}
+      {/* 5. WALLET DETAILS FULL SCREEN PAGE */}
+      {walletModalOpen && (
+        <div className="fixed inset-0 z-[2000] bg-slate-50 flex flex-col md:p-6 overflow-hidden animate-in slide-in-from-bottom duration-300">
+          <div className="bg-white w-full h-full md:max-w-xl md:mx-auto md:rounded-[2rem] md:shadow-2xl flex flex-col overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center gap-2.5 px-4 py-3 border-b border-slate-100 bg-white shrink-0">
+              <button
+                type="button"
+                onClick={() => setWalletModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors"
+              >
+                <ArrowLeft size={18} />
+              </button>
+              <h3 className="text-[15px] font-black text-slate-800 leading-none">
+                খতিয়ান ওয়ালেট হিসাব বিবরণী
+              </h3>
+            </div>
 
+            {/* Content Body (Scrollable) */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-4">
+              {/* Quick Summary Grid */}
+              <div className="grid grid-cols-3 gap-2.5">
+                <div className="bg-emerald-50/50 border border-emerald-100 rounded-2xl p-3 text-center">
+                  <p className="text-[9px] font-bold text-emerald-600 uppercase">মোট আদায়</p>
+                  <p className="font-black text-emerald-800 text-sm mt-0.5">৳{analytics.totalCollected}</p>
+                </div>
+                <div className="bg-rose-50/50 border border-rose-100 rounded-2xl p-3 text-center">
+                  <p className="text-[9px] font-bold text-rose-500 uppercase">মোট পেমেন্ট</p>
+                  <p className="font-black text-rose-800 text-sm mt-0.5">৳{analytics.totalPaidToDriver}</p>
+                </div>
+                <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-3 text-center">
+                  <p className="text-[9px] font-bold text-indigo-600 uppercase">ক্যাশ তহবিল</p>
+                  <p className="font-black text-indigo-800 text-sm mt-0.5">৳{analytics.walletBalance}</p>
+                </div>
+              </div>
 
+              {/* Search Box */}
+              <div className="relative w-full">
+                <span className="absolute left-3 top-2.5 text-slate-400">
+                  <Search size={15} />
+                </span>
+                <input
+                  type="text"
+                  placeholder="স্টুডেন্টের নাম খুঁজুন..."
+                  value={searchWalletStudent}
+                  onChange={(e) => setSearchWalletStudent(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-100 rounded-xl pl-9 pr-4 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              {/* Student list container */}
+              <div className="space-y-2 pb-6">
+                {analytics.friendDetails.filter(fd => fd.name.toLowerCase().includes(searchWalletStudent.toLowerCase())).length === 0 ? (
+                  <div className="text-center py-8 text-slate-400 font-medium text-xs">
+                    কোনো স্টুডেন্ট পাওয়া যায়নি
+                  </div>
+                ) : (
+                  analytics.friendDetails
+                    .filter(fd => fd.name.toLowerCase().includes(searchWalletStudent.toLowerCase()))
+                    .map((fd) => {
+                      const diff = fd.totalPaid - fd.totalShare;
+                      return (
+                        <div key={fd.id} className="bg-slate-50/70 border border-slate-100 rounded-2xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50 transition-all">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 font-black text-xs flex items-center justify-center shrink-0">
+                              {fd.name.charAt(0)}
+                            </div>
+                            <div>
+                              <h4 className="font-extrabold text-slate-800 text-xs">{fd.name}</h4>
+                              <p className="text-[9px] text-slate-400 font-bold mt-0.5">
+                                জমা: <span className="text-emerald-600 font-black">৳{fd.totalPaid}</span> | খরচ ভাগ: <span className="text-slate-600 font-black">৳{fd.totalShare}</span>
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Balance badge */}
+                          <div className="flex items-center self-end sm:self-auto shrink-0">
+                            {diff > 0 ? (
+                              <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 text-[10px] font-black px-2.5 py-1 rounded-xl border border-emerald-100">
+                                ৳{diff} উদ্বৃত্ত (অগ্রিম)
+                              </span>
+                            ) : diff < 0 ? (
+                              <span className="inline-flex items-center gap-1 bg-rose-50 text-rose-600 text-[10px] font-black px-2.5 py-1 rounded-xl border border-rose-100">
+                                ৳{Math.abs(diff)} বকেয়া (Due)
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-500 text-[10px] font-black px-2.5 py-1 rounded-xl border border-slate-200">
+                                হিসাব সমতা
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
