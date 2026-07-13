@@ -344,6 +344,38 @@ export const CarRent: React.FC = () => {
     }
   };
 
+  // Allocate total payments to trips dynamically in chronological (FIFO) order
+  const tripStudentAllocations = useMemo(() => {
+    const allocations: Record<string, Record<string, number>> = {}; // tripId -> { studentId -> allocatedAmount }
+    
+    // Initialize empty allocations for each trip
+    trips.forEach(t => {
+      allocations[t.id] = {};
+    });
+
+    // For each active friend, distribute their total paid amount across their trips chronologically
+    friends.forEach(f => {
+      // Find all trips this friend participated in, sorted by date (ascending)
+      const friendTrips = trips
+        .filter(t => t.participantIds?.includes(f.id))
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      // Calculate total cash paid by this friend (excluding advance payment records to prevent double counting)
+      const totalCashPaid = collections
+        .filter(c => c.friendId === f.id && c.paymentMethod !== 'advance')
+        .reduce((sum, c) => sum + c.amount, 0);
+
+      let remaining = totalCashPaid;
+      friendTrips.forEach(t => {
+        const allocated = Math.min(100, remaining);
+        allocations[t.id][f.id] = allocated;
+        remaining -= allocated;
+      });
+    });
+
+    return allocations;
+  }, [friends, trips, collections]);
+
   // Calculations & Analytics
   const analytics = useMemo(() => {
     // 1. Calculate each friend's total trip share (100 Taka per trip)
@@ -963,7 +995,7 @@ export const CarRent: React.FC = () => {
         carRentData: {
           friends,
           trips,
-          collections: collections.filter(c => friends.some(f => f.id === c.friendId)),
+          collections: collections.filter(c => c.paymentMethod !== 'advance' && friends.some(f => f.id === c.friendId)),
           driverPayments,
         },
       },
@@ -1718,8 +1750,7 @@ export const CarRent: React.FC = () => {
                   const driverFare = 1300;
                   const tripBalance = studentTotalFare - driverFare;
 
-                  const tripCollections = collections.filter(c => c.tripId === t.id && friends.some(f => f.id === c.friendId));
-                  const actualCollected = tripCollections.reduce((sum, c) => sum + c.amount, 0);
+                  const actualCollected = activeParticipants.reduce((sum, pid) => sum + (tripStudentAllocations[t.id]?.[pid] || 0), 0);
                   const actualDue = Math.max(0, studentTotalFare - actualCollected);
                   return (
                     <div key={t.id} className="bg-white rounded-xl p-5 border border-slate-100 shadow-sm hover:border-indigo-500/20 hover:shadow-md transition-all">
@@ -1780,7 +1811,7 @@ export const CarRent: React.FC = () => {
                         {/* Checklist-like names bubble */}
                         <div className="flex flex-wrap gap-1.5 mt-1.5">
                           {t.participantIds?.filter(pid => friends.some(f => f.id === pid)).map(pid => {
-                            const studentPayment = tripCollections.find(c => c.friendId === pid)?.amount ?? 0;
+                            const studentPayment = tripStudentAllocations[t.id]?.[pid] ?? 0;
                             const isPaidInFull = studentPayment >= 100;
                             const name = getFriendName(pid);
                             
