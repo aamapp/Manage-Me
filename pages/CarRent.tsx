@@ -394,9 +394,10 @@ export const CarRent: React.FC = () => {
     });
 
     // 4. Summaries
-    // totalCollected should only include fresh cash to represent the real money in hand
+    // totalCollected should only include fresh cash to represent the real money in hand, filtering out any deleted/orphaned students' collections
+    const activeFriendIds = new Set(friends.map(f => f.id));
     const totalCollected = collections
-      .filter(c => c.paymentMethod !== 'advance')
+      .filter(c => c.paymentMethod !== 'advance' && activeFriendIds.has(c.friendId))
       .reduce((sum, c) => sum + c.amount, 0);
       
     const totalDriverRent = trips.length * 1300; 
@@ -478,20 +479,35 @@ export const CarRent: React.FC = () => {
             // Delete friend doc
             await deleteDoc(doc(db, "car_rent_friends", friendId));
             
-            // Delete all associated collections for this friend
-            const friendCollections = collections.filter(c => c.friendId === friendId);
-            for (const col of friendCollections) {
-              await deleteDoc(doc(db, "car_rent_collections", col.id));
-            }
+            // Delete all associated collections for this friend - Robust Firestore Query
+            const collectionsQuery = query(
+              collection(db, "car_rent_collections"),
+              where("friendId", "==", friendId)
+            );
+            const collectionsSnap = await getDocs(collectionsQuery);
+            const batch = writeBatch(db);
+            collectionsSnap.forEach((colDoc) => {
+              batch.delete(colDoc.ref);
+            });
+            await batch.commit();
 
             // Remove friend from all trips participantIds
-            const affectedTrips = trips.filter(t => t.participantIds?.includes(friendId));
-            for (const trip of affectedTrips) {
-              const updatedParts = trip.participantIds.filter(pid => pid !== friendId);
-              await updateDoc(doc(db, "car_rent_trips", trip.id), {
-                participantIds: updatedParts,
-                updatedAt: new Date().toISOString()
-              });
+            const tripsQuery = query(
+              collection(db, "car_rent_trips"),
+              where("participantIds", "array-contains", friendId)
+            );
+            const tripsSnap = await getDocs(tripsQuery);
+            for (const tripDoc of tripsSnap.docs) {
+              const tripData = tripDoc.data();
+              const updatedParts = (tripData.participantIds || []).filter((pid: string) => pid !== friendId);
+              if (updatedParts.length === 0) {
+                await deleteDoc(tripDoc.ref);
+              } else {
+                await updateDoc(tripDoc.ref, {
+                  participantIds: updatedParts,
+                  updatedAt: new Date().toISOString()
+                });
+              }
             }
           }
           
@@ -502,11 +518,12 @@ export const CarRent: React.FC = () => {
               return { ...t, participantIds: t.participantIds.filter(pid => pid !== friendId) };
             }
             return t;
-          }));
+          }).filter(t => t.participantIds.length > 0));
           
           showToast("স্টুডেন্ট প্রোফাইল ও সংশ্লিষ্ট হিসাব ডিলিট হয়েছে।", "success");
           setTimeout(fetchLiveAndSync, 500);
         } catch (err: any) {
+          console.error("Error deleting friend:", err);
           showToast("ডিলিট করা যায়নি।", "error");
         } finally {
           setDeleteConfirm(prev => ({ ...prev, isOpen: false }));
@@ -829,8 +846,9 @@ export const CarRent: React.FC = () => {
       return true;
     };
 
+    const activeFriendIds = new Set(friends.map(f => f.id));
     const fTrips = trips.filter(t => checkInRange(t.date));
-    const fCollections = collections.filter(c => checkInRange(c.date));
+    const fCollections = collections.filter(c => checkInRange(c.date) && activeFriendIds.has(c.friendId));
     const fDriverPayments = driverPayments.filter(dp => checkInRange(dp.date));
 
     // Summary of filtered period
@@ -863,7 +881,9 @@ export const CarRent: React.FC = () => {
       });
     });
 
+    const activeFriendIdsForActivities = new Set(friends.map(f => f.id));
     collections.forEach(c => {
+      if (!activeFriendIdsForActivities.has(c.friendId)) return;
       const f = friends.find(friend => friend.id === c.friendId);
       list.push({
         id: c.id,
@@ -950,7 +970,7 @@ export const CarRent: React.FC = () => {
         carRentData: {
           friends,
           trips,
-          collections,
+          collections: collections.filter(c => friends.some(f => f.id === c.friendId)),
           driverPayments,
         },
       },
@@ -1705,7 +1725,7 @@ export const CarRent: React.FC = () => {
                   const driverFare = 1300;
                   const tripBalance = studentTotalFare - driverFare;
 
-                  const tripCollections = collections.filter(c => c.tripId === t.id);
+                  const tripCollections = collections.filter(c => c.tripId === t.id && friends.some(f => f.id === c.friendId));
                   const actualCollected = tripCollections.reduce((sum, c) => sum + c.amount, 0);
                   const actualDue = Math.max(0, studentTotalFare - actualCollected);
                   return (

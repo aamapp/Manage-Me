@@ -4762,6 +4762,17 @@ const DuesManager: React.FC<DuesManagerProps> = ({
       const expenseIdsToTrash: string[] = [];
 
       if (person) {
+        // Reverse all transactions in wallets before deleting/trashing the person
+        if (person.transactions && person.transactions.length > 0) {
+          for (const tx of person.transactions) {
+            const wallet = tx.walletName || "ক্যাশ";
+            const impact = tx.type === "receive" ? -tx.amount : tx.amount;
+            if (impact !== 0) {
+              await adjustWalletBalance(wallet, impact);
+            }
+          }
+        }
+
         // Find associated expenses to soft-delete
         if (person.transactions && person.transactions.length > 0) {
           const dueTxIds: string[] = [];
