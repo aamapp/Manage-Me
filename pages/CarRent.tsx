@@ -34,7 +34,7 @@ import { jsPDF } from "jspdf";
 import { useAppContext } from "@/context/AppContext";
 import { DatePicker } from "@/components/DatePicker";
 import { ConfirmModal } from "@/components/ConfirmModal";
-import { db } from "@/lib/firebase";
+import { db, handleFirestoreError, OperationType } from "@/lib/firebase";
 import {
   collection,
   query,
@@ -168,7 +168,9 @@ export const CarRent: React.FC = () => {
   const [collectionModal, setCollectionModal] = useState<{ open: boolean; mode: "add" | "edit"; data?: Partial<CarRentCollection> }>({ open: false, mode: "add" });
   const [driverModal, setDriverModal] = useState<{ open: boolean; mode: "add" | "edit"; data?: Partial<CarRentDriverPayment> }>({ open: false, mode: "add" });
   const [walletModalOpen, setWalletModalOpen] = useState(false);
+  const [walletSubTab, setWalletSubTab] = useState<"accounts" | "history">("accounts");
   const [searchWalletStudent, setSearchWalletStudent] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
   // Temporary payments mapped to each participant for trip creation
   const [tempPayments, setTempPayments] = useState<Record<string, number | "">>({});
@@ -341,6 +343,9 @@ export const CarRent: React.FC = () => {
 
     } catch (e: any) {
       console.error("Firestore sync error:", e);
+      if (e.message && (e.message.includes("permission") || e.message.includes("insufficient"))) {
+        handleFirestoreError(e, OperationType.GET, "car_rent_data");
+      }
     } finally {
       setLoading(false);
     }
@@ -456,7 +461,7 @@ export const CarRent: React.FC = () => {
   // Handle Friends Operations
   const handleSaveFriend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || isSaving) return;
     const fData = friendModal.data;
     if (!fData?.name?.trim()) {
       showToast("বন্ধুর নাম অবশ্যই দিতে হবে।", "error");
@@ -464,6 +469,7 @@ export const CarRent: React.FC = () => {
     }
 
     try {
+      setIsSaving(true);
       const friendId = fData.id || "friend_" + Date.now();
       const newFriend: CarRentFriend = {
         id: friendId,
@@ -498,6 +504,8 @@ export const CarRent: React.FC = () => {
 
     } catch (err: any) {
       showToast("সম্পন্ন করা সম্ভব হয়নি। " + err.message, "error");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -562,7 +570,7 @@ export const CarRent: React.FC = () => {
   // Handle Trips Operations
   const handleSaveTrip = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || isSaving) return;
     const tData = tripModal.data;
     const finalExamName = tData?.examName?.trim() || "নিয়মিত ট্রিপ";
     if (!tData?.date) {
@@ -575,6 +583,7 @@ export const CarRent: React.FC = () => {
     }
 
     try {
+      setIsSaving(true);
       const tripId = tData.id || "trip_" + Date.now();
       const newTrip: CarRentTrip = {
         id: tripId,
@@ -710,6 +719,8 @@ export const CarRent: React.FC = () => {
       setTimeout(fetchLiveAndSync, 500);
     } catch (err: any) {
       showToast("সম্পন্ন করা সম্ভব হয়নি। " + err.message, "error");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -749,7 +760,7 @@ export const CarRent: React.FC = () => {
   // Handle Collection Operations
   const handleSaveCollection = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || isSaving) return;
     const cData = collectionModal.data;
     if (!cData?.friendId || !cData?.date || !cData?.amount) {
       showToast("বন্ধু, তারিখ এবং টাকার পরিমাণ দিন।", "error");
@@ -757,6 +768,7 @@ export const CarRent: React.FC = () => {
     }
 
     try {
+      setIsSaving(true);
       const colId = cData.id || "col_" + Date.now();
       const newCol: CarRentCollection = {
         id: colId,
@@ -786,16 +798,21 @@ export const CarRent: React.FC = () => {
       setTimeout(fetchLiveAndSync, 500);
     } catch (err: any) {
       showToast("সম্পন্ন করা সম্ভব হয়নি।", "error");
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const handleDeleteCollection = (colId: string) => {
     const col = collections.find(c => c.id === colId);
     const friend = friends.find(f => f.id === col?.friendId);
+    const trip = col?.tripId ? trips.find(t => t.id === col.tripId) : null;
+    const sourceInfo = trip ? `পরীক্ষা: ${trip.examName}` : "সরাসরি আদায়";
+    
     setDeleteConfirm({
       isOpen: true,
       title: "আদায় ডিলিট",
-      message: `আপনি কি "${friend?.name || ""}" এর ৳${col?.amount || 0} আদায়ের রেকর্ডটি মুছে ফেলতে চান?`,
+      message: `আপনি কি "${friend?.name || ""}" এর ৳${col?.amount || 0} আদায়ের রেকর্ডটি (${sourceInfo}) মুছে ফেলতে চান?`,
       onConfirm: async () => {
         try {
           if (isOnline) {
@@ -816,7 +833,7 @@ export const CarRent: React.FC = () => {
   // Handle Driver Payment Operations
   const handleSaveDriverPayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || isSaving) return;
     const dData = driverModal.data;
     if (!dData?.amount || !dData?.date) {
       showToast("টাকা ও তারিখ প্রদান করুন।", "error");
@@ -824,6 +841,7 @@ export const CarRent: React.FC = () => {
     }
 
     try {
+      setIsSaving(true);
       const payId = dData.id || "dp_" + Date.now();
       const newPay: CarRentDriverPayment = {
         id: payId,
@@ -851,6 +869,8 @@ export const CarRent: React.FC = () => {
       setTimeout(fetchLiveAndSync, 500);
     } catch (err: any) {
       showToast("সম্পন্ন করা সম্ভব হয়নি।", "error");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -1652,7 +1672,7 @@ export const CarRent: React.FC = () => {
                 />
               </div>
               <button
-                onClick={() => setFriendModal({ open: true, mode: "add", data: { name: "", phone: "" } })}
+                onClick={() => setFriendModal({ open: true, mode: "add", data: { id: "friend_" + Date.now() + "_" + Math.random().toString(36).substring(2, 9), name: "", phone: "" } })}
                 className="w-full sm:w-auto flex items-center justify-center gap-1.5 bg-indigo-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl active:scale-95 transition-all shadow-md shadow-indigo-100 hover:bg-indigo-700"
               >
                 <UserPlus size={15} />
@@ -1719,6 +1739,7 @@ export const CarRent: React.FC = () => {
                         open: true,
                         mode: "add",
                         data: {
+                          id: "col_" + Date.now() + "_" + Math.random().toString(36).substring(2, 9),
                           friendId: fd.id,
                           amount: fd.due,
                           date: new Date().toISOString().split("T")[0]
@@ -1754,7 +1775,7 @@ export const CarRent: React.FC = () => {
                 />
               </div>
               <button
-                onClick={() => setTripModal({ open: true, mode: "add", data: { examName: "", totalRent: 0, participantIds: [], date: new Date().toISOString().split("T")[0] } })}
+                onClick={() => setTripModal({ open: true, mode: "add", data: { id: "trip_" + Date.now() + "_" + Math.random().toString(36).substring(2, 9), examName: "", totalRent: 0, participantIds: [], date: new Date().toISOString().split("T")[0] } })}
                 className="w-full sm:w-auto flex items-center justify-center gap-1.5 bg-indigo-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl active:scale-95 transition-all shadow-md shadow-indigo-100 hover:bg-indigo-700"
               >
                 <Plus size={15} />
@@ -1876,7 +1897,7 @@ export const CarRent: React.FC = () => {
                 </div>
               </div>
               <button
-                onClick={() => setDriverModal({ open: true, mode: "add", data: { amount: analytics.driverDue, date: new Date().toISOString().split("T")[0], remarks: "" } })}
+                onClick={() => setDriverModal({ open: true, mode: "add", data: { id: "dp_" + Date.now() + "_" + Math.random().toString(36).substring(2, 9), amount: analytics.driverDue, date: new Date().toISOString().split("T")[0], remarks: "" } })}
                 className="w-full sm:w-auto flex items-center justify-center gap-1.5 bg-indigo-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl active:scale-95 transition-all shadow-md shadow-indigo-100 hover:bg-indigo-700"
               >
                 <Plus size={15} />
@@ -1962,9 +1983,10 @@ export const CarRent: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-xs shadow-md shadow-indigo-100 hover:bg-indigo-700"
+                  disabled={isSaving}
+                  className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-xs shadow-md shadow-indigo-100 hover:bg-indigo-700 disabled:opacity-70 disabled:cursor-not-allowed"
                 >
-                  সংরক্ষণ
+                  {isSaving ? "সংরক্ষণ হচ্ছে..." : "সংরক্ষণ"}
                 </button>
               </div>
             </form>
@@ -2133,10 +2155,10 @@ export const CarRent: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  disabled={friends.length === 0}
-                  className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold text-xs shadow-md shadow-indigo-100 hover:bg-indigo-700 disabled:opacity-50"
+                  disabled={friends.length === 0 || isSaving}
+                  className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold text-xs shadow-md shadow-indigo-100 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  সংরক্ষণ
+                  {isSaving ? "সংরক্ষণ হচ্ছে..." : "সংরক্ষণ"}
                 </button>
               </div>
             </form>
@@ -2151,7 +2173,7 @@ export const CarRent: React.FC = () => {
           <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setCollectionModal({ open: false, mode: "add" })} />
           <div className="relative bg-white w-full max-w-sm rounded-[2rem] shadow-2xl p-6 overflow-hidden animate-in zoom-in-95 duration-200 transition-transform duration-300 ease-in-out focus-within:-translate-y-[15vh] sm:focus-within:translate-y-0">
             <h3 className="text-base font-black text-slate-800 mb-4 border-b border-slate-50 pb-2.5">
-              টাকা আদায়ের রসিদ লিখুন
+              {collectionModal.mode === "edit" ? "আদায় রসিদ সংশোধন করুন" : "টাকা আদায়ের রসিদ লিখুন"}
             </h3>
 
             <form onSubmit={handleSaveCollection} className="flex flex-col gap-4">
@@ -2199,9 +2221,13 @@ export const CarRent: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-xs shadow-md shadow-indigo-100 hover:bg-indigo-700"
+                  disabled={isSaving}
+                  className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-xs shadow-md shadow-indigo-100 hover:bg-indigo-700 disabled:opacity-70 disabled:cursor-not-allowed"
                 >
-                  রিসিভ সেভ করুন
+                  {isSaving 
+                    ? "সংরক্ষণ হচ্ছে..." 
+                    : (collectionModal.mode === "edit" ? "সংশোধন সেভ করুন" : "রিসিভ সেভ করুন")
+                  }
                 </button>
               </div>
             </form>
@@ -2249,9 +2275,10 @@ export const CarRent: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-xs shadow-md shadow-indigo-100 hover:bg-indigo-700"
+                  disabled={isSaving}
+                  className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-xs shadow-md shadow-indigo-100 hover:bg-indigo-700 disabled:opacity-70 disabled:cursor-not-allowed"
                 >
-                  পেমেন্ট সেভ করুন
+                  {isSaving ? "সংরক্ষণ হচ্ছে..." : "পেমেন্ট সেভ করুন"}
                 </button>
               </div>
             </form>
@@ -2584,6 +2611,32 @@ export const CarRent: React.FC = () => {
                 </div>
               </div>
 
+              {/* Segmented Control to switch between accounts list and edit/decrease history */}
+              <div className="flex bg-slate-100/80 p-1 rounded-xl border border-slate-200/50">
+                <button
+                  type="button"
+                  onClick={() => setWalletSubTab("accounts")}
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+                    walletSubTab === "accounts"
+                      ? "bg-white text-indigo-700 shadow-sm"
+                      : "text-slate-500 hover:text-slate-700"
+                  }`}
+                >
+                  স্টুডেন্টদের খতিয়ান
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWalletSubTab("history")}
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+                    walletSubTab === "history"
+                      ? "bg-white text-indigo-700 shadow-sm"
+                      : "text-slate-500 hover:text-slate-700"
+                  }`}
+                >
+                  আদায় রসিদ সংশোধন (কমানো)
+                </button>
+              </div>
+
               {/* Search Box */}
               <div className="relative w-full">
                 <span className="absolute left-3 top-2.5 text-slate-400">
@@ -2591,59 +2644,140 @@ export const CarRent: React.FC = () => {
                 </span>
                 <input
                   type="text"
-                  placeholder="স্টুডেন্টের নাম খুঁজুন..."
+                  placeholder={walletSubTab === "accounts" ? "স্টুডেন্টের নাম খুঁজুন..." : "স্টুডেন্টের নাম দিয়ে রসিদ খুঁজুন..."}
                   value={searchWalletStudent}
                   onChange={(e) => setSearchWalletStudent(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-100 rounded-xl pl-9 pr-4 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:border-indigo-500"
                 />
               </div>
 
-              {/* Student list container */}
-              <div className="space-y-2 pb-6">
-                {analytics.friendDetails.filter(fd => fd.name.toLowerCase().includes(searchWalletStudent.toLowerCase())).length === 0 ? (
-                  <div className="text-center py-8 text-slate-400 font-medium text-xs">
-                    কোনো স্টুডেন্ট পাওয়া যায়নি
-                  </div>
-                ) : (
-                  analytics.friendDetails
-                    .filter(fd => fd.name.toLowerCase().includes(searchWalletStudent.toLowerCase()))
-                    .map((fd) => {
-                      const diff = fd.totalPaid - fd.totalShare;
+              {walletSubTab === "accounts" ? (
+                /* Student list container */
+                <div className="space-y-2 pb-6">
+                  {analytics.friendDetails.filter(fd => fd.name.toLowerCase().includes(searchWalletStudent.toLowerCase())).length === 0 ? (
+                    <div className="text-center py-8 text-slate-400 font-medium text-xs">
+                      কোনো স্টুডেন্ট পাওয়া যায়নি
+                    </div>
+                  ) : (
+                    analytics.friendDetails
+                      .filter(fd => fd.name.toLowerCase().includes(searchWalletStudent.toLowerCase()))
+                      .map((fd) => {
+                        const diff = fd.totalPaid - fd.totalShare;
+                        return (
+                          <div key={fd.id} className="bg-slate-50/70 border border-slate-100 rounded-2xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50 transition-all">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 font-black text-xs flex items-center justify-center shrink-0">
+                                {fd.name.charAt(0)}
+                              </div>
+                              <div>
+                                <h4 className="font-extrabold text-slate-800 text-xs">{fd.name}</h4>
+                                <p className="text-[9px] text-slate-400 font-bold mt-0.5">
+                                  জমা: <span className="text-emerald-600 font-black">৳{fd.totalPaid}</span> | খরচ ভাগ: <span className="text-slate-600 font-black">৳{fd.totalShare}</span>
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Balance badge */}
+                            <div className="flex items-center self-end sm:self-auto shrink-0">
+                              {diff > 0 ? (
+                                <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 text-[10px] font-black px-2.5 py-1 rounded-xl border border-emerald-100">
+                                  ৳{diff} উদ্বৃত্ত (অগ্রিম)
+                                </span>
+                              ) : diff < 0 ? (
+                                <span className="inline-flex items-center gap-1 bg-rose-50 text-rose-600 text-[10px] font-black px-2.5 py-1 rounded-xl border border-rose-100">
+                                  ৳{Math.abs(diff)} বকেয়া (Due)
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-500 text-[10px] font-black px-2.5 py-1 rounded-xl border border-slate-200">
+                                  হিসাব সমতা
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                  )}
+                </div>
+              ) : (
+                /* Collected Receipts list container for edit/decrease */
+                <div className="space-y-2 pb-6">
+                  {(() => {
+                    const filteredCollections = collections
+                      .filter(c => {
+                        if (c.paymentMethod === 'advance') return false;
+                        const friend = friends.find(f => f.id === c.friendId);
+                        if (!friend) return false;
+                        return friend.name.toLowerCase().includes(searchWalletStudent.toLowerCase());
+                      })
+                      .sort((a, b) => b.date.localeCompare(a.date));
+
+                    if (filteredCollections.length === 0) {
                       return (
-                        <div key={fd.id} className="bg-slate-50/70 border border-slate-100 rounded-2xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50 transition-all">
+                        <div className="text-center py-8 text-slate-400 font-medium text-xs">
+                          কোনো আদায়ের রসিদ পাওয়া যায়নি
+                        </div>
+                      );
+                    }
+
+                    return filteredCollections.map((c) => {
+                      const friend = friends.find(f => f.id === c.friendId);
+                      const trip = c.tripId ? trips.find(t => t.id === c.tripId) : null;
+                      return (
+                        <div key={c.id} className="bg-white border border-slate-100 rounded-2xl p-3 flex items-center justify-between gap-3 hover:bg-slate-50 transition-all shadow-sm">
                           <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 font-black text-xs flex items-center justify-center shrink-0">
-                              {fd.name.charAt(0)}
+                            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 font-black text-xs flex items-center justify-center shrink-0">
+                              ৳
                             </div>
                             <div>
-                              <h4 className="font-extrabold text-slate-800 text-xs">{fd.name}</h4>
-                              <p className="text-[9px] text-slate-400 font-bold mt-0.5">
-                                জমা: <span className="text-emerald-600 font-black">৳{fd.totalPaid}</span> | খরচ ভাগ: <span className="text-slate-600 font-black">৳{fd.totalShare}</span>
+                              <h4 className="font-extrabold text-slate-800 text-xs">{friend?.name || "অজানা স্টুডেন্ট"}</h4>
+                              <p className="text-[9px] text-slate-400 font-bold mt-0.5 flex flex-wrap items-center gap-1">
+                                <span>তারিখ: <span className="text-slate-600">{c.date}</span></span>
+                                {trip ? (
+                                  <span className="text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-md text-[8px] font-extrabold">
+                                    পরীক্ষা: {trip.examName}
+                                  </span>
+                                ) : (
+                                  <span className="text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md text-[8px] font-extrabold">
+                                    সরাসরি আদায়
+                                  </span>
+                                )}
                               </p>
                             </div>
                           </div>
 
-                          {/* Balance badge */}
-                          <div className="flex items-center self-end sm:self-auto shrink-0">
-                            {diff > 0 ? (
-                              <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 text-[10px] font-black px-2.5 py-1 rounded-xl border border-emerald-100">
-                                ৳{diff} উদ্বৃত্ত (অগ্রিম)
-                              </span>
-                            ) : diff < 0 ? (
-                              <span className="inline-flex items-center gap-1 bg-rose-50 text-rose-600 text-[10px] font-black px-2.5 py-1 rounded-xl border border-rose-100">
-                                ৳{Math.abs(diff)} বকেয়া (Due)
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-500 text-[10px] font-black px-2.5 py-1 rounded-xl border border-slate-200">
-                                হিসাব সমতা
-                              </span>
-                            )}
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-emerald-700 text-xs font-black mr-1 bg-emerald-50 px-2 py-0.5 rounded-lg">
+                              ৳{c.amount}
+                            </span>
+                            
+                            <button
+                              type="button"
+                              onClick={() => setCollectionModal({
+                                open: true,
+                                mode: "edit",
+                                data: c
+                              })}
+                              className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg active:scale-95 transition-all"
+                              title="টাকার পরিমাণ সংশোধন/কমান"
+                            >
+                              <Edit2 size={13} />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCollection(c.id)}
+                              className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg active:scale-95 transition-all"
+                              title="ডিলিট করুন"
+                            >
+                              <Trash2 size={13} />
+                            </button>
                           </div>
                         </div>
                       );
-                    })
-                )}
-              </div>
+                    });
+                  })()}
+                </div>
+              )}
             </div>
           </div>
         </div>

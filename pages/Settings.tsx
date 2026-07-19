@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User as UserIcon, Bell, Shield, Palette, Globe, Save, CheckCircle2, Loader2, Camera, UploadCloud, AlertCircle, Lock, Key, Trash2, Fingerprint, Download, Image as ImageIcon, Check, RefreshCw, ArrowLeft } from 'lucide-react';
+import { User as UserIcon, Bell, Shield, Palette, Globe, Save, CheckCircle2, Loader2, Camera, UploadCloud, AlertCircle, Lock, Key, Trash2, Fingerprint, Download, Image as ImageIcon, Check, RefreshCw, ArrowLeft, Upload, FileText, CheckCircle, Database } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { AppLogo } from '@/components/AppLogo';
 import { APP_NAME } from '../constants';
@@ -8,10 +8,29 @@ import { useAppContext } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
 import { AppLock } from '@/components/AppLock';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { collection, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType } from '@/lib/firebase';
 
 export const Settings: React.FC = () => {
   const navigate = useNavigate();
-  const { user, setUser, showToast, appPin, setAppPin, isOnline, isFingerprintEnabled, setIsFingerprintEnabled } = useAppContext();
+  const { 
+    user, 
+    setUser, 
+    showToast, 
+    appPin, 
+    setAppPin, 
+    isOnline, 
+    isFingerprintEnabled, 
+    setIsFingerprintEnabled,
+    refreshData,
+    projects,
+    clients,
+    incomeRecords,
+    expenses,
+    ghazalNotes,
+    shoppingLists,
+    duePersons
+  } = useAppContext();
   const [formData, setFormData] = useState({
     name: user?.name || '',
     email: user?.email || '',
@@ -31,15 +50,355 @@ export const Settings: React.FC = () => {
   
   // 'setup' means setting a new pin, 'disable' means verifying pin to turn it off
   const [pinAction, setPinAction] = useState<'setup' | 'disable' | null>(null);
-  const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'system'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'system' | 'backup'>('profile');
   const [showClearCacheModal, setShowClearCacheModal] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   
+  // Backup & Restore States
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importPreview, setImportPreview] = useState<any | null>(null);
+  const [importStatus, setImportStatus] = useState<'idle' | 'validating' | 'ready' | 'error'>('idle');
+  const [importErrorMessage, setImportErrorMessage] = useState('');
+  const importFileInputRef = useRef<HTMLInputElement>(null);
+
+  const [exportSelections, setExportSelections] = useState({
+    projects: true,
+    clients: true,
+    income_records: true,
+    expenses: true,
+    ghazal_notes: true,
+    shopping_lists: true,
+    due_persons: true,
+    car_rent: true,
+  });
+
+  const [importSelections, setImportSelections] = useState<Record<string, boolean>>({
+    projects: true,
+    clients: true,
+    income_records: true,
+    expenses: true,
+    ghazal_notes: true,
+    shopping_lists: true,
+    due_persons: true,
+    car_rent_friends: true,
+    car_rent_trips: true,
+    car_rent_collections: true,
+    car_rent_driver_payments: true,
+  });
+
   // Logo Download States
   const [isCapturingLogo, setIsCapturingLogo] = useState(false);
   const [isLogoDownloadDone, setIsLogoDownloadDone] = useState(false);
   const logoRef = useRef<HTMLDivElement>(null);
+
+  // === Backup & Restore Logic ===
+  
+  const handleExportData = async () => {
+    if (!user) {
+      showToast('ইউজার সেশন পাওয়া যায়নি।', 'error');
+      return;
+    }
+
+    const hasAnyExportSelection = Object.values(exportSelections).some(v => v);
+    if (!hasAnyExportSelection) {
+      showToast('দয়া করে ব্যাকআপের জন্য কমপক্ষে একটি ক্যাটাগরি সিলেক্ট করুন।', 'error');
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      showToast('ডাটা ব্যাকআপ ফাইল প্রস্তুত করা হচ্ছে...', 'info');
+      
+      // 1. Fetch Supabase Data live dynamically based on user selections
+      const projectsData = exportSelections.projects ? (await supabase.from('projects').select('*').eq('userid', user.id)).data : [];
+      const clientsData = exportSelections.clients ? (await supabase.from('clients').select('*').eq('userid', user.id)).data : [];
+      const incomeRecordsData = exportSelections.income_records ? (await supabase.from('income_records').select('*').eq('userid', user.id)).data : [];
+      const expensesData = exportSelections.expenses ? (await supabase.from('expenses').select('*').eq('userid', user.id)).data : [];
+      const ghazalNotesData = exportSelections.ghazal_notes ? (await supabase.from('ghazal_notes').select('*').eq('userid', user.id)).data : [];
+      const shoppingListsData = exportSelections.shopping_lists ? (await supabase.from('shopping_lists').select('*').eq('userid', user.id)).data : [];
+      const duePersonsData = exportSelections.due_persons ? (await supabase.from('due_persons').select('*').eq('userid', user.id)).data : [];
+
+      // 2. Fetch Firebase Car Rent Data defensively based on user selections
+      let carRentFriends: any[] = [];
+      let carRentTrips: any[] = [];
+      let carRentCollections: any[] = [];
+      let carRentDriverPayments: any[] = [];
+
+      if (exportSelections.car_rent) {
+        try {
+          const friendsSnap = await getDocs(query(collection(db, "car_rent_friends"), where("userid", "==", user.id)));
+          friendsSnap.forEach(docSnap => {
+            carRentFriends.push({ id: docSnap.id, ...docSnap.data() });
+          });
+
+          const tripsSnap = await getDocs(query(collection(db, "car_rent_trips"), where("userid", "==", user.id)));
+          tripsSnap.forEach(docSnap => {
+            carRentTrips.push({ id: docSnap.id, ...docSnap.data() });
+          });
+
+          const collectionsSnap = await getDocs(query(collection(db, "car_rent_collections"), where("userid", "==", user.id)));
+          collectionsSnap.forEach(docSnap => {
+            carRentCollections.push({ id: docSnap.id, ...docSnap.data() });
+          });
+
+          const driverSnap = await getDocs(query(collection(db, "car_rent_driver_payments"), where("userid", "==", user.id)));
+          driverSnap.forEach(docSnap => {
+            carRentDriverPayments.push({ id: docSnap.id, ...docSnap.data() });
+          });
+        } catch (fbErr) {
+          console.warn("Firestore data fetch skipped or failed:", fbErr);
+        }
+      }
+
+      // 3. Assemble complete backup object
+      const backupData = {
+        version: "1.0.0",
+        app: APP_NAME,
+        exportedAt: new Date().toISOString(),
+        userId: user.id,
+        userEmail: user.email,
+        data: {
+          supabase: {
+            projects: projectsData || [],
+            clients: clientsData || [],
+            income_records: incomeRecordsData || [],
+            expenses: expensesData || [],
+            ghazal_notes: ghazalNotesData || [],
+            shopping_lists: shoppingListsData || [],
+            due_persons: duePersonsData || []
+          },
+          firebase: {
+            car_rent_friends: carRentFriends,
+            car_rent_trips: carRentTrips,
+            car_rent_collections: carRentCollections,
+            car_rent_driver_payments: carRentDriverPayments
+          }
+        }
+      };
+
+      // 4. Download file
+      const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const dateStr = new Date().toISOString().split('T')[0];
+      link.href = url;
+      link.download = `manage_me_backup_${dateStr}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      showToast('নির্বাচিত ডাটা সফলভাবে ব্যাকআপ ফাইল আকারে ডাউনলোড করা হয়েছে!', 'success');
+    } catch (err: any) {
+      console.error('Export error:', err);
+      showToast('ডাটা এক্সপোর্ট করতে সমস্যা হয়েছে: ' + (err.message || 'অজানা ত্রুটি'), 'error');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      processBackupFile(e.target.files[0]);
+    }
+  };
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      processBackupFile(e.dataTransfer.files[0]);
+    }
+  };
+
+  const processBackupFile = (file: File) => {
+    setImportFile(file);
+    setImportStatus('validating');
+    setImportErrorMessage('');
+    setImportPreview(null);
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target?.result as string;
+        const json = JSON.parse(text);
+
+        if (!json || typeof json !== 'object' || !json.data) {
+          throw new Error('অবৈধ ব্যাকআপ ফাইল ফরম্যাট। ডাটা অবজেক্ট পাওয়া যায়নি।');
+        }
+
+        const sData = json.data.supabase || {};
+        const fData = json.data.firebase || {};
+
+        const counts = {
+          projects: sData.projects?.length || 0,
+          clients: sData.clients?.length || 0,
+          income_records: sData.income_records?.length || 0,
+          expenses: sData.expenses?.length || 0,
+          ghazal_notes: sData.ghazal_notes?.length || 0,
+          shopping_lists: sData.shopping_lists?.length || 0,
+          due_persons: sData.due_persons?.length || 0,
+          car_rent_friends: fData.car_rent_friends?.length || 0,
+          car_rent_trips: fData.car_rent_trips?.length || 0,
+          car_rent_collections: fData.car_rent_collections?.length || 0,
+          car_rent_driver_payments: fData.car_rent_driver_payments?.length || 0,
+        };
+
+        const totalRecords = Object.values(counts).reduce((a, b) => a + b, 0);
+        if (totalRecords === 0) {
+          throw new Error('ব্যাকআপ ফাইলে কোনো ডাটা পাওয়া যায়নি।');
+        }
+
+        // Initialize selections dynamically based on what is present in the backup file
+        setImportSelections({
+          projects: counts.projects > 0,
+          clients: counts.clients > 0,
+          income_records: counts.income_records > 0,
+          expenses: counts.expenses > 0,
+          ghazal_notes: counts.ghazal_notes > 0,
+          shopping_lists: counts.shopping_lists > 0,
+          due_persons: counts.due_persons > 0,
+          car_rent_friends: counts.car_rent_friends > 0,
+          car_rent_trips: counts.car_rent_trips > 0,
+          car_rent_collections: counts.car_rent_collections > 0,
+          car_rent_driver_payments: counts.car_rent_driver_payments > 0,
+        });
+
+        setImportPreview({
+          counts,
+          totalRecords,
+          exportedAt: json.exportedAt,
+          userEmail: json.userEmail || 'অজানা ইমেইল',
+          raw: json
+        });
+        setImportStatus('ready');
+      } catch (err: any) {
+        console.error('File parsing error:', err);
+        setImportStatus('error');
+        setImportErrorMessage(err.message || 'ফাইলটি পড়তে সমস্যা হয়েছে। দয়া করে সঠিক JSON ফাইল আপলোড করুন।');
+      }
+    };
+    reader.onerror = () => {
+      setImportStatus('error');
+      setImportErrorMessage('ফাইলটি লোড করতে সমস্যা হয়েছে।');
+    };
+    reader.readAsText(file);
+  };
+
+  const handleImportData = async () => {
+    if (!user || !importPreview) return;
+
+    // Check if at least one selected category has actual records to import
+    const activeImportCount = Object.entries(importSelections)
+      .filter(([_, enabled]) => enabled)
+      .reduce((sum, [key]) => sum + (importPreview.counts[key] || 0), 0);
+
+    if (activeImportCount === 0) {
+      showToast('দয়া করে ইমপোর্টের জন্য কমপক্ষে একটি ক্যাটাগরি সিলেক্ট করুন যার ডাটা ফাইলে রয়েছে।', 'error');
+      return;
+    }
+
+    setIsImporting(true);
+    try {
+      showToast('ডাটা ইমপোর্ট শুরু হচ্ছে, অনুগ্রহ করে অপেক্ষা করুন...', 'info');
+
+      const rawBackup = importPreview.raw;
+      const sData = rawBackup.data.supabase || {};
+      const fData = rawBackup.data.firebase || {};
+
+      // 1. Restore Supabase tables (Only those selected by the user)
+      const supabaseTables = [
+        { name: 'projects', list: sData.projects, enabled: importSelections.projects },
+        { name: 'clients', list: sData.clients, enabled: importSelections.clients },
+        { name: 'income_records', list: sData.income_records, enabled: importSelections.income_records },
+        { name: 'expenses', list: sData.expenses, enabled: importSelections.expenses },
+        { name: 'ghazal_notes', list: sData.ghazal_notes, enabled: importSelections.ghazal_notes },
+        { name: 'shopping_lists', list: sData.shopping_lists, enabled: importSelections.shopping_lists },
+        { name: 'due_persons', list: sData.due_persons, enabled: importSelections.due_persons },
+      ].filter(table => table.enabled);
+
+      for (const table of supabaseTables) {
+        if (table.list && table.list.length > 0) {
+          const preparedList = table.list.map((item: any) => {
+            const cleaned = { ...item };
+            cleaned.userid = user.id;
+            
+            if (!cleaned.id) {
+              cleaned.id = table.name.substring(0, 3) + "_" + Date.now() + "_" + Math.random().toString(36).substring(2, 9);
+            }
+            return cleaned;
+          });
+
+          const { error } = await supabase.from(table.name).upsert(preparedList);
+          if (error) {
+            console.error(`Error importing table ${table.name}:`, error);
+            throw new Error(`${table.name} ডাটা ইমপোর্ট করতে সমস্যা হয়েছে: ${error.message}`);
+          }
+        }
+      }
+
+      // 2. Restore Firebase (Car Rent) tables (Only those selected by the user)
+      const firebaseCollections = [
+        { name: 'car_rent_friends', list: fData.car_rent_friends, enabled: importSelections.car_rent_friends, valFunc: (d: any) => ({ id: d.id, name: d.name, phone: d.phone || "", userid: user.id, createdAt: d.createdAt || new Date().toISOString() }) },
+        { name: 'car_rent_trips', list: fData.car_rent_trips, enabled: importSelections.car_rent_trips, valFunc: (d: any) => ({ id: d.id, date: d.date, examName: d.examName, totalRent: Number(d.totalRent) || 0, participantIds: d.participantIds || [], userid: user.id, createdAt: d.createdAt || new Date().toISOString() }) },
+        { name: 'car_rent_collections', list: fData.car_rent_collections, enabled: importSelections.car_rent_collections, valFunc: (d: any) => ({ id: d.id, date: d.date, friendId: d.friendId, amount: Number(d.amount) || 0, tripId: d.tripId || null, paymentMethod: d.paymentMethod || null, userid: user.id, createdAt: d.createdAt || new Date().toISOString() }) },
+        { name: 'car_rent_driver_payments', list: fData.car_rent_driver_payments, enabled: importSelections.car_rent_driver_payments, valFunc: (d: any) => ({ id: d.id, date: d.date, amount: Number(d.amount) || 0, remarks: d.remarks || "", userid: user.id, createdAt: d.createdAt || new Date().toISOString() }) }
+      ].filter(col => col.enabled);
+
+      for (const col of firebaseCollections) {
+        if (col.list && col.list.length > 0) {
+          const CHUNK_SIZE = 400;
+          for (let i = 0; i < col.list.length; i += CHUNK_SIZE) {
+            const chunk = col.list.slice(i, i + CHUNK_SIZE);
+            const batch = writeBatch(db);
+            
+            chunk.forEach((item: any) => {
+              const itemId = item.id || col.name.substring(0, 4) + "_" + Date.now() + "_" + Math.random().toString(36).substring(2, 9);
+              const cleanItem = col.valFunc({ ...item, id: itemId });
+              
+              const ref = doc(db, col.name, cleanItem.id);
+              batch.set(ref, cleanItem);
+            });
+            try {
+              await batch.commit();
+            } catch (firestoreErr: any) {
+              handleFirestoreError(firestoreErr, OperationType.WRITE, col.name);
+            }
+          }
+        }
+      }
+
+      setImportFile(null);
+      setImportPreview(null);
+      setImportStatus('idle');
+      
+      showToast('নির্বাচিত ডাটা সফলভাবে ইমপোর্ট সম্পন্ন হয়েছে!', 'success');
+      
+      if (refreshData) {
+        await refreshData();
+      }
+    } catch (err: any) {
+      console.error('Import error:', err);
+      showToast('ডাটা ইমপোর্ট ব্যর্থ হয়েছে: ' + (err.message || 'অজানা ত্রুটি'), 'error');
+    } finally {
+      setIsImporting(false);
+    }
+  };
 
   const downloadLogoHD = async () => {
     if (!logoRef.current) return;
@@ -426,42 +785,54 @@ export const Settings: React.FC = () => {
         </div>
 
       {/* Tabs Layout */}
-      <div className="grid grid-cols-3 p-[4px] bg-[#f0f3f6] rounded-2xl gap-1.5 max-w-2xl mx-auto border border-slate-200/40 shadow-inner select-none" id="settings-tab-switcher">
+      <div className="grid grid-cols-4 p-[4px] bg-[#f0f3f6] rounded-2xl gap-1 max-w-2xl mx-auto border border-slate-200/40 shadow-inner select-none" id="settings-tab-switcher">
         <button
           onClick={() => setActiveTab('profile')}
-          className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 py-3 px-2 sm:px-4 rounded-xl text-xs sm:text-xs md:text-sm font-bold transition-all duration-300 cursor-pointer ${
+          className={`flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 py-2.5 px-1 sm:px-4 rounded-xl text-[10px] sm:text-xs md:text-sm font-bold transition-all duration-300 cursor-pointer ${
             activeTab === 'profile' 
               ? 'bg-[#e2edfc] text-[#1a73e8] shadow-sm font-bold scale-[1.01]' 
               : 'text-[#8e9aa8] hover:text-slate-700 hover:bg-white/40'
           }`}
           id="tab-profile-btn"
         >
-          <UserIcon size={16} />
+          <UserIcon size={14} className="sm:w-4 sm:h-4" />
           <span>প্রোফাইল</span>
         </button>
         <button
           onClick={() => setActiveTab('security')}
-          className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 py-3 px-2 sm:px-4 rounded-xl text-xs sm:text-xs md:text-sm font-bold transition-all duration-300 cursor-pointer ${
+          className={`flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 py-2.5 px-1 sm:px-4 rounded-xl text-[10px] sm:text-xs md:text-sm font-bold transition-all duration-300 cursor-pointer ${
             activeTab === 'security' 
               ? 'bg-[#e2fced] text-[#50AD54] shadow-sm font-bold scale-[1.01]' 
               : 'text-[#8e9aa8] hover:text-slate-700 hover:bg-white/40'
           }`}
           id="tab-security-btn"
         >
-          <Shield size={16} />
+          <Shield size={14} className="sm:w-4 sm:h-4" />
           <span>নিরাপত্তা</span>
         </button>
         <button
           onClick={() => setActiveTab('system')}
-          className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 py-3 px-2 sm:px-4 rounded-xl text-xs sm:text-xs md:text-sm font-bold transition-all duration-300 cursor-pointer ${
+          className={`flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 py-2.5 px-1 sm:px-4 rounded-xl text-[10px] sm:text-xs md:text-sm font-bold transition-all duration-300 cursor-pointer ${
             activeTab === 'system' 
               ? 'bg-[#fcedeb] text-[#db4437] shadow-sm font-bold scale-[1.01]' 
               : 'text-[#8e9aa8] hover:text-slate-700 hover:bg-white/40'
           }`}
           id="tab-system-btn"
         >
-          <RefreshCw size={16} />
+          <RefreshCw size={14} className="sm:w-4 sm:h-4" />
           <span>সিস্টেম</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('backup')}
+          className={`flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 py-2.5 px-1 sm:px-4 rounded-xl text-[10px] sm:text-xs md:text-sm font-bold transition-all duration-300 cursor-pointer ${
+            activeTab === 'backup' 
+              ? 'bg-[#fdf8e2] text-[#c6930a] shadow-sm font-bold scale-[1.01]' 
+              : 'text-[#8e9aa8] hover:text-slate-700 hover:bg-white/40'
+          }`}
+          id="tab-backup-btn"
+        >
+          <Database size={14} className="sm:w-4 sm:h-4" />
+          <span>ব্যাকআপ</span>
         </button>
       </div>
 
@@ -814,6 +1185,409 @@ export const Settings: React.FC = () => {
                     অ্যাপ ক্যাশ সাফ করুন
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Backup & Restore Tab Content */}
+        {activeTab === 'backup' && (
+          <div className="space-y-6 bg-white rounded-3xl border border-slate-100 shadow-sm p-6 md:p-8 animate-fadeIn" id="tab-content-backup">
+            <div className="pb-4 mb-2">
+              <h3 className="text-lg font-black text-slate-800 mb-1">ডাটা ব্যাকআপ ও রিস্টোর</h3>
+              <p className="text-xs text-slate-400 font-medium">আপনার অ্যাকাউন্টের সব ডাটা ফাইল আকারে ডাউনলোড করুন এবং পরবর্তীতে অন্য কোনো ডিভাইস বা অ্যাকাউন্টে রিস্টোর করুন।</p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-14 divide-y lg:divide-y-0 lg:divide-x divide-slate-100 pt-2">
+              {/* Export Panel */}
+              <div className="space-y-5">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 bg-amber-50 text-amber-600 border border-amber-100 rounded-lg flex items-center justify-center shadow-sm">
+                    <Download size={18} />
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-slate-800 text-sm md:text-base">ডাটা এক্সপোর্ট (Export)</h4>
+                    <p className="text-[10px] text-slate-400">আপনার সব বর্তমান তথ্য ব্যাকআপ ফাইল হিসেবে সেভ করুন</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    এই ব্যাকআপ ফাইলের ভেতর আপনার প্রজেক্ট, কাস্টমার লিস্ট, আয়-ব্যয়, গজল নোট, শপিং লিস্ট, দেনা-পাওনা এবং কার রেন্ট সিস্টেমের সমস্ত তথ্য সুরক্ষিতভাবে সংকলিত থাকবে।
+                  </p>
+
+                  {/* Summary counts of exportable items with custom interactive checkboxes */}
+                  <div className="bg-slate-50/70 rounded-2xl p-4 sm:p-5 border border-slate-100 space-y-3 text-xs select-none">
+                    <div className="font-bold text-slate-600 mb-1 flex items-center justify-between border-b border-slate-200/50 pb-2">
+                      <span className="flex items-center gap-1.5"><span>📊</span> ব্যাকআপের ক্যাটাগরি নির্বাচন করুন:</span>
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          const allTrue = Object.values(exportSelections).every(v => v);
+                          setExportSelections({
+                            projects: !allTrue,
+                            clients: !allTrue,
+                            income_records: !allTrue,
+                            expenses: !allTrue,
+                            ghazal_notes: !allTrue,
+                            shopping_lists: !allTrue,
+                            due_persons: !allTrue,
+                            car_rent: !allTrue,
+                          });
+                        }}
+                        className="text-[10px] text-amber-600 font-extrabold hover:underline cursor-pointer"
+                      >
+                        {Object.values(exportSelections).every(v => v) ? 'সব আনসিলেক্ট করুন' : 'সব সিলেক্ট করুন'}
+                      </button>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-slate-500 font-medium select-none">
+                      <label className="flex items-center gap-2 cursor-pointer hover:text-slate-800 transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={exportSelections.projects}
+                          onChange={(e) => setExportSelections({ ...exportSelections, projects: e.target.checked })}
+                          className="w-4 h-4 rounded text-amber-500 focus:ring-amber-400 border-slate-300 accent-amber-500 cursor-pointer"
+                        />
+                        <span>প্রজেক্টসমূহ ({(projects || []).length}টি)</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer hover:text-slate-800 transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={exportSelections.clients}
+                          onChange={(e) => setExportSelections({ ...exportSelections, clients: e.target.checked })}
+                          className="w-4 h-4 rounded text-amber-500 focus:ring-amber-400 border-slate-300 accent-amber-500 cursor-pointer"
+                        />
+                        <span>কাস্টমারসমূহ ({(clients || []).length}টি)</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer hover:text-slate-800 transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={exportSelections.income_records}
+                          onChange={(e) => setExportSelections({ ...exportSelections, income_records: e.target.checked })}
+                          className="w-4 h-4 rounded text-amber-500 focus:ring-amber-400 border-slate-300 accent-amber-500 cursor-pointer"
+                        />
+                        <span>আয় রেকর্ডসমূহ ({(incomeRecords || []).length}টি)</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer hover:text-slate-800 transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={exportSelections.expenses}
+                          onChange={(e) => setExportSelections({ ...exportSelections, expenses: e.target.checked })}
+                          className="w-4 h-4 rounded text-amber-500 focus:ring-amber-400 border-slate-300 accent-amber-500 cursor-pointer"
+                        />
+                        <span>ব্যয় রেকর্ডসমূহ ({(expenses || []).length}টি)</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer hover:text-slate-800 transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={exportSelections.ghazal_notes}
+                          onChange={(e) => setExportSelections({ ...exportSelections, ghazal_notes: e.target.checked })}
+                          className="w-4 h-4 rounded text-amber-500 focus:ring-amber-400 border-slate-300 accent-amber-500 cursor-pointer"
+                        />
+                        <span>গজলের নোট ({(ghazalNotes || []).length}টি)</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer hover:text-slate-800 transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={exportSelections.shopping_lists}
+                          onChange={(e) => setExportSelections({ ...exportSelections, shopping_lists: e.target.checked })}
+                          className="w-4 h-4 rounded text-amber-500 focus:ring-amber-400 border-slate-300 accent-amber-500 cursor-pointer"
+                        />
+                        <span>শপিং লিস্ট ({(shoppingLists || []).length}টি)</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer hover:text-slate-800 transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={exportSelections.due_persons}
+                          onChange={(e) => setExportSelections({ ...exportSelections, due_persons: e.target.checked })}
+                          className="w-4 h-4 rounded text-amber-500 focus:ring-amber-400 border-slate-300 accent-amber-500 cursor-pointer"
+                        />
+                        <span>দেনা-পাওনা ({(duePersons || []).length}টি)</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer hover:text-indigo-700 text-[#1a73e8] font-bold transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={exportSelections.car_rent}
+                          onChange={(e) => setExportSelections({ ...exportSelections, car_rent: e.target.checked })}
+                          className="w-4 h-4 rounded text-indigo-500 focus:ring-indigo-400 border-slate-300 accent-indigo-600 cursor-pointer"
+                        />
+                        <span>কার রেন্ট ডাটা (Firestore)</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleExportData}
+                  disabled={isExporting}
+                  className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-xl font-extrabold text-sm hover:from-amber-600 hover:to-amber-700 active:scale-95 transition-all duration-200 shadow-md shadow-amber-100 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {isExporting ? (
+                    <>
+                      <Loader2 className="animate-spin" size={16} />
+                      <span>ব্যাকআপ তৈরি হচ্ছে...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download size={16} />
+                      <span>ব্যাকআপ ফাইল ডাউনলোড করুন</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Import Panel */}
+              <div className="space-y-5 flex flex-col lg:pl-14 pt-8 lg:pt-0">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-lg flex items-center justify-center shadow-sm">
+                    <Upload size={18} />
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-slate-800 text-sm md:text-base">ডাটা ইমপোর্ট (Import)</h4>
+                    <p className="text-[10px] text-slate-400">ব্যাকআপ ফাইল থেকে আপনার তথ্য রিস্টোর বা আপডেট করুন</p>
+                  </div>
+                </div>
+
+                {importStatus === 'idle' && (
+                  <div 
+                    onDragEnter={handleDrag}
+                    onDragOver={handleDrag}
+                    onDragLeave={handleDrag}
+                    onDrop={handleDrop}
+                    onClick={() => importFileInputRef.current?.click()}
+                    className={`flex-1 min-h-[220px] border-2 border-dashed rounded-2xl flex flex-col items-center justify-center p-6 text-center transition-all duration-300 cursor-pointer ${
+                      dragActive ? 'border-indigo-500 bg-indigo-50/30' : 'border-slate-200 hover:border-indigo-500 hover:bg-slate-50/30'
+                    }`}
+                  >
+                    <input 
+                      type="file" 
+                      ref={importFileInputRef}
+                      className="hidden" 
+                      accept=".json" 
+                      onChange={handleFileChange} 
+                    />
+                    <UploadCloud size={32} className="text-slate-400 mb-2.5 animate-pulse" />
+                    <p className="font-black text-xs text-slate-700">ডিভাইস থেকে ব্যাকআপ ফাইল নির্বাচন করুন</p>
+                    <p className="text-[10px] text-slate-400 mt-1">অথবা ফাইলটি এখানে ড্র্যাগ অ্যান্ড ড্রপ করুন (শুধুমাত্র .json ফরম্যাট)</p>
+                  </div>
+                )}
+
+                {importStatus === 'validating' && (
+                  <div className="flex-1 min-h-[220px] border border-slate-100 bg-slate-50/40 rounded-2xl flex flex-col items-center justify-center p-6 text-center shadow-inner">
+                    <Loader2 className="animate-spin text-indigo-500 mb-2.5" size={28} />
+                    <p className="font-black text-xs text-slate-700">ফাইলটি যাচাই করা হচ্ছে...</p>
+                    <p className="text-[10px] text-slate-400 mt-1">ব্যাকআপ ফাইলের গঠন পরীক্ষা করা হচ্ছে</p>
+                  </div>
+                )}
+
+                {importStatus === 'error' && (
+                  <div className="flex-1 min-h-[220px] border border-rose-100 bg-rose-50/20 rounded-2xl flex flex-col items-center justify-center p-6 text-center">
+                    <AlertCircle className="text-rose-500 mb-2" size={28} />
+                    <p className="font-black text-xs text-rose-800">ভুল ব্যাকআপ ফাইল!</p>
+                    <p className="text-[10px] text-rose-600 max-w-xs mt-1 leading-normal font-medium">{importErrorMessage}</p>
+                    <button
+                      onClick={() => setImportStatus('idle')}
+                      className="mt-4 px-4 py-1.5 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                    >
+                      আবার চেষ্টা করুন
+                    </button>
+                  </div>
+                )}
+
+                {importStatus === 'ready' && importPreview && (
+                  <div className="flex-1 space-y-4">
+                    {/* Validation Successful Header */}
+                    <div className="bg-emerald-50 border border-emerald-100/80 p-3.5 rounded-xl flex items-start gap-2.5 text-emerald-800 animate-fadeIn">
+                      <CheckCircle className="shrink-0 text-emerald-600 mt-0.5" size={16} />
+                      <div className="text-xs">
+                        <p className="font-extrabold">সঠিক ব্যাকআপ ফাইল পাওয়া গেছে!</p>
+                        <p className="text-[10px] text-emerald-600/90 font-medium mt-0.5">উৎসের ইমেইল: {importPreview.userEmail}</p>
+                        {importPreview.exportedAt && (
+                          <p className="text-[10px] text-emerald-600/90 font-medium">রপ্তানির সময়: {new Date(importPreview.exportedAt).toLocaleString('bn-BD')}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Breakdown of elements being imported with custom checkboxes */}
+                    <div className="bg-slate-50/70 border border-slate-100 rounded-2xl p-4 sm:p-5 space-y-3 text-xs select-none">
+                      <div className="font-bold text-slate-600 border-b border-slate-200/50 pb-2 flex justify-between items-center select-none">
+                        <span className="flex items-center gap-1">📋 ইমপোর্ট ডাটা নির্বাচন করুন:</span>
+                        <button 
+                          type="button"
+                          onClick={() => {
+                            const availableKeys = Object.keys(importSelections).filter(key => importPreview.counts[key] > 0);
+                            const allTrue = availableKeys.every(key => importSelections[key]);
+                            const updatedSelections = { ...importSelections };
+                            availableKeys.forEach(key => {
+                              updatedSelections[key] = !allTrue;
+                            });
+                            setImportSelections(updatedSelections);
+                          }}
+                          className="text-[10px] text-indigo-600 font-extrabold hover:underline cursor-pointer"
+                        >
+                          {Object.keys(importSelections).filter(key => importPreview.counts[key] > 0).every(key => importSelections[key]) ? 'সব আনসিলেক্ট করুন' : 'সব সিলেক্ট করুন'}
+                        </button>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[11px] text-slate-500 font-medium max-h-[145px] overflow-y-auto select-none pr-1">
+                        {importPreview.counts.projects > 0 && (
+                          <label className="flex items-center gap-2 cursor-pointer hover:text-slate-800 transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={!!importSelections.projects}
+                              onChange={(e) => setImportSelections({ ...importSelections, projects: e.target.checked })}
+                              className="w-3.5 h-3.5 rounded text-indigo-500 focus:ring-indigo-400 border-slate-300 accent-indigo-600 cursor-pointer"
+                            />
+                            <span>প্রজেক্ট ({importPreview.counts.projects}টি)</span>
+                          </label>
+                        )}
+                        {importPreview.counts.clients > 0 && (
+                          <label className="flex items-center gap-2 cursor-pointer hover:text-slate-800 transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={!!importSelections.clients}
+                              onChange={(e) => setImportSelections({ ...importSelections, clients: e.target.checked })}
+                              className="w-3.5 h-3.5 rounded text-indigo-500 focus:ring-indigo-400 border-slate-300 accent-indigo-600 cursor-pointer"
+                            />
+                            <span>কাস্টমার ({importPreview.counts.clients}টি)</span>
+                          </label>
+                        )}
+                        {importPreview.counts.income_records > 0 && (
+                          <label className="flex items-center gap-2 cursor-pointer hover:text-slate-800 transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={!!importSelections.income_records}
+                              onChange={(e) => setImportSelections({ ...importSelections, income_records: e.target.checked })}
+                              className="w-3.5 h-3.5 rounded text-indigo-500 focus:ring-indigo-400 border-slate-300 accent-indigo-600 cursor-pointer"
+                            />
+                            <span>আয় রেকর্ড ({importPreview.counts.income_records}টি)</span>
+                          </label>
+                        )}
+                        {importPreview.counts.expenses > 0 && (
+                          <label className="flex items-center gap-2 cursor-pointer hover:text-slate-800 transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={!!importSelections.expenses}
+                              onChange={(e) => setImportSelections({ ...importSelections, expenses: e.target.checked })}
+                              className="w-3.5 h-3.5 rounded text-indigo-500 focus:ring-indigo-400 border-slate-300 accent-indigo-600 cursor-pointer"
+                            />
+                            <span>ব্যয় রেকর্ড ({importPreview.counts.expenses}টি)</span>
+                          </label>
+                        )}
+                        {importPreview.counts.ghazal_notes > 0 && (
+                          <label className="flex items-center gap-2 cursor-pointer hover:text-slate-800 transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={!!importSelections.ghazal_notes}
+                              onChange={(e) => setImportSelections({ ...importSelections, ghazal_notes: e.target.checked })}
+                              className="w-3.5 h-3.5 rounded text-indigo-500 focus:ring-indigo-400 border-slate-300 accent-indigo-600 cursor-pointer"
+                            />
+                            <span>গজল নোট ({importPreview.counts.ghazal_notes}টি)</span>
+                          </label>
+                        )}
+                        {importPreview.counts.shopping_lists > 0 && (
+                          <label className="flex items-center gap-2 cursor-pointer hover:text-slate-800 transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={!!importSelections.shopping_lists}
+                              onChange={(e) => setImportSelections({ ...importSelections, shopping_lists: e.target.checked })}
+                              className="w-3.5 h-3.5 rounded text-indigo-500 focus:ring-indigo-400 border-slate-300 accent-indigo-600 cursor-pointer"
+                            />
+                            <span>শপিং লিস্ট ({importPreview.counts.shopping_lists}টি)</span>
+                          </label>
+                        )}
+                        {importPreview.counts.due_persons > 0 && (
+                          <label className="flex items-center gap-2 cursor-pointer hover:text-slate-800 transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={!!importSelections.due_persons}
+                              onChange={(e) => setImportSelections({ ...importSelections, due_persons: e.target.checked })}
+                              className="w-3.5 h-3.5 rounded text-indigo-500 focus:ring-indigo-400 border-slate-300 accent-indigo-600 cursor-pointer"
+                            />
+                            <span>দেনা-পাওনা ({importPreview.counts.due_persons}টি)</span>
+                          </label>
+                        )}
+                        {importPreview.counts.car_rent_friends > 0 && (
+                          <label className="flex items-center gap-2 cursor-pointer hover:text-[#1a73e8] text-[#1a73e8] font-bold transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={!!importSelections.car_rent_friends}
+                              onChange={(e) => setImportSelections({ ...importSelections, car_rent_friends: e.target.checked })}
+                              className="w-3.5 h-3.5 rounded text-[#1a73e8] focus:ring-[#1a73e8] border-slate-300 accent-indigo-600 cursor-pointer"
+                            />
+                            <span>রেন্ট ফ্রেন্ড ({importPreview.counts.car_rent_friends}টি)</span>
+                          </label>
+                        )}
+                        {importPreview.counts.car_rent_trips > 0 && (
+                          <label className="flex items-center gap-2 cursor-pointer hover:text-[#1a73e8] text-[#1a73e8] font-bold transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={!!importSelections.car_rent_trips}
+                              onChange={(e) => setImportSelections({ ...importSelections, car_rent_trips: e.target.checked })}
+                              className="w-3.5 h-3.5 rounded text-[#1a73e8] focus:ring-[#1a73e8] border-slate-300 accent-indigo-600 cursor-pointer"
+                            />
+                            <span>রেন্ট ট্রিপ ({importPreview.counts.car_rent_trips}টি)</span>
+                          </label>
+                        )}
+                        {importPreview.counts.car_rent_collections > 0 && (
+                          <label className="flex items-center gap-2 cursor-pointer hover:text-[#1a73e8] text-[#1a73e8] font-bold transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={!!importSelections.car_rent_collections}
+                              onChange={(e) => setImportSelections({ ...importSelections, car_rent_collections: e.target.checked })}
+                              className="w-3.5 h-3.5 rounded text-[#1a73e8] focus:ring-[#1a73e8] border-slate-300 accent-indigo-600 cursor-pointer"
+                            />
+                            <span>রেন্ট কালেকশন ({importPreview.counts.car_rent_collections}টি)</span>
+                          </label>
+                        )}
+                        {importPreview.counts.car_rent_driver_payments > 0 && (
+                          <label className="flex items-center gap-2 cursor-pointer hover:text-[#1a73e8] text-[#1a73e8] font-bold transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={!!importSelections.car_rent_driver_payments}
+                              onChange={(e) => setImportSelections({ ...importSelections, car_rent_driver_payments: e.target.checked })}
+                              className="w-3.5 h-3.5 rounded text-[#1a73e8] focus:ring-[#1a73e8] border-slate-300 accent-indigo-600 cursor-pointer"
+                            />
+                            <span>ড্রাইভার পেমেন্ট ({importPreview.counts.car_rent_driver_payments}টি)</span>
+                          </label>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Action buttons */}
+                    <div className="flex gap-2.5 pt-1">
+                      <button
+                        onClick={() => {
+                          setImportFile(null);
+                          setImportPreview(null);
+                          setImportStatus('idle');
+                        }}
+                        className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs md:text-sm active:scale-95 transition-all duration-200 cursor-pointer"
+                        disabled={isImporting}
+                      >
+                        অন্য ফাইল
+                      </button>
+                      <button
+                        onClick={handleImportData}
+                        disabled={isImporting}
+                        className="flex-2 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-extrabold text-xs md:text-sm active:scale-95 transition-all duration-200 shadow-md shadow-indigo-100 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {isImporting ? (
+                          <>
+                            <Loader2 className="animate-spin" size={16} />
+                            <span>ইমপোর্ট হচ্ছে...</span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 size={16} />
+                            <span>ইমপোর্ট সম্পন্ন করুন</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
