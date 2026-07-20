@@ -235,6 +235,26 @@ export const CarRent: React.FC = () => {
     fetchLiveAndSync();
   }, [user]);
 
+  // Auto-sync when coming online
+  useEffect(() => {
+    if (user && isOnline) {
+      fetchLiveAndSync();
+    }
+  }, [isOnline, user]);
+
+  // Auto-save to LocalStorage cache whenever any state changes
+  useEffect(() => {
+    if (!user || loading) return;
+    const cacheKey = `car_rent_cache_${user.id}`;
+    localStorage.setItem(cacheKey, JSON.stringify({
+      friends,
+      trips,
+      collections,
+      driverPayments,
+      lastSynced: Date.now()
+    }));
+  }, [friends, trips, collections, driverPayments, user, loading]);
+
   useEffect(() => {
     if (viewState !== "preview") return;
 
@@ -286,6 +306,54 @@ export const CarRent: React.FC = () => {
         return;
       }
 
+      // --- Offline Sync Logic ---
+      const cacheKey = `car_rent_cache_${user.id}`;
+      const cachedData = localStorage.getItem(cacheKey);
+      if (cachedData) {
+        try {
+          const parsed = JSON.parse(cachedData);
+          
+          // 1. Sync Unsynced Friends
+          const unsyncedFriends = (parsed.friends || []).filter((f: any) => f._unsynced);
+          for (const friend of unsyncedFriends) {
+            const { _unsynced, ...cleanFriend } = friend;
+            await setDoc(doc(db, "car_rent_friends", friend.id), cleanFriend);
+          }
+
+          // 2. Sync Unsynced Trips
+          const unsyncedTrips = (parsed.trips || []).filter((t: any) => t._unsynced);
+          for (const trip of unsyncedTrips) {
+            const { _unsynced, ...cleanTrip } = trip;
+            await setDoc(doc(db, "car_rent_trips", trip.id), cleanTrip);
+          }
+
+          // 3. Sync Unsynced Collections
+          const unsyncedCollections = (parsed.collections || []).filter((c: any) => c._unsynced);
+          for (const col of unsyncedCollections) {
+            const { _unsynced, ...cleanCol } = col;
+            await setDoc(doc(db, "car_rent_collections", col.id), cleanCol);
+          }
+
+          // 4. Sync Unsynced Driver Payments
+          const unsyncedPayments = (parsed.driverPayments || []).filter((p: any) => p._unsynced);
+          for (const p of unsyncedPayments) {
+            const { _unsynced, ...cleanPay } = p;
+            await setDoc(doc(db, "car_rent_driver_payments", p.id), cleanPay);
+          }
+
+          // 5. Sync Unsynced Deletions
+          const unsyncedDeletionsKey = `car_rent_unsynced_deletions_${user.id}`;
+          const unsyncedDeletions = JSON.parse(localStorage.getItem(unsyncedDeletionsKey) || "[]");
+          for (const del of unsyncedDeletions) {
+            await deleteDoc(doc(db, del.collection, del.id));
+          }
+          localStorage.removeItem(unsyncedDeletionsKey);
+        } catch (syncErr) {
+          console.error("Error during auto-sync:", syncErr);
+        }
+      }
+      // ----------------------------
+
       // Fetch friends
       const friendsSnap = await getDocs(query(collection(db, "car_rent_friends"), where("userid", "==", user.id)));
       const friendsData: CarRentFriend[] = [];
@@ -330,16 +398,6 @@ export const CarRent: React.FC = () => {
       setTrips(tripsData);
       setCollections(collectionsData);
       setDriverPayments(driverData);
-
-      // Save to Cache
-      const cacheKey = `car_rent_cache_${user.id}`;
-      localStorage.setItem(cacheKey, JSON.stringify({
-        friends: friendsData,
-        trips: tripsData,
-        collections: collectionsData,
-        driverPayments: driverData,
-        lastSynced: Date.now()
-      }));
 
     } catch (e: any) {
       console.error("Firestore sync error:", e);
@@ -480,15 +538,23 @@ export const CarRent: React.FC = () => {
         updatedAt: new Date().toISOString()
       };
 
+      let isSynced = false;
       // Firestore Write
       if (isOnline) {
-        await setDoc(doc(db, "car_rent_friends", friendId), newFriend);
+        try {
+          await setDoc(doc(db, "car_rent_friends", friendId), newFriend);
+          isSynced = true;
+        } catch (err) {
+          console.error("Firestore save friend failed, saving locally:", err);
+        }
       }
+
+      const localFriend = isSynced ? newFriend : { ...newFriend, _unsynced: true };
 
       // Optimistic local update
       setFriends(prev => {
         const filtered = prev.filter(f => f.id !== friendId);
-        const updated = [...filtered, newFriend];
+        const updated = [...filtered, localFriend];
         updated.sort((a, b) => {
           const dateA = a.createdAt || "";
           const dateB = b.createdAt || "";
@@ -517,33 +583,51 @@ export const CarRent: React.FC = () => {
       message: `আপনি কি নিশ্চিতভাবে "${friend?.name || ""}" কে ডিলিট করতে চান? এতে তার সমস্ত হিসাব মুছে যেতে পারে।`,
       onConfirm: async () => {
         try {
+          const friendCollections = collections.filter(c => c.friendId === friendId);
+          let isSynced = false;
+          
           if (isOnline) {
-            const batch = writeBatch(db);
-            
-            // Delete friend doc
-            batch.delete(doc(db, "car_rent_friends", friendId));
-            
-            // Delete all associated collections for this friend using pre-loaded local state
-            const friendCollections = collections.filter(c => c.friendId === friendId);
+            try {
+              const batch = writeBatch(db);
+              
+              // Delete friend doc
+              batch.delete(doc(db, "car_rent_friends", friendId));
+              
+              // Delete all associated collections for this friend
+              friendCollections.forEach((col) => {
+                batch.delete(doc(db, "car_rent_collections", col.id));
+              });
+
+              // Remove friend from all trips participantIds
+              const friendTrips = trips.filter(t => t.participantIds?.includes(friendId));
+              friendTrips.forEach((trip) => {
+                const updatedParts = (trip.participantIds || []).filter((pid: string) => pid !== friendId);
+                if (updatedParts.length === 0) {
+                  batch.delete(doc(db, "car_rent_trips", trip.id));
+                } else {
+                  batch.update(doc(db, "car_rent_trips", trip.id), {
+                    participantIds: updatedParts,
+                    updatedAt: new Date().toISOString()
+                  });
+                }
+              });
+
+              await batch.commit();
+              isSynced = true;
+            } catch (err) {
+              console.error("Firestore batch delete friend failed, queuing locally:", err);
+            }
+          }
+
+          if (!isSynced) {
+            // Save to unsynced deletions queue
+            const unsyncedDeletionsKey = `car_rent_unsynced_deletions_${user.id}`;
+            const existingDeletions = JSON.parse(localStorage.getItem(unsyncedDeletionsKey) || "[]");
+            existingDeletions.push({ id: friendId, collection: "car_rent_friends" });
             friendCollections.forEach((col) => {
-              batch.delete(doc(db, "car_rent_collections", col.id));
+              existingDeletions.push({ id: col.id, collection: "car_rent_collections" });
             });
-
-            // Remove friend from all trips participantIds using pre-loaded local state
-            const friendTrips = trips.filter(t => t.participantIds?.includes(friendId));
-            friendTrips.forEach((trip) => {
-              const updatedParts = (trip.participantIds || []).filter((pid: string) => pid !== friendId);
-              if (updatedParts.length === 0) {
-                batch.delete(doc(db, "car_rent_trips", trip.id));
-              } else {
-                batch.update(doc(db, "car_rent_trips", trip.id), {
-                  participantIds: updatedParts,
-                  updatedAt: new Date().toISOString()
-                });
-              }
-            });
-
-            await batch.commit();
+            localStorage.setItem(unsyncedDeletionsKey, JSON.stringify(existingDeletions));
           }
           
           setFriends(prev => prev.filter(f => f.id !== friendId));
@@ -596,120 +680,96 @@ export const CarRent: React.FC = () => {
         updatedAt: new Date().toISOString()
       };
 
+      const oldTripCols = collections.filter(c => c.tripId === tripId);
+      const newCols: CarRentCollection[] = [];
+      
+      newTrip.participantIds.forEach(pid => {
+        const amountPaid = tempPayments[pid] !== undefined && tempPayments[pid] !== "" ? Number(tempPayments[pid]) : 0;
+        const fdDetail = analytics.friendDetails.find(d => d.id === pid);
+        const currentAdvance = fdDetail ? fdDetail.balance : 0;
+        const advanceUsage = Math.min(amountPaid, currentAdvance);
+        const cashPayment = amountPaid - advanceUsage;
+
+        const advColId = `col_${tripId}_${pid}_adv`;
+        const cashColId = `col_${tripId}_${pid}_cash`;
+
+        if (advanceUsage > 0) {
+          newCols.push({
+            id: advColId,
+            friendId: pid,
+            tripId: tripId,
+            amount: advanceUsage,
+            paymentMethod: 'advance',
+            date: newTrip.date,
+            userid: user.id,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          });
+        }
+
+        if (cashPayment > 0 || (advanceUsage === 0 && amountPaid === 0)) {
+          newCols.push({
+            id: cashColId,
+            friendId: pid,
+            tripId: tripId,
+            amount: cashPayment,
+            paymentMethod: 'cash',
+            date: newTrip.date,
+            userid: user.id,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          });
+        }
+      });
+
+      let isSynced = false;
       if (isOnline) {
-        const batch = writeBatch(db);
-        batch.set(doc(db, "car_rent_trips", tripId), newTrip);
+        try {
+          const batch = writeBatch(db);
+          batch.set(doc(db, "car_rent_trips", tripId), newTrip);
 
-        // Delete any collections for this trip that are no longer participants
-        const oldTripCols = collections.filter(c => c.tripId === tripId);
-        oldTripCols.forEach(oldCol => {
-          if (!newTrip.participantIds.includes(oldCol.friendId)) {
-            batch.delete(doc(db, "car_rent_collections", oldCol.id));
-          }
-        });
-
-        // Save collections for each selected student
-        newTrip.participantIds.forEach(pid => {
-          const amountPaid = tempPayments[pid] !== undefined && tempPayments[pid] !== "" ? Number(tempPayments[pid]) : 0;
-          
-          // Determine how much is from existing advance balance
-          const fdDetail = analytics.friendDetails.find(d => d.id === pid);
-          const currentAdvance = fdDetail ? fdDetail.balance : 0;
-          const advanceUsage = Math.min(amountPaid, currentAdvance);
-          const cashPayment = amountPaid - advanceUsage;
-
-          const advColId = `col_${tripId}_${pid}_adv`;
-          const cashColId = `col_${tripId}_${pid}_cash`;
-
-          if (advanceUsage > 0) {
-            const advCol: CarRentCollection = {
-              id: advColId,
-              friendId: pid,
-              tripId: tripId,
-              amount: advanceUsage,
-              paymentMethod: 'advance',
-              date: newTrip.date,
-              userid: user.id,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString()
-            };
-            batch.set(doc(db, "car_rent_collections", advColId), advCol);
-          } else {
-            // Delete old advance collection if it existed
-            if (oldTripCols.some(c => c.id === advColId)) {
-              batch.delete(doc(db, "car_rent_collections", advColId));
+          // Delete any collections for this trip that are no longer participants
+          oldTripCols.forEach(oldCol => {
+            if (!newTrip.participantIds.includes(oldCol.friendId)) {
+              batch.delete(doc(db, "car_rent_collections", oldCol.id));
             }
-          }
+          });
 
-          if (cashPayment > 0 || (advanceUsage === 0 && amountPaid === 0)) {
-            const cashCol: CarRentCollection = {
-              id: cashColId,
-              friendId: pid,
-              tripId: tripId,
-              amount: cashPayment,
-              paymentMethod: 'cash',
-              date: newTrip.date,
-              userid: user.id,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString()
-            };
-            batch.set(doc(db, "car_rent_collections", cashColId), cashCol);
-          } else {
-            // Delete old cash collection if it existed
-            if (oldTripCols.some(c => c.id === cashColId)) {
-              batch.delete(doc(db, "car_rent_collections", cashColId));
+          // Save collections for each selected student
+          newCols.forEach(col => {
+            batch.set(doc(db, "car_rent_collections", col.id), col);
+          });
+
+          // Delete old collections that aren't in new collections
+          const newColIds = new Set(newCols.map(c => c.id));
+          oldTripCols.forEach(oldCol => {
+            if (!newColIds.has(oldCol.id)) {
+              batch.delete(doc(db, "car_rent_collections", oldCol.id));
             }
-          }
-        });
+          });
 
-        await batch.commit();
+          await batch.commit();
+          isSynced = true;
+        } catch (err) {
+          console.error("Firestore batch save trip failed, saving locally:", err);
+        }
       }
+
+      const localTrip = isSynced ? newTrip : { ...newTrip, _unsynced: true };
+      const localCols = isSynced ? newCols : newCols.map(c => ({ ...c, _unsynced: true }));
 
       // Update trips state
       setTrips(prev => {
         const filtered = prev.filter(t => t.id !== tripId);
-        const updated = [...filtered, newTrip];
+        const updated = [...filtered, localTrip];
         updated.sort((a, b) => b.date.localeCompare(a.date));
         return updated;
       });
 
       // Update collections state
       setCollections(prev => {
-        // Filter out old collections for this trip
         let updated = prev.filter(c => c.tripId !== tripId);
-        // Add new ones
-        newTrip.participantIds.forEach(pid => {
-          const amountPaid = tempPayments[pid] !== undefined && tempPayments[pid] !== "" ? Number(tempPayments[pid]) : 0;
-          const fdDetail = analytics.friendDetails.find(d => d.id === pid);
-          const currentAdvance = fdDetail ? fdDetail.balance : 0;
-          const advanceUsage = Math.min(amountPaid, currentAdvance);
-          const cashPayment = amountPaid - advanceUsage;
-
-          if (advanceUsage > 0) {
-            updated.push({
-              id: `col_${tripId}_${pid}_adv`,
-              friendId: pid,
-              tripId: tripId,
-              amount: advanceUsage,
-              paymentMethod: 'advance',
-              date: newTrip.date,
-              userid: user.id,
-              createdAt: new Date().toISOString()
-            });
-          }
-          if (cashPayment > 0 || (advanceUsage === 0 && amountPaid === 0)) {
-            updated.push({
-              id: `col_${tripId}_${pid}_cash`,
-              friendId: pid,
-              tripId: tripId,
-              amount: cashPayment,
-              paymentMethod: 'cash',
-              date: newTrip.date,
-              userid: user.id,
-              createdAt: new Date().toISOString()
-            });
-          }
-        });
+        updated = [...updated, ...localCols];
         updated.sort((a, b) => b.date.localeCompare(a.date));
         return updated;
       });
@@ -732,18 +792,36 @@ export const CarRent: React.FC = () => {
       message: `আপনি কি "${trip?.examName || "নিয়মিত ট্রিপ"}" ট্রিপটি ডিলিট করতে চান?`,
       onConfirm: async () => {
         try {
+          const colsToDelete = collections.filter(c => c.tripId === tripId);
+          let isSynced = false;
+
           if (isOnline) {
-            const batch = writeBatch(db);
-            batch.delete(doc(db, "car_rent_trips", tripId));
-            
-            // Delete all associated collections in Firestore
-            const colsToDelete = collections.filter(c => c.tripId === tripId);
-            colsToDelete.forEach(col => {
-              batch.delete(doc(db, "car_rent_collections", col.id));
-            });
-            
-            await batch.commit();
+            try {
+              const batch = writeBatch(db);
+              batch.delete(doc(db, "car_rent_trips", tripId));
+              
+              // Delete all associated collections in Firestore
+              colsToDelete.forEach(col => {
+                batch.delete(doc(db, "car_rent_collections", col.id));
+              });
+              
+              await batch.commit();
+              isSynced = true;
+            } catch (err) {
+              console.error("Firestore batch delete trip failed, queuing locally:", err);
+            }
           }
+
+          if (!isSynced) {
+            const unsyncedDeletionsKey = `car_rent_unsynced_deletions_${user.id}`;
+            const existingDeletions = JSON.parse(localStorage.getItem(unsyncedDeletionsKey) || "[]");
+            existingDeletions.push({ id: tripId, collection: "car_rent_trips" });
+            colsToDelete.forEach(col => {
+              existingDeletions.push({ id: col.id, collection: "car_rent_collections" });
+            });
+            localStorage.setItem(unsyncedDeletionsKey, JSON.stringify(existingDeletions));
+          }
+
           setTrips(prev => prev.filter(t => t.id !== tripId));
           setCollections(prev => prev.filter(c => c.tripId !== tripId));
           showToast("ট্রিপ ডিলিট করা হয়েছে।", "success");
@@ -782,13 +860,21 @@ export const CarRent: React.FC = () => {
         updatedAt: new Date().toISOString()
       };
 
+      let isSynced = false;
       if (isOnline) {
-        await setDoc(doc(db, "car_rent_collections", colId), newCol);
+        try {
+          await setDoc(doc(db, "car_rent_collections", colId), newCol);
+          isSynced = true;
+        } catch (err) {
+          console.error("Firestore save collection failed, saving locally:", err);
+        }
       }
+
+      const localCol = isSynced ? newCol : { ...newCol, _unsynced: true };
 
       setCollections(prev => {
         const filtered = prev.filter(c => c.id !== colId);
-        const updated = [...filtered, newCol];
+        const updated = [...filtered, localCol];
         updated.sort((a, b) => b.date.localeCompare(a.date));
         return updated;
       });
@@ -815,9 +901,23 @@ export const CarRent: React.FC = () => {
       message: `আপনি কি "${friend?.name || ""}" এর ৳${col?.amount || 0} আদায়ের রেকর্ডটি (${sourceInfo}) মুছে ফেলতে চান?`,
       onConfirm: async () => {
         try {
+          let isSynced = false;
           if (isOnline) {
-            await deleteDoc(doc(db, "car_rent_collections", colId));
+            try {
+              await deleteDoc(doc(db, "car_rent_collections", colId));
+              isSynced = true;
+            } catch (err) {
+              console.error("Firestore delete collection failed, queuing locally:", err);
+            }
           }
+
+          if (!isSynced) {
+            const unsyncedDeletionsKey = `car_rent_unsynced_deletions_${user.id}`;
+            const existingDeletions = JSON.parse(localStorage.getItem(unsyncedDeletionsKey) || "[]");
+            existingDeletions.push({ id: colId, collection: "car_rent_collections" });
+            localStorage.setItem(unsyncedDeletionsKey, JSON.stringify(existingDeletions));
+          }
+
           setCollections(prev => prev.filter(c => c.id !== colId));
           showToast("রেকর্ড মুছে ফেলা হয়েছে।", "success");
           setTimeout(fetchLiveAndSync, 500);
@@ -853,13 +953,21 @@ export const CarRent: React.FC = () => {
         updatedAt: new Date().toISOString()
       };
 
+      let isSynced = false;
       if (isOnline) {
-        await setDoc(doc(db, "car_rent_driver_payments", payId), newPay);
+        try {
+          await setDoc(doc(db, "car_rent_driver_payments", payId), newPay);
+          isSynced = true;
+        } catch (err) {
+          console.error("Firestore save driver payment failed, saving locally:", err);
+        }
       }
+
+      const localPay = isSynced ? newPay : { ...newPay, _unsynced: true };
 
       setDriverPayments(prev => {
         const filtered = prev.filter(p => p.id !== payId);
-        const updated = [...filtered, newPay];
+        const updated = [...filtered, localPay];
         updated.sort((a, b) => b.date.localeCompare(a.date));
         return updated;
       });
@@ -882,9 +990,23 @@ export const CarRent: React.FC = () => {
       message: `আপনি কি ৳${pay?.amount || 0} ভাড়া পরিশোধের রেকর্ডটি ডিলিট করতে চান?`,
       onConfirm: async () => {
         try {
+          let isSynced = false;
           if (isOnline) {
-            await deleteDoc(doc(db, "car_rent_driver_payments", payId));
+            try {
+              await deleteDoc(doc(db, "car_rent_driver_payments", payId));
+              isSynced = true;
+            } catch (err) {
+              console.error("Firestore delete driver payment failed, queuing locally:", err);
+            }
           }
+
+          if (!isSynced) {
+            const unsyncedDeletionsKey = `car_rent_unsynced_deletions_${user.id}`;
+            const existingDeletions = JSON.parse(localStorage.getItem(unsyncedDeletionsKey) || "[]");
+            existingDeletions.push({ id: payId, collection: "car_rent_driver_payments" });
+            localStorage.setItem(unsyncedDeletionsKey, JSON.stringify(existingDeletions));
+          }
+
           setDriverPayments(prev => prev.filter(p => p.id !== payId));
           showToast("রেকর্ড ডিলিট করা হয়েছে।", "success");
           setTimeout(fetchLiveAndSync, 500);
