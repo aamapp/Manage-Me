@@ -46,8 +46,8 @@ import {
   APP_NAME,
 } from "../constants";
 import { Project, ProjectStatus, ProjectType, Client } from "../types";
-import { useAppContext } from "../context/AppContext";
-import { supabase } from "../lib/supabase";
+import { useAppContext } from '@/context/AppContext';
+import { supabase } from '@/lib/supabase';
 import { NumericKeypad } from "@/components/NumericKeypad";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { DatePicker } from "@/components/DatePicker";

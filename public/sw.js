@@ -3,18 +3,28 @@ const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
   '/index.css',
-  '/index.tsx',
   '/manifest.json',
   'https://cdn.tailwindcss.com',
   'https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&display=swap'
 ];
 
+// Detect if we are in development/preview mode
+const isDev = 
+  self.location.hostname === 'localhost' || 
+  self.location.hostname === '127.0.0.1' || 
+  self.location.hostname.includes('-dev-') || 
+  self.location.hostname.includes('-pre-');
+
 // Install Event - Pre-cache essential assets resiliently
 self.addEventListener('install', (event) => {
+  if (isDev) {
+    console.log('Service Worker: Bypass install in development mode.');
+    self.skipWaiting();
+    return;
+  }
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       console.log('Pre-caching assets in background...');
-      // Safe dynamic caching: if one asset fails to fetch, others will still cache and SW will install successfully!
       const cachePromises = ASSETS_TO_CACHE.map((asset) => {
         return cache.add(asset).catch((err) => {
           console.warn(`Pre-cache failed for asset: ${asset}. Service Worker will still continue.`, err);
@@ -32,8 +42,8 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cache) => {
-          if (cache !== CACHE_NAME) {
-            console.log('Deleting old cache:', cache);
+          if (cache !== CACHE_NAME || isDev) {
+            console.log('Deleting cache:', cache);
             return caches.delete(cache);
           }
         })
@@ -46,6 +56,11 @@ self.addEventListener('activate', (event) => {
 // Fetch Event - Stale-While-Revalidate with resilient fallbacks
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+
+  // CRITICAL: Always bypass caching entirely in development/preview modes
+  if (isDev) {
+    return; // Let browser handle normally
+  }
 
   const url = new URL(event.request.url);
 

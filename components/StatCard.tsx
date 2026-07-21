@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { useAppContext } from '../context/AppContext';
+import { useAppContext } from '@/context/AppContext';
 import { MoreVertical, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
 interface StatCardProps {

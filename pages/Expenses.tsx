@@ -67,8 +67,8 @@ import { useLocation, useNavigate } from "react-router-dom";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import { EXPENSE_CATEGORY_LABELS, APP_NAME } from "../constants";
-import { useAppContext } from "../context/AppContext";
-import { supabase } from "../lib/supabase";
+import { useAppContext } from '@/context/AppContext';
+import { supabase } from '@/lib/supabase';
 import { NumericKeypad } from "@/components/NumericKeypad";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { DatePicker } from "@/components/DatePicker";
@@ -2341,24 +2341,30 @@ export const Expenses: React.FC = () => {
               className="flex flex-col items-center w-[44px] cursor-pointer group focus:outline-none pb-2.5 relative"
             >
               <div
-                className={`w-[27px] h-[27px] rounded-[8px] flex items-center justify-center transition-all border relative ${
+                className={`w-[27px] h-[27px] flex items-center justify-center transition-all relative ${
                   activeTab === "expenses"
-                    ? "border-[#1a73e8] text-white bg-[#1a73e8] shadow-xs"
-                    : "border-[#cdd5de] text-[#8e9aa8] hover:border-slate-300 hover:text-slate-600 bg-white"
+                    ? "text-[#1a73e8]"
+                    : "text-[#8e9aa8] hover:text-slate-600"
                 }`}
               >
                 <svg
-                  width="14"
-                  height="14"
+                  width="24"
+                  height="24"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
-                  strokeWidth="2.5"
+                  strokeWidth="1.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 >
-                  <path d="M20 9H4l4.5-4.5" />
-                  <path d="M4 15h16l-4.5 4.5" />
+                  <path 
+                    d="M9 22H15C20 22 22 20 22 15V9C22 4 20 2 15 2H9C4 2 2 4 2 9V15C2 20 4 22 9 22Z" 
+                    fill={activeTab === "expenses" ? "currentColor" : "none"}
+                  />
+                  <path d="M17.15 13.8201L14.11 16.8601" stroke={activeTab === "expenses" ? "#fff" : "currentColor"} strokeMiterlimit="10" />
+                  <path d="M6.84998 13.8201H17.15" stroke={activeTab === "expenses" ? "#fff" : "currentColor"} strokeMiterlimit="10" />
+                  <path d="M6.84998 10.1799L9.88998 7.13989" stroke={activeTab === "expenses" ? "#fff" : "currentColor"} strokeMiterlimit="10" />
+                  <path d="M17.15 10.1799H6.84998" stroke={activeTab === "expenses" ? "#fff" : "currentColor"} strokeMiterlimit="10" />
                 </svg>
               </div>
             </button>
@@ -2370,24 +2376,30 @@ export const Expenses: React.FC = () => {
               className="flex flex-col items-center w-[44px] cursor-pointer group focus:outline-none pb-2.5 relative"
             >
               <div
-                className={`w-[27px] h-[27px] rounded-[8px] flex items-center justify-center transition-all border relative ${
+                className={`w-[27px] h-[27px] flex items-center justify-center transition-all relative ${
                   activeTab === "dues"
-                    ? "border-[#1a73e8] text-white bg-[#1a73e8] shadow-xs"
-                    : "border-[#cdd5de] text-[#8e9aa8] hover:border-slate-300 hover:text-slate-600 bg-white"
+                    ? "text-[#1a73e8]"
+                    : "text-[#8e9aa8] hover:text-slate-600"
                 }`}
               >
                 <svg
-                  width="14"
-                  height="14"
+                  width="24"
+                  height="24"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
-                  strokeWidth="2.5"
+                  strokeWidth="1.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 >
-                  <path d="M9 4v16l-4.5-4.5" />
-                  <path d="M15 20V4l4.5 4.5" />
+                  <path 
+                    d="M9 22H15C20 22 22 20 22 15V9C22 4 20 2 15 2H9C4 2 2 4 2 9V15C2 20 4 22 9 22Z" 
+                    fill={activeTab === "dues" ? "currentColor" : "none"}
+                  />
+                  <path d="M10.18 17.1501L7.14001 14.1101" stroke={activeTab === "dues" ? "#fff" : "currentColor"} strokeMiterlimit="10" />
+                  <path d="M10.1801 6.8501V17.1501" stroke={activeTab === "dues" ? "#fff" : "currentColor"} strokeMiterlimit="10" />
+                  <path d="M13.8199 6.8501L16.8599 9.8901" stroke={activeTab === "dues" ? "#fff" : "currentColor"} strokeMiterlimit="10" />
+                  <path d="M13.8199 17.1501V6.8501" stroke={activeTab === "dues" ? "#fff" : "currentColor"} strokeMiterlimit="10" />
                 </svg>
               </div>
             </button>
@@ -2399,23 +2411,30 @@ export const Expenses: React.FC = () => {
               className="flex flex-col items-center w-[44px] cursor-pointer group focus:outline-none pb-2.5 relative"
             >
               <div
-                className={`w-[27px] h-[27px] rounded-[8px] flex items-center justify-center transition-all border relative ${
+                className={`w-[27px] h-[27px] flex items-center justify-center transition-all relative ${
                   activeTab === "reports"
-                    ? "border-[#1a73e8] text-white bg-[#1a73e8] shadow-xs"
-                    : "border-[#cdd5de] text-[#8e9aa8] hover:border-slate-300 hover:text-slate-600 bg-white"
+                    ? "text-[#1a73e8]"
+                    : "text-[#8e9aa8] hover:text-slate-600"
                 }`}
               >
                 <svg
-                  width="16.5"
-                  height="16.5"
+                  width="24"
+                  height="24"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
-                  strokeWidth="2.5"
+                  strokeWidth="1.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 >
-                  <path d="M 5.5 14.5 C 8 11.5, 9.5 9.5, 11.5 9.5 C 13.5 9.5, 14.5 14.5, 16.5 14.5 C 18 14.5, 19 13, 20 12" />
+                  <path 
+                    d="M9 22H15C20 22 22 20 22 15V9C22 4 20 2 15 2H9C4 2 2 4 2 9V15C2 20 4 22 9 22Z" 
+                    fill={activeTab === "reports" ? "currentColor" : "none"}
+                  />
+                  <path 
+                    d="M7.33008 14.49L9.71008 11.4C10.0501 10.96 10.6801 10.88 11.1201 11.22L12.9501 12.66C13.3901 13 14.0201 12.92 14.3601 12.49L16.6701 9.51001" 
+                    stroke={activeTab === "reports" ? "#fff" : "currentColor"}
+                  />
                 </svg>
               </div>
             </button>
@@ -2427,13 +2446,29 @@ export const Expenses: React.FC = () => {
               className="flex flex-col items-center w-[44px] cursor-pointer group focus:outline-none pb-2.5 relative"
             >
               <div
-                className={`w-[27px] h-[27px] rounded-[8px] flex items-center justify-center transition-all border relative ${
+                className={`w-[27px] h-[27px] flex items-center justify-center transition-all relative ${
                   activeTab === "savings"
-                    ? "border-[#1a73e8] text-white bg-[#1a73e8] shadow-xs"
-                    : "border-[#cdd5de] text-[#8e9aa8] hover:border-slate-300 hover:text-slate-600 bg-white"
+                    ? "text-[#1a73e8]"
+                    : "text-[#8e9aa8] hover:text-slate-600"
                 }`}
               >
-                <Plus size={14} strokeWidth={2.4} />
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path 
+                    d="M9 22H15C20 22 22 20 22 15V9C22 4 20 2 15 2H9C4 2 2 4 2 9V15C2 20 4 22 9 22Z" 
+                    fill={activeTab === "savings" ? "currentColor" : "none"}
+                  />
+                  <path d="M8 12H16" stroke={activeTab === "savings" ? "#fff" : "currentColor"} />
+                  <path d="M12 16V8" stroke={activeTab === "savings" ? "#fff" : "currentColor"} />
+                </svg>
               </div>
             </button>
 
@@ -2444,13 +2479,31 @@ export const Expenses: React.FC = () => {
               className="flex flex-col items-center w-[44px] cursor-pointer group focus:outline-none pb-2.5 relative"
             >
               <div
-                className={`w-[27px] h-[27px] rounded-[8px] flex items-center justify-center transition-all border relative ${
+                className={`w-[27px] h-[27px] flex items-center justify-center transition-all relative ${
                   activeTab === "tasks"
-                    ? "border-[#1a73e8] text-white bg-[#1a73e8] shadow-xs"
-                    : "border-[#cdd5de] text-[#8e9aa8] hover:border-slate-300 hover:text-slate-600 bg-white"
+                    ? "text-[#1a73e8]"
+                    : "text-[#8e9aa8] hover:text-slate-600"
                 }`}
               >
-                <ListTodo size={14} strokeWidth={2.4} />
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path 
+                    d="M9 22H15C20 22 22 20 22 15V9C22 4 20 2 15 2H9C4 2 2 4 2 9V15C2 20 4 22 9 22Z" 
+                    fill={activeTab === "tasks" ? "currentColor" : "none"}
+                  />
+                  <path d="M12.3691 8.87988H17.6191" stroke={activeTab === "tasks" ? "#fff" : "currentColor"} />
+                  <path d="M6.38086 8.87988L7.13086 9.62988L9.38086 7.37988" stroke={activeTab === "tasks" ? "#fff" : "currentColor"} />
+                  <path d="M12.3691 15.8799H17.6191" stroke={activeTab === "tasks" ? "#fff" : "currentColor"} />
+                  <path d="M6.38086 15.8799L7.13086 16.6299L9.38086 14.3799" stroke={activeTab === "tasks" ? "#fff" : "currentColor"} />
+                </svg>
               </div>
             </button>
 
@@ -2461,13 +2514,41 @@ export const Expenses: React.FC = () => {
               className="flex flex-col items-center w-[44px] cursor-pointer group focus:outline-none pb-2.5 relative"
             >
               <div
-                className={`w-[27px] h-[27px] rounded-[8px] flex items-center justify-center transition-all border relative ${
+                className={`w-[27px] h-[27px] flex items-center justify-center transition-all relative ${
                   activeTab === "wallet"
-                    ? "border-[#1a73e8] text-white bg-[#1a73e8] shadow-xs"
-                    : "border-[#cdd5de] text-[#8e9aa8] hover:border-slate-300 hover:text-slate-600 bg-white"
+                    ? "text-[#1a73e8]"
+                    : "text-[#8e9aa8] hover:text-slate-600"
                 }`}
               >
-                <Wallet size={14} strokeWidth={2.4} />
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path 
+                    d="M13 11.1499H7" 
+                    stroke="currentColor" 
+                  />
+                  <path 
+                    d="M2 11.1501V6.53009C2 4.49009 3.65 2.84009 5.69 2.84009H11.31C13.35 2.84009 15 4.11009 15 6.15009" 
+                    stroke="currentColor" 
+                  />
+                  <path 
+                    d="M17.48 12.1999C16.98 12.6799 16.74 13.4199 16.94 14.1799C17.19 15.1099 18.11 15.6999 19.07 15.6999H20V17.1499C20 19.3599 18.21 21.1499 16 21.1499H6C3.79 21.1499 2 19.3599 2 17.1499V10.1499C2 7.9399 3.79 6.1499 6 6.1499H16C18.2 6.1499 20 7.9499 20 10.1499V11.5999H18.92C18.36 11.5999 17.85 11.8199 17.48 12.1999Z" 
+                    stroke="currentColor"
+                    fill="none"
+                  />
+                  <path 
+                    d="M22 12.6201V14.6801C22 15.2401 21.5399 15.7001 20.9699 15.7001H19.0399C17.9599 15.7001 16.97 14.9101 16.88 13.8301C16.82 13.2001 17.0599 12.6101 17.4799 12.2001C17.8499 11.8201 18.36 11.6001 18.92 11.6001H20.9699C21.5399 11.6001 22 12.0601 22 12.6201Z" 
+                    stroke="currentColor"
+                    fill="none"
+                  />
+                </svg>
               </div>
             </button>
 
@@ -7868,7 +7949,7 @@ const BudgetManager: React.FC<{ expenses: any[]; user: any }> = ({
                             className="p-1 text-slate-400 hover:text-[#1a73e8] rounded-md hover:bg-slate-50 cursor-pointer"
                             title="এডিট"
                           >
-                            <Pencil size={12} />
+                            <CustomEditIcon size={12} />
                           </button>
                           <button
                             onClick={() =>

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Download, AlertTriangle, CheckCircle2, RefreshCw, X, Loader2, Info } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { AppLogo } from '@/components/AppLogo';
 
 interface AppUpdate {

@@ -5,6 +5,40 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Manage-Me</title>
+    <script>
+        // Force unregister Service Worker and clear caches in development/preview environments to prevent stale code crashing the preview
+        (function() {
+            var hostname = window.location.hostname;
+            var isDev = hostname === 'localhost' || 
+                        hostname === '127.0.0.1' || 
+                        hostname.indexOf('-dev-') !== -1 || 
+                        hostname.indexOf('-pre-') !== -1 ||
+                        hostname.indexOf('run.app') !== -1;
+            
+            if (isDev) {
+                if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                        if (registrations && registrations.length > 0) {
+                            console.log('Clearing service workers in dev/preview mode...');
+                            for (var i = 0; i < registrations.length; i++) {
+                                registrations[i].unregister().catch(function(e) {});
+                            }
+                        }
+                    });
+                }
+                if (window.caches) {
+                    caches.keys().then(function(keys) {
+                        if (keys && keys.length > 0) {
+                            console.log('Clearing caches in dev/preview mode...');
+                            for (var j = 0; j < keys.length; j++) {
+                                caches.delete(keys[j]).catch(function(e) {});
+                            }
+                        }
+                    });
+                }
+            }
+        })();
+    </script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <link rel="preload" href="https://cdn.jsdelivr.net/gh/manthib/Typhaine@master/Site/maheer/assets/font/KohinoorBangla-Regular.ttf" as="font" type="font/ttf" crossorigin="anonymous">
     <script src="https://cdn.tailwindcss.com"></script>

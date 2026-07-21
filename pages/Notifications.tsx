@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Trash2, Gift, Bell, AlertCircle, Info, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useAppContext } from '../context/AppContext';
+import { useAppContext } from '@/context/AppContext';
 import { ConfirmModal } from '../components/ConfirmModal';
 
 export const Notifications = () => {

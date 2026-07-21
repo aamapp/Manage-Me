@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAppContext } from '../context/AppContext';
-import { supabase } from '../lib/supabase';
+import { useAppContext } from '@/context/AppContext';
+import { supabase } from '@/lib/supabase';
 import { 
   Check, 
   Loader2, 

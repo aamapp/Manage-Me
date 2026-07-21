@@ -17,7 +17,7 @@ import {
   TrendingDown
 } from 'lucide-react';
 import { StatCard } from '@/components/StatCard';
-import { useAppContext } from '../context/AppContext';
+import { useAppContext } from '@/context/AppContext';
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();

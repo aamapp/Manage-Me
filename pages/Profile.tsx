@@ -6,7 +6,7 @@ import {
   Shield, ArrowLeft, Edit, LogOut, 
   CheckCircle, Clock, Award, MapPin
 } from 'lucide-react';
-import { useAppContext } from '../context/AppContext';
+import { useAppContext } from '@/context/AppContext';
 
 export const Profile: React.FC = () => {
   const navigate = useNavigate();

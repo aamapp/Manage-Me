@@ -495,28 +495,34 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
             {/* Tab 1: Expenses / Dashboard / লেনদেন */}
             <button
               onClick={() => handleExpenseTabClick("expenses")}
-              title="লেনদেন / ড্যাশবোর্ড"
+              title="লেনদেন / ড্যাশুভোর্ড"
               className="flex flex-col items-center justify-center h-full w-8 sm:w-10 cursor-pointer group focus:outline-none relative"
             >
               <div
-                className={`w-7 h-7 sm:w-8 sm:h-8 rounded-[8px] flex items-center justify-center transition-all border relative ${
+                className={`w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center transition-all relative ${
                   activeExpenseTab === "expenses"
-                    ? "border-[#1a73e8] text-white bg-[#1a73e8] shadow-xs"
-                    : "border-[#cdd5de] text-[#8e9aa8] hover:border-slate-300 hover:text-slate-600 bg-white"
+                    ? "text-[#1a73e8]"
+                    : "text-[#8e9aa8] hover:text-slate-600"
                 }`}
               >
                 <svg
-                  width="13"
-                  height="13"
+                  width="22"
+                  height="22"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
-                  strokeWidth="2.5"
+                  strokeWidth="1.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 >
-                  <path d="M20 9H4l4.5-4.5" />
-                  <path d="M4 15h16l-4.5 4.5" />
+                  <path 
+                    d="M9 22H15C20 22 22 20 22 15V9C22 4 20 2 15 2H9C4 2 2 4 2 9V15C2 20 4 22 9 22Z" 
+                    fill={activeExpenseTab === "expenses" ? "currentColor" : "none"}
+                  />
+                  <path d="M17.15 13.8201L14.11 16.8601" stroke={activeExpenseTab === "expenses" ? "#fff" : "currentColor"} strokeMiterlimit="10" />
+                  <path d="M6.84998 13.8201H17.15" stroke={activeExpenseTab === "expenses" ? "#fff" : "currentColor"} strokeMiterlimit="10" />
+                  <path d="M6.84998 10.1799L9.88998 7.13989" stroke={activeExpenseTab === "expenses" ? "#fff" : "currentColor"} strokeMiterlimit="10" />
+                  <path d="M17.15 10.1799H6.84998" stroke={activeExpenseTab === "expenses" ? "#fff" : "currentColor"} strokeMiterlimit="10" />
                 </svg>
               </div>
               {activeExpenseTab === "expenses" && (
@@ -531,24 +537,30 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
               className="flex flex-col items-center justify-center h-full w-8 sm:w-10 cursor-pointer group focus:outline-none relative"
             >
               <div
-                className={`w-7 h-7 sm:w-8 sm:h-8 rounded-[8px] flex items-center justify-center transition-all border relative ${
+                className={`w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center transition-all relative ${
                   activeExpenseTab === "dues"
-                    ? "border-[#1a73e8] text-white bg-[#1a73e8] shadow-xs"
-                    : "border-[#cdd5de] text-[#8e9aa8] hover:border-slate-300 hover:text-slate-600 bg-white"
+                    ? "text-[#1a73e8]"
+                    : "text-[#8e9aa8] hover:text-slate-600"
                 }`}
               >
                 <svg
-                  width="13"
-                  height="13"
+                  width="22"
+                  height="22"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
-                  strokeWidth="2.5"
+                  strokeWidth="1.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 >
-                  <path d="M9 4v16l-4.5-4.5" />
-                  <path d="M15 20V4l4.5 4.5" />
+                  <path 
+                    d="M9 22H15C20 22 22 20 22 15V9C22 4 20 2 15 2H9C4 2 2 4 2 9V15C2 20 4 22 9 22Z" 
+                    fill={activeExpenseTab === "dues" ? "currentColor" : "none"}
+                  />
+                  <path d="M10.18 17.1501L7.14001 14.1101" stroke={activeExpenseTab === "dues" ? "#fff" : "currentColor"} strokeMiterlimit="10" />
+                  <path d="M10.1801 6.8501V17.1501" stroke={activeExpenseTab === "dues" ? "#fff" : "currentColor"} strokeMiterlimit="10" />
+                  <path d="M13.8199 6.8501L16.8599 9.8901" stroke={activeExpenseTab === "dues" ? "#fff" : "currentColor"} strokeMiterlimit="10" />
+                  <path d="M13.8199 17.1501V6.8501" stroke={activeExpenseTab === "dues" ? "#fff" : "currentColor"} strokeMiterlimit="10" />
                 </svg>
               </div>
               {activeExpenseTab === "dues" && (
@@ -563,23 +575,30 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
               className="flex flex-col items-center justify-center h-full w-8 sm:w-10 cursor-pointer group focus:outline-none relative"
             >
               <div
-                className={`w-7 h-7 sm:w-8 sm:h-8 rounded-[8px] flex items-center justify-center transition-all border relative ${
+                className={`w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center transition-all relative ${
                   activeExpenseTab === "reports"
-                    ? "border-[#1a73e8] text-white bg-[#1a73e8] shadow-xs"
-                    : "border-[#cdd5de] text-[#8e9aa8] hover:border-slate-300 hover:text-slate-600 bg-white"
+                    ? "text-[#1a73e8]"
+                    : "text-[#8e9aa8] hover:text-slate-600"
                 }`}
               >
                 <svg
-                  width="14"
-                  height="14"
+                  width="22"
+                  height="22"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
-                  strokeWidth="2.5"
+                  strokeWidth="1.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 >
-                  <path d="M 5.5 14.5 C 8 11.5, 9.5 9.5, 11.5 9.5 C 13.5 9.5, 14.5 14.5, 16.5 14.5 C 18 14.5, 19 13, 20 12" />
+                  <path 
+                    d="M9 22H15C20 22 22 20 22 15V9C22 4 20 2 15 2H9C4 2 2 4 2 9V15C2 20 4 22 9 22Z" 
+                    fill={activeExpenseTab === "reports" ? "currentColor" : "none"}
+                  />
+                  <path 
+                    d="M7.33008 14.49L9.71008 11.4C10.0501 10.96 10.6801 10.88 11.1201 11.22L12.9501 12.66C13.3901 13 14.0201 12.92 14.3601 12.49L16.6701 9.51001" 
+                    stroke={activeExpenseTab === "reports" ? "#fff" : "currentColor"}
+                  />
                 </svg>
               </div>
               {activeExpenseTab === "reports" && (
@@ -594,13 +613,29 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
               className="flex flex-col items-center justify-center h-full w-8 sm:w-10 cursor-pointer group focus:outline-none relative"
             >
               <div
-                className={`w-7 h-7 sm:w-8 sm:h-8 rounded-[8px] flex items-center justify-center transition-all border relative ${
+                className={`w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center transition-all relative ${
                   activeExpenseTab === "savings"
-                    ? "border-[#1a73e8] text-white bg-[#1a73e8] shadow-xs"
-                    : "border-[#cdd5de] text-[#8e9aa8] hover:border-slate-300 hover:text-slate-600 bg-white"
+                    ? "text-[#1a73e8]"
+                    : "text-[#8e9aa8] hover:text-slate-600"
                 }`}
               >
-                <Plus size={13} strokeWidth={2.5} />
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path 
+                    d="M9 22H15C20 22 22 20 22 15V9C22 4 20 2 15 2H9C4 2 2 4 2 9V15C2 20 4 22 9 22Z" 
+                    fill={activeExpenseTab === "savings" ? "currentColor" : "none"}
+                  />
+                  <path d="M8 12H16" stroke={activeExpenseTab === "savings" ? "#fff" : "currentColor"} />
+                  <path d="M12 16V8" stroke={activeExpenseTab === "savings" ? "#fff" : "currentColor"} />
+                </svg>
               </div>
               {activeExpenseTab === "savings" && (
                 <div className="absolute bottom-0 h-[3px] w-7 sm:w-8 bg-[#1a73e8] rounded-t-[3px]" />
@@ -614,13 +649,31 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
               className="flex flex-col items-center justify-center h-full w-8 sm:w-10 cursor-pointer group focus:outline-none relative"
             >
               <div
-                className={`w-7 h-7 sm:w-8 sm:h-8 rounded-[8px] flex items-center justify-center transition-all border relative ${
+                className={`w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center transition-all relative ${
                   activeExpenseTab === "tasks"
-                    ? "border-[#1a73e8] text-white bg-[#1a73e8] shadow-xs"
-                    : "border-[#cdd5de] text-[#8e9aa8] hover:border-slate-300 hover:text-slate-600 bg-white"
+                    ? "text-[#1a73e8]"
+                    : "text-[#8e9aa8] hover:text-slate-600"
                 }`}
               >
-                <ListTodo size={13} strokeWidth={2.5} />
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path 
+                    d="M9 22H15C20 22 22 20 22 15V9C22 4 20 2 15 2H9C4 2 2 4 2 9V15C2 20 4 22 9 22Z" 
+                    fill={activeExpenseTab === "tasks" ? "currentColor" : "none"}
+                  />
+                  <path d="M12.3691 8.87988H17.6191" stroke={activeExpenseTab === "tasks" ? "#fff" : "currentColor"} />
+                  <path d="M6.38086 8.87988L7.13086 9.62988L9.38086 7.37988" stroke={activeExpenseTab === "tasks" ? "#fff" : "currentColor"} />
+                  <path d="M12.3691 15.8799H17.6191" stroke={activeExpenseTab === "tasks" ? "#fff" : "currentColor"} />
+                  <path d="M6.38086 15.8799L7.13086 16.6299L9.38086 14.3799" stroke={activeExpenseTab === "tasks" ? "#fff" : "currentColor"} />
+                </svg>
               </div>
               {activeExpenseTab === "tasks" && (
                 <div className="absolute bottom-0 h-[3px] w-7 sm:w-8 bg-[#1a73e8] rounded-t-[3px]" />
@@ -634,13 +687,41 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
               className="flex flex-col items-center justify-center h-full w-8 sm:w-10 cursor-pointer group focus:outline-none relative"
             >
               <div
-                className={`w-7 h-7 sm:w-8 sm:h-8 rounded-[8px] flex items-center justify-center transition-all border relative ${
+                className={`w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center transition-all relative ${
                   activeExpenseTab === "wallet"
-                    ? "border-[#1a73e8] text-white bg-[#1a73e8] shadow-xs"
-                    : "border-[#cdd5de] text-[#8e9aa8] hover:border-slate-300 hover:text-slate-600 bg-white"
+                    ? "text-[#1a73e8]"
+                    : "text-[#8e9aa8] hover:text-slate-600"
                 }`}
               >
-                <Wallet size={13} strokeWidth={2.5} />
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path 
+                    d="M13 11.1499H7" 
+                    stroke="currentColor" 
+                  />
+                  <path 
+                    d="M2 11.1501V6.53009C2 4.49009 3.65 2.84009 5.69 2.84009H11.31C13.35 2.84009 15 4.11009 15 6.15009" 
+                    stroke="currentColor" 
+                  />
+                  <path 
+                    d="M17.48 12.1999C16.98 12.6799 16.74 13.4199 16.94 14.1799C17.19 15.1099 18.11 15.6999 19.07 15.6999H20V17.1499C20 19.3599 18.21 21.1499 16 21.1499H6C3.79 21.1499 2 19.3599 2 17.1499V10.1499C2 7.9399 3.79 6.1499 6 6.1499H16C18.2 6.1499 20 7.9499 20 10.1499V11.5999H18.92C18.36 11.5999 17.85 11.8199 17.48 12.1999Z" 
+                    stroke="currentColor"
+                    fill="none"
+                  />
+                  <path 
+                    d="M22 12.6201V14.6801C22 15.2401 21.5399 15.7001 20.9699 15.7001H19.0399C17.9599 15.7001 16.97 14.9101 16.88 13.8301C16.82 13.2001 17.0599 12.6101 17.4799 12.2001C17.8499 11.8201 18.36 11.6001 18.92 11.6001H20.9699C21.5399 11.6001 22 12.0601 22 12.6201Z" 
+                    stroke="currentColor"
+                    fill="none"
+                  />
+                </svg>
               </div>
               {activeExpenseTab === "wallet" && (
                 <div className="absolute bottom-0 h-[3px] w-7 sm:w-8 bg-[#1a73e8] rounded-t-[3px]" />
@@ -688,7 +769,25 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                 onClick={() => handleNavigate("/notifications")}
                 className="w-9 h-9 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 hover:text-indigo-600 transition-colors relative"
               >
-                <Bell size={20} />
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="w-[22px] h-[22px]"
+                >
+                  <g id="SVGRepo_bgCarrier" strokeWidth="0" />
+                  <g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round" />
+                  <g id="SVGRepo_iconCarrier">
+                    <path
+                      d="M8.35179 20.2418C9.19288 21.311 10.5142 22 12 22C13.4858 22 14.8071 21.311 15.6482 20.2418C13.2264 20.57 10.7736 20.57 8.35179 20.2418Z"
+                      fill="currentColor"
+                    />
+                    <path
+                      d="M18.7491 9V9.7041C18.7491 10.5491 18.9903 11.3752 19.4422 12.0782L20.5496 13.8012C21.5612 15.3749 20.789 17.5139 19.0296 18.0116C14.4273 19.3134 9.57274 19.3134 4.97036 18.0116C3.21105 17.5139 2.43882 15.3749 3.45036 13.8012L4.5578 12.0782C5.00972 11.3752 5.25087 10.5491 5.25087 9.7041V9C5.25087 5.13401 8.27256 2 12 2C15.7274 2 18.7491 5.13401 18.7491 9Z"
+                      fill="currentColor"
+                    />
+                  </g>
+                </svg>
                 {notifications && notifications.filter(n => !n.is_read).length > 0 && (
                   <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
                 )}

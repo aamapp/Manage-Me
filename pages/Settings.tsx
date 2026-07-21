@@ -4,8 +4,8 @@ import { User as UserIcon, Bell, Shield, Palette, Globe, Save, CheckCircle2, Loa
 import html2canvas from 'html2canvas';
 import { AppLogo } from '@/components/AppLogo';
 import { APP_NAME } from '../constants';
-import { useAppContext } from '../context/AppContext';
-import { supabase } from '../lib/supabase';
+import { useAppContext } from '@/context/AppContext';
+import { supabase } from '@/lib/supabase';
 import { AppLock } from '@/components/AppLock';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { collection, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';

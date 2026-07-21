@@ -17,8 +17,8 @@ import {
 import { useNavigate } from "react-router-dom";
 import { CURRENCY } from "../constants";
 import { Client } from "../types";
-import { useAppContext } from "../context/AppContext";
-import { supabase } from "../lib/supabase";
+import { useAppContext } from '@/context/AppContext';
+import { supabase } from '@/lib/supabase';
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { CustomEditIcon, CustomDeleteIcon } from "@/components/CustomMenuIcons";
 import { motion, AnimatePresence } from "motion/react";

@@ -34,9 +34,9 @@ import {
 } from "lucide-react";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
-import { useAppContext } from "../context/AppContext";
+import { useAppContext } from '@/context/AppContext';
 import { Project, IncomeRecord } from "../types";
-import { supabase } from "../lib/supabase";
+import { supabase } from '@/lib/supabase';
 import { NumericKeypad } from "@/components/NumericKeypad";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { DatePicker } from "@/components/DatePicker";

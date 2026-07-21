@@ -1,8 +1,8 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
-import { useAppContext } from '../context/AppContext';
+import { supabase } from '@/lib/supabase';
+import { useAppContext } from '@/context/AppContext';
 import { Lock, CheckCircle2, Loader2, Eye, EyeOff } from 'lucide-react';
 
 export const UpdatePassword: React.FC = () => {

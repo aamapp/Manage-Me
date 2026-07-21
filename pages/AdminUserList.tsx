@@ -2,9 +2,10 @@
 import React, { useMemo, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
-import { User, Wallet, Briefcase, ChevronRight, UserCog, Users, RefreshCw, AlertCircle, Pencil, X, Save, Loader2, Camera, UploadCloud } from 'lucide-react';
-import { useAppContext } from '../context/AppContext';
-import { supabase } from '../lib/supabase';
+import { User, Wallet, Briefcase, ChevronRight, UserCog, Users, RefreshCw, AlertCircle, X, Save, Loader2, Camera, UploadCloud } from 'lucide-react';
+import { CustomEditIcon } from '@/components/CustomMenuIcons';
+import { useAppContext } from '@/context/AppContext';
+import { supabase } from '@/lib/supabase';
 
 export const AdminUserList: React.FC = () => {
   const { allProjects, allIncomeRecords, userProfiles, setAdminSelectedUserId, user, refreshData, showToast, isOnline } = useAppContext();
@@ -249,7 +250,7 @@ export const AdminUserList: React.FC = () => {
                                         disabled={!isOnline}
                                         className={`p-2 rounded-full transition-colors ${!isOnline ? 'bg-slate-50 text-slate-300 cursor-not-allowed' : 'bg-slate-50 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'}`}
                                     >
-                                        <Pencil size={16} />
+                                        <CustomEditIcon size={16} />
                                     </button>
                                     <ChevronRight size={18} className="text-slate-300 group-hover:text-indigo-500" />
                                 </div>
