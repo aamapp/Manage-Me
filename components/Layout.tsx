@@ -355,7 +355,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
       {/* Desktop Sidebar - Visible only on LG screens */}
       {!isTrash && (
         <aside className="hidden lg:flex flex-col w-72 bg-white border-r border-slate-200 h-screen lg:fixed lg:top-0 lg:left-0 z-50">
-        <div className="p-6 border-b border-slate-100">
+        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
           <div
             onClick={() => setAboutOpen(true)}
             className="flex items-center gap-3 cursor-pointer group"
@@ -369,6 +369,37 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
               {APP_NAME}
             </span>
           </div>
+
+          <button
+            onClick={() => handleNavigate("/notifications")}
+            title="নোটিফিকেশন"
+            className="w-9 h-9 rounded-full flex items-center justify-center text-slate-700 hover:bg-slate-100 hover:text-indigo-600 transition-colors relative"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-[22px] h-[22px]"
+            >
+              <g id="SVGRepo_bgCarrier" strokeWidth="0" />
+              <g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round" />
+              <g id="SVGRepo_iconCarrier">
+                <path
+                  d="M8.35179 20.2418C9.19288 21.311 10.5142 22 12 22C13.4858 22 14.8071 21.311 15.6482 20.2418C13.2264 20.57 10.7736 20.57 8.35179 20.2418Z"
+                  fill="currentColor"
+                />
+                <path
+                  d="M18.7491 9V9.7041C18.7491 10.5491 18.9903 11.3752 19.4422 12.0782L20.5496 13.8012C21.5612 15.3749 20.789 17.5139 19.0296 18.0116C14.4273 19.3134 9.57274 19.3134 4.97036 18.0116C3.21105 17.5139 2.43882 15.3749 3.45036 13.8012L4.5578 12.0782C5.00972 11.3752 5.25087 10.5491 5.25087 9.7041V9C5.25087 5.13401 8.27256 2 12 2C15.7274 2 18.7491 5.13401 18.7491 9Z"
+                  fill="currentColor"
+                />
+              </g>
+            </svg>
+            {unreadCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-xs leading-none select-none">
+                {unreadCount > 99 ? "৯৯+" : toBanglaNum(unreadCount)}
+              </span>
+            )}
+          </button>
         </div>
 
         <nav className="flex-1 overflow-y-auto p-4 space-y-1 custom-scrollbar">
@@ -431,6 +462,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                   className={`relative ${isActive ? "text-indigo-600" : "text-slate-400"}`}
                 >
                   {item.icon}
+                  {item.path === "/notifications" && unreadCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[9px] font-black px-1 rounded-full min-w-[16px] h-[16px] flex items-center justify-center shadow-sm ring-2 ring-white">
+                      {unreadCount > 99 ? "৯৯+" : toBanglaNum(unreadCount)}
+                    </span>
+                  )}
                   {item.path === "/trash" && trashCount > 0 && (
                     <span className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[9px] font-black px-1 py-0.5 rounded-full min-w-[16px] h-[16px] flex items-center justify-center shadow-sm ring-2 ring-white animate-in zoom-in duration-300">
                       {trashCount}
@@ -773,7 +809,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => handleNavigate("/notifications")}
-                className="w-9 h-9 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 hover:text-indigo-600 transition-colors relative"
+                className="w-9 h-9 rounded-full flex items-center justify-center text-slate-700 hover:bg-slate-100 hover:text-indigo-600 transition-colors relative"
               >
                 <svg
                   viewBox="0 0 24 24"
@@ -838,7 +874,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
             ? "p-0"
             : isExpensesPage
             ? `pt-14 lg:pt-8 ${!isOnline ? (hasBottomNav ? "pb-[110px]" : "pb-[38px]") : "pb-[72px]"} lg:pb-8 px-0 lg:px-8`
-            : `pt-14 lg:pt-8 ${!isOnline ? (hasBottomNav ? "pb-[110px]" : "pb-[38px]") : "pb-[72px]"} lg:pb-8 px-3 lg:px-8`
+            : `pt-[72px] lg:pt-8 ${!isOnline ? (hasBottomNav ? "pb-[110px]" : "pb-[38px]") : "pb-[72px]"} lg:pb-8 px-3.5 lg:px-8`
         } ${isExpensesPage ? "" : "animate-in fade-in duration-150"} w-full max-w-[100vw] lg:max-w-none ${isExpensesPage ? 'overflow-x-clip' : 'overflow-x-hidden'} ${isTrash ? "" : "lg:ml-72"}`}
       >
         <div
@@ -1001,6 +1037,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                       {React.cloneElement(
                         item.icon as React.ReactElement<{ size?: number }>,
                         { size: 14 },
+                      )}
+                      {item.path === "/notifications" && unreadCount > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[8px] font-black px-1 rounded-full min-w-[14px] h-[14px] flex items-center justify-center shadow-sm ring-2 bg-white group-hover:ring-indigo-600 transition-all">
+                          {unreadCount > 99 ? "৯৯+" : toBanglaNum(unreadCount)}
+                        </span>
                       )}
                       {item.path === "/trash" && trashCount > 0 && (
                         <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[8px] font-black px-1 py-0.5 rounded-full min-w-[14px] h-[14px] flex items-center justify-center shadow-sm ring-2 bg-white group-hover:ring-indigo-600 transition-all animate-in zoom-in duration-300">

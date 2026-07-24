@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Bot, Send, User, Loader2, ArrowLeft, Copy, Check, Phone, PhoneOff, Mic, MicOff, Volume2, VolumeX, Sparkles, X } from "lucide-react";
+import { Bot, Send, User, Loader2, ArrowLeft, Copy, Check, Mic, MicOff, Sparkles, X } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useNavigate } from "react-router-dom";
@@ -36,48 +36,56 @@ export const AIAssistant: React.FC = () => {
   const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // --- VOICE & AUDIO CALL MODE STATE & REFS ---
-  const [isCallMode, setIsCallMode] = useState(false);
-  const [isListeningText, setIsListeningText] = useState(false); // for quick text area microphone
-  const [callStatus, setCallStatus] = useState<"connecting" | "listening" | "thinking" | "speaking" | "muted">("connecting");
-  const [userTranscript, setUserTranscript] = useState("");
-  const [aiSpeechOutput, setAiSpeechOutput] = useState("");
-  const [isMuted, setIsMuted] = useState(false);
-  const [isSpeakerOn, setIsSpeakerOn] = useState(true);
-  const [voiceSupported, setVoiceSupported] = useState(true);
-
-  const textMicRecognitionRef = useRef<any>(null);
-  const callRecognitionRef = useRef<any>(null);
-  const isCallModeRef = useRef(false);
-  const isMutedRef = useRef(false);
-  const latestTranscriptRef = useRef("");
+  // --- MOBILE VISUAL VIEWPORT & KEYBOARD POSITIONING ---
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
 
   useEffect(() => {
-    isCallModeRef.current = isCallMode;
-  }, [isCallMode]);
+    if (typeof window === "undefined" || !window.visualViewport) return;
 
-  useEffect(() => {
-    isMutedRef.current = isMuted;
-  }, [isMuted]);
+    const handleResize = () => {
+      if (window.visualViewport) {
+        if (window.innerWidth < 1024) {
+          setViewportHeight(window.visualViewport.height);
+        } else {
+          setViewportHeight(null);
+        }
+      }
+    };
 
-  // Check browser support
-  useEffect(() => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      setVoiceSupported(false);
-    }
+    handleResize();
+
+    const viewport = window.visualViewport;
+    viewport.addEventListener("resize", handleResize);
+    viewport.addEventListener("scroll", handleResize);
+
+    return () => {
+      viewport.removeEventListener("resize", handleResize);
+      viewport.removeEventListener("scroll", handleResize);
+    };
   }, []);
+
+  // --- AUTO-EXPAND TEXTAREA HEIGHT ---
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = "auto";
+    const newHeight = Math.min(Math.max(textarea.scrollHeight, 38), 130);
+    textarea.style.height = `${newHeight}px`;
+  }, [input]);
+
+  // --- VOICE INPUT STATE & REFS ---
+  const [isListeningText, setIsListeningText] = useState(false); // for quick text area microphone
+  const textMicRecognitionRef = useRef<any>(null);
+  const voiceSupported = typeof window !== "undefined" && ("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (textMicRecognitionRef.current) {
         try { textMicRecognitionRef.current.stop(); } catch (e) {}
-      }
-      if (callRecognitionRef.current) {
-        try { callRecognitionRef.current.stop(); } catch (e) {}
       }
       window.speechSynthesis?.cancel();
     };
@@ -135,374 +143,6 @@ export const AIAssistant: React.FC = () => {
     } catch (e) {
       console.error("Failed to start speech recognition:", e);
       setIsListeningText(false);
-    }
-  };
-
-  // 2. Immersive Hands-Free Audio Call Mode
-  const speakBengaliText = (text: string, callback?: () => void) => {
-    if (!window.speechSynthesis) {
-      if (callback) callback();
-      return;
-    }
-
-    window.speechSynthesis.cancel();
-
-    if (!isSpeakerOn) {
-      if (callback) callback();
-      return;
-    }
-
-    // Clean markdown, links, and formatting before speaking
-    const cleanText = text
-      .replace(/!\[.*\]\(.*\)/g, "") // remove markdown images
-      .replace(/[*#_`\-[\]()]/g, "") // remove basic markdown formatting
-      .replace(/https?:\/\/[^\s]+/g, "") // remove links
-      .replace(/৳/g, "টাকা") // replace currency symbols with words for better pronunciation
-      .trim();
-
-    if (!cleanText) {
-      if (callback) callback();
-      return;
-    }
-
-    // Check if running in Android WebView with native TTS Interface
-    if ((window as any).AndroidInterface && typeof (window as any).AndroidInterface.speak === "function") {
-      try {
-        let callbackCalled = false;
-        (window as any).onAndroidSpeechEnd = () => {
-          if (!callbackCalled) {
-            callbackCalled = true;
-            if (callback) callback();
-          }
-        };
-        (window as any).AndroidInterface.speak(cleanText);
-        // Fallback safety in case Android side doesn't trigger the end callback
-        setTimeout(() => {
-          if (!callbackCalled) {
-            callbackCalled = true;
-            if (callback) callback();
-          }
-        }, Math.max(3000, cleanText.length * 200));
-        return;
-      } catch (e) {
-        console.error("Android native TTS bridge failed:", e);
-      }
-    }
-
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    utterance.lang = "bn-BD";
-
-    // Select suitable Bengali voice if available
-    const voices = window.speechSynthesis.getVoices();
-    const bnVoice = voices.find(v => v.lang.includes("bn") || v.lang.includes("BN"));
-    if (bnVoice) {
-      utterance.voice = bnVoice;
-    }
-
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
-
-    let callbackCalled = false;
-    let fallbackTimer: NodeJS.Timeout | null = null;
-
-    const safeCallback = () => {
-      if (fallbackTimer) clearTimeout(fallbackTimer);
-      if (callbackCalled) return;
-      callbackCalled = true;
-      if (callback) callback();
-    };
-
-    utterance.onend = () => {
-      safeCallback();
-    };
-
-    utterance.onerror = (err) => {
-      console.error("Speech synthesis error:", err);
-      if (err.error === "interrupted" || err.error === "canceled") {
-        return;
-      }
-      safeCallback();
-    };
-
-    // Calculate maximum duration based on text length: ~150 words per minute => 2.5 words per second
-    // Let's allow plenty of time: 400ms per character plus a 5 second buffer
-    const timeoutMs = Math.max(5000, cleanText.length * 400);
-    fallbackTimer = setTimeout(() => {
-      if (!callbackCalled) {
-        console.warn("Speech synthesis timed out, forcing fallback callback.");
-        try {
-          window.speechSynthesis.cancel();
-        } catch (e) {}
-        safeCallback();
-      }
-    }, timeoutMs);
-
-    window.speechSynthesis.speak(utterance);
-  };
-
-  const startCallRecognition = () => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition || isMutedRef.current) return;
-
-    if (callRecognitionRef.current) {
-      try {
-        callRecognitionRef.current.onend = null;
-        callRecognitionRef.current.onerror = null;
-        callRecognitionRef.current.stop();
-      } catch (e) {}
-    }
-
-    const recognition = new SpeechRecognition();
-    recognition.lang = "bn-BD";
-    recognition.interimResults = true;
-    recognition.continuous = false;
-
-    recognition.onstart = () => {
-      setCallStatus("listening");
-      setUserTranscript("");
-      latestTranscriptRef.current = "";
-    };
-
-    recognition.onresult = (event: any) => {
-      let combined = "";
-      for (let i = 0; i < event.results.length; i++) {
-        combined += event.results[i][0].transcript;
-      }
-      setUserTranscript(combined);
-      latestTranscriptRef.current = combined;
-    };
-
-    recognition.onerror = (event: any) => {
-      console.error("Call speech error:", event.error);
-      if (event.error === "not-allowed") {
-        alert("মাইক্রোফোন অ্যাক্সেস ব্লক করা আছে। দয়া করে আপনার ব্রাউজারের অ্যাড্রেস বারের লক আইকনে ক্লিক করে মাইক্রোফোন ব্যবহারের অনুমতি (Allow) দিন, অথবা অ্যাপটি নতুন ট্যাবে (Open in new tab) ওপেন করুন।");
-        terminateCall();
-      } else if (event.error === "network") {
-        console.warn("Call speech network issue detected, silent retry will trigger onend");
-      }
-    };
-
-    recognition.onend = () => {
-      const transcript = latestTranscriptRef.current;
-      // Check if we captured valid Bengali voice input
-      if (transcript.trim() && isCallModeRef.current && !isMutedRef.current) {
-        submitVoiceQuery(transcript.trim());
-      } else if (isCallModeRef.current && !isMutedRef.current) {
-        // If nothing heard, wait a second and restart listening loop in call mode
-        setTimeout(() => {
-          if (isCallModeRef.current && !isMutedRef.current) {
-            startCallRecognition();
-          }
-        }, 1200);
-      }
-    };
-
-    callRecognitionRef.current = recognition;
-    try {
-      recognition.start();
-    } catch (e) {
-      console.error("Failed to start call recognition:", e);
-    }
-  };
-
-  const submitVoiceQuery = async (queryText: string) => {
-    setCallStatus("thinking");
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: "user",
-      content: queryText,
-    };
-    setMessages((prev) => [...prev, userMessage]);
-
-    try {
-      const totalBudget = projects.reduce((sum, p) => sum + (p.totalamount || 0), 0);
-      const totalPaid = projects.reduce((sum, p) => sum + (p.paidamount || 0), 0);
-      const totalDue = projects.reduce((sum, p) => sum + (p.dueamount || 0), 0);
-      const totalIncome = incomeRecords.reduce((sum, i) => sum + (i.amount || 0), 0);
-      const totalExpense = expenses.reduce((sum, i) => sum + (i.amount || 0), 0);
-
-      const contextData = {
-        totalProjects: projects.length,
-        totalClients: clients.length,
-        totalBudget,
-        totalPaid,
-        totalDue,
-        totalIncome,
-        totalExpense,
-        currency: user?.currency || '৳',
-        projectsList: projects.map((p) => ({
-          name: p.name,
-          client: p.clientname,
-          budget: p.totalamount,
-          paid: p.paidamount,
-          due: p.dueamount,
-          status: p.status,
-        })),
-        incomeList: incomeRecords.map((i) => ({
-          client: i.clientname,
-          amount: i.amount,
-          date: i.date,
-        })),
-        expenseList: expenses.map((e) => ({
-          category: e.category,
-          amount: e.amount,
-          date: e.date,
-        })),
-        clientsList: clients.map((c) => ({
-          name: c.name,
-          totalProjects: c.totalprojects,
-          totalEarnings: c.totalearnings,
-        })),
-      };
-
-      const response = await generateAiResponse(
-        queryText,
-        messages.slice(1),
-        contextData
-      );
-
-      let aiResponseText = "আমি আপনার কথাটি বুঝতে পেরেছি।";
-      if (response.text) {
-        aiResponseText = response.text;
-      } else if (response.functionCall) {
-        if (response.functionCall.name === "navigate_to_page") {
-          const pageName = response.functionCall.args.page_name;
-          aiResponseText = `আমি আপনাকে ব্রাউজারের ${pageName} পেইজে নিয়ে যাচ্ছি।`;
-          setTimeout(() => {
-            const pathMap: any = {
-              dashboard: "/",
-              projects: "/projects",
-              income: "/income",
-              expenses: "/expenses",
-              clients: "/clients",
-              reports: "/reports",
-              settings: "/settings",
-              shopping: "/shopping-lists",
-              assistant: "/ai-assistant",
-            };
-            const path = pathMap[pageName?.toLowerCase()] || "/";
-            navigate(path);
-          }, 3000);
-        }
-      }
-
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: aiResponseText,
-      };
-      setMessages((prev) => [...prev, assistantMessage]);
-
-      setAiSpeechOutput(aiResponseText);
-      setCallStatus("speaking");
-
-      speakBengaliText(aiResponseText, () => {
-        if (isCallModeRef.current && !isMutedRef.current) {
-          setCallStatus("listening");
-          setUserTranscript("");
-          setTimeout(() => {
-            startCallRecognition();
-          }, 400);
-        } else if (isCallModeRef.current && isMutedRef.current) {
-          setCallStatus("muted");
-        }
-      });
-
-    } catch (error: any) {
-      console.error("AI voice processing error:", error);
-      const errorMsg = "দুঃখিত, কোনো একটি নেটওয়ার্ক সমস্যা হয়েছে। দয়া করে আবার বলুন।";
-      setAiSpeechOutput(errorMsg);
-      setCallStatus("speaking");
-      speakBengaliText(errorMsg, () => {
-        if (isCallModeRef.current && !isMutedRef.current) {
-          setCallStatus("listening");
-          setUserTranscript("");
-          startCallRecognition();
-        }
-      });
-    }
-  };
-
-  const startAudioCall = () => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert("দুঃখিত, আপনার ব্রাউজারে ভয়েস কল সাপোর্ট করে না। দয়া করে গুগল ক্রোম ব্যবহার করুন।");
-      return;
-    }
-
-    if (textMicRecognitionRef.current) {
-      try {
-        textMicRecognitionRef.current.onend = null;
-        textMicRecognitionRef.current.onerror = null;
-        textMicRecognitionRef.current.stop();
-      } catch (e) {}
-      setIsListeningText(false);
-    }
-
-    setIsCallMode(true);
-    setCallStatus("connecting");
-    setUserTranscript("");
-
-    const welcomeMessage = "আসসালামু আলাইকুম! আমি আপনার এআই অ্যাসিস্ট্যান্ট। আমি শুনছি, বলুন আপনাকে কীভাবে সাহায্য করতে পারি?";
-    setAiSpeechOutput(welcomeMessage);
-
-    window.speechSynthesis?.cancel();
-
-    setTimeout(() => {
-      setCallStatus("speaking");
-      speakBengaliText(welcomeMessage, () => {
-        if (!isMutedRef.current) {
-          setCallStatus("listening");
-          startCallRecognition();
-        } else {
-          setCallStatus("muted");
-        }
-      });
-    }, 600);
-  };
-
-  const terminateCall = () => {
-    setIsCallMode(false);
-    window.speechSynthesis?.cancel();
-    if (callRecognitionRef.current) {
-      try {
-        callRecognitionRef.current.onend = null;
-        callRecognitionRef.current.onerror = null;
-        callRecognitionRef.current.stop();
-      } catch (e) {}
-    }
-  };
-
-  const toggleMute = () => {
-    if (isMuted) {
-      setIsMuted(false);
-      setCallStatus("listening");
-      setTimeout(() => {
-        startCallRecognition();
-      }, 200);
-    } else {
-      setIsMuted(true);
-      setCallStatus("muted");
-      if (callRecognitionRef.current) {
-        try {
-          callRecognitionRef.current.onend = null;
-          callRecognitionRef.current.onerror = null;
-          callRecognitionRef.current.stop();
-        } catch (e) {}
-      }
-    }
-  };
-
-  const toggleSpeaker = () => {
-    if (isSpeakerOn) {
-      setIsSpeakerOn(false);
-      window.speechSynthesis?.cancel();
-    } else {
-      setIsSpeakerOn(true);
-      if (aiSpeechOutput && callStatus === "speaking") {
-        speakBengaliText(aiSpeechOutput);
-      }
     }
   };
 
@@ -826,7 +466,10 @@ export const AIAssistant: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 lg:static lg:inset-auto lg:h-[calc(100dvh-80px)] flex flex-col overflow-hidden bg-[#f8fafc] z-[100] lg:z-auto">
+    <div
+      className="fixed inset-0 lg:static lg:inset-auto lg:h-[calc(100dvh-80px)] flex flex-col overflow-hidden bg-[#f8fafc] z-[100] lg:z-auto"
+      style={viewportHeight ? { height: `${viewportHeight}px` } : undefined}
+    >
       {/* Header */}
       <div className="py-2 px-4 sm:px-6 sm:py-3 shrink-0 bg-white border-b border-indigo-50/50 lg:rounded-t-3xl shadow-sm z-10 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
@@ -858,20 +501,6 @@ export const AIAssistant: React.FC = () => {
             </p>
           </div>
         </div>
-
-        {/* Voice Call Trigger Button */}
-        {voiceSupported && (
-          <button
-            type="button"
-            onClick={startAudioCall}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-500 hover:bg-indigo-600 text-white font-semibold text-xs transition-all shadow-sm shadow-indigo-100 active:scale-95 animate-pulse shrink-0"
-            style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
-            title="এআই অডিও কল করুন"
-          >
-            <Phone size={12} className="animate-bounce" />
-            <span>কল করুন</span>
-          </button>
-        )}
       </div>
 
       {/* Chat Area */}
@@ -1008,12 +637,18 @@ export const AIAssistant: React.FC = () => {
       </div>
 
       {/* Input Area */}
-      <div className="shrink-0 p-3 pb-[max(12px,env(safe-area-inset-bottom))] sm:p-6 bg-[#f8fafc] lg:rounded-b-3xl">
+      <div className="shrink-0 p-2.5 sm:p-4 pb-[max(12px,env(safe-area-inset-bottom))] bg-white sm:bg-[#f8fafc] border-t border-slate-200/60 lg:border-t-0 lg:rounded-b-3xl">
         <form onSubmit={handleSendMessage} className="max-w-4xl mx-auto">
-          <div className="relative flex items-center bg-white border border-slate-200 rounded-2xl focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500/50 transition-all shadow-sm p-1 pr-1.5 pl-1">
+          <div className="relative flex items-end bg-slate-50 sm:bg-white border border-slate-200/90 rounded-2xl focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500/50 focus-within:bg-white transition-all shadow-xs p-1.5">
             <textarea
+              ref={textareaRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
+              onFocus={() => {
+                setTimeout(() => {
+                  messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+                }, 300);
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
@@ -1021,7 +656,7 @@ export const AIAssistant: React.FC = () => {
                 }
               }}
               placeholder="আপনার প্রশ্ন লিখুন..."
-              className="flex-1 bg-transparent border-none px-3 py-1.5 text-sm sm:text-base font-medium text-slate-700 focus:outline-none resize-none min-h-[38px] max-h-[150px] leading-relaxed"
+              className="flex-1 bg-transparent border-none px-2.5 py-1.5 text-sm sm:text-base font-medium text-slate-800 focus:outline-none resize-none min-h-[38px] max-h-[130px] leading-relaxed overflow-y-auto custom-scrollbar"
               style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}
               rows={1}
             />
@@ -1030,10 +665,10 @@ export const AIAssistant: React.FC = () => {
               <button
                 type="button"
                 onClick={startTextMicListening}
-                className={`shrink-0 w-9 h-9 mr-1.5 rounded-xl flex items-center justify-center transition-all active:scale-95 ${
+                className={`shrink-0 w-9 h-9 mr-1 mb-0.5 rounded-xl flex items-center justify-center transition-all active:scale-95 ${
                   isListeningText
                     ? "bg-red-500 text-white animate-pulse"
-                    : "bg-slate-50 text-slate-500 hover:bg-slate-100"
+                    : "bg-slate-100 text-slate-500 hover:bg-slate-200"
                 }`}
                 title="ভয়েস টাইপিং করুন"
               >
@@ -1044,7 +679,7 @@ export const AIAssistant: React.FC = () => {
             <button
               type="submit"
               disabled={isLoading || !input.trim()}
-              className={`shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-all shadow-sm active:scale-95 ${
+              className={`shrink-0 w-9 h-9 mb-0.5 rounded-xl flex items-center justify-center transition-all shadow-xs active:scale-95 ${
                 !input.trim() || isLoading
                   ? "bg-slate-200 text-slate-400"
                   : "bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-200"
@@ -1058,186 +693,6 @@ export const AIAssistant: React.FC = () => {
           </div>
         </form>
       </div>
-
-      {/* 3. FULL SCREEN AUDIO CALL MODE OVERLAY */}
-      {isCallMode && (
-        <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-md z-[200] flex flex-col justify-between p-6 text-white transition-all duration-300">
-          {/* Call Header */}
-          <div className="flex justify-between items-center w-full max-w-md mx-auto pt-4">
-            <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
-              <span className="text-xs font-semibold uppercase tracking-wider text-green-400 font-mono">
-                {callStatus === "connecting" && "কানেক্টিং..."}
-                {callStatus === "listening" && "আপনার কথা শুনছে..."}
-                {callStatus === "thinking" && "ভাবছে..."}
-                {callStatus === "speaking" && "কথা বলছে..."}
-                {callStatus === "muted" && "মাইক মিউট করা"}
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={terminateCall}
-              className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
-            >
-              <X size={18} />
-            </button>
-          </div>
-
-          {/* Central Pulsing Wave Area */}
-          <div className="flex-1 flex flex-col items-center justify-center max-w-md mx-auto w-full gap-8">
-            <div className="relative">
-              {/* Concentric Pulsing Ripples */}
-              {callStatus === "speaking" && isSpeakerOn && (
-                <>
-                  <div className="absolute inset-0 bg-indigo-500/20 rounded-full scale-150 animate-ping opacity-75" />
-                  <div className="absolute inset-0 bg-indigo-500/10 rounded-full scale-125 animate-ping opacity-50" />
-                </>
-              )}
-              {callStatus === "listening" && (
-                <>
-                  <div className="absolute inset-0 bg-emerald-500/20 rounded-full scale-150 animate-ping opacity-75" />
-                  <div className="absolute inset-0 bg-emerald-500/10 rounded-full scale-125 animate-ping opacity-50" />
-                </>
-              )}
-              {callStatus === "thinking" && (
-                <div className="absolute inset-0 bg-purple-500/20 rounded-full scale-150 animate-pulse" />
-              )}
-              
-              <div className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-indigo-600 border-4 border-white/20 flex items-center justify-center shadow-2xl shadow-indigo-500/30">
-                <Bot size={48} className="text-white animate-bounce" />
-              </div>
-            </div>
-
-            <div className="text-center">
-              <h2 className="text-xl sm:text-2xl font-bold tracking-tight mb-2" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
-                এআই অডিও কল
-              </h2>
-              <p className="text-xs sm:text-sm text-slate-400" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
-                {callStatus === "connecting" && "অডিও লাইন সংযুক্ত হচ্ছে..."}
-                {callStatus === "listening" && "নিদ্বিধায় আপনার প্রশ্নটি বলুন..."}
-                {callStatus === "thinking" && "দয়া করে একটু অপেক্ষা করুন..."}
-                {callStatus === "speaking" && "আপনার উত্তর দেওয়া হচ্ছে..."}
-                {callStatus === "muted" && "মাইক আনমিউট করতে নিচের বাটনে চাপুন"}
-              </p>
-            </div>
-
-            {/* EQ Visualizer representation */}
-            <div className="flex items-center justify-center gap-1.5 h-12 w-full max-w-xs bg-white/5 rounded-2xl px-6">
-              {callStatus === "speaking" && isSpeakerOn ? (
-                // Speaking waves
-                [...Array(9)].map((_, i) => (
-                  <div
-                    key={i}
-                    className="w-1 bg-indigo-400 rounded-full"
-                    style={{
-                      height: `${30 + Math.sin(i + Date.now() / 100) * 40}%`,
-                      animationName: "pulse",
-                      animationDuration: "0.6s",
-                      animationTimingFunction: "ease-in-out",
-                      animationIterationCount: "infinite",
-                      animationDirection: "alternate",
-                      animationDelay: `${i * 80}ms`
-                    }}
-                  />
-                ))
-              ) : callStatus === "listening" ? (
-                // Listening waves (green)
-                [...Array(9)].map((_, i) => (
-                  <div
-                    key={i}
-                    className="w-1 bg-emerald-400 rounded-full"
-                    style={{
-                      height: `${20 + Math.cos(i + Date.now() / 100) * 30}%`,
-                      animationName: "pulse",
-                      animationDuration: "0.4s",
-                      animationTimingFunction: "ease-in-out",
-                      animationIterationCount: "infinite",
-                      animationDirection: "alternate",
-                      animationDelay: `${i * 50}ms`
-                    }}
-                  />
-                ))
-              ) : callStatus === "thinking" ? (
-                // Thinking (loader)
-                <div className="flex items-center gap-1">
-                  <div className="w-2.5 h-2.5 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                  <div className="w-2.5 h-2.5 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                  <div className="w-2.5 h-2.5 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                </div>
-              ) : (
-                // Silent / Idle bars
-                [...Array(9)].map((_, i) => (
-                  <div key={i} className="w-1 h-2 bg-slate-600 rounded-full" />
-                ))
-              )}
-            </div>
-
-            {/* Real-time speech transcription boxes */}
-            <div className="w-full space-y-3 px-2">
-              {/* User transcript */}
-              {userTranscript && (
-                <div className="p-3 bg-white/5 border border-white/10 rounded-xl text-sm max-h-[80px] overflow-y-auto">
-                  <span className="text-[10px] text-emerald-400 block mb-0.5 font-semibold uppercase tracking-wider font-sans">আপনি বলছেন:</span>
-                  <p className="text-slate-100 font-medium text-xs sm:text-sm" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
-                    {userTranscript}
-                  </p>
-                </div>
-              )}
-
-              {/* AI current spoken output */}
-              {aiSpeechOutput && (
-                <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-sm max-h-[150px] overflow-y-auto">
-                  <span className="text-[10px] text-indigo-400 block mb-0.5 font-semibold uppercase tracking-wider font-sans">এআই উত্তর:</span>
-                  <p className="text-slate-200 font-medium text-xs sm:text-sm leading-relaxed" style={{ fontFamily: "'Kohinoor Bangla', sans-serif" }}>
-                    {aiSpeechOutput.replace(/[*#_`\-[\]()]/g, "")}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Call Controls Area */}
-          <div className="w-full max-w-md mx-auto flex items-center justify-around pb-8 pt-4 shrink-0">
-            {/* Speaker Toggle Button */}
-            <button
-              type="button"
-              onClick={toggleSpeaker}
-              className={`w-12 h-12 rounded-full flex items-center justify-center transition-all active:scale-90 border ${
-                isSpeakerOn
-                  ? "bg-white/10 text-white border-white/10 hover:bg-white/20"
-                  : "bg-red-500/20 text-red-400 border-red-500/20 hover:bg-red-500/30"
-              }`}
-              title={isSpeakerOn ? "স্পিকার বন্ধ করুন" : "স্পিকার চালু করুন"}
-            >
-              {isSpeakerOn ? <Volume2 size={20} /> : <VolumeX size={20} />}
-            </button>
-
-            {/* End Call Button */}
-            <button
-              type="button"
-              onClick={terminateCall}
-              className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-red-600 hover:bg-red-700 text-white flex items-center justify-center shadow-lg shadow-red-600/30 transition-all active:scale-90 hover:scale-105"
-              title="কল শেষ করুন"
-            >
-              <PhoneOff size={24} />
-            </button>
-
-            {/* Mute Mic Button */}
-            <button
-              type="button"
-              onClick={toggleMute}
-              className={`w-12 h-12 rounded-full flex items-center justify-center transition-all active:scale-90 border ${
-                !isMuted
-                  ? "bg-white/10 text-white border-white/10 hover:bg-white/20"
-                  : "bg-red-500/20 text-red-400 border-red-500/20 hover:bg-red-500/30 animate-pulse"
-              }`}
-              title={isMuted ? "মাইক চালু করুন" : "মাইক মিউট করুন"}
-            >
-              {!isMuted ? <Mic size={20} /> : <MicOff size={20} />}
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
