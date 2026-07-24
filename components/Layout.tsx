@@ -136,6 +136,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
     isCarRent;
   const isExpensesPage = location.pathname === "/expenses";
 
+  const unreadCount = notifications ? notifications.filter((n) => !n.is_read).length : 0;
+  const toBanglaNum = (num: number | string): string => {
+    const banglaDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+    return String(num).replace(/\d/g, (digit) => banglaDigits[parseInt(digit, 10)]);
+  };
+
   const handleNavigate = (path: string) => {
     setMoreMenuOpen(false);
 
@@ -788,8 +794,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                     />
                   </g>
                 </svg>
-                {notifications && notifications.filter(n => !n.is_read).length > 0 && (
-                  <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-xs leading-none select-none">
+                    {unreadCount > 99 ? "৯৯+" : toBanglaNum(unreadCount)}
+                  </span>
                 )}
               </button>
               <div

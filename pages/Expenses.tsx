@@ -5409,49 +5409,15 @@ const DuesManager: React.FC<DuesManagerProps> = ({
               title="রিপোর্ট ডাউনলোড"
             >
               <svg
-                viewBox="0 0 32 32"
+                viewBox="0 0 24 24"
                 width={23}
                 height={23}
                 fill="none"
                 xmlns="http://www.w3.org/2000/svg"
               >
-                <g clipPath="url(#pdf-spec-clip-expenses)">
-                  {/* Document Body (Light Gray) */}
-                  <path d="M4 2H20L28 10V30H4V2Z" fill="#E2E8F0" />
-                  
-                  {/* Red Bottom Banner */}
-                  <rect x="4" y="20" width="24" height="10" fill="#E14E3A" />
-                  
-                  {/* PDF Text */}
-                  <text
-                    x="16"
-                    y="27.5"
-                    fill="#FFFFFF"
-                    fontSize="7.5"
-                    fontWeight="900"
-                    fontFamily="Inter, system-ui, sans-serif"
-                    textAnchor="middle"
-                    letterSpacing="0.2"
-                  >
-                    PDF
-                  </text>
-                </g>
-                
-                {/* Fold flap */}
-                <path d="M20 2L20 10L28 10Z" fill="#CBD5E1" />
-                <path d="M20 10L28 10L20 14Z" fill="rgba(0,0,0,0.08)" />
-                
-                {/* Arrow Shadow */}
-                <path d="M14.5 6.5H17.5V12.5H20.5L16 17.5L11.5 12.5H14.5V6.5Z" fill="rgba(0,0,0,0.12)" />
-                
-                {/* Red Arrow */}
-                <path d="M14 6H18V12H21L16 17L11 12H14V6Z" fill="#E14E3A" />
-
-                <defs>
-                  <clipPath id="pdf-spec-clip-expenses">
-                    <path d="M4 5C4 3.34315 5.34315 2 7 2H20L28 10V27C28 28.6569 26.6569 30 25 30H7C5.34315 30 4 28.6569 4 27V5Z" />
-                  </clipPath>
-                </defs>
+                <path d="M12 7L12 14M12 14L15 11M12 14L9 11" stroke="#1C274C" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M16 17H12H8" stroke="#1C274C" strokeWidth="1.5" strokeLinecap="round" />
+                <path d="M22 12C22 16.714 22 19.0711 20.5355 20.5355C19.0711 22 16.714 22 12 22C7.28595 22 4.92893 22 3.46447 20.5355C2 19.0711 2 16.714 2 12C2 7.28595 2 4.92893 3.46447 3.46447C4.92893 2 7.28595 2 12 2C16.714 2 19.0711 2 20.5355 3.46447C21.5093 4.43821 21.8356 5.80655 21.9449 8" stroke="#1C274C" strokeWidth="1.5" strokeLinecap="round" />
               </svg>
             </button>
           </div>
