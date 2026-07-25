@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User as UserIcon, Bell, Shield, Palette, Globe, Save, CheckCircle2, Loader2, Camera, UploadCloud, AlertCircle, Lock, Key, Trash2, Fingerprint, Download, Image as ImageIcon, Check, RefreshCw, ArrowLeft, Upload, FileText, CheckCircle, Database } from 'lucide-react';
+import { User as UserIcon, Bell, Shield, Palette, Globe, Save, CheckCircle2, Loader2, Camera, UploadCloud, AlertCircle, Lock, Key, Trash2, Fingerprint, Download, Image as ImageIcon, Check, RefreshCw, ArrowLeft, Upload, FileText, CheckCircle, Database, Coins, X } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { AppLogo } from '@/components/AppLogo';
 import { APP_NAME } from '../constants';
@@ -67,28 +67,50 @@ export const Settings: React.FC = () => {
 
   const [exportSelections, setExportSelections] = useState({
     projects: true,
+    project_income: true,
     clients: true,
-    income_records: true,
-    expenses: true,
-    ghazal_notes: true,
     shopping_lists: true,
-    due_persons: true,
+    ghazal_notes: true,
     car_rent: true,
+    wallets: true,
   });
 
   const [importSelections, setImportSelections] = useState<Record<string, boolean>>({
     projects: true,
-    clients: true,
-    income_records: true,
+    project_income: true,
+    wallets: true,
+    wallet_income: true,
     expenses: true,
-    ghazal_notes: true,
+    clients: true,
     shopping_lists: true,
+    ghazal_notes: true,
     due_persons: true,
     car_rent_friends: true,
     car_rent_trips: true,
     car_rent_collections: true,
     car_rent_driver_payments: true,
   });
+
+  // Wallet selection modal states
+  const [availableWallets, setAvailableWallets] = useState<any[]>([]);
+  const [selectedWalletIds, setSelectedWalletIds] = useState<Set<string>>(new Set());
+  const [showWalletModal, setShowWalletModal] = useState(false);
+
+  useEffect(() => {
+    if (user && activeTab === 'backup') {
+      supabase
+        .from('wallets')
+        .select('*')
+        .eq('userid', user.id)
+        .then(({ data, error }) => {
+          if (data && !error) {
+            const active = data.filter((w: any) => !w.name?.startsWith('[TRASH]'));
+            setAvailableWallets(active);
+            setSelectedWalletIds(new Set(active.map((w: any) => w.id)));
+          }
+        });
+    }
+  }, [user, activeTab]);
 
   // Logo Download States
   const [isCapturingLogo, setIsCapturingLogo] = useState(false);
@@ -114,13 +136,113 @@ export const Settings: React.FC = () => {
       showToast('ডাটা ব্যাকআপ ফাইল প্রস্তুত করা হচ্ছে...', 'info');
       
       // 1. Fetch Supabase Data live dynamically based on user selections
-      const projectsData = exportSelections.projects ? (await supabase.from('projects').select('*').eq('userid', user.id)).data : [];
-      const clientsData = exportSelections.clients ? (await supabase.from('clients').select('*').eq('userid', user.id)).data : [];
-      const incomeRecordsData = exportSelections.income_records ? (await supabase.from('income_records').select('*').eq('userid', user.id)).data : [];
-      const expensesData = exportSelections.expenses ? (await supabase.from('expenses').select('*').eq('userid', user.id)).data : [];
-      const ghazalNotesData = exportSelections.ghazal_notes ? (await supabase.from('ghazal_notes').select('*').eq('userid', user.id)).data : [];
-      const shoppingListsData = exportSelections.shopping_lists ? (await supabase.from('shopping_lists').select('*').eq('userid', user.id)).data : [];
-      const duePersonsData = exportSelections.due_persons ? (await supabase.from('due_persons').select('*').eq('userid', user.id)).data : [];
+      const projectsData = exportSelections.projects ? (await supabase.from('projects').select('*').eq('userid', user.id)).data || [] : [];
+      const clientsData = exportSelections.clients ? (await supabase.from('clients').select('*').eq('userid', user.id)).data || [] : [];
+      const ghazalNotesData = exportSelections.ghazal_notes ? (await supabase.from('ghazal_notes').select('*').eq('userid', user.id)).data || [] : [];
+      const shoppingListsData = exportSelections.shopping_lists ? (await supabase.from('shopping_lists').select('*').eq('userid', user.id)).data || [] : [];
+
+      // Project Incomes
+      let projectIncomesData: any[] = [];
+      if (exportSelections.project_income) {
+        const { data } = await supabase.from('income_records').select('*').eq('userid', user.id);
+        if (data) {
+          projectIncomesData = data.filter((r: any) => Boolean(r.projectid));
+        }
+      }
+
+      // Wallets & associated transactions (Incomes, Expenses, Dues)
+      let walletsData: any[] = [];
+      let walletIncomesData: any[] = [];
+      let walletExpensesData: any[] = [];
+      let walletDuesData: any[] = [];
+
+      if (exportSelections.wallets) {
+        const { data: allWallets } = await supabase.from('wallets').select('*').eq('userid', user.id);
+        if (allWallets) {
+          walletsData = allWallets.filter((w: any) => !w.name?.startsWith('[TRASH]') && (selectedWalletIds.size === 0 || selectedWalletIds.has(w.id)));
+        }
+        const selectedWalletNames = walletsData.map((w: any) => w.name);
+
+        // Wallet Incomes (non-project)
+        const { data: allIncomes } = await supabase.from('income_records').select('*').eq('userid', user.id);
+        if (allIncomes) {
+          walletIncomesData = allIncomes.filter((r: any) => !r.projectid && (selectedWalletNames.length === 0 || selectedWalletNames.includes(r.method)));
+        }
+
+        // Wallet Expenses
+        const { data: allExpenses } = await supabase.from('expenses').select('*').eq('userid', user.id);
+        if (allExpenses) {
+          walletExpensesData = allExpenses.filter((exp: any) => {
+            if (exp.notes?.startsWith('[TRASH]')) return false;
+            if (selectedWalletNames.length === 0) return true;
+            if (!exp.notes) return selectedWalletNames.includes('ক্যাশ');
+            return selectedWalletNames.some((wName: string) => exp.notes.includes(`[ওয়ালেট: ${wName}]`) || exp.notes.includes(`[Wallet: ${wName}]`));
+          });
+        }
+
+        // Wallet Dues
+        const { data: allDues } = await supabase.from('due_persons').select('*').eq('userid', user.id);
+        if (allDues) {
+          walletDuesData = allDues.filter((dp: any) => {
+            if (dp.name?.startsWith('[TRASH]')) return false;
+
+            // If no specific wallet filter is set (all wallets selected or none), include active due persons
+            if (selectedWalletIds.size === 0 || selectedWalletIds.size === availableWallets.length) {
+              return true;
+            }
+
+            let txs: any[] = [];
+            if (Array.isArray(dp.transactions)) {
+              txs = dp.transactions;
+            } else if (typeof dp.transactions === 'string') {
+              try {
+                txs = JSON.parse(dp.transactions);
+              } catch (e) {
+                txs = [];
+              }
+            }
+
+            // Check if any transaction in this due person matches the selected wallet names
+            return txs.some((tx: any) => {
+              const txWallet = tx.walletName || 'ক্যাশ';
+              return selectedWalletNames.includes(txWallet) ||
+                (txWallet === 'Cash' && selectedWalletNames.includes('ক্যাশ')) ||
+                (txWallet === 'ক্যাশ' && selectedWalletNames.includes('Cash'));
+            });
+          }).map((dp: any) => {
+            if (selectedWalletIds.size === 0 || selectedWalletIds.size === availableWallets.length) {
+              return dp;
+            }
+
+            let txs: any[] = [];
+            if (Array.isArray(dp.transactions)) {
+              txs = dp.transactions;
+            } else if (typeof dp.transactions === 'string') {
+              try {
+                txs = JSON.parse(dp.transactions);
+              } catch (e) {
+                txs = [];
+              }
+            }
+
+            const matchingTxs = txs.filter((tx: any) => {
+              const txWallet = tx.walletName || 'ক্যাশ';
+              return selectedWalletNames.includes(txWallet) ||
+                (txWallet === 'Cash' && selectedWalletNames.includes('ক্যাশ')) ||
+                (txWallet === 'ক্যাশ' && selectedWalletNames.includes('Cash'));
+            });
+
+            return {
+              ...dp,
+              transactions: matchingTxs
+            };
+          });
+        }
+      }
+
+      const incomeRecordsData = [...projectIncomesData, ...walletIncomesData];
+      const expensesData = walletExpensesData;
+      const duePersonsData = walletDuesData;
 
       // 2. Fetch Firebase Car Rent Data defensively based on user selections
       let carRentFriends: any[] = [];
@@ -154,19 +276,66 @@ export const Settings: React.FC = () => {
         }
       }
 
-      // 3. Assemble complete backup object
+      // 3. Check if there are actual items in selected export
+      const totalExportItems = 
+        (projectsData?.length || 0) +
+        (clientsData?.length || 0) +
+        (incomeRecordsData?.length || 0) +
+        (expensesData?.length || 0) +
+        (walletsData?.length || 0) +
+        (ghazalNotesData?.length || 0) +
+        (shoppingListsData?.length || 0) +
+        (duePersonsData?.length || 0) +
+        carRentFriends.length +
+        carRentTrips.length +
+        carRentCollections.length +
+        carRentDriverPayments.length;
+
+      if (totalExportItems === 0) {
+        showToast('আপনার নির্বাচিত ক্যাটাগরিতে (যেমন: শপিং লিস্ট) কোনো ডাটা নেই (০টি আইটেম)! ফাঁকা ফাইল ইমপোর্ট করা যাবে না।', 'info');
+      }
+
+      // 4. Assemble complete backup object
+      const nowIso = new Date().toISOString();
       const backupData = {
-        version: "1.0.0",
-        app: APP_NAME,
-        exportedAt: new Date().toISOString(),
+        version: "2.0.0",
+        app: "আয় বায়",
+        appName: "আয় বায়",
+        app_name: "আয় বায়",
+        exportedAt: nowIso,
         userId: user.id,
         userEmail: user.email,
+        metadata: {
+          appName: "আয় বায়",
+          app: "আয় বায়",
+          app_name: "আয় বায়",
+          version: "2.0.0",
+          exportedAt: nowIso,
+          userId: user.id,
+          userEmail: user.email,
+        },
         data: {
+          // Direct root fields inside data for cloned apps expecting json.data.shopping_lists
+          projects: projectsData || [],
+          clients: clientsData || [],
+          income_records: incomeRecordsData || [],
+          expenses: expensesData || [],
+          wallets: walletsData || [],
+          ghazal_notes: ghazalNotesData || [],
+          shopping_lists: shoppingListsData || [],
+          due_persons: duePersonsData || [],
+          car_rent_friends: carRentFriends,
+          car_rent_trips: carRentTrips,
+          car_rent_collections: carRentCollections,
+          car_rent_driver_payments: carRentDriverPayments,
+
+          // Nested fields for apps expecting json.data.supabase / json.data.firebase
           supabase: {
             projects: projectsData || [],
             clients: clientsData || [],
             income_records: incomeRecordsData || [],
             expenses: expensesData || [],
+            wallets: walletsData || [],
             ghazal_notes: ghazalNotesData || [],
             shopping_lists: shoppingListsData || [],
             due_persons: duePersonsData || []
@@ -177,7 +346,20 @@ export const Settings: React.FC = () => {
             car_rent_collections: carRentCollections,
             car_rent_driver_payments: carRentDriverPayments
           }
-        }
+        },
+        // Direct top level fields for maximum compatibility
+        projects: projectsData || [],
+        clients: clientsData || [],
+        income_records: incomeRecordsData || [],
+        expenses: expensesData || [],
+        wallets: walletsData || [],
+        ghazal_notes: ghazalNotesData || [],
+        shopping_lists: shoppingListsData || [],
+        due_persons: duePersonsData || [],
+        car_rent_friends: carRentFriends,
+        car_rent_trips: carRentTrips,
+        car_rent_collections: carRentCollections,
+        car_rent_driver_payments: carRentDriverPayments
       };
 
       // 4. Download file
@@ -238,28 +420,50 @@ export const Settings: React.FC = () => {
         const text = e.target?.result as string;
         const json = JSON.parse(text);
 
-        if (!json || typeof json !== 'object' || !json.data) {
-          throw new Error('অবৈধ ব্যাকআপ ফাইল ফরম্যাট। ডাটা অবজেক্ট পাওয়া যায়নি।');
+        if (!json || typeof json !== 'object') {
+          throw new Error('অবৈধ ব্যাকআপ ফাইল ফরম্যাট। সঠিক JSON ফাইল নির্বাচন করুন।');
         }
 
-        const sData = json.data.supabase || {};
-        const fData = json.data.firebase || {};
+        const d = json.data || json;
+        const sData = d.supabase || d;
+        const fData = d.firebase || d;
+
+        const allIncomeRecords = (sData.income_records || d.income_records) || [];
+        const projectIncomesCount = allIncomeRecords.filter((r: any) => Boolean(r.projectid)).length;
+        const walletIncomesCount = allIncomeRecords.filter((r: any) => !r.projectid).length;
 
         const counts = {
-          projects: sData.projects?.length || 0,
-          clients: sData.clients?.length || 0,
-          income_records: sData.income_records?.length || 0,
-          expenses: sData.expenses?.length || 0,
-          ghazal_notes: sData.ghazal_notes?.length || 0,
-          shopping_lists: sData.shopping_lists?.length || 0,
-          due_persons: sData.due_persons?.length || 0,
-          car_rent_friends: fData.car_rent_friends?.length || 0,
-          car_rent_trips: fData.car_rent_trips?.length || 0,
-          car_rent_collections: fData.car_rent_collections?.length || 0,
-          car_rent_driver_payments: fData.car_rent_driver_payments?.length || 0,
+          projects: (sData.projects || d.projects)?.length || 0,
+          clients: (sData.clients || d.clients)?.length || 0,
+          project_income: projectIncomesCount,
+          wallet_income: walletIncomesCount,
+          income_records: allIncomeRecords.length,
+          wallets: (sData.wallets || d.wallets)?.length || 0,
+          expenses: (sData.expenses || d.expenses)?.length || 0,
+          ghazal_notes: (sData.ghazal_notes || d.ghazal_notes)?.length || 0,
+          shopping_lists: (sData.shopping_lists || d.shopping_lists)?.length || 0,
+          due_persons: (sData.due_persons || d.due_persons)?.length || 0,
+          car_rent_friends: (fData.car_rent_friends || d.car_rent_friends)?.length || 0,
+          car_rent_trips: (fData.car_rent_trips || d.car_rent_trips)?.length || 0,
+          car_rent_collections: (fData.car_rent_collections || d.car_rent_collections)?.length || 0,
+          car_rent_driver_payments: (fData.car_rent_driver_payments || d.car_rent_driver_payments)?.length || 0,
         };
 
-        const totalRecords = Object.values(counts).reduce((a, b) => a + b, 0);
+        const totalRecords = 
+          counts.projects +
+          counts.clients +
+          counts.project_income +
+          counts.wallet_income +
+          counts.wallets +
+          counts.expenses +
+          counts.ghazal_notes +
+          counts.shopping_lists +
+          counts.due_persons +
+          counts.car_rent_friends +
+          counts.car_rent_trips +
+          counts.car_rent_collections +
+          counts.car_rent_driver_payments;
+
         if (totalRecords === 0) {
           throw new Error('ব্যাকআপ ফাইলে কোনো ডাটা পাওয়া যায়নি।');
         }
@@ -268,7 +472,9 @@ export const Settings: React.FC = () => {
         setImportSelections({
           projects: counts.projects > 0,
           clients: counts.clients > 0,
-          income_records: counts.income_records > 0,
+          project_income: counts.project_income > 0,
+          wallets: counts.wallets > 0,
+          wallet_income: counts.wallet_income > 0,
           expenses: counts.expenses > 0,
           ghazal_notes: counts.ghazal_notes > 0,
           shopping_lists: counts.shopping_lists > 0,
@@ -282,8 +488,8 @@ export const Settings: React.FC = () => {
         setImportPreview({
           counts,
           totalRecords,
-          exportedAt: json.exportedAt,
-          userEmail: json.userEmail || 'অজানা ইমেইল',
+          exportedAt: json.exportedAt || json.metadata?.exportedAt,
+          userEmail: json.userEmail || json.metadata?.userEmail || 'অজানা ইমেইল',
           raw: json
         });
         setImportStatus('ready');
@@ -305,7 +511,7 @@ export const Settings: React.FC = () => {
 
     // Check if at least one selected category has actual records to import
     const activeImportCount = Object.entries(importSelections)
-      .filter(([_, enabled]) => enabled)
+      .filter(([key, enabled]) => enabled && key !== 'income_records')
       .reduce((sum, [key]) => sum + (importPreview.counts[key] || 0), 0);
 
     if (activeImportCount === 0) {
@@ -318,33 +524,115 @@ export const Settings: React.FC = () => {
       showToast('ডাটা ইমপোর্ট শুরু হচ্ছে, অনুগ্রহ করে অপেক্ষা করুন...', 'info');
 
       const rawBackup = importPreview.raw;
-      const sData = rawBackup.data.supabase || {};
-      const fData = rawBackup.data.firebase || {};
+      const d = rawBackup.data || rawBackup;
+      const sData = d.supabase || d;
+      const fData = d.firebase || d;
+
+      // Filter income records according to user project vs wallet selections
+      const allIncomesFromBackup = (sData.income_records || d.income_records) || [];
+      const incomeListToRestore = allIncomesFromBackup.filter((r: any) => {
+        const isProjectInc = Boolean(r.projectid || r.projectId);
+        if (isProjectInc && importSelections.project_income) return true;
+        if (!isProjectInc && (importSelections.wallet_income || importSelections.wallets)) return true;
+        return false;
+      });
+
+      // Helper to validate UUID format
+      const isValidUuid = (str?: string): boolean => {
+        if (!str || typeof str !== 'string') return false;
+        return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+      };
+
+      // Maps to track project/client ID remappings for cross-user imports
+      const projectIdMap = new Map<string, string>();
+      const clientIdMap = new Map<string, string>();
 
       // 1. Restore Supabase tables (Only those selected by the user)
       const supabaseTables = [
-        { name: 'projects', list: sData.projects, enabled: importSelections.projects },
-        { name: 'clients', list: sData.clients, enabled: importSelections.clients },
-        { name: 'income_records', list: sData.income_records, enabled: importSelections.income_records },
-        { name: 'expenses', list: sData.expenses, enabled: importSelections.expenses },
-        { name: 'ghazal_notes', list: sData.ghazal_notes, enabled: importSelections.ghazal_notes },
-        { name: 'shopping_lists', list: sData.shopping_lists, enabled: importSelections.shopping_lists },
-        { name: 'due_persons', list: sData.due_persons, enabled: importSelections.due_persons },
+        { name: 'projects', list: sData.projects || d.projects, enabled: importSelections.projects },
+        { name: 'clients', list: sData.clients || d.clients, enabled: importSelections.clients },
+        { name: 'income_records', list: incomeListToRestore, enabled: Boolean(importSelections.project_income || importSelections.wallet_income || importSelections.wallets) },
+        { name: 'expenses', list: sData.expenses || d.expenses, enabled: Boolean(importSelections.expenses || importSelections.wallets) },
+        { name: 'ghazal_notes', list: sData.ghazal_notes || d.ghazal_notes, enabled: importSelections.ghazal_notes },
+        { name: 'shopping_lists', list: sData.shopping_lists || d.shopping_lists, enabled: importSelections.shopping_lists },
+        { name: 'due_persons', list: sData.due_persons || d.due_persons, enabled: Boolean(importSelections.due_persons || importSelections.wallets) },
+        { name: 'wallets', list: sData.wallets || d.wallets, enabled: importSelections.wallets },
       ].filter(table => table.enabled);
 
       for (const table of supabaseTables) {
         if (table.list && table.list.length > 0) {
           const preparedList = table.list.map((item: any) => {
-            const cleaned = { ...item };
-            cleaned.userid = user.id;
-            
-            if (!cleaned.id) {
-              cleaned.id = table.name.substring(0, 3) + "_" + Date.now() + "_" + Math.random().toString(36).substring(2, 9);
+            const isSameUser = item.userid === user.id;
+            const hasValidUuid = isValidUuid(item.id);
+
+            // Determine target UUID
+            let targetId: string;
+            if (isSameUser && hasValidUuid) {
+              targetId = item.id;
+            } else {
+              targetId = crypto.randomUUID();
+              if (item.id) {
+                if (table.name === 'projects') projectIdMap.set(item.id, targetId);
+                if (table.name === 'clients') clientIdMap.set(item.id, targetId);
+              }
             }
-            return cleaned;
+
+            if (table.name === 'income_records') {
+              const rawProjId = item.projectid || item.projectId || null;
+              const mappedProjId = (rawProjId && projectIdMap.has(rawProjId))
+                ? projectIdMap.get(rawProjId)
+                : (isValidUuid(rawProjId) ? rawProjId : null);
+
+              return {
+                id: targetId,
+                projectid: mappedProjId,
+                projectname: item.projectname || item.projectName || '',
+                clientname: item.clientname || item.clientName || '',
+                amount: Number(item.amount) || 0,
+                date: item.date || new Date().toISOString().split('T')[0],
+                createdat: item.createdat || item.createdAt || new Date().toISOString(),
+                method: item.method || 'ক্যাশ',
+                userid: user.id,
+              };
+            } else {
+              const cleaned: any = { ...item };
+              cleaned.id = targetId;
+              cleaned.userid = user.id;
+              delete cleaned.userId;
+              delete cleaned.user_id;
+
+              if (cleaned.projectid || cleaned.projectId) {
+                const rawP = cleaned.projectid || cleaned.projectId;
+                cleaned.projectid = projectIdMap.has(rawP)
+                  ? projectIdMap.get(rawP)
+                  : (isValidUuid(rawP) ? rawP : null);
+                delete cleaned.projectId;
+              }
+              if (cleaned.clientid || cleaned.clientId) {
+                const rawC = cleaned.clientid || cleaned.clientId;
+                cleaned.clientid = clientIdMap.has(rawC)
+                  ? clientIdMap.get(rawC)
+                  : (isValidUuid(rawC) ? rawC : null);
+                delete cleaned.clientId;
+              }
+
+              return cleaned;
+            }
           });
 
-          const { error } = await supabase.from(table.name).upsert(preparedList);
+          let { error } = await supabase.from(table.name).upsert(preparedList);
+
+          if (error) {
+            console.warn(`Upsert conflict/error on ${table.name} (${error.message}), retrying with fresh UUIDs via insert...`);
+            const freshList = preparedList.map((item: any) => ({
+              ...item,
+              id: crypto.randomUUID(),
+              userid: user.id,
+            }));
+            const retryResult = await supabase.from(table.name).insert(freshList);
+            error = retryResult.error;
+          }
+
           if (error) {
             console.error(`Error importing table ${table.name}:`, error);
             throw new Error(`${table.name} ডাটা ইমপোর্ট করতে সমস্যা হয়েছে: ${error.message}`);
@@ -352,12 +640,14 @@ export const Settings: React.FC = () => {
         }
       }
 
+      window.dispatchEvent(new CustomEvent('wallets-updated'));
+
       // 2. Restore Firebase (Car Rent) tables (Only those selected by the user)
       const firebaseCollections = [
-        { name: 'car_rent_friends', list: fData.car_rent_friends, enabled: importSelections.car_rent_friends, valFunc: (d: any) => ({ id: d.id, name: d.name, phone: d.phone || "", userid: user.id, createdAt: d.createdAt || new Date().toISOString() }) },
-        { name: 'car_rent_trips', list: fData.car_rent_trips, enabled: importSelections.car_rent_trips, valFunc: (d: any) => ({ id: d.id, date: d.date, examName: d.examName, totalRent: Number(d.totalRent) || 0, participantIds: d.participantIds || [], userid: user.id, createdAt: d.createdAt || new Date().toISOString() }) },
-        { name: 'car_rent_collections', list: fData.car_rent_collections, enabled: importSelections.car_rent_collections, valFunc: (d: any) => ({ id: d.id, date: d.date, friendId: d.friendId, amount: Number(d.amount) || 0, tripId: d.tripId || null, paymentMethod: d.paymentMethod || null, userid: user.id, createdAt: d.createdAt || new Date().toISOString() }) },
-        { name: 'car_rent_driver_payments', list: fData.car_rent_driver_payments, enabled: importSelections.car_rent_driver_payments, valFunc: (d: any) => ({ id: d.id, date: d.date, amount: Number(d.amount) || 0, remarks: d.remarks || "", userid: user.id, createdAt: d.createdAt || new Date().toISOString() }) }
+        { name: 'car_rent_friends', list: fData.car_rent_friends || d.car_rent_friends, enabled: importSelections.car_rent_friends, valFunc: (d: any) => ({ id: d.id, name: d.name, phone: d.phone || "", userid: user.id, createdAt: d.createdAt || new Date().toISOString() }) },
+        { name: 'car_rent_trips', list: fData.car_rent_trips || d.car_rent_trips, enabled: importSelections.car_rent_trips, valFunc: (d: any) => ({ id: d.id, date: d.date, examName: d.examName, totalRent: Number(d.totalRent) || 0, participantIds: d.participantIds || [], userid: user.id, createdAt: d.createdAt || new Date().toISOString() }) },
+        { name: 'car_rent_collections', list: fData.car_rent_collections || d.car_rent_collections, enabled: importSelections.car_rent_collections, valFunc: (d: any) => ({ id: d.id, date: d.date, friendId: d.friendId, amount: Number(d.amount) || 0, tripId: d.tripId || null, paymentMethod: d.paymentMethod || null, userid: user.id, createdAt: d.createdAt || new Date().toISOString() }) },
+        { name: 'car_rent_driver_payments', list: fData.car_rent_driver_payments || d.car_rent_driver_payments, enabled: importSelections.car_rent_driver_payments, valFunc: (d: any) => ({ id: d.id, date: d.date, amount: Number(d.amount) || 0, remarks: d.remarks || "", userid: user.id, createdAt: d.createdAt || new Date().toISOString() }) }
       ].filter(col => col.enabled);
 
       for (const col of firebaseCollections) {
@@ -1226,13 +1516,12 @@ export const Settings: React.FC = () => {
                           const allTrue = Object.values(exportSelections).every(v => v);
                           setExportSelections({
                             projects: !allTrue,
+                            project_income: !allTrue,
                             clients: !allTrue,
-                            income_records: !allTrue,
-                            expenses: !allTrue,
-                            ghazal_notes: !allTrue,
                             shopping_lists: !allTrue,
-                            due_persons: !allTrue,
+                            ghazal_notes: !allTrue,
                             car_rent: !allTrue,
+                            wallets: !allTrue,
                           });
                         }}
                         className="text-[10px] text-amber-600 font-extrabold hover:underline cursor-pointer"
@@ -1254,38 +1543,20 @@ export const Settings: React.FC = () => {
                       <label className="flex items-center gap-2 cursor-pointer hover:text-slate-800 transition-colors">
                         <input
                           type="checkbox"
+                          checked={exportSelections.project_income}
+                          onChange={(e) => setExportSelections({ ...exportSelections, project_income: e.target.checked })}
+                          className="w-4 h-4 rounded text-amber-500 focus:ring-amber-400 border-slate-300 accent-amber-500 cursor-pointer"
+                        />
+                        <span>প্রজেক্টের আয় ({(incomeRecords || []).filter(r => Boolean(r.projectid)).length}টি)</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer hover:text-slate-800 transition-colors">
+                        <input
+                          type="checkbox"
                           checked={exportSelections.clients}
                           onChange={(e) => setExportSelections({ ...exportSelections, clients: e.target.checked })}
                           className="w-4 h-4 rounded text-amber-500 focus:ring-amber-400 border-slate-300 accent-amber-500 cursor-pointer"
                         />
                         <span>কাস্টমারসমূহ ({(clients || []).length}টি)</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer hover:text-slate-800 transition-colors">
-                        <input
-                          type="checkbox"
-                          checked={exportSelections.income_records}
-                          onChange={(e) => setExportSelections({ ...exportSelections, income_records: e.target.checked })}
-                          className="w-4 h-4 rounded text-amber-500 focus:ring-amber-400 border-slate-300 accent-amber-500 cursor-pointer"
-                        />
-                        <span>আয় রেকর্ডসমূহ ({(incomeRecords || []).length}টি)</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer hover:text-slate-800 transition-colors">
-                        <input
-                          type="checkbox"
-                          checked={exportSelections.expenses}
-                          onChange={(e) => setExportSelections({ ...exportSelections, expenses: e.target.checked })}
-                          className="w-4 h-4 rounded text-amber-500 focus:ring-amber-400 border-slate-300 accent-amber-500 cursor-pointer"
-                        />
-                        <span>ব্যয় রেকর্ডসমূহ ({(expenses || []).length}টি)</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer hover:text-slate-800 transition-colors">
-                        <input
-                          type="checkbox"
-                          checked={exportSelections.ghazal_notes}
-                          onChange={(e) => setExportSelections({ ...exportSelections, ghazal_notes: e.target.checked })}
-                          className="w-4 h-4 rounded text-amber-500 focus:ring-amber-400 border-slate-300 accent-amber-500 cursor-pointer"
-                        />
-                        <span>গজলের নোট ({(ghazalNotes || []).length}টি)</span>
                       </label>
                       <label className="flex items-center gap-2 cursor-pointer hover:text-slate-800 transition-colors">
                         <input
@@ -1299,11 +1570,11 @@ export const Settings: React.FC = () => {
                       <label className="flex items-center gap-2 cursor-pointer hover:text-slate-800 transition-colors">
                         <input
                           type="checkbox"
-                          checked={exportSelections.due_persons}
-                          onChange={(e) => setExportSelections({ ...exportSelections, due_persons: e.target.checked })}
+                          checked={exportSelections.ghazal_notes}
+                          onChange={(e) => setExportSelections({ ...exportSelections, ghazal_notes: e.target.checked })}
                           className="w-4 h-4 rounded text-amber-500 focus:ring-amber-400 border-slate-300 accent-amber-500 cursor-pointer"
                         />
-                        <span>দেনা-পাওনা ({(duePersons || []).length}টি)</span>
+                        <span>গজলের নোট ({(ghazalNotes || []).length}টি)</span>
                       </label>
                       <label className="flex items-center gap-2 cursor-pointer hover:text-indigo-700 text-[#1a73e8] font-bold transition-colors">
                         <input
@@ -1314,6 +1585,26 @@ export const Settings: React.FC = () => {
                         />
                         <span>কার রেন্ট ডাটা (Firestore)</span>
                       </label>
+                      <div className="col-span-2 mt-1 bg-amber-50/80 p-3 rounded-xl border border-amber-200/80 flex flex-wrap items-center justify-between gap-2">
+                        <label className="flex items-center gap-2 cursor-pointer font-bold text-amber-900">
+                          <input
+                            type="checkbox"
+                            checked={exportSelections.wallets}
+                            onChange={(e) => setExportSelections({ ...exportSelections, wallets: e.target.checked })}
+                            className="w-4 h-4 rounded text-amber-600 focus:ring-amber-400 border-slate-300 accent-amber-600 cursor-pointer"
+                          />
+                          <span>
+                            ওয়ালেট ({selectedWalletIds.size}/{availableWallets.length || 1}টি সিলেক্টেড)
+                          </span>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setShowWalletModal(true)}
+                          className="px-2.5 py-1 text-[11px] bg-amber-500 hover:bg-amber-600 text-white font-extrabold rounded-lg transition-all shadow-xs flex items-center gap-1 cursor-pointer"
+                        >
+                          <Coins className="w-3.5 h-3.5" /> নির্দিষ্ট ওয়ালেট সিলেক্ট করুন
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1453,15 +1744,37 @@ export const Settings: React.FC = () => {
                             <span>কাস্টমার ({importPreview.counts.clients}টি)</span>
                           </label>
                         )}
-                        {importPreview.counts.income_records > 0 && (
+                        {importPreview.counts.project_income > 0 && (
                           <label className="flex items-center gap-2 cursor-pointer hover:text-slate-800 transition-colors">
                             <input
                               type="checkbox"
-                              checked={!!importSelections.income_records}
-                              onChange={(e) => setImportSelections({ ...importSelections, income_records: e.target.checked })}
+                              checked={!!importSelections.project_income}
+                              onChange={(e) => setImportSelections({ ...importSelections, project_income: e.target.checked })}
                               className="w-3.5 h-3.5 rounded text-indigo-500 focus:ring-indigo-400 border-slate-300 accent-indigo-600 cursor-pointer"
                             />
-                            <span>আয় রেকর্ড ({importPreview.counts.income_records}টি)</span>
+                            <span>প্রজেক্টের আয় ({importPreview.counts.project_income}টি)</span>
+                          </label>
+                        )}
+                        {importPreview.counts.wallets > 0 && (
+                          <label className="flex items-center gap-2 cursor-pointer hover:text-slate-800 transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={!!importSelections.wallets}
+                              onChange={(e) => setImportSelections({ ...importSelections, wallets: e.target.checked })}
+                              className="w-3.5 h-3.5 rounded text-indigo-500 focus:ring-indigo-400 border-slate-300 accent-indigo-600 cursor-pointer"
+                            />
+                            <span>ওয়ালেট ({importPreview.counts.wallets}টি)</span>
+                          </label>
+                        )}
+                        {importPreview.counts.wallet_income > 0 && (
+                          <label className="flex items-center gap-2 cursor-pointer hover:text-slate-800 transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={!!importSelections.wallet_income}
+                              onChange={(e) => setImportSelections({ ...importSelections, wallet_income: e.target.checked })}
+                              className="w-3.5 h-3.5 rounded text-indigo-500 focus:ring-indigo-400 border-slate-300 accent-indigo-600 cursor-pointer"
+                            />
+                            <span>ওয়ালেট/সাধারণ আয় ({importPreview.counts.wallet_income}টি)</span>
                           </label>
                         )}
                         {importPreview.counts.expenses > 0 && (
@@ -1472,7 +1785,7 @@ export const Settings: React.FC = () => {
                               onChange={(e) => setImportSelections({ ...importSelections, expenses: e.target.checked })}
                               className="w-3.5 h-3.5 rounded text-indigo-500 focus:ring-indigo-400 border-slate-300 accent-indigo-600 cursor-pointer"
                             />
-                            <span>ব্যয় রেকর্ড ({importPreview.counts.expenses}টি)</span>
+                            <span>দৈনিক খরচ/ব্যয় ({importPreview.counts.expenses}টি)</span>
                           </label>
                         )}
                         {importPreview.counts.ghazal_notes > 0 && (
@@ -1593,6 +1906,102 @@ export const Settings: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Wallet Selection Modal */}
+      {showWalletModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center">
+                  <Coins size={18} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-slate-800 text-base">ব্যাকআপের জন্য ওয়ালেট নির্বাচন</h3>
+                  <p className="text-[11px] text-slate-400">নির্দিষ্ট ওয়ালেটের আয়, ব্যয় ও লেনদেন ব্যাকআপ নিন</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowWalletModal(false)}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg transition-colors cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between text-xs font-bold text-slate-500 bg-slate-50 px-3 py-2 rounded-xl">
+              <span>ওয়ালেটের তালিকা ({availableWallets.length}টি)</span>
+              <button
+                type="button"
+                onClick={() => {
+                  if (selectedWalletIds.size === availableWallets.length) {
+                    setSelectedWalletIds(new Set());
+                  } else {
+                    setSelectedWalletIds(new Set(availableWallets.map(w => w.id)));
+                  }
+                }}
+                className="text-amber-600 hover:underline text-[11px] font-extrabold cursor-pointer"
+              >
+                {selectedWalletIds.size === availableWallets.length ? 'সব আনসিলেক্ট করুন' : 'সব সিলেক্ট করুন'}
+              </button>
+            </div>
+
+            <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
+              {availableWallets.length === 0 ? (
+                <p className="text-center text-xs text-slate-400 py-6">কোনো একটিভ ওয়ালেট পাওয়া যায়নি</p>
+              ) : (
+                availableWallets.map((wallet) => {
+                  const isChecked = selectedWalletIds.has(wallet.id);
+                  return (
+                    <label 
+                      key={wallet.id} 
+                      className={`flex items-center justify-between p-3 rounded-2xl border transition-all cursor-pointer select-none ${
+                        isChecked 
+                          ? 'bg-amber-50/70 border-amber-200 text-slate-800' 
+                          : 'bg-white border-slate-100 text-slate-500 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {
+                            const newSet = new Set(selectedWalletIds);
+                            if (newSet.has(wallet.id)) {
+                              newSet.delete(wallet.id);
+                            } else {
+                              newSet.add(wallet.id);
+                            }
+                            setSelectedWalletIds(newSet);
+                          }}
+                          className="w-4 h-4 rounded text-amber-500 focus:ring-amber-400 border-slate-300 accent-amber-500 cursor-pointer"
+                        />
+                        <div>
+                          <p className="font-extrabold text-xs text-slate-800">{wallet.name}</p>
+                          <p className="text-[10px] text-slate-400">টাইপ: {wallet.type || 'সাধারণ'}</p>
+                        </div>
+                      </div>
+                      <span className="text-xs font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100/60">
+                        ৳{Number(wallet.balance || 0).toLocaleString('bn-BD')}
+                      </span>
+                    </label>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowWalletModal(false)}
+                className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-extrabold text-xs transition-colors shadow-sm cursor-pointer"
+              >
+                সংরক্ষণ করুন ({selectedWalletIds.size}টি নির্বাচিত)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Pin Action Modal (Setup or Disable) */}
       {pinAction && (

@@ -38,10 +38,15 @@ const Trash: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TrashTab>('projects');
   const [isRestoring, setIsRestoring] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<{ id: string; type: TrashTab } | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [pendingAction, setPendingAction] = useState<{ ids: string[]; type: TrashTab; action: 'restore' | 'delete' } | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [confirmAction, setConfirmAction] = useState<'restore' | 'delete'>('restore');
   const [trashedWallets, setTrashedWallets] = useState<any[]>([]);
+
+  // Clear selections when switching tabs
+  React.useEffect(() => {
+    setSelectedIds([]);
+  }, [activeTab]);
 
   const fetchTrashedWallets = async () => {
     if (!user) return;
@@ -64,55 +69,74 @@ const Trash: React.FC = () => {
     fetchTrashedWallets();
   }, [user]);
 
-  const handleRestore = async () => {
-    if (!selectedItem) return;
+  const getCurrentTabItems = () => {
+    switch (activeTab) {
+      case 'projects': return trashedProjects;
+      case 'clients': return trashedClients;
+      case 'expenses': return trashedExpenses;
+      case 'ghazal_notes': return trashedGhazalNotes;
+      case 'shopping_lists': return trashedShoppingLists;
+      case 'due_persons': return trashedDuePersons;
+      case 'wallets': return trashedWallets;
+      default: return [];
+    }
+  };
+
+  const currentItems = getCurrentTabItems();
+  const isAllSelected = currentItems.length > 0 && selectedIds.length === currentItems.length;
+
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(currentItems.map((item: any) => item.id));
+    }
+  };
+
+  const toggleSelectItem = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const executeRestoreItems = async (idsToRestore: string[], tabType: TrashTab) => {
+    if (idsToRestore.length === 0) return;
     setIsRestoring(true);
     try {
-      let table = '';
-      let updateData = {};
-      
-      if (selectedItem.type === 'projects') {
-        table = 'projects';
-        const project = trashedProjects.find(p => p.id === selectedItem.id);
-        updateData = { notes: project?.notes?.replace('[TRASH]', '').trim() || '' };
-      } else if (selectedItem.type === 'expenses') {
-        table = 'expenses';
-        const expense = trashedExpenses.find(e => e.id === selectedItem.id);
-        updateData = { notes: expense?.notes?.replace('[TRASH]', '').trim() || '' };
-      } else if (selectedItem.type === 'ghazal_notes') {
-        table = 'ghazal_notes';
-        const note = trashedGhazalNotes.find(n => n.id === selectedItem.id);
-        updateData = { lyrics: note?.lyrics?.replace('[TRASH]', '').trim() || '' };
-      } else if (selectedItem.type === 'clients') {
-        table = 'clients';
-        const client = trashedClients.find(c => c.id === selectedItem.id);
-        updateData = { contact: client?.contact?.replace('[TRASH]', '').trim() || '' };
-      } else if (selectedItem.type === 'shopping_lists') {
-        table = 'shopping_lists';
-        const list = trashedShoppingLists.find(s => s.id === selectedItem.id);
-        updateData = { title: list?.title?.replace('[TRASH]', '').trim() || '' };
-      } else if (selectedItem.type === 'due_persons') {
-        table = 'due_persons';
-        const person = trashedDuePersons.find(d => d.id === selectedItem.id);
-        const originalName = person?.name?.replace('[TRASH]', '').trim() || '';
-        updateData = { name: originalName };
+      for (const id of idsToRestore) {
+        if (tabType === 'projects') {
+          const project = trashedProjects.find(p => p.id === id);
+          const updateData = { notes: project?.notes?.replace('[TRASH]', '').trim() || '' };
+          await supabase.from('projects').update(updateData).eq('id', id);
+        } else if (tabType === 'expenses') {
+          const expense = trashedExpenses.find(e => e.id === id);
+          const updateData = { notes: expense?.notes?.replace('[TRASH]', '').trim() || '' };
+          await supabase.from('expenses').update(updateData).eq('id', id);
+        } else if (tabType === 'ghazal_notes') {
+          const note = trashedGhazalNotes.find(n => n.id === id);
+          const updateData = { lyrics: note?.lyrics?.replace('[TRASH]', '').trim() || '' };
+          await supabase.from('ghazal_notes').update(updateData).eq('id', id);
+        } else if (tabType === 'clients') {
+          const client = trashedClients.find(c => c.id === id);
+          const updateData = { contact: client?.contact?.replace('[TRASH]', '').trim() || '' };
+          await supabase.from('clients').update(updateData).eq('id', id);
+        } else if (tabType === 'shopping_lists') {
+          const list = trashedShoppingLists.find(s => s.id === id);
+          const updateData = { title: list?.title?.replace('[TRASH]', '').trim() || '' };
+          await supabase.from('shopping_lists').update(updateData).eq('id', id);
+        } else if (tabType === 'due_persons') {
+          const person = trashedDuePersons.find(d => d.id === id);
+          const originalName = person?.name?.replace('[TRASH]', '').trim() || '';
+          await supabase.from('due_persons').update({ name: originalName }).eq('id', id);
 
-        // Also restore associated expenses
-        try {
           if (person && person.transactions && person.transactions.length > 0) {
             const dueTxIds: string[] = [];
             const expenseIdsToRestore: string[] = [];
-
             person.transactions.forEach((tx: any) => {
-              if (tx.expense_id) {
-                expenseIdsToRestore.push(tx.expense_id);
-              }
-              if (tx.id) {
-                dueTxIds.push(tx.id);
-              }
+              if (tx.expense_id) expenseIdsToRestore.push(tx.expense_id);
+              if (tx.id) dueTxIds.push(tx.id);
             });
 
-            // Find expenses referencing the tx IDs in notes
             for (const txId of dueTxIds) {
               const { data: expData } = await supabase
                 .from('expenses')
@@ -121,9 +145,7 @@ const Trash: React.FC = () => {
 
               if (expData) {
                 expData.forEach((e: any) => {
-                  if (!expenseIdsToRestore.includes(e.id)) {
-                    expenseIdsToRestore.push(e.id);
-                  }
+                  if (!expenseIdsToRestore.includes(e.id)) expenseIdsToRestore.push(e.id);
                 });
               }
             }
@@ -137,140 +159,106 @@ const Trash: React.FC = () => {
               if (expensesToRestore) {
                 for (const exp of expensesToRestore) {
                   if (exp.notes && exp.notes.startsWith('[TRASH]')) {
-                    const cleanNotes = exp.notes.replace('[TRASH]', '').trim();
                     await supabase
                       .from('expenses')
-                      .update({ notes: cleanNotes })
+                      .update({ notes: exp.notes.replace('[TRASH]', '').trim() })
                       .eq('id', exp.id);
                   }
                 }
               }
             }
           }
-        } catch (err) {
-          console.error("Error restoring person expenses:", err);
-        }
-      } else if (selectedItem.type === 'wallets') {
-        table = 'wallets';
-        const wallet = trashedWallets.find(w => w.id === selectedItem.id);
-        const originalName = wallet?.name?.replace('[TRASH]', '').trim() || '';
-        updateData = { name: originalName };
+        } else if (tabType === 'wallets') {
+          const wallet = trashedWallets.find(w => w.id === id);
+          const originalName = wallet?.name?.replace('[TRASH]', '').trim() || '';
+          await supabase.from('wallets').update({ name: originalName }).eq('id', id);
 
-        // Also restore associated expenses
-        try {
-          const { data: expData } = await supabase
-            .from('expenses')
-            .select('*')
-            .eq('userid', user.id);
-          
-          if (expData) {
-            const targetExpenses = expData.filter((e: any) => {
-              if (!e.notes) return false;
-              if (!e.notes.startsWith('[TRASH]')) return false;
-              return e.notes.includes(`[ওয়ালেট: ${originalName}]`);
-            });
+          if (user) {
+            const { data: expData } = await supabase
+              .from('expenses')
+              .select('*')
+              .eq('userid', user.id);
 
-            for (const exp of targetExpenses) {
-              const cleanNotes = exp.notes.replace('[TRASH]', '').trim();
-              await supabase
-                .from('expenses')
-                .update({ notes: cleanNotes })
-                .eq('id', exp.id);
+            if (expData) {
+              const targetExpenses = expData.filter((e: any) => {
+                if (!e.notes || !e.notes.startsWith('[TRASH]')) return false;
+                return e.notes.includes(`[ওয়ালেট: ${originalName}]`);
+              });
+
+              for (const exp of targetExpenses) {
+                await supabase
+                  .from('expenses')
+                  .update({ notes: exp.notes.replace('[TRASH]', '').trim() })
+                  .eq('id', exp.id);
+              }
             }
           }
-        } catch (err) {
-          console.error("Error restoring wallet expenses:", err);
         }
       }
 
-      const { error } = await supabase
-        .from(table)
-        .update(updateData)
-        .eq('id', selectedItem.id);
+      showToast(
+        idsToRestore.length > 1
+          ? `${idsToRestore.length}টি আইটেম রিস্টোর করা হয়েছে`
+          : 'সফলভাবে রিস্টোর করা হয়েছে',
+        'success'
+      );
 
-      if (error) throw error;
-      showToast('সফলভাবে রিস্টোর করা হয়েছে', 'success');
-      
-      if (selectedItem.type === 'wallets') {
+      if (tabType === 'wallets') {
         fetchTrashedWallets();
         window.dispatchEvent(new CustomEvent('wallets-updated'));
       }
       await refreshData();
+      setSelectedIds([]);
     } catch (error: any) {
       showToast(error.message, 'error');
     } finally {
       setIsRestoring(false);
       setShowConfirm(false);
-      setSelectedItem(null);
+      setPendingAction(null);
     }
   };
 
-  const handlePermanentDelete = async () => {
-    if (!selectedItem) return;
+  const executeDeleteItems = async (idsToDelete: string[], tabType: TrashTab) => {
+    if (idsToDelete.length === 0) return;
     setIsDeleting(true);
     try {
-      const table = selectedItem.type === 'projects' ? 'projects' : 
-                    selectedItem.type === 'expenses' ? 'expenses' : 
-                    selectedItem.type === 'clients' ? 'clients' : 
-                    selectedItem.type === 'ghazal_notes' ? 'ghazal_notes' :
-                    selectedItem.type === 'shopping_lists' ? 'shopping_lists' : 
-                    selectedItem.type === 'wallets' ? 'wallets' : 'due_persons';
-
-      // Special cleanup if permanently deleting a wallet
-      if (selectedItem.type === 'wallets') {
-        const wallet = trashedWallets.find(w => w.id === selectedItem.id);
-        if (wallet && user) {
-          const originalName = wallet.name.replace('[TRASH]', '').trim();
-          
-          // Delete all associated expenses from DB (even if trashed)
-          try {
+      for (const id of idsToDelete) {
+        if (tabType === 'wallets') {
+          const wallet = trashedWallets.find(w => w.id === id);
+          if (wallet && user) {
+            const originalName = wallet.name.replace('[TRASH]', '').trim();
             const { data: expData } = await supabase
               .from('expenses')
               .select('id, notes')
               .eq('userid', user.id);
-            
+
             if (expData) {
               const expIdsToDelete = expData
                 .filter((e: any) => e.notes && e.notes.includes(`[ওয়ালেট: ${originalName}]`))
                 .map((e: any) => e.id);
-              
+
               if (expIdsToDelete.length > 0) {
                 await supabase.from('expenses').delete().in('id', expIdsToDelete);
               }
             }
-          } catch (e) {
-            console.error("Error deleting wallet expenses permanently:", e);
-          }
 
-          // Delete all associated income records
-          try {
             await supabase
               .from('income_records')
               .delete()
               .eq('userid', user.id)
               .eq('method', originalName);
-          } catch (e) {
-            console.error("Error deleting wallet incomes permanently:", e);
           }
-        }
-      }
-
-      // Special cleanup if permanently deleting a due person
-      if (selectedItem.type === 'due_persons') {
-        const person = trashedDuePersons.find(d => d.id === selectedItem.id);
-        if (person && user) {
-          try {
+          await supabase.from('wallets').delete().eq('id', id);
+        } else if (tabType === 'due_persons') {
+          const person = trashedDuePersons.find(d => d.id === id);
+          if (person && user) {
             const expenseIdsToDelete: string[] = [];
             const dueTxIds: string[] = [];
 
             if (person.transactions && person.transactions.length > 0) {
               person.transactions.forEach((tx: any) => {
-                if (tx.expense_id) {
-                  expenseIdsToDelete.push(tx.expense_id);
-                }
-                if (tx.id) {
-                  dueTxIds.push(tx.id);
-                }
+                if (tx.expense_id) expenseIdsToDelete.push(tx.expense_id);
+                if (tx.id) dueTxIds.push(tx.id);
               });
 
               for (const txId of dueTxIds) {
@@ -281,55 +269,53 @@ const Trash: React.FC = () => {
 
                 if (expData) {
                   expData.forEach((e: any) => {
-                    if (!expenseIdsToDelete.includes(e.id)) {
-                      expenseIdsToDelete.push(e.id);
-                    }
+                    if (!expenseIdsToDelete.includes(e.id)) expenseIdsToDelete.push(e.id);
                   });
                 }
               }
 
               if (expenseIdsToDelete.length > 0) {
-                await supabase
-                  .from('expenses')
-                  .delete()
-                  .in('id', expenseIdsToDelete);
+                await supabase.from('expenses').delete().in('id', expenseIdsToDelete);
               }
             }
-          } catch (e) {
-            console.error("Error deleting person expenses permanently:", e);
           }
+          await supabase.from('due_persons').delete().eq('id', id);
+        } else if (tabType === 'clients') {
+          const client = trashedClients.find(c => c.id === id);
+          if (client) {
+            await supabase.from('projects').delete().eq('clientname', client.name);
+            await supabase.from('income_records').delete().eq('clientname', client.name);
+          }
+          await supabase.from('clients').delete().eq('id', id);
+        } else {
+          const table =
+            tabType === 'projects' ? 'projects' :
+            tabType === 'expenses' ? 'expenses' :
+            tabType === 'ghazal_notes' ? 'ghazal_notes' : 'shopping_lists';
+
+          await supabase.from(table).delete().eq('id', id);
         }
       }
 
-      const { error } = await supabase
-        .from(table)
-        .delete()
-        .eq('id', selectedItem.id);
+      showToast(
+        idsToDelete.length > 1
+          ? `${idsToDelete.length}টি আইটেম স্থায়ীভাবে মুছে ফেলা হয়েছে`
+          : 'স্থায়ীভাবে মুছে ফেলা হয়েছে',
+        'success'
+      );
 
-      if (error) throw error;
-
-      // If it's a client, also delete its projects and income records
-      if (selectedItem.type === 'clients') {
-        const client = trashedClients.find(c => c.id === selectedItem.id);
-        if (client) {
-          await supabase.from('projects').delete().eq('clientname', client.name);
-          await supabase.from('income_records').delete().eq('clientname', client.name);
-        }
-      }
-
-      showToast('স্থায়ীভাবে মুছে ফেলা হয়েছে', 'success');
-      
-      if (selectedItem.type === 'wallets') {
+      if (tabType === 'wallets') {
         fetchTrashedWallets();
         window.dispatchEvent(new CustomEvent('wallets-updated'));
       }
       await refreshData();
+      setSelectedIds([]);
     } catch (error: any) {
       showToast(error.message, 'error');
     } finally {
       setIsDeleting(false);
       setShowConfirm(false);
-      setSelectedItem(null);
+      setPendingAction(null);
     }
   };
 
@@ -338,9 +324,30 @@ const Trash: React.FC = () => {
       showToast(`অফলাইনে ${action === 'restore' ? 'রিস্টোর' : 'ডিলিট'} করা যাবে না`, 'error');
       return;
     }
-    setSelectedItem({ id, type });
-    setConfirmAction(action);
+    setPendingAction({ ids: [id], type, action });
     setShowConfirm(true);
+  };
+
+  const openBulkConfirm = (action: 'restore' | 'delete') => {
+    if (!isOnline) {
+      showToast(`অফলাইনে ${action === 'restore' ? 'রিস্টোর' : 'ডিলিট'} করা যাবে না`, 'error');
+      return;
+    }
+    if (selectedIds.length === 0) return;
+    setPendingAction({ ids: selectedIds, type: activeTab, action });
+    setShowConfirm(true);
+  };
+
+  const handleRestore = () => {
+    if (pendingAction) {
+      executeRestoreItems(pendingAction.ids, pendingAction.type);
+    }
+  };
+
+  const handlePermanentDelete = () => {
+    if (pendingAction) {
+      executeDeleteItems(pendingAction.ids, pendingAction.type);
+    }
   };
 
   const renderProjects = () => (
@@ -351,51 +358,62 @@ const Trash: React.FC = () => {
           <p className="text-slate-500 font-medium">কোন ডিলিট করা প্রজেক্ট নেই</p>
         </div>
       ) : (
-        trashedProjects.map((project) => (
-          <div key={project.id} className="bg-white p-5 rounded-2xl border border-slate-150 shadow-sm transition-all flex flex-col justify-between">
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                  <Briefcase className="w-4 h-4" />
+        trashedProjects.map((project) => {
+          const isSelected = selectedIds.includes(project.id);
+          return (
+            <div key={project.id} className={`bg-white p-5 rounded-2xl border transition-all flex flex-col justify-between ${
+              isSelected ? 'border-blue-400 ring-2 ring-blue-100 bg-blue-50/20' : 'border-slate-150 shadow-sm'
+            }`}>
+              <div>
+                <div className="flex items-center gap-2.5 mb-3">
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => toggleSelectItem(project.id)}
+                    className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 accent-blue-600 cursor-pointer shrink-0"
+                  />
+                  <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                    <Briefcase className="w-4 h-4" />
+                  </div>
+                  <h3 className="font-bold text-slate-800 text-lg line-clamp-1">{project.name}</h3>
                 </div>
-                <h3 className="font-bold text-slate-800 text-lg line-clamp-1">{project.name}</h3>
+                <div className="grid grid-cols-2 gap-2.5 text-sm text-slate-600 mb-4">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <User className="w-4 h-4 text-slate-400 shrink-0" /> 
+                    <span className="truncate">{project.clientname || 'Unknown Client'}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Receipt className="w-4 h-4 text-slate-400 shrink-0" /> <span>বাজেট: ৳{project.totalamount}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" /> <span>পেইড: ৳{project.paidamount}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Clock className="w-4 h-4 text-amber-500 shrink-0" /> <span>ডিউ: ৳{project.dueamount}</span>
+                  </div>
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-2.5 text-sm text-slate-600 mb-4">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <User className="w-4 h-4 text-slate-400 shrink-0" /> 
-                  <span className="truncate">{project.clientname || 'Unknown Client'}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Receipt className="w-4 h-4 text-slate-400 shrink-0" /> <span>বাজেট: ৳{project.totalamount}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" /> <span>পেইড: ৳{project.paidamount}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Clock className="w-4 h-4 text-amber-500 shrink-0" /> <span>ডিউ: ৳{project.dueamount}</span>
-                </div>
+              <div className="flex justify-end gap-2 mt-2 pt-4 border-t border-slate-100 font-sans">
+                <button
+                  onClick={() => openConfirm(project.id, 'projects', 'restore')}
+                  disabled={!isOnline}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold tracking-wide uppercase transition-colors duration-200 cursor-pointer ${!isOnline ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-blue-600 bg-blue-50 hover:bg-blue-100'}`}
+                  title="Restore"
+                >
+                  <RotateCcw className="w-4 h-4" /> রিস্টোর
+                </button>
+                <button
+                  onClick={() => openConfirm(project.id, 'projects', 'delete')}
+                  disabled={!isOnline}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold tracking-wide uppercase transition-colors duration-200 cursor-pointer ${!isOnline ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-red-600 bg-red-50 hover:bg-red-100'}`}
+                  title="Permanent Delete"
+                >
+                  <Trash2 className="w-4 h-4" /> ডিলিট
+                </button>
               </div>
             </div>
-            <div className="flex justify-end gap-2 mt-2 pt-4 border-t border-slate-100 font-sans">
-              <button
-                onClick={() => openConfirm(project.id, 'projects', 'restore')}
-                disabled={!isOnline}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold tracking-wide uppercase transition-colors duration-200 cursor-pointer ${!isOnline ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-blue-600 bg-blue-50 hover:bg-blue-100'}`}
-                title="Restore"
-              >
-                <RotateCcw className="w-4 h-4" /> রিস্টোর
-              </button>
-              <button
-                onClick={() => openConfirm(project.id, 'projects', 'delete')}
-                disabled={!isOnline}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold tracking-wide uppercase transition-colors duration-200 cursor-pointer ${!isOnline ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-red-600 bg-red-50 hover:bg-red-100'}`}
-                title="Permanent Delete"
-              >
-                <Trash2 className="w-4 h-4" /> ডিলিট
-              </button>
-            </div>
-          </div>
-        ))
+          );
+        })
       )}
     </div>
   );
@@ -408,39 +426,50 @@ const Trash: React.FC = () => {
           <p className="text-slate-500 font-medium">কোন ডিলিট করা ক্লায়েন্ট নেই</p>
         </div>
       ) : (
-        trashedClients.map((client) => (
-          <div key={client.id} className="bg-white p-5 rounded-2xl border border-slate-150 shadow-sm transition-all flex flex-col justify-between">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                  <Users className="w-4 h-4" />
+        trashedClients.map((client) => {
+          const isSelected = selectedIds.includes(client.id);
+          return (
+            <div key={client.id} className={`bg-white p-5 rounded-2xl border transition-all flex flex-col justify-between ${
+              isSelected ? 'border-blue-400 ring-2 ring-blue-100 bg-blue-50/20' : 'border-slate-150 shadow-sm'
+            }`}>
+              <div>
+                <div className="flex items-center gap-2.5 mb-2">
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => toggleSelectItem(client.id)}
+                    className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 accent-blue-600 cursor-pointer shrink-0"
+                  />
+                  <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                    <Users className="w-4 h-4" />
+                  </div>
+                  <h3 className="font-bold text-slate-800 text-lg line-clamp-1">{client.name}</h3>
                 </div>
-                <h3 className="font-bold text-slate-800 text-lg line-clamp-1">{client.name}</h3>
+                <p className="text-sm text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 font-mono break-all mt-2 max-h-32 overflow-y-auto">
+                  {client.contact.replace('[TRASH]', '').trim()}
+                </p>
               </div>
-              <p className="text-sm text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 font-mono break-all mt-2 max-h-32 overflow-y-auto">
-                {client.contact.replace('[TRASH]', '').trim()}
-              </p>
+              <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-slate-100">
+                <button
+                  onClick={() => openConfirm(client.id, 'clients', 'restore')}
+                  disabled={!isOnline}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold tracking-wide uppercase transition-colors duration-200 cursor-pointer ${!isOnline ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-blue-600 bg-blue-50 hover:bg-blue-100'}`}
+                  title="Restore"
+                >
+                  <RotateCcw className="w-4 h-4" /> রিস্টোর
+                </button>
+                <button
+                  onClick={() => openConfirm(client.id, 'clients', 'delete')}
+                  disabled={!isOnline}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold tracking-wide uppercase transition-colors duration-200 cursor-pointer ${!isOnline ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-red-600 bg-red-50 hover:bg-red-100'}`}
+                  title="Permanent Delete"
+                >
+                  <Trash2 className="w-4 h-4" /> ডিলিট
+                </button>
+              </div>
             </div>
-            <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-slate-100">
-              <button
-                onClick={() => openConfirm(client.id, 'clients', 'restore')}
-                disabled={!isOnline}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold tracking-wide uppercase transition-colors duration-200 cursor-pointer ${!isOnline ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-blue-600 bg-blue-50 hover:bg-blue-100'}`}
-                title="Restore"
-              >
-                <RotateCcw className="w-4 h-4" /> রিস্টোর
-              </button>
-              <button
-                onClick={() => openConfirm(client.id, 'clients', 'delete')}
-                disabled={!isOnline}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold tracking-wide uppercase transition-colors duration-200 cursor-pointer ${!isOnline ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-red-600 bg-red-50 hover:bg-red-100'}`}
-                title="Permanent Delete"
-              >
-                <Trash2 className="w-4 h-4" /> ডিলিট
-              </button>
-            </div>
-          </div>
-        ))
+          );
+        })
       )}
     </div>
   );
@@ -453,49 +482,60 @@ const Trash: React.FC = () => {
           <p className="text-slate-500 font-medium">কোন ডিলিট করা খরচ নেই</p>
         </div>
       ) : (
-        trashedExpenses.map((expense) => (
-          <div key={expense.id} className="bg-white p-5 rounded-2xl border border-slate-150 shadow-sm transition-all flex flex-col justify-between">
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
-                  <Receipt className="w-4 h-4" />
+        trashedExpenses.map((expense) => {
+          const isSelected = selectedIds.includes(expense.id);
+          return (
+            <div key={expense.id} className={`bg-white p-5 rounded-2xl border transition-all flex flex-col justify-between ${
+              isSelected ? 'border-blue-400 ring-2 ring-blue-100 bg-blue-50/20' : 'border-slate-150 shadow-sm'
+            }`}>
+              <div>
+                <div className="flex items-center gap-2.5 mb-3">
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => toggleSelectItem(expense.id)}
+                    className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 accent-blue-600 cursor-pointer shrink-0"
+                  />
+                  <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                    <Receipt className="w-4 h-4" />
+                  </div>
+                  <h3 className="font-bold text-slate-800 text-lg line-clamp-1">{expense.category}</h3>
                 </div>
-                <h3 className="font-bold text-slate-800 text-lg line-clamp-1">{expense.category}</h3>
+                <div className="grid grid-cols-2 gap-2 text-sm text-slate-500 mb-2">
+                  <div className="flex items-center gap-1.5">
+                    <Receipt className="w-4 h-4 text-slate-400" /> <span>পরিমাণ: ৳{expense.amount}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Calendar className="w-4 h-4 text-slate-400" /> <span>তারিখ: {new Date(expense.date).toLocaleDateString('bn-BD')}</span>
+                  </div>
+                </div>
+                {expense.notes && (
+                  <div className="mt-2 text-sm text-slate-500 italic bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                    "{expense.notes.replace('[TRASH]', '').trim()}"
+                  </div>
+                )}
               </div>
-              <div className="grid grid-cols-2 gap-2 text-sm text-slate-500 mb-2">
-                <div className="flex items-center gap-1.5">
-                  <Receipt className="w-4 h-4 text-slate-400" /> <span>পরিমাণ: ৳{expense.amount}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Calendar className="w-4 h-4 text-slate-400" /> <span>তারিখ: {new Date(expense.date).toLocaleDateString('bn-BD')}</span>
-                </div>
+              <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-slate-100">
+                <button
+                  onClick={() => openConfirm(expense.id, 'expenses', 'restore')}
+                  disabled={!isOnline}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold tracking-wide uppercase transition-colors duration-200 cursor-pointer ${!isOnline ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-blue-600 bg-blue-50 hover:bg-blue-100'}`}
+                  title="Restore"
+                >
+                  <RotateCcw className="w-4 h-4" /> রিস্টোর
+                </button>
+                <button
+                  onClick={() => openConfirm(expense.id, 'expenses', 'delete')}
+                  disabled={!isOnline}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold tracking-wide uppercase transition-colors duration-200 cursor-pointer ${!isOnline ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-red-600 bg-red-50 hover:bg-red-100'}`}
+                  title="Permanent Delete"
+                >
+                  <Trash2 className="w-4 h-4" /> ডিলিট
+                </button>
               </div>
-              {expense.notes && (
-                <div className="mt-2 text-sm text-slate-500 italic bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                  "{expense.notes.replace('[TRASH]', '').trim()}"
-                </div>
-              )}
             </div>
-            <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-slate-100">
-              <button
-                onClick={() => openConfirm(expense.id, 'expenses', 'restore')}
-                disabled={!isOnline}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold tracking-wide uppercase transition-colors duration-200 cursor-pointer ${!isOnline ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-blue-600 bg-blue-50 hover:bg-blue-100'}`}
-                title="Restore"
-              >
-                <RotateCcw className="w-4 h-4" /> রিস্টোর
-              </button>
-              <button
-                onClick={() => openConfirm(expense.id, 'expenses', 'delete')}
-                disabled={!isOnline}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold tracking-wide uppercase transition-colors duration-200 cursor-pointer ${!isOnline ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-red-600 bg-red-50 hover:bg-red-100'}`}
-                title="Permanent Delete"
-              >
-                <Trash2 className="w-4 h-4" /> ডিলিট
-              </button>
-            </div>
-          </div>
-        ))
+          );
+        })
       )}
     </div>
   );
@@ -508,39 +548,50 @@ const Trash: React.FC = () => {
           <p className="text-slate-500 font-medium">কোন ডিলিট করা গজল নোট নেই</p>
         </div>
       ) : (
-        trashedGhazalNotes.map((note) => (
-          <div key={note.id} className="bg-white p-5 rounded-2xl border border-slate-150 shadow-sm transition-all flex flex-col justify-between">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center shrink-0">
-                  <BookOpen className="w-4 h-4" />
+        trashedGhazalNotes.map((note) => {
+          const isSelected = selectedIds.includes(note.id);
+          return (
+            <div key={note.id} className={`bg-white p-5 rounded-2xl border transition-all flex flex-col justify-between ${
+              isSelected ? 'border-blue-400 ring-2 ring-blue-100 bg-blue-50/20' : 'border-slate-150 shadow-sm'
+            }`}>
+              <div>
+                <div className="flex items-center gap-2.5 mb-2">
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => toggleSelectItem(note.id)}
+                    className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 accent-blue-600 cursor-pointer shrink-0"
+                  />
+                  <div className="w-8 h-8 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center shrink-0">
+                    <BookOpen className="w-4 h-4" />
+                  </div>
+                  <h3 className="font-bold text-slate-800 text-lg line-clamp-1">{note.title}</h3>
                 </div>
-                <h3 className="font-bold text-slate-800 text-lg line-clamp-1">{note.title}</h3>
+                <p className="text-sm text-slate-600 line-clamp-3 bg-slate-50 p-3 rounded-xl border border-slate-100 whitespace-pre-line font-serif">
+                  {note.lyrics.replace('[TRASH]', '').trim()}
+                </p>
               </div>
-              <p className="text-sm text-slate-600 line-clamp-3 bg-slate-50 p-3 rounded-xl border border-slate-100 whitespace-pre-line font-serif">
-                {note.lyrics.replace('[TRASH]', '').trim()}
-              </p>
+              <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-slate-100">
+                <button
+                  onClick={() => openConfirm(note.id, 'ghazal_notes', 'restore')}
+                  disabled={!isOnline}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold tracking-wide uppercase transition-colors duration-200 cursor-pointer ${!isOnline ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-blue-600 bg-blue-50 hover:bg-blue-100'}`}
+                  title="Restore"
+                >
+                  <RotateCcw className="w-4 h-4" /> রিস্টোর
+                </button>
+                <button
+                  onClick={() => openConfirm(note.id, 'ghazal_notes', 'delete')}
+                  disabled={!isOnline}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold tracking-wide uppercase transition-colors duration-200 cursor-pointer ${!isOnline ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-red-600 bg-red-50 hover:bg-red-100'}`}
+                  title="Permanent Delete"
+                >
+                  <Trash2 className="w-4 h-4" /> ডিলিট
+                </button>
+              </div>
             </div>
-            <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-slate-100">
-              <button
-                onClick={() => openConfirm(note.id, 'ghazal_notes', 'restore')}
-                disabled={!isOnline}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold tracking-wide uppercase transition-colors duration-200 cursor-pointer ${!isOnline ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-blue-600 bg-blue-50 hover:bg-blue-100'}`}
-                title="Restore"
-              >
-                <RotateCcw className="w-4 h-4" /> রিস্টোর
-              </button>
-              <button
-                onClick={() => openConfirm(note.id, 'ghazal_notes', 'delete')}
-                disabled={!isOnline}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold tracking-wide uppercase transition-colors duration-200 cursor-pointer ${!isOnline ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-red-600 bg-red-50 hover:bg-red-100'}`}
-                title="Permanent Delete"
-              >
-                <Trash2 className="w-4 h-4" /> ডিলিট
-              </button>
-            </div>
-          </div>
-        ))
+          );
+        })
       )}
     </div>
   );
@@ -553,47 +604,58 @@ const Trash: React.FC = () => {
           <p className="text-slate-500 font-medium">কোন ডিলিট করা শপিং লিস্ট নেই</p>
         </div>
       ) : (
-        trashedShoppingLists.map((list) => (
-          <div key={list.id} className="bg-white p-5 rounded-2xl border border-slate-150 shadow-sm transition-all flex flex-col justify-between">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center shrink-0">
-                  <ShoppingBag className="w-4 h-4" />
+        trashedShoppingLists.map((list) => {
+          const isSelected = selectedIds.includes(list.id);
+          return (
+            <div key={list.id} className={`bg-white p-5 rounded-2xl border transition-all flex flex-col justify-between ${
+              isSelected ? 'border-blue-400 ring-2 ring-blue-100 bg-blue-50/20' : 'border-slate-150 shadow-sm'
+            }`}>
+              <div>
+                <div className="flex items-center gap-2.5 mb-2">
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => toggleSelectItem(list.id)}
+                    className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 accent-blue-600 cursor-pointer shrink-0"
+                  />
+                  <div className="w-8 h-8 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center shrink-0">
+                    <ShoppingBag className="w-4 h-4" />
+                  </div>
+                  <h3 className="font-bold text-slate-800 text-lg line-clamp-1">{list.title.replace('[TRASH]', '').trim()}</h3>
                 </div>
-                <h3 className="font-bold text-slate-800 text-lg line-clamp-1">{list.title.replace('[TRASH]', '').trim()}</h3>
+                <div className="grid grid-cols-2 gap-2 text-sm text-slate-500 mb-3">
+                  <div className="flex items-center gap-1.5">
+                    <Calendar className="w-4 h-4 text-slate-400" /> <span>তারিখ: {new Date(list.date).toLocaleDateString('bn-BD')}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Receipt className="w-4 h-4 text-slate-400" /> <span>{list.items?.length || 0} টি পণ্য</span>
+                  </div>
+                </div>
+                <div className="text-slate-700 font-semibold bg-slate-50 px-3 py-1.5 rounded-lg inline-block text-sm border border-slate-100">
+                  মোট বাজেট: ৳{list.totalamount}
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-2 text-sm text-slate-500 mb-3">
-                <div className="flex items-center gap-1.5">
-                  <Calendar className="w-4 h-4 text-slate-400" /> <span>তারিখ: {new Date(list.date).toLocaleDateString('bn-BD')}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Receipt className="w-4 h-4 text-slate-400" /> <span>{list.items?.length || 0} টি পণ্য</span>
-                </div>
-              </div>
-              <div className="text-slate-700 font-semibold bg-slate-50 px-3 py-1.5 rounded-lg inline-block text-sm border border-slate-100">
-                মোট বাজেট: ৳{list.totalamount}
+              <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-slate-100">
+                <button
+                  onClick={() => openConfirm(list.id, 'shopping_lists', 'restore')}
+                  disabled={!isOnline}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold tracking-wide uppercase transition-colors duration-200 cursor-pointer ${!isOnline ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-blue-600 bg-blue-50 hover:bg-blue-100'}`}
+                  title="Restore"
+                >
+                  <RotateCcw className="w-4 h-4" /> রিস্টোর
+                </button>
+                <button
+                  onClick={() => openConfirm(list.id, 'shopping_lists', 'delete')}
+                  disabled={!isOnline}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold tracking-wide uppercase transition-colors duration-200 cursor-pointer ${!isOnline ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-red-600 bg-red-50 hover:bg-red-100'}`}
+                  title="Permanent Delete"
+                >
+                  <Trash2 className="w-4 h-4" /> ডিলিট
+                </button>
               </div>
             </div>
-            <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-slate-100">
-              <button
-                onClick={() => openConfirm(list.id, 'shopping_lists', 'restore')}
-                disabled={!isOnline}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold tracking-wide uppercase transition-colors duration-200 cursor-pointer ${!isOnline ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-blue-600 bg-blue-50 hover:bg-blue-100'}`}
-                title="Restore"
-              >
-                <RotateCcw className="w-4 h-4" /> রিস্টোর
-              </button>
-              <button
-                onClick={() => openConfirm(list.id, 'shopping_lists', 'delete')}
-                disabled={!isOnline}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold tracking-wide uppercase transition-colors duration-200 cursor-pointer ${!isOnline ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-red-600 bg-red-50 hover:bg-red-100'}`}
-                title="Permanent Delete"
-              >
-                <Trash2 className="w-4 h-4" /> ডিলিট
-              </button>
-            </div>
-          </div>
-        ))
+          );
+        })
       )}
     </div>
   );
@@ -618,6 +680,7 @@ const Trash: React.FC = () => {
         </div>
       ) : (
         trashedDuePersons.map((person) => {
+          const isSelected = selectedIds.includes(person.id);
           const balance = person.transactions ? person.transactions.reduce((acc: number, tx: any) => {
             if (tx.type === 'receive') return acc + tx.amount;
             if (tx.type === 'give') return acc - tx.amount;
@@ -625,9 +688,17 @@ const Trash: React.FC = () => {
           }, 0) : 0;
 
           return (
-            <div key={person.id} className="bg-white p-5 rounded-2xl border border-slate-150 shadow-sm transition-all flex flex-col justify-between">
+            <div key={person.id} className={`bg-white p-5 rounded-2xl border transition-all flex flex-col justify-between ${
+              isSelected ? 'border-blue-400 ring-2 ring-blue-100 bg-blue-50/20' : 'border-slate-150 shadow-sm'
+            }`}>
               <div>
-                <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center gap-2.5 mb-2">
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => toggleSelectItem(person.id)}
+                    className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 accent-blue-600 cursor-pointer shrink-0"
+                  />
                   <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
                     <svg
                       width="16"
@@ -695,11 +766,20 @@ const Trash: React.FC = () => {
         </div>
       ) : (
         trashedWallets.map((wallet) => {
+          const isSelected = selectedIds.includes(wallet.id);
           const originalName = wallet.name.replace('[TRASH]', '').trim();
           return (
-            <div key={wallet.id} className="bg-white p-5 rounded-2xl border border-slate-150 shadow-sm transition-all flex flex-col justify-between">
+            <div key={wallet.id} className={`bg-white p-5 rounded-2xl border transition-all flex flex-col justify-between ${
+              isSelected ? 'border-blue-400 ring-2 ring-blue-100 bg-blue-50/20' : 'border-slate-150 shadow-sm'
+            }`}>
               <div>
-                <div className="flex items-center gap-2 mb-3">
+                <div className="flex items-center gap-2.5 mb-3">
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => toggleSelectItem(wallet.id)}
+                    className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 accent-blue-600 cursor-pointer shrink-0"
+                  />
                   <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
                     <Coins className="w-4 h-4" />
                   </div>
@@ -978,7 +1058,48 @@ const Trash: React.FC = () => {
           </div>
         </div>
 
+        {/* Select All & Bulk Action Bar */}
+        {currentItems.length > 0 && (
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-3.5 mb-4 flex flex-wrap items-center justify-between gap-3">
+            <label className="flex items-center gap-2.5 cursor-pointer select-none text-slate-700 font-medium text-sm">
+              <input
+                type="checkbox"
+                checked={isAllSelected}
+                onChange={toggleSelectAll}
+                className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 accent-blue-600 cursor-pointer"
+              />
+              <span>সব নির্বাচন করুন</span>
+              {selectedIds.length > 0 && (
+                <span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-md text-xs font-bold border border-blue-100">
+                  {selectedIds.length} / {currentItems.length}
+                </span>
+              )}
+            </label>
 
+            {selectedIds.length > 0 && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => openBulkConfirm('restore')}
+                  disabled={!isOnline}
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold uppercase tracking-wide transition-colors cursor-pointer ${
+                    !isOnline ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-blue-600 bg-blue-50 hover:bg-blue-100'
+                  }`}
+                >
+                  <RotateCcw className="w-3.5 h-3.5" /> রিস্টোর করুন ({selectedIds.length})
+                </button>
+                <button
+                  onClick={() => openBulkConfirm('delete')}
+                  disabled={!isOnline}
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold uppercase tracking-wide transition-colors cursor-pointer ${
+                    !isOnline ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-red-600 bg-red-50 hover:bg-red-100'
+                  }`}
+                >
+                  <Trash2 className="w-3.5 h-3.5" /> ডিলিট করুন ({selectedIds.length})
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Content with dynamic transition */}
         <AnimatePresence mode="wait">
@@ -1003,14 +1124,20 @@ const Trash: React.FC = () => {
         <ConfirmModal
           isOpen={showConfirm}
           onClose={() => setShowConfirm(false)}
-          onConfirm={confirmAction === 'restore' ? handleRestore : handlePermanentDelete}
-          title={confirmAction === 'restore' ? "রিস্টোর নিশ্চিত করুন" : "স্থায়ীভাবে ডিলিট নিশ্চিত করুন"}
-          message={confirmAction === 'restore' 
-            ? "আপনি কি এই আইটেমটি রিস্টোর করতে চান?" 
-            : "এটি স্থায়ীভাবে মুছে ফেলা হবে এবং আর ফিরে পাওয়া যাবে না। আপনি কি নিশ্চিত?"}
-          confirmText={confirmAction === 'restore' ? "রিস্টোর করুন" : "ডিলিট করুন"}
-          type={confirmAction === 'restore' ? "primary" : "danger"}
-          isProcessing={confirmAction === 'restore' ? isRestoring : isDeleting}
+          onConfirm={pendingAction?.action === 'restore' ? handleRestore : handlePermanentDelete}
+          title={pendingAction?.action === 'restore' ? "রিস্টোর নিশ্চিত করুন" : "স্থায়ীভাবে ডিলিট নিশ্চিত করুন"}
+          message={
+            pendingAction?.action === 'restore'
+              ? pendingAction && pendingAction.ids.length > 1
+                ? `আপনি কি নির্বাচিত ${pendingAction.ids.length}টি আইটেম রিস্টোর করতে চান?`
+                : "আপনি কি এই আইটেমটি রিস্টোর করতে চান?"
+              : pendingAction && pendingAction.ids.length > 1
+                ? `নির্বাচিত ${pendingAction.ids.length}টি আইটেম স্থায়ীভাবে মুছে ফেলা হবে এবং আর ফিরে পাওয়া যাবে না। আপনি কি নিশ্চিত?`
+                : "এটি স্থায়ীভাবে মুছে ফেলা হবে এবং আর ফিরে পাওয়া যাবে না। আপনি কি নিশ্চিত?"
+          }
+          confirmText={pendingAction?.action === 'restore' ? "রিস্টোর করুন" : "ডিলিট করুন"}
+          type={pendingAction?.action === 'restore' ? "primary" : "danger"}
+          isProcessing={pendingAction?.action === 'restore' ? isRestoring : isDeleting}
         />
       </div>
     </div>
