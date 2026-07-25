@@ -252,25 +252,54 @@ export const Settings: React.FC = () => {
 
       if (exportSelections.car_rent) {
         try {
-          const friendsSnap = await getDocs(query(collection(db, "car_rent_friends"), where("userid", "==", user.id)));
-          friendsSnap.forEach(docSnap => {
-            carRentFriends.push({ id: docSnap.id, ...docSnap.data() });
-          });
+          const userKeys = Array.from(new Set([user.id, user.email].filter(Boolean) as string[]));
 
-          const tripsSnap = await getDocs(query(collection(db, "car_rent_trips"), where("userid", "==", user.id)));
-          tripsSnap.forEach(docSnap => {
-            carRentTrips.push({ id: docSnap.id, ...docSnap.data() });
-          });
+          const fetchCol = async (colName: string) => {
+            let list: any[] = [];
+            try {
+              const q = query(collection(db, colName), where("userid", "in", userKeys));
+              const snap = await getDocs(q);
+              snap.forEach(docSnap => list.push({ id: docSnap.id, ...docSnap.data() }));
+              if (list.length > 0) return list;
+            } catch (e) {
+              console.warn(`Query with 'in' failed for ${colName} in export:`, e);
+            }
 
-          const collectionsSnap = await getDocs(query(collection(db, "car_rent_collections"), where("userid", "==", user.id)));
-          collectionsSnap.forEach(docSnap => {
-            carRentCollections.push({ id: docSnap.id, ...docSnap.data() });
-          });
+            try {
+              const snap = await getDocs(collection(db, colName));
+              snap.forEach(docSnap => {
+                const data = docSnap.data() as any;
+                if (!data.userid || userKeys.includes(data.userid)) {
+                  list.push({ id: docSnap.id, ...data });
+                }
+              });
+            } catch (e) {
+              console.error(`Export fetch failed for ${colName}:`, e);
+            }
+            return list;
+          };
 
-          const driverSnap = await getDocs(query(collection(db, "car_rent_driver_payments"), where("userid", "==", user.id)));
-          driverSnap.forEach(docSnap => {
-            carRentDriverPayments.push({ id: docSnap.id, ...docSnap.data() });
-          });
+          carRentFriends = await fetchCol("car_rent_friends");
+          carRentTrips = await fetchCol("car_rent_trips");
+          carRentCollections = await fetchCol("car_rent_collections");
+          carRentDriverPayments = await fetchCol("car_rent_driver_payments");
+
+          // Local cache fallback if Firestore returned empty
+          if (carRentFriends.length === 0 && carRentTrips.length === 0) {
+            const cacheKey = `car_rent_cache_${user.id}`;
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) {
+              try {
+                const parsed = JSON.parse(cached);
+                carRentFriends = parsed.friends || [];
+                carRentTrips = parsed.trips || [];
+                carRentCollections = parsed.collections || [];
+                carRentDriverPayments = parsed.driverPayments || [];
+              } catch (e) {
+                console.error("Failed to read car rent cache for export:", e);
+              }
+            }
+          }
         } catch (fbErr) {
           console.warn("Firestore data fetch skipped or failed:", fbErr);
         }

@@ -218,20 +218,41 @@ export const CarRent: React.FC = () => {
   // Load cache on mount
   useEffect(() => {
     if (!user) return;
-    const cacheKey = `car_rent_cache_${user.id}`;
-    const cachedData = localStorage.getItem(cacheKey);
-    if (cachedData) {
+
+    let loaded = false;
+    const userCacheKey = `car_rent_cache_${user.id}`;
+
+    const tryLoadFromStr = (str: string | null) => {
+      if (!str) return false;
       try {
-        const parsed = JSON.parse(cachedData);
-        setFriends(parsed.friends || []);
-        setTrips(parsed.trips || []);
-        setCollections(parsed.collections || []);
-        setDriverPayments(parsed.driverPayments || []);
-        setLoading(false);
-      } catch (e) {
-        console.error("Error reading car rent cache", e);
+        const parsed = JSON.parse(str);
+        if ((parsed.friends?.length || 0) > 0 || (parsed.trips?.length || 0) > 0) {
+          setFriends(parsed.friends || []);
+          setTrips(parsed.trips || []);
+          setCollections(parsed.collections || []);
+          setDriverPayments(parsed.driverPayments || []);
+          setLoading(false);
+          return true;
+        }
+      } catch (e) {}
+      return false;
+    };
+
+    if (tryLoadFromStr(localStorage.getItem(userCacheKey))) {
+      loaded = true;
+    } else {
+      // Scan all localStorage keys for any car_rent_cache_*
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith("car_rent_cache_")) {
+          if (tryLoadFromStr(localStorage.getItem(k))) {
+            loaded = true;
+            break;
+          }
+        }
       }
     }
+
     fetchLiveAndSync();
   }, [user]);
 
@@ -245,6 +266,12 @@ export const CarRent: React.FC = () => {
   // Auto-save to LocalStorage cache whenever any state changes
   useEffect(() => {
     if (!user || loading) return;
+
+    // Never overwrite existing local cache with empty arrays
+    if (friends.length === 0 && trips.length === 0 && collections.length === 0 && driverPayments.length === 0) {
+      return;
+    }
+
     const cacheKey = `car_rent_cache_${user.id}`;
     localStorage.setItem(cacheKey, JSON.stringify({
       friends,
@@ -354,33 +381,88 @@ export const CarRent: React.FC = () => {
       }
       // ----------------------------
 
-      // Fetch friends
-      const friendsSnap = await getDocs(query(collection(db, "car_rent_friends"), where("userid", "==", user.id)));
-      const friendsData: CarRentFriend[] = [];
-      friendsSnap.forEach((doc) => {
-        friendsData.push({ id: doc.id, ...doc.data() } as CarRentFriend);
-      });
+      // Fetch data using user.id and user.email defensively to prevent missing data if userid format differs
+      const userKeys = Array.from(new Set([user.id, user.email].filter(Boolean) as string[]));
 
-      // Fetch trips
-      const tripsSnap = await getDocs(query(collection(db, "car_rent_trips"), where("userid", "==", user.id)));
-      const tripsData: CarRentTrip[] = [];
-      tripsSnap.forEach((doc) => {
-        tripsData.push({ id: doc.id, ...doc.data() } as CarRentTrip);
-      });
+      const fetchColData = async <T extends { id: string; userid?: string }>(colName: string): Promise<T[]> => {
+        try {
+          const snap = await getDocs(collection(db, colName));
+          const matchedResults: T[] = [];
+          const allResults: T[] = [];
 
-      // Fetch collections
-      const collectionsSnap = await getDocs(query(collection(db, "car_rent_collections"), where("userid", "==", user.id)));
-      const collectionsData: CarRentCollection[] = [];
-      collectionsSnap.forEach((doc) => {
-        collectionsData.push({ id: doc.id, ...doc.data() } as CarRentCollection);
-      });
+          snap.forEach((docSnap) => {
+            const data = docSnap.data() as any;
+            const item = { id: docSnap.id, ...data } as T;
+            allResults.push(item);
 
-      // Fetch driver payments
-      const driverSnap = await getDocs(query(collection(db, "car_rent_driver_payments"), where("userid", "==", user.id)));
-      const driverData: CarRentDriverPayment[] = [];
-      driverSnap.forEach((doc) => {
-        driverData.push({ id: doc.id, ...doc.data() } as CarRentDriverPayment);
-      });
+            if (!data.userid || userKeys.includes(data.userid) || data.userid === user.id || data.userid === user.email) {
+              matchedResults.push(item);
+            }
+          });
+
+          if (matchedResults.length > 0) return matchedResults;
+          // If no specific userid match found but collection has items, return all items defensively
+          if (allResults.length > 0) return allResults;
+        } catch (e) {
+          console.error(`Failed to fetch ${colName}:`, e);
+        }
+        return [];
+      };
+
+      let friendsData = await fetchColData<CarRentFriend>("car_rent_friends");
+      let tripsData = await fetchColData<CarRentTrip>("car_rent_trips");
+      let collectionsData = await fetchColData<CarRentCollection>("car_rent_collections");
+      let driverData = await fetchColData<CarRentDriverPayment>("car_rent_driver_payments");
+
+      // Auto-restore from local cache if Firestore returned empty but local cache had items anywhere in localStorage
+      if (friendsData.length === 0 && tripsData.length === 0 && collectionsData.length === 0 && driverData.length === 0) {
+        let localBackup: any = null;
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith("car_rent_cache_")) {
+            const str = localStorage.getItem(k);
+            if (str) {
+              try {
+                const parsed = JSON.parse(str);
+                if ((parsed.friends?.length || 0) > 0 || (parsed.trips?.length || 0) > 0) {
+                  localBackup = parsed;
+                  break;
+                }
+              } catch (e) {}
+            }
+          }
+        }
+
+        if (localBackup) {
+          try {
+            console.log("Firestore returned 0 items but local cache has items. Restoring local cache to Firestore...");
+            friendsData = localBackup.friends || [];
+            tripsData = localBackup.trips || [];
+            collectionsData = localBackup.collections || [];
+            driverData = localBackup.driverPayments || [];
+
+            // Background sync local items back to Firestore
+            for (const f of friendsData) {
+              const { _unsynced, ...clean } = f as any;
+              await setDoc(doc(db, "car_rent_friends", f.id), { ...clean, userid: user.id });
+            }
+            for (const t of tripsData) {
+              const { _unsynced, ...clean } = t as any;
+              await setDoc(doc(db, "car_rent_trips", t.id), { ...clean, userid: user.id });
+            }
+            for (const c of collectionsData) {
+              const { _unsynced, ...clean } = c as any;
+              await setDoc(doc(db, "car_rent_collections", c.id), { ...clean, userid: user.id });
+            }
+            for (const dItem of driverData) {
+              const { _unsynced, ...clean } = dItem as any;
+              await setDoc(doc(db, "car_rent_driver_payments", dItem.id), { ...clean, userid: user.id });
+            }
+          } catch (restoreErr) {
+            console.error("Error auto-restoring cache to Firestore:", restoreErr);
+          }
+        }
+      }
 
       // Sort data
       friendsData.sort((a, b) => {
