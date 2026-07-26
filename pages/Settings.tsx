@@ -578,9 +578,11 @@ export const Settings: React.FC = () => {
         return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
       };
 
-      // Maps to track project/client ID remappings for cross-user imports
+      // Maps to track project/client/friend/trip ID remappings for cross-user imports
       const projectIdMap = new Map<string, string>();
       const clientIdMap = new Map<string, string>();
+      const friendIdMap = new Map<string, string>();
+      const tripIdMap = new Map<string, string>();
 
       // 1. Restore Supabase tables (Only those selected by the user)
       const supabaseTables = [
@@ -613,6 +615,8 @@ export const Settings: React.FC = () => {
               if (item.id) {
                 if (table.name === 'projects') projectIdMap.set(item.id, targetId);
                 if (table.name === 'clients') clientIdMap.set(item.id, targetId);
+                if (table.name === 'car_rent_friends') friendIdMap.set(item.id, targetId);
+                if (table.name === 'car_rent_trips') tripIdMap.set(item.id, targetId);
               }
             }
 
@@ -647,23 +651,32 @@ export const Settings: React.FC = () => {
               if (typeof pIds === 'string') {
                 try { pIds = JSON.parse(pIds); } catch { pIds = []; }
               }
+              const mappedPIds = Array.isArray(pIds)
+                ? pIds.map((pId: string) => friendIdMap.get(pId) || pId)
+                : [];
+
               return {
                 id: targetId,
                 date: item.date || new Date().toISOString().split('T')[0],
                 examname: item.examname || item.examName || '',
                 totalrent: Number(item.totalrent ?? item.totalRent ?? 1300),
-                participantids: Array.isArray(pIds) ? pIds : [],
+                participantids: mappedPIds,
                 userid: user.id,
                 createdat: item.createdat || item.createdAt || new Date().toISOString(),
                 updatedat: item.updatedat || item.updatedAt || new Date().toISOString(),
               };
             } else if (table.name === 'car_rent_collections') {
+              const rawFId = item.friendid || item.friendId || '';
+              const mappedFId = friendIdMap.get(rawFId) || rawFId;
+              const rawTId = item.tripid || item.tripId || '';
+              const mappedTId = tripIdMap.get(rawTId) || rawTId;
+
               return {
                 id: targetId,
                 date: item.date || new Date().toISOString().split('T')[0],
-                friendid: item.friendid || item.friendId || '',
+                friendid: mappedFId,
                 amount: Number(item.amount) || 0,
-                tripid: item.tripid || item.tripId || '',
+                tripid: mappedTId,
                 paymentmethod: item.paymentmethod || item.paymentMethod || 'cash',
                 userid: user.id,
                 createdat: item.createdat || item.createdAt || new Date().toISOString(),
@@ -719,8 +732,12 @@ export const Settings: React.FC = () => {
           }
 
           if (error) {
-            console.error(`Error importing table ${table.name}:`, error);
-            throw new Error(`${table.name} ডাটা ইমপোর্ট করতে সমস্যা হয়েছে: ${error.message}`);
+            if (table.name.startsWith('car_rent_')) {
+              console.warn(`Supabase import for ${table.name} skipped (${error.message}). Car Rent data will be safely restored via Firestore/LocalStorage...`);
+            } else {
+              console.error(`Error importing table ${table.name}:`, error);
+              throw new Error(`${table.name} ডাটা ইমপোর্ট করতে সমস্যা হয়েছে: ${error.message}`);
+            }
           }
         }
       }
