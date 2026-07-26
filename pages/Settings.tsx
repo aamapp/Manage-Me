@@ -633,6 +633,52 @@ export const Settings: React.FC = () => {
                 method: item.method || 'ক্যাশ',
                 userid: user.id,
               };
+            } else if (table.name === 'car_rent_friends') {
+              return {
+                id: targetId,
+                name: item.name || '',
+                phone: item.phone || '',
+                userid: user.id,
+                createdat: item.createdat || item.createdAt || new Date().toISOString(),
+                updatedat: item.updatedat || item.updatedAt || new Date().toISOString(),
+              };
+            } else if (table.name === 'car_rent_trips') {
+              let pIds = item.participantids || item.participantIds || [];
+              if (typeof pIds === 'string') {
+                try { pIds = JSON.parse(pIds); } catch { pIds = []; }
+              }
+              return {
+                id: targetId,
+                date: item.date || new Date().toISOString().split('T')[0],
+                examname: item.examname || item.examName || '',
+                totalrent: Number(item.totalrent ?? item.totalRent ?? 1300),
+                participantids: Array.isArray(pIds) ? pIds : [],
+                userid: user.id,
+                createdat: item.createdat || item.createdAt || new Date().toISOString(),
+                updatedat: item.updatedat || item.updatedAt || new Date().toISOString(),
+              };
+            } else if (table.name === 'car_rent_collections') {
+              return {
+                id: targetId,
+                date: item.date || new Date().toISOString().split('T')[0],
+                friendid: item.friendid || item.friendId || '',
+                amount: Number(item.amount) || 0,
+                tripid: item.tripid || item.tripId || '',
+                paymentmethod: item.paymentmethod || item.paymentMethod || 'cash',
+                userid: user.id,
+                createdat: item.createdat || item.createdAt || new Date().toISOString(),
+                updatedat: item.updatedat || item.updatedAt || new Date().toISOString(),
+              };
+            } else if (table.name === 'car_rent_driver_payments') {
+              return {
+                id: targetId,
+                date: item.date || new Date().toISOString().split('T')[0],
+                amount: Number(item.amount) || 0,
+                remarks: item.remarks || '',
+                userid: user.id,
+                createdat: item.createdat || item.createdAt || new Date().toISOString(),
+                updatedat: item.updatedat || item.updatedAt || new Date().toISOString(),
+              };
             } else {
               const cleaned: any = { ...item };
               cleaned.id = targetId;
