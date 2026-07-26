@@ -35,6 +35,7 @@ import { useAppContext } from "@/context/AppContext";
 import { DatePicker } from "@/components/DatePicker";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { db, handleFirestoreError, OperationType } from "@/lib/firebase";
+import { supabase } from "@/lib/supabase";
 import {
   collection,
   query,
@@ -333,133 +334,187 @@ export const CarRent: React.FC = () => {
         return;
       }
 
-      // --- Offline Sync Logic ---
-      const cacheKey = `car_rent_cache_${user.id}`;
-      const cachedData = localStorage.getItem(cacheKey);
-      if (cachedData) {
-        try {
-          const parsed = JSON.parse(cachedData);
-          
-          // 1. Sync Unsynced Friends
-          const unsyncedFriends = (parsed.friends || []).filter((f: any) => f._unsynced);
-          for (const friend of unsyncedFriends) {
-            const { _unsynced, ...cleanFriend } = friend;
-            await setDoc(doc(db, "car_rent_friends", friend.id), cleanFriend);
-          }
+      let friendsData: CarRentFriend[] = [];
+      let tripsData: CarRentTrip[] = [];
+      let collectionsData: CarRentCollection[] = [];
+      let driverData: CarRentDriverPayment[] = [];
+      let loadedFromSupabase = false;
 
-          // 2. Sync Unsynced Trips
-          const unsyncedTrips = (parsed.trips || []).filter((t: any) => t._unsynced);
-          for (const trip of unsyncedTrips) {
-            const { _unsynced, ...cleanTrip } = trip;
-            await setDoc(doc(db, "car_rent_trips", trip.id), cleanTrip);
-          }
+      // 1. Try fetching directly from Supabase first
+      try {
+        const [fRes, tRes, cRes, dRes] = await Promise.all([
+          supabase.from("car_rent_friends").select("*").eq("userid", user.id),
+          supabase.from("car_rent_trips").select("*").eq("userid", user.id),
+          supabase.from("car_rent_collections").select("*").eq("userid", user.id),
+          supabase.from("car_rent_driver_payments").select("*").eq("userid", user.id)
+        ]);
 
-          // 3. Sync Unsynced Collections
-          const unsyncedCollections = (parsed.collections || []).filter((c: any) => c._unsynced);
-          for (const col of unsyncedCollections) {
-            const { _unsynced, ...cleanCol } = col;
-            await setDoc(doc(db, "car_rent_collections", col.id), cleanCol);
-          }
-
-          // 4. Sync Unsynced Driver Payments
-          const unsyncedPayments = (parsed.driverPayments || []).filter((p: any) => p._unsynced);
-          for (const p of unsyncedPayments) {
-            const { _unsynced, ...cleanPay } = p;
-            await setDoc(doc(db, "car_rent_driver_payments", p.id), cleanPay);
-          }
-
-          // 5. Sync Unsynced Deletions
-          const unsyncedDeletionsKey = `car_rent_unsynced_deletions_${user.id}`;
-          const unsyncedDeletions = JSON.parse(localStorage.getItem(unsyncedDeletionsKey) || "[]");
-          for (const del of unsyncedDeletions) {
-            await deleteDoc(doc(db, del.collection, del.id));
-          }
-          localStorage.removeItem(unsyncedDeletionsKey);
-        } catch (syncErr) {
-          console.error("Error during auto-sync:", syncErr);
+        if (fRes.data) {
+          friendsData = fRes.data.map((f: any) => ({
+            id: f.id,
+            name: f.name || "",
+            phone: f.phone || "",
+            userid: f.userid || user.id,
+            createdAt: f.createdAt || f.createdat,
+            updatedAt: f.updatedAt || f.updatedat
+          }));
         }
-      }
-      // ----------------------------
 
-      // Fetch data using user.id and user.email defensively to prevent missing data if userid format differs
-      const userKeys = Array.from(new Set([user.id, user.email].filter(Boolean) as string[]));
-
-      const fetchColData = async <T extends { id: string; userid?: string }>(colName: string): Promise<T[]> => {
-        try {
-          const snap = await getDocs(collection(db, colName));
-          const matchedResults: T[] = [];
-          const allResults: T[] = [];
-
-          snap.forEach((docSnap) => {
-            const data = docSnap.data() as any;
-            const item = { id: docSnap.id, ...data } as T;
-            allResults.push(item);
-
-            if (!data.userid || userKeys.includes(data.userid) || data.userid === user.id || data.userid === user.email) {
-              matchedResults.push(item);
+        if (tRes.data) {
+          tripsData = tRes.data.map((t: any) => {
+            let pIds = t.participantIds || t.participantids || [];
+            if (typeof pIds === "string") {
+              try { pIds = JSON.parse(pIds); } catch { pIds = []; }
             }
+            return {
+              id: t.id,
+              date: t.date,
+              examName: t.examName || t.examname || "",
+              totalRent: Number(t.totalRent ?? t.totalrent ?? 1300),
+              participantIds: Array.isArray(pIds) ? pIds : [],
+              userid: t.userid || user.id,
+              createdAt: t.createdAt || t.createdat,
+              updatedAt: t.updatedAt || t.updatedat
+            };
           });
-
-          if (matchedResults.length > 0) return matchedResults;
-          // If no specific userid match found but collection has items, return all items defensively
-          if (allResults.length > 0) return allResults;
-        } catch (e) {
-          console.error(`Failed to fetch ${colName}:`, e);
         }
-        return [];
-      };
 
-      let friendsData = await fetchColData<CarRentFriend>("car_rent_friends");
-      let tripsData = await fetchColData<CarRentTrip>("car_rent_trips");
-      let collectionsData = await fetchColData<CarRentCollection>("car_rent_collections");
-      let driverData = await fetchColData<CarRentDriverPayment>("car_rent_driver_payments");
+        if (cRes.data) {
+          collectionsData = cRes.data.map((c: any) => ({
+            id: c.id,
+            date: c.date,
+            friendId: c.friendId || c.friendid || "",
+            amount: Number(c.amount || 0),
+            tripId: c.tripId || c.tripid || "",
+            paymentMethod: c.paymentMethod || c.paymentmethod || "cash",
+            userid: c.userid || user.id,
+            createdAt: c.createdAt || c.createdat,
+            updatedAt: c.updatedAt || c.updatedat
+          }));
+        }
 
-      // Auto-restore from local cache if Firestore returned empty but local cache had items anywhere in localStorage
-      if (friendsData.length === 0 && tripsData.length === 0 && collectionsData.length === 0 && driverData.length === 0) {
-        let localBackup: any = null;
-        for (let i = 0; i < localStorage.length; i++) {
-          const k = localStorage.key(i);
-          if (k && k.startsWith("car_rent_cache_")) {
-            const str = localStorage.getItem(k);
-            if (str) {
-              try {
-                const parsed = JSON.parse(str);
-                if ((parsed.friends?.length || 0) > 0 || (parsed.trips?.length || 0) > 0) {
-                  localBackup = parsed;
-                  break;
-                }
-              } catch (e) {}
+        if (dRes.data) {
+          driverData = dRes.data.map((d: any) => ({
+            id: d.id,
+            date: d.date,
+            amount: Number(d.amount || 0),
+            remarks: d.remarks || "",
+            userid: d.userid || user.id,
+            createdAt: d.createdAt || d.createdat,
+            updatedAt: d.updatedAt || d.updatedat
+          }));
+        }
+
+        if (friendsData.length > 0 || tripsData.length > 0 || collectionsData.length > 0 || driverData.length > 0) {
+          loadedFromSupabase = true;
+        }
+      } catch (sbErr) {
+        console.warn("Supabase car rent load error, falling back:", sbErr);
+      }
+
+      // 2. If Supabase returned 0 items, check Firestore & LocalStorage for existing records and migrate them to Supabase!
+      if (!loadedFromSupabase) {
+        const userKeys = Array.from(new Set([user.id, user.email].filter(Boolean) as string[]));
+
+        const fetchColData = async <T extends { id: string; userid?: string }>(colName: string): Promise<T[]> => {
+          try {
+            const snap = await getDocs(collection(db, colName));
+            const matchedResults: T[] = [];
+            const allResults: T[] = [];
+
+            snap.forEach((docSnap) => {
+              const data = docSnap.data() as any;
+              const item = { id: docSnap.id, ...data } as T;
+              allResults.push(item);
+
+              if (!data.userid || userKeys.includes(data.userid) || data.userid === user.id || data.userid === user.email) {
+                matchedResults.push(item);
+              }
+            });
+
+            if (matchedResults.length > 0) return matchedResults;
+            if (allResults.length > 0) return allResults;
+          } catch (e) {
+            console.error(`Failed to fetch ${colName} from Firestore:`, e);
+          }
+          return [];
+        };
+
+        friendsData = await fetchColData<CarRentFriend>("car_rent_friends");
+        tripsData = await fetchColData<CarRentTrip>("car_rent_trips");
+        collectionsData = await fetchColData<CarRentCollection>("car_rent_collections");
+        driverData = await fetchColData<CarRentDriverPayment>("car_rent_driver_payments");
+
+        // Local cache fallback if Firestore returned 0 items
+        if (friendsData.length === 0 && tripsData.length === 0 && collectionsData.length === 0 && driverData.length === 0) {
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && k.startsWith("car_rent_cache_")) {
+              const str = localStorage.getItem(k);
+              if (str) {
+                try {
+                  const parsed = JSON.parse(str);
+                  if ((parsed.friends?.length || 0) > 0 || (parsed.trips?.length || 0) > 0) {
+                    friendsData = parsed.friends || [];
+                    tripsData = parsed.trips || [];
+                    collectionsData = parsed.collections || [];
+                    driverData = parsed.driverPayments || [];
+                    break;
+                  }
+                } catch (e) {}
+              }
             }
           }
         }
 
-        if (localBackup) {
+        // Auto-migrate retrieved data to Supabase
+        if (friendsData.length > 0 || tripsData.length > 0 || collectionsData.length > 0 || driverData.length > 0) {
           try {
-            console.log("Firestore returned 0 items but local cache has items. Restoring local cache to Firestore...");
-            friendsData = localBackup.friends || [];
-            tripsData = localBackup.trips || [];
-            collectionsData = localBackup.collections || [];
-            driverData = localBackup.driverPayments || [];
-
-            // Background sync local items back to Firestore
-            for (const f of friendsData) {
-              const { _unsynced, ...clean } = f as any;
-              await setDoc(doc(db, "car_rent_friends", f.id), { ...clean, userid: user.id });
+            console.log("Migrating Car Rent data to Supabase...");
+            if (friendsData.length > 0) {
+              await supabase.from("car_rent_friends").upsert(friendsData.map(f => ({
+                id: f.id,
+                name: f.name,
+                phone: f.phone || "",
+                userid: user.id,
+                createdat: f.createdAt || new Date().toISOString()
+              })));
             }
-            for (const t of tripsData) {
-              const { _unsynced, ...clean } = t as any;
-              await setDoc(doc(db, "car_rent_trips", t.id), { ...clean, userid: user.id });
+            if (tripsData.length > 0) {
+              await supabase.from("car_rent_trips").upsert(tripsData.map(t => ({
+                id: t.id,
+                date: t.date,
+                examname: t.examName,
+                totalrent: t.totalRent,
+                participantids: t.participantIds,
+                userid: user.id,
+                createdat: t.createdAt || new Date().toISOString()
+              })));
             }
-            for (const c of collectionsData) {
-              const { _unsynced, ...clean } = c as any;
-              await setDoc(doc(db, "car_rent_collections", c.id), { ...clean, userid: user.id });
+            if (collectionsData.length > 0) {
+              await supabase.from("car_rent_collections").upsert(collectionsData.map(c => ({
+                id: c.id,
+                date: c.date,
+                friendid: c.friendId,
+                amount: c.amount,
+                tripid: c.tripId || "",
+                paymentmethod: c.paymentMethod || "cash",
+                userid: user.id,
+                createdat: c.createdAt || new Date().toISOString()
+              })));
             }
-            for (const dItem of driverData) {
-              const { _unsynced, ...clean } = dItem as any;
-              await setDoc(doc(db, "car_rent_driver_payments", dItem.id), { ...clean, userid: user.id });
+            if (driverData.length > 0) {
+              await supabase.from("car_rent_driver_payments").upsert(driverData.map(d => ({
+                id: d.id,
+                date: d.date,
+                amount: d.amount,
+                remarks: d.remarks || "",
+                userid: user.id,
+                createdat: d.createdAt || new Date().toISOString()
+              })));
             }
-          } catch (restoreErr) {
-            console.error("Error auto-restoring cache to Firestore:", restoreErr);
+          } catch (migErr) {
+            console.error("Error auto-migrating Car Rent data to Supabase:", migErr);
           }
         }
       }
@@ -482,10 +537,7 @@ export const CarRent: React.FC = () => {
       setDriverPayments(driverData);
 
     } catch (e: any) {
-      console.error("Firestore sync error:", e);
-      if (e.message && (e.message.includes("permission") || e.message.includes("insufficient"))) {
-        handleFirestoreError(e, OperationType.GET, "car_rent_data");
-      }
+      console.error("Car Rent sync error:", e);
     } finally {
       setLoading(false);
     }
@@ -621,7 +673,22 @@ export const CarRent: React.FC = () => {
       };
 
       let isSynced = false;
-      // Firestore Write
+      // Primary Save: Supabase
+      try {
+        const { error: sbErr } = await supabase.from("car_rent_friends").upsert([{
+          id: friendId,
+          name: newFriend.name,
+          phone: newFriend.phone,
+          userid: user.id,
+          createdat: newFriend.createdAt,
+          updatedat: newFriend.updatedAt
+        }]);
+        if (!sbErr) isSynced = true;
+      } catch (err) {
+        console.warn("Supabase save friend failed:", err);
+      }
+
+      // Secondary Mirror: Firestore
       if (isOnline) {
         try {
           await setDoc(doc(db, "car_rent_friends", friendId), newFriend);
@@ -667,6 +734,18 @@ export const CarRent: React.FC = () => {
         try {
           const friendCollections = collections.filter(c => c.friendId === friendId);
           let isSynced = false;
+
+          // Delete from Supabase
+          try {
+            await supabase.from("car_rent_friends").delete().eq("id", friendId);
+            if (friendCollections.length > 0) {
+              const colIds = friendCollections.map(c => c.id);
+              await supabase.from("car_rent_collections").delete().in("id", colIds);
+            }
+            isSynced = true;
+          } catch (err) {
+            console.warn("Supabase delete friend failed:", err);
+          }
           
           if (isOnline) {
             try {
@@ -805,6 +884,56 @@ export const CarRent: React.FC = () => {
       });
 
       let isSynced = false;
+
+      // Primary Save: Supabase
+      try {
+        await supabase.from("car_rent_trips").upsert([{
+          id: tripId,
+          date: newTrip.date,
+          examName: newTrip.examName,
+          examname: newTrip.examName,
+          totalRent: newTrip.totalRent,
+          totalrent: newTrip.totalRent,
+          participantIds: newTrip.participantIds,
+          participantids: newTrip.participantIds,
+          userid: user.id,
+          createdAt: newTrip.createdAt,
+          createdat: newTrip.createdAt,
+          updatedAt: newTrip.updatedAt,
+          updatedat: newTrip.updatedAt
+        }]);
+
+        if (newCols.length > 0) {
+          await supabase.from("car_rent_collections").upsert(newCols.map(col => ({
+            id: col.id,
+            date: col.date,
+            friendId: col.friendId,
+            friendid: col.friendId,
+            tripId: col.tripId,
+            tripid: col.tripId,
+            amount: col.amount,
+            paymentMethod: col.paymentMethod,
+            paymentmethod: col.paymentMethod,
+            userid: user.id,
+            createdAt: col.createdAt,
+            createdat: col.createdAt,
+            updatedAt: col.updatedAt,
+            updatedat: col.updatedAt
+          })));
+        }
+
+        const newColIds = new Set(newCols.map(c => c.id));
+        const colsToRemove = oldTripCols.filter(oldCol => !newColIds.has(oldCol.id) || !newTrip.participantIds.includes(oldCol.friendId));
+        if (colsToRemove.length > 0) {
+          await supabase.from("car_rent_collections").delete().in("id", colsToRemove.map(c => c.id));
+        }
+
+        isSynced = true;
+      } catch (err) {
+        console.warn("Supabase save trip failed:", err);
+      }
+
+      // Secondary Mirror: Firestore
       if (isOnline) {
         try {
           const batch = writeBatch(db);
@@ -877,6 +1006,17 @@ export const CarRent: React.FC = () => {
           const colsToDelete = collections.filter(c => c.tripId === tripId);
           let isSynced = false;
 
+          // Delete from Supabase
+          try {
+            await supabase.from("car_rent_trips").delete().eq("id", tripId);
+            if (colsToDelete.length > 0) {
+              await supabase.from("car_rent_collections").delete().in("id", colsToDelete.map(c => c.id));
+            }
+            isSynced = true;
+          } catch (err) {
+            console.warn("Supabase delete trip failed:", err);
+          }
+
           if (isOnline) {
             try {
               const batch = writeBatch(db);
@@ -943,6 +1083,29 @@ export const CarRent: React.FC = () => {
       };
 
       let isSynced = false;
+      // Primary Save: Supabase
+      try {
+        await supabase.from("car_rent_collections").upsert([{
+          id: colId,
+          date: newCol.date,
+          friendId: newCol.friendId,
+          friendid: newCol.friendId,
+          amount: newCol.amount,
+          tripId: newCol.tripId || "",
+          tripid: newCol.tripId || "",
+          paymentMethod: newCol.paymentMethod,
+          paymentmethod: newCol.paymentMethod,
+          userid: user.id,
+          createdAt: newCol.createdAt,
+          createdat: newCol.createdAt,
+          updatedAt: newCol.updatedAt,
+          updatedat: newCol.updatedAt
+        }]);
+        isSynced = true;
+      } catch (err) {
+        console.warn("Supabase save collection failed:", err);
+      }
+
       if (isOnline) {
         try {
           await setDoc(doc(db, "car_rent_collections", colId), newCol);
@@ -984,6 +1147,15 @@ export const CarRent: React.FC = () => {
       onConfirm: async () => {
         try {
           let isSynced = false;
+
+          // Delete from Supabase
+          try {
+            await supabase.from("car_rent_collections").delete().eq("id", colId);
+            isSynced = true;
+          } catch (err) {
+            console.warn("Supabase delete collection failed:", err);
+          }
+
           if (isOnline) {
             try {
               await deleteDoc(doc(db, "car_rent_collections", colId));
@@ -1036,6 +1208,24 @@ export const CarRent: React.FC = () => {
       };
 
       let isSynced = false;
+      // Primary Save: Supabase
+      try {
+        await supabase.from("car_rent_driver_payments").upsert([{
+          id: payId,
+          date: newPay.date,
+          amount: newPay.amount,
+          remarks: newPay.remarks,
+          userid: user.id,
+          createdAt: newPay.createdAt,
+          createdat: newPay.createdAt,
+          updatedAt: newPay.updatedAt,
+          updatedat: newPay.updatedAt
+        }]);
+        isSynced = true;
+      } catch (err) {
+        console.warn("Supabase save driver payment failed:", err);
+      }
+
       if (isOnline) {
         try {
           await setDoc(doc(db, "car_rent_driver_payments", payId), newPay);
@@ -1073,6 +1263,15 @@ export const CarRent: React.FC = () => {
       onConfirm: async () => {
         try {
           let isSynced = false;
+
+          // Delete from Supabase
+          try {
+            await supabase.from("car_rent_driver_payments").delete().eq("id", payId);
+            isSynced = true;
+          } catch (err) {
+            console.warn("Supabase delete driver payment failed:", err);
+          }
+
           if (isOnline) {
             try {
               await deleteDoc(doc(db, "car_rent_driver_payments", payId));

@@ -244,7 +244,7 @@ export const Settings: React.FC = () => {
       const expensesData = walletExpensesData;
       const duePersonsData = walletDuesData;
 
-      // 2. Fetch Firebase Car Rent Data defensively based on user selections
+      // 2. Fetch Car Rent Data from Supabase (with Firestore/local fallback) based on user selections
       let carRentFriends: any[] = [];
       let carRentTrips: any[] = [];
       let carRentCollections: any[] = [];
@@ -252,56 +252,62 @@ export const Settings: React.FC = () => {
 
       if (exportSelections.car_rent) {
         try {
-          const userKeys = Array.from(new Set([user.id, user.email].filter(Boolean) as string[]));
+          // Try Supabase first
+          const [fRes, tRes, cRes, dRes] = await Promise.all([
+            supabase.from('car_rent_friends').select('*').eq('userid', user.id),
+            supabase.from('car_rent_trips').select('*').eq('userid', user.id),
+            supabase.from('car_rent_collections').select('*').eq('userid', user.id),
+            supabase.from('car_rent_driver_payments').select('*').eq('userid', user.id)
+          ]);
 
-          const fetchCol = async (colName: string) => {
-            let list: any[] = [];
-            try {
-              const q = query(collection(db, colName), where("userid", "in", userKeys));
-              const snap = await getDocs(q);
-              snap.forEach(docSnap => list.push({ id: docSnap.id, ...docSnap.data() }));
-              if (list.length > 0) return list;
-            } catch (e) {
-              console.warn(`Query with 'in' failed for ${colName} in export:`, e);
-            }
+          if (fRes.data) carRentFriends = fRes.data;
+          if (tRes.data) carRentTrips = tRes.data;
+          if (cRes.data) carRentCollections = cRes.data;
+          if (dRes.data) carRentDriverPayments = dRes.data;
 
-            try {
-              const snap = await getDocs(collection(db, colName));
-              snap.forEach(docSnap => {
-                const data = docSnap.data() as any;
-                if (!data.userid || userKeys.includes(data.userid)) {
-                  list.push({ id: docSnap.id, ...data });
-                }
-              });
-            } catch (e) {
-              console.error(`Export fetch failed for ${colName}:`, e);
-            }
-            return list;
-          };
-
-          carRentFriends = await fetchCol("car_rent_friends");
-          carRentTrips = await fetchCol("car_rent_trips");
-          carRentCollections = await fetchCol("car_rent_collections");
-          carRentDriverPayments = await fetchCol("car_rent_driver_payments");
-
-          // Local cache fallback if Firestore returned empty
+          // If Supabase has no data, fallback to Firestore/LocalStorage
           if (carRentFriends.length === 0 && carRentTrips.length === 0) {
-            const cacheKey = `car_rent_cache_${user.id}`;
-            const cached = localStorage.getItem(cacheKey);
-            if (cached) {
+            const userKeys = Array.from(new Set([user.id, user.email].filter(Boolean) as string[]));
+            const fetchCol = async (colName: string) => {
+              let list: any[] = [];
               try {
-                const parsed = JSON.parse(cached);
-                carRentFriends = parsed.friends || [];
-                carRentTrips = parsed.trips || [];
-                carRentCollections = parsed.collections || [];
-                carRentDriverPayments = parsed.driverPayments || [];
+                const snap = await getDocs(collection(db, colName));
+                snap.forEach(docSnap => {
+                  const data = docSnap.data() as any;
+                  if (!data.userid || userKeys.includes(data.userid)) {
+                    list.push({ id: docSnap.id, ...data });
+                  }
+                });
               } catch (e) {
-                console.error("Failed to read car rent cache for export:", e);
+                console.error(`Export Firestore fetch failed for ${colName}:`, e);
+              }
+              return list;
+            };
+
+            carRentFriends = await fetchCol("car_rent_friends");
+            carRentTrips = await fetchCol("car_rent_trips");
+            carRentCollections = await fetchCol("car_rent_collections");
+            carRentDriverPayments = await fetchCol("car_rent_driver_payments");
+
+            // Local cache fallback
+            if (carRentFriends.length === 0 && carRentTrips.length === 0) {
+              const cacheKey = `car_rent_cache_${user.id}`;
+              const cached = localStorage.getItem(cacheKey);
+              if (cached) {
+                try {
+                  const parsed = JSON.parse(cached);
+                  carRentFriends = parsed.friends || [];
+                  carRentTrips = parsed.trips || [];
+                  carRentCollections = parsed.collections || [];
+                  carRentDriverPayments = parsed.driverPayments || [];
+                } catch (e) {
+                  console.error("Failed to read car rent cache for export:", e);
+                }
               }
             }
           }
         } catch (fbErr) {
-          console.warn("Firestore data fetch skipped or failed:", fbErr);
+          console.warn("Car Rent export data fetch skipped or failed:", fbErr);
         }
       }
 
@@ -586,6 +592,10 @@ export const Settings: React.FC = () => {
         { name: 'shopping_lists', list: sData.shopping_lists || d.shopping_lists, enabled: importSelections.shopping_lists },
         { name: 'due_persons', list: sData.due_persons || d.due_persons, enabled: Boolean(importSelections.due_persons || importSelections.wallets) },
         { name: 'wallets', list: sData.wallets || d.wallets, enabled: importSelections.wallets },
+        { name: 'car_rent_friends', list: fData.car_rent_friends || d.car_rent_friends, enabled: importSelections.car_rent_friends },
+        { name: 'car_rent_trips', list: fData.car_rent_trips || d.car_rent_trips, enabled: importSelections.car_rent_trips },
+        { name: 'car_rent_collections', list: fData.car_rent_collections || d.car_rent_collections, enabled: importSelections.car_rent_collections },
+        { name: 'car_rent_driver_payments', list: fData.car_rent_driver_payments || d.car_rent_driver_payments, enabled: importSelections.car_rent_driver_payments },
       ].filter(table => table.enabled);
 
       for (const table of supabaseTables) {
@@ -1612,7 +1622,7 @@ export const Settings: React.FC = () => {
                           onChange={(e) => setExportSelections({ ...exportSelections, car_rent: e.target.checked })}
                           className="w-4 h-4 rounded text-indigo-500 focus:ring-indigo-400 border-slate-300 accent-indigo-600 cursor-pointer"
                         />
-                        <span>কার রেন্ট ডাটা (Firestore)</span>
+                        <span>কার রেন্ট ডাটা (Supabase)</span>
                       </label>
                       <div className="col-span-2 mt-1 bg-amber-50/80 p-3 rounded-xl border border-amber-200/80 flex flex-wrap items-center justify-between gap-2">
                         <label className="flex items-center gap-2 cursor-pointer font-bold text-amber-900">
